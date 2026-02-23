@@ -83,17 +83,13 @@ func _generate_new_upgrade(original_upgrade: UpgradeData, conf) -> UpgradeData:
 	negative_effect.value = _my_round(negative_base_value * conf.global_upgrade_mult * conf.negative_upgrade_mult)
 	negative_effect.effect_sign = 3
 
-	# var stat_data = ItemService.get_stat_data(negative_stat)
-	# if stat_data:
-	# 	negative_effect.set("icon", stat_data.icon)
+	negative_effect.set("key_hash", Keys[negative_stat+'_hash'])
 	
 	new_upgrade.effects.append(negative_effect)
 
 	return _try_curse(new_upgrade, conf)
 
 func _generate_normal_upgrade(original_upgrade: UpgradeData, conf) -> UpgradeData:
-	# if conf.global_upgrade_mult == 1.0:
-	# 	return original_upgrade
 	
 	var new_upgrade = original_upgrade.duplicate()
 	new_upgrade.effects = []
