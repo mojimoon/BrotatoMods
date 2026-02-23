@@ -52,6 +52,8 @@ func show_upgrades_for_level(level: int) -> void :
 			upgrade_ui.set_upgrade(modified_upgrades[i], player_index)
 
 func _my_round(value: float) -> int:
+	# if abs(value) < 1:
+	# 	return value > 0 ? 1 : -1
 	return int(round(value))
 
 func _generate_new_upgrade(original_upgrade: UpgradeData, conf) -> UpgradeData:
@@ -90,12 +92,18 @@ func _generate_new_upgrade(original_upgrade: UpgradeData, conf) -> UpgradeData:
 	negative_effect.effect_sign = 3
 
 	new_upgrade.effects.append(negative_effect)
+	
+	if conf.cursed_upgrade:
+		for dlc_id in RunData.enabled_dlcs:
+			var dlc_data = ProgressData.get_dlc_data(dlc_id)
+			if dlc_data and dlc_data.has_method("curse_item"):
+				new_upgrade = dlc_data.curse_item(new_upgrade, player_index)
 
 	return new_upgrade
 
 func _generate_normal_upgrade(original_upgrade: UpgradeData, conf) -> UpgradeData:
-	if conf.global_upgrade_mult == 1.0:
-		return original_upgrade
+	# if conf.global_upgrade_mult == 1.0:
+	# 	return original_upgrade
 	
 	var new_upgrade = original_upgrade.duplicate()
 	new_upgrade.effects = []
@@ -104,4 +112,11 @@ func _generate_normal_upgrade(original_upgrade: UpgradeData, conf) -> UpgradeDat
 		var new_value = _my_round(original_effect.value * conf.global_upgrade_mult)
 		new_effect.value = new_value
 		new_upgrade.effects.append(new_effect)
+
+	if conf.cursed_upgrade:
+		for dlc_id in RunData.enabled_dlcs:
+			var dlc_data = ProgressData.get_dlc_data(dlc_id)
+			if dlc_data and dlc_data.has_method("curse_item"):
+				new_upgrade = dlc_data.curse_item(new_upgrade, player_index)
+
 	return new_upgrade

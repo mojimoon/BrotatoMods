@@ -9,7 +9,7 @@ var double_sided_upgrade_chance: float = 0.1
 var global_upgrade_mult: float = 1.0
 var positive_upgrade_mult: float = 2.0
 var negative_upgrade_mult: float = -1.0
-# var cursed_upgrade: bool = false
+var cursed_upgrade: bool = false
 
 func _ready() -> void:
 	load_mod_options()
@@ -36,5 +36,5 @@ func load_mod_options() -> void:
 		if config.has("NEGATIVE_UPGRADE_MULT"):
 			negative_upgrade_mult = config["NEGATIVE_UPGRADE_MULT"]
 		
-		# if config.has("CURSED_UPGRADE"):
-		# 	cursed_upgrade = config["CURSED_UPGRADE"]
+		if config.has("CURSED_UPGRADE"):
+			cursed_upgrade = config["CURSED_UPGRADE"]
