@@ -6,20 +6,60 @@ A collection of mods for the game [Brotato](https://store.steampowered.com/app/1
 
 [Steam Workshop Link](https://steamcommunity.com/sharedfiles/filedetails/?id=3671945570)
 
-Have you ever thought about the upgrades in Brotato being a bit too fixed? This mod allows you to have more control over your upgrades by introducing a double-sided upgrade system and an upgrades multiplier.
+![](img/dsu-icon-v2.png)
 
-By default, 50% of the upgrades will be double-sided, which composes of a positive effect (200% of stat A) and a negative effect (-100% of stat B). Say, instead of choosing +20% attack speed at Tier 4, you can now choose a double-sided upgrade that gives you +40% attack speed but -12% movement speed.
+Have you ever thought about the upgrades in Brotato being a bit too fixed? Then this mod is for you! It introduces the cursed and double-sided upgrade system and configurable upgrades effect strength.
 
-For the following configurations, you need to subscribe to [dami-ModOptions](https://steamcommunity.com/sharedfiles/filedetails/?id=2944608034) to configure in-game: (this is not required if you are fine with the default settings)
+Here's the default settings:
 
-This mod also allows you to modify the global, positive and negative upgrades multipliers, which can be set to any value you want. (If you are a masochist, you can even set the global multiplier to -100% to make the game more challenging!)
+- 50% of the upgrades will be double-sided, which composes of a positive effect (200% of stat A) and a negative effect (-100% of stat B). For example, the attack speed upgrade at Tier 4 usually gives you +20% attack speed, but with this mod, you can now choose a double-sided upgrade that gives you +40% attack speed but -12% movement speed.
+- If you have DLC installed, upgrades have a chance to be cursed just like any other item, which increases the positive effect and reduces the negative effect (if any).
+
+By subscribing to [dami-ModOptions](https://steamcommunity.com/sharedfiles/filedetails/?id=2944608034), you can configure the following settings in-game (this is not required if you are fine with the default settings):
+
+- DOUBLE_SIDED_UPGRADES_CHANCE: the chance for an upgrade to be double-sided (default: 50%)
+- GLOBAL_UPGRADE_MULT: the global multiplier for all upgrade effects. Will affect both positive and negative effects multiplicatively (default: 100%)
+- POSITIVE_UPGRADE_MULT: the multiplier for the positive effect of double-sided upgrades (default: 200%)
+- NEGATIVE_UPGRADE_MULT: the multiplier for the negative effect of double-sided upgrades (default: -100%)
+- CURSED_UPGRADE: enable cursed upgrades (default: true)
+- FORCE_CURSED_UPGRADE: force all upgrades to be cursed. Only works if CURSED_UPGRADE is enabled (default: false)
+
+There are many fun ways to play with these settings. If you are a masochist, try -100% Mutant and see your stats weaken as you level up! If you want to be overpowered, check out +500% Baby and see how crazy it is to get 5 weapon slots from one upgrade!
+
+If you like this mod, please consider liking, favoriting and sharing it, thank you! Comments and suggestions are also very welcome!
 
 ---
 
-你是否觉得Brotato中的升级有点过于固定了？那么好，这个 mod 引入了双面升级系统和升级乘数。
+你是否觉得Brotato中的升级有点过于固定了？那么好，这个 mod 引入了诅咒和双面升级，以及可自定义的升级效果强度。
 
-默认情况下，50%的升级会变成双面升级，由一个正面效果（200%的属性A）和一个负面效果（-100%的属性B）组成。比如说，T4升级中，除了+20%攻速的常规升级，你现在还可以选择一个双面升级，获得+40%攻速但-12%速度。
+默认设置如下：
 
-以下配置需要订阅[dami-ModOptions](https://steamcommunity.com/sharedfiles/filedetails/?id=2944608034)才能在游戏中进行配置：（这不是个强制依赖，如果你对默认设置满意的话，不装也行）
+- 50%的升级会变成双面升级，由一个正面效果（200%的属性A）和一个负面效果（-100%的属性B）组成。例如，T4的攻速升级通常会给你+20%攻速，但有了这个 mod，你现在还可以选择一个双面升级，获得+40%攻速但-12%速度。
+- 如果你安装了DLC，升级和其他物品一样有可能被诅咒，增加正面效果并减少负面效果。
 
-这个 mod 还允许修改全局、正面和负面升级的乘数，可以设置为你想要的任何值。（如果你是个M的话，不妨把全局乘数设置为-100%，让游戏更有挑战性！）
+通过订阅[dami-ModOptions](https://steamcommunity.com/sharedfiles/filedetails/?id=2944608034)，你可以在游戏中配置以下设置：（这不是个强制依赖，如果你对默认设置满意的话，不装也行）
+
+- DOUBLE_SIDED_UPGRADES_CHANCE：升级变成双面升级的概率（默认：50%）
+- GLOBAL_UPGRADE_MULT：所有升级效果的倍率。和下面两个叠乘（默认：100%）
+- POSITIVE_UPGRADE_MULT：双面升级中正面效果的倍率（默认：200%）
+- NEGATIVE_UPGRADE_MULT：双面升级中负面效果的倍率（默认：-100%）
+- CURSED_UPGRADE：允许升级被诅咒（默认：true）
+- FORCE_CURSED_UPGRADE：强制所有升级都被诅咒。只有在启用CURSED_UPGRADE的情况下才有效（默认：false）
+
+有很多有趣的玩法可以尝试。如果你是个抖M，不妨试试 -100% 异变体，看看全红的升级好不好受。或者如果你想要一些乐子，试试 +500% 宝宝，看看升级一次拿5个武器栏有多爽！
+
+如果你喜欢这个 mod，欢迎点赞、收藏、转发，多谢啦！有问题或建议欢迎在评论区留言。
+
+<details>
+
+<summary>Screenshots</summary>
+
+![](img/dsu-mod-1.png)
+
+![](img/dsu-mod-2.png)
+
+![](img/dsu-mod-3.png)
+
+![](img/dsu-mod-4.png)
+
+</details>
