@@ -2,7 +2,7 @@
 
 A collection of mods for the game [Brotato](https://store.steampowered.com/app/1942280/Brotato/).
 
-## [Mojimoon-DoubleSidedUpgrades](Mojimoon-DoubleSidedUpgrades)
+## [Double Sided Upgrades](Mojimoon-DoubleSidedUpgrades)
 
 [Steam Workshop Link](https://steamcommunity.com/sharedfiles/filedetails/?id=3671945570)
 
