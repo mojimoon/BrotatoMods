@@ -1,0 +1,50 @@
+{
+    "name": "DoubleSidedUpgrades",
+    "namespace": "Mojimoon",
+    "version_number": "0.9.1",
+    "description": "Adds a chance for upgrades to be double sided, giving both a positive and negative effect. Use dami-ModOptions to customize the chances and multipliers for the effects.",
+    "website_url": "",
+    "dependencies": [],
+    "extra": {
+        "godot": {
+            "incompatibilities": [],
+            "authors": ["Mojimoon"],
+            "compatible_mod_loader_version": "3.0.0",
+            "compatible_game_version": ["0.6.1.6"],
+            "optional_dependencies": ["dami-ModOptions"],
+            "config_schema": {
+                "type": "object",
+                "properties": {
+                    "DOUBLE_SIDED_UPGRADE_CHANCE": {
+                        "type": "number",
+                        "default": 0.5,
+                        "maximum": 1.0,
+                        "minimum": 0.0,
+                        "description": "The probability of an upgrade being double sided. Default is 50%."
+                    },
+                    "GLOBAL_UPGRADE_MULT": {
+                        "type": "number",
+                        "default": 1.0,
+                        "maximum": 5.0,
+                        "minimum": -5.0,
+                        "description": "Global multiplier for all upgrade effects. Default is 100%."
+                    },
+                    "POSITIVE_UPGRADE_MULT": {
+                        "type": "number",
+                        "default": 2.0,
+                        "maximum": 5.0,
+                        "minimum": -5.0,
+                        "description": "Multiplier for the positive effect of double sided upgrades. Default is 200%."
+                    },
+                    "NEGATIVE_UPGRADE_MULT": {
+                        "type": "number",
+                        "default": -1.0,
+                        "maximum": 5.0,
+                        "minimum": -5.0,
+                        "description": "Multiplier for the negative effect of double sided upgrades. Default is -100%."
+                    }
+                }
+            }
+        }
+    }
+}
