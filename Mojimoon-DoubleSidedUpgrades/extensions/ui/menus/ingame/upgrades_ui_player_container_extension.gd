@@ -21,17 +21,6 @@ const VANILLA_STAT_VALUES = {
 
 const EffectScript = preload("res://items/global/effect.gd")
 
-# const NEGATIVE_OVERRIDE_STAT_VALUES = {
-# 	"stat_harvesting": [3, 6, 8, 10]
-# }
-
-# const POSITIVE_OVERRIDE_STAT_VALUES = {
-# 	"stat_ranged_damage": [1.5, 3, 4, 5],
-# 	"stat_elemental_damage": [1.5, 3, 4, 5],
-# 	"stat_engineering": [2, 3.5, 5, 6],
-# 	"stat_harvesting": [4, 7, 9, 11]
-# }
-
 func show_upgrades_for_level(level: int) -> void :
 	.show_upgrades_for_level(level)
 
@@ -67,7 +56,10 @@ func _generate_new_upgrade(original_upgrade: UpgradeData, conf) -> UpgradeData:
 	if primary_stat_key == "":
 		return original_upgrade
 	
-	if not VANILLA_STAT_VALUES.has(primary_stat_key) or randf() > conf.double_sided_upgrade_chance:
+	if not VANILLA_STAT_VALUES.has(primary_stat_key):
+		return _generate_normal_upgrade(original_upgrade, conf)
+	
+	if randf() > conf.double_sided_upgrade_chance:
 		return _generate_normal_upgrade(original_upgrade, conf)
 	
 	var new_upgrade = original_upgrade.duplicate()
@@ -116,6 +108,9 @@ func _try_curse(upgrade: UpgradeData, conf) -> UpgradeData:
 	for dlc_id in RunData.enabled_dlcs:
 		var dlc_data = ProgressData.get_dlc_data(dlc_id)
 		if dlc_data and dlc_data.has_method("curse_item"):
-			upgrade = dlc_data.update_item_effects(upgrade, player_index)
+			if conf.force_cursed_upgrade:
+				upgrade = dlc_data.curse_item(upgrade, player_index)
+			else:
+				upgrade = dlc_data.update_item_effects(upgrade, player_index)
 	
 	return upgrade
