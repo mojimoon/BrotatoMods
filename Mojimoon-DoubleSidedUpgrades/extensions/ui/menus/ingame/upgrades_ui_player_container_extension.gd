@@ -83,6 +83,10 @@ func _generate_new_upgrade(original_upgrade: UpgradeData, conf) -> UpgradeData:
 	negative_effect.value = _my_round(negative_base_value * conf.global_upgrade_mult * conf.negative_upgrade_mult)
 	negative_effect.effect_sign = 3
 
+	# var stat_data = ItemService.get_stat_data(negative_stat)
+	# if stat_data:
+	# 	negative_effect.set("icon", stat_data.icon)
+	
 	new_upgrade.effects.append(negative_effect)
 
 	return _try_curse(new_upgrade, conf)

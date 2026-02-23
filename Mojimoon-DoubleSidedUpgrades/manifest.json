@@ -1,7 +1,7 @@
 {
-    "name": "DoubleSidedandCursedUpgrades",
+    "name": "DoubleSidedUpgrades",
     "namespace": "Mojimoon",
-    "version_number": "0.9.9",
+    "version_number": "1.0.0",
     "description": "Adds a chance for upgrades to be double sided and cursed. Chances and strength of effects can be configured via ModOptions.",
     "website_url": "",
     "dependencies": [],
