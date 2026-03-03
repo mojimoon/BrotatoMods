@@ -1,0 +1,19 @@
+{
+    "name": "LowerTierWeapons",
+    "namespace": "Mojimoon",
+    "version_number": "0.1.0",
+    "description": "Adds T1 and T2 versions of all advanced weapons, except for Legendary weapons (T4 only).",
+    "website_url": "",
+	"dependencies": [
+		"Darkly77-Brotils",
+		"Darkly77-ContentLoader"
+	],
+    "extra": {
+        "godot": {
+            "incompatibilities": [],
+            "authors": ["Mojimoon"],
+            "compatible_mod_loader_version": "3.0.0",
+            "compatible_game_version": ["0.6.1.6"]
+        }
+    }
+}
