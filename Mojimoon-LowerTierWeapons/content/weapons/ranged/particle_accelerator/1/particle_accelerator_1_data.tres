@@ -5,7 +5,7 @@
 [ext_resource path="res://mods-unpacked-unsafe/Mojimoon-LowerTierWeapons/content/weapons/ranged/particle_accelerator/1/particle_accelerator_1_effect_1.tres" type="Resource" id=3]
 [ext_resource path="res://weapons/ranged/particle_accelerator/particle_accelerator.tscn" type="PackedScene" id=4]
 [ext_resource path="res://mods-unpacked-unsafe/Mojimoon-LowerTierWeapons/content/weapons/ranged/particle_accelerator/1/particle_accelerator_1_stats.tres" type="Resource" id=5]
-[ext_resource path="res://mods-unpacked-unsafe/Mojimoon-LowerTierWeapons/content/weapons/ranged/particle_accelerator/1/particle_accelerator_1_effect_1.tres" type="Resource" id=6]
+[ext_resource path="res://mods-unpacked-unsafe/Mojimoon-LowerTierWeapons/content/weapons/ranged/particle_accelerator/1/particle_accelerator_1_effect_2.tres" type="Resource" id=6]
 [ext_resource path="res://items/sets/heavy/heavy_set_data.tres" type="Resource" id=7]
 [ext_resource path="res://items/sets/fire/fire_set_data.tres" type="Resource" id=8]
 [ext_resource path="res://mods-unpacked-unsafe/Mojimoon-LowerTierWeapons/content/weapons/ranged/particle_accelerator/2/particle_accelerator_2_data.tres" type="Resource" id=9]
@@ -18,7 +18,7 @@ can_be_looted = true
 icon = ExtResource( 2 )
 name = "WEAPON_PARTICLE_ACCELERATOR"
 tier = 0
-value = 144
+value = 34
 effects = [ ExtResource( 3 ), ExtResource( 6 ) ]
 tracking_text = ""
 is_lockable = true

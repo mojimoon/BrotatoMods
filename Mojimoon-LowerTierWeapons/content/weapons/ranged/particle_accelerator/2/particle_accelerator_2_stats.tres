@@ -7,8 +7,8 @@
 
 [resource]
 script = ExtResource( 1 )
-cooldown = 100
-damage = 60
+cooldown = 120
+damage = 40
 accuracy = 1.0
 crit_chance = 0.03
 crit_damage = 2.0
@@ -19,7 +19,7 @@ knockback_piercing = 0.0
 can_have_positive_knockback = true
 can_have_negative_knockback = false
 effect_scale = 1.0
-scaling_stats = [ [ "stat_elemental_damage", 1.0 ], [ "stat_engineering", 1.0 ] ]
+scaling_stats = [ [ "stat_elemental_damage", 0.75 ], [ "stat_engineering", 0.75 ] ]
 lifesteal = 0.0
 shooting_sounds = [ ExtResource( 4 ), ExtResource( 2 ) ]
 sound_db_mod = -10

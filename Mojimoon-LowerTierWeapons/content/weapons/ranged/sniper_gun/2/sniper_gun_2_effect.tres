@@ -7,7 +7,7 @@
 script = ExtResource( 2 )
 key = "EFFECT_PROJECTILES_ON_HIT"
 text_key = ""
-value = 5
+value = 3
 custom_key = ""
 storage_method = 0
 effect_sign = 3
