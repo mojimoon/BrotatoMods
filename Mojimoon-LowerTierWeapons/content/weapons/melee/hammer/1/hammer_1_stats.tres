@@ -9,19 +9,19 @@
 
 [resource]
 script = ExtResource( 1 )
-cooldown = 65
-damage = 35
+cooldown = 70
+damage = 20
 accuracy = 1.0
 crit_chance = 0.03
 crit_damage = 1.75
 min_range = 0
 max_range = 175
-knockback = 30
+knockback = 20
 knockback_piercing = 0.0
 can_have_positive_knockback = true
 can_have_negative_knockback = false
 effect_scale = 1.0
-scaling_stats = [ [ "stat_melee_damage", 1.5 ] ]
+scaling_stats = [ [ "stat_melee_damage", 1.25 ] ]
 lifesteal = 0.0
 shooting_sounds = [ ExtResource( 5 ), ExtResource( 6 ), ExtResource( 2 ), ExtResource( 4 ), ExtResource( 3 ) ]
 sound_db_mod = -5
