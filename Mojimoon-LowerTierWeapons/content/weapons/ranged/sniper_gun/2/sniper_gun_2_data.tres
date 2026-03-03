@@ -1,0 +1,33 @@
+[gd_resource type="Resource" load_steps=9 format=2]
+
+[ext_resource path="res://weapons/ranged/sniper_gun/3/sniper_gun_3_data.tres" type="Resource" id=1]
+[ext_resource path="res://mods-unpacked-unsafe/Mojimoon-LowerTierWeapons/content/weapons/ranged/sniper_gun/2/sniper_gun_2_stats.tres" type="Resource" id=2]
+[ext_resource path="res://weapons/ranged/sniper_gun/sniper_gun.tscn" type="PackedScene" id=3]
+[ext_resource path="res://items/global/weapon_data.gd" type="Script" id=4]
+[ext_resource path="res://mods-unpacked-unsafe/Mojimoon-LowerTierWeapons/content/weapons/ranged/sniper_gun/2/sniper_gun_2_effect.tres" type="Resource" id=5]
+[ext_resource path="res://weapons/ranged/sniper_gun/sniper_gun_icon.png" type="Texture" id=6]
+[ext_resource path="res://items/sets/gun/gun_set_data.tres" type="Resource" id=7]
+[ext_resource path="res://items/sets/precise/precise_set_data.tres" type="Resource" id=8]
+
+[resource]
+script = ExtResource( 4 )
+my_id = "weapon_sniper_gun_2"
+unlocked_by_default = false
+can_be_looted = true
+icon = ExtResource( 6 )
+name = "WEAPON_SNIPER_GUN"
+tier = 1
+value = 115
+effects = [ ExtResource( 5 ) ]
+tracking_text = ""
+is_lockable = true
+unlock_codex_descr_after_get_it = 1
+is_cursed = false
+curse_factor = 0.0
+weapon_id = "weapon_sniper_gun"
+type = 1
+sets = [ ExtResource( 7 ), ExtResource( 8 ) ]
+scene = ExtResource( 3 )
+stats = ExtResource( 2 )
+upgrades_into = ExtResource( 1 )
+add_to_chars_as_starting = [  ]

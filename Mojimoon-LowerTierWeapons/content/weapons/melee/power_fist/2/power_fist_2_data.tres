@@ -1,0 +1,33 @@
+[gd_resource type="Resource" load_steps=9 format=2]
+
+[ext_resource path="res://items/global/weapon_data.gd" type="Script" id=1]
+[ext_resource path="res://weapons/melee/power_fist/power_fist_icon.png" type="Texture" id=2]
+[ext_resource path="res://mods-unpacked-unsafe/Mojimoon-LowerTierWeapons/content/weapons/melee/power_fist/2/power_fist_2_stats.tres" type="Resource" id=3]
+[ext_resource path="res://weapons/melee/power_fist/power_fist.tscn" type="PackedScene" id=4]
+[ext_resource path="res://weapons/melee/power_fist/3/power_fist_3_data.tres" type="Resource" id=5]
+[ext_resource path="res://mods-unpacked-unsafe/Mojimoon-LowerTierWeapons/content/weapons/melee/power_fist/2/power_fist_2_exploding_effect.tres" type="Resource" id=6]
+[ext_resource path="res://items/sets/unarmed/unarmed_set_data.tres" type="Resource" id=7]
+[ext_resource path="res://items/sets/explosive/explosive_set_data.tres" type="Resource" id=8]
+
+[resource]
+script = ExtResource( 1 )
+my_id = "weapon_power_fist_2"
+unlocked_by_default = false
+can_be_looted = true
+icon = ExtResource( 2 )
+name = "WEAPON_POWER_FIST"
+tier = 1
+value = 110
+effects = [ ExtResource( 6 ) ]
+tracking_text = ""
+is_lockable = true
+unlock_codex_descr_after_get_it = 1
+is_cursed = false
+curse_factor = 0.0
+weapon_id = "weapon_power_fist"
+type = 0
+sets = [ ExtResource( 7 ), ExtResource( 8 ) ]
+scene = ExtResource( 4 )
+stats = ExtResource( 3 )
+upgrades_into = ExtResource( 5 )
+add_to_chars_as_starting = [  ]

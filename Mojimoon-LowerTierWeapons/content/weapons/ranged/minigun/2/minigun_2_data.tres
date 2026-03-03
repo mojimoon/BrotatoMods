@@ -1,0 +1,32 @@
+[gd_resource type="Resource" load_steps=8 format=2]
+
+[ext_resource path="res://items/global/weapon_data.gd" type="Script" id=1]
+[ext_resource path="res://mods-unpacked-unsafe/Mojimoon-LowerTierWeapons/content/weapons/ranged/minigun/2/minigun_2_stats.tres" type="Resource" id=2]
+[ext_resource path="res://weapons/ranged/minigun/minigun_icon.png" type="Texture" id=3]
+[ext_resource path="res://weapons/ranged/minigun/minigun.tscn" type="PackedScene" id=4]
+[ext_resource path="res://weapons/ranged/minigun/3/minigun_3_data.tres" type="Resource" id=5]
+[ext_resource path="res://items/sets/gun/gun_set_data.tres" type="Resource" id=6]
+[ext_resource path="res://items/sets/heavy/heavy_set_data.tres" type="Resource" id=7]
+
+[resource]
+script = ExtResource( 1 )
+my_id = "weapon_minigun_2"
+unlocked_by_default = true
+can_be_looted = true
+icon = ExtResource( 3 )
+name = "WEAPON_MINIGUN"
+tier = 1
+value = 127
+effects = [  ]
+tracking_text = ""
+is_lockable = true
+unlock_codex_descr_after_get_it = 1
+is_cursed = false
+curse_factor = 0.0
+weapon_id = "weapon_minigun"
+type = 1
+sets = [ ExtResource( 7 ), ExtResource( 6 ) ]
+scene = ExtResource( 4 )
+stats = ExtResource( 2 )
+upgrades_into = ExtResource( 5 )
+add_to_chars_as_starting = [  ]

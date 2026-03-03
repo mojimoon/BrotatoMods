@@ -1,0 +1,17 @@
+[gd_resource type="Resource" load_steps=4 format=2]
+
+[ext_resource path="res://effects/weapons/one_shot_on_hit_effect.gd" type="Script" id=1]
+[ext_resource path="res://weapons/melee/vorpal_sword/vorpal_one_shot.mp3" type="AudioStream" id=2]
+[ext_resource path="res://weapons/melee/vorpal_sword/OneShotParticles.tscn" type="PackedScene" id=3]
+
+[resource]
+script = ExtResource( 1 )
+key = ""
+text_key = "EFFECT_ONE_SHOT_ON_HIT_EFFECT"
+value = 1
+custom_key = ""
+storage_method = 0
+effect_sign = 3
+custom_args = [  ]
+sound_one_shot = ExtResource( 2 )
+particles_one_shot = ExtResource( 3 )

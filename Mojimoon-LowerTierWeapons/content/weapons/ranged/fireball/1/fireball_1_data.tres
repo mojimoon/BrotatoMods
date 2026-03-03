@@ -1,0 +1,34 @@
+[gd_resource type="Resource" load_steps=10 format=2]
+
+[ext_resource path="res://items/global/weapon_data.gd" type="Script" id=1]
+[ext_resource path="res://weapons/ranged/fireball/fireball_icon.png" type="Texture" id=2]
+[ext_resource path="res://mods-unpacked-unsafe/Mojimoon-LowerTierWeapons/content/weapons/ranged/fireball/1/fireball_1_stats.tres" type="Resource" id=3]
+[ext_resource path="res://weapons/ranged/fireball/2/fireball_2_data.tres" type="Resource" id=4]
+[ext_resource path="res://weapons/ranged/fireball/fireball.tscn" type="PackedScene" id=5]
+[ext_resource path="res://mods-unpacked-unsafe/Mojimoon-LowerTierWeapons/content/weapons/ranged/fireball/1/fireball_1_effect_1.tres" type="Resource" id=6]
+[ext_resource path="res://weapons/ranged/fireball/fireball_effect.tres" type="Resource" id=7]
+[ext_resource path="res://items/sets/fire/fire_set_data.tres" type="Resource" id=8]
+[ext_resource path="res://items/sets/explosive/explosive_set_data.tres" type="Resource" id=9]
+
+[resource]
+script = ExtResource( 1 )
+my_id = "weapon_fireball_1"
+unlocked_by_default = true
+can_be_looted = true
+icon = ExtResource( 2 )
+name = "WEAPON_FIREBALL"
+tier = 0
+value = 36
+effects = [ ExtResource( 7 ), ExtResource( 6 ) ]
+tracking_text = ""
+is_lockable = true
+unlock_codex_descr_after_get_it = 1
+is_cursed = false
+curse_factor = 0.0
+weapon_id = "weapon_fireball"
+type = 1
+sets = [ ExtResource( 9 ), ExtResource( 8 ) ]
+scene = ExtResource( 5 )
+stats = ExtResource( 3 )
+upgrades_into = ExtResource( 4 )
+add_to_chars_as_starting = [  ]
