@@ -1,7 +1,7 @@
 {
     "name": "ImperfectHook",
     "namespace": "Mojimoon",
-    "version_number": "0.1.0",
+    "version_number": "0.2.0",
     "description": "Fish hooks are forced to curse locked items. Nothing else.",
     "website_url": "",
     "dependencies": [],
