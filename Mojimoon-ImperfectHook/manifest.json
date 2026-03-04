@@ -1,0 +1,17 @@
+{
+    "name": "ImperfectHook",
+    "namespace": "Mojimoon",
+    "version_number": "0.1.0",
+    "description": "Fish hooks are forced to curse locked items. Nothing else.",
+    "website_url": "",
+    "dependencies": [],
+    "extra": {
+        "godot": {
+            "incompatibilities": [],
+            "authors": ["Mojimoon"],
+            "compatible_mod_loader_version": "3.0.0",
+            "compatible_game_version": ["0.6.1.6"],
+            "optional_dependencies": []
+        }
+    }
+}
