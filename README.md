@@ -63,3 +63,31 @@ If you like this mod, please consider liking, favoriting and sharing it, thank y
 ![](img/dsu-mod-4.png)
 
 </details>
+
+## [Imperfect Hook](Mojimoon-ImperfectHook)
+
+[Steam Workshop Link](https://steamcommunity.com/sharedfiles/filedetails/?id=3678338295)
+
+![](img/imperfect-hook-icon.png)
+
+This mod forces the fish hook to curse locked items. Nothing else.
+
+This is effective the same as save/load scumming until your item is cursed. It does not guarantee that the fish hook will appear, nor does it change the curse strength to 110%. Suitable for those who find a perfect hook too imba but are running out of patience with savescumming.
+
+Works with other hook mods such as Recurse.
+
+---
+
+这个 mod 会让鱼钩必定诅咒锁定物品，仅此而已。
+
+这样做的效果和 S/L 刷诅咒物品是一样的。这个 mod 不保证鱼钩一定会出现，也不会把诅咒强度改成 110%。如果你觉得完美鱼钩太超模了，但又厌烦了 S/L 刷诅咒，不妨来试一试。
+
+可以和其他鱼钩 mod（比如 Recurse）一起使用。
+
+<details>
+
+<summary>Screenshots</summary>
+
+![](img/imperfect-hook-mod-1.png)
+
+</details>
