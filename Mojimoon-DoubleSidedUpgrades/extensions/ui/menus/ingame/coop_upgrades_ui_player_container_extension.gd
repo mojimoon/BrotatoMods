@@ -1,10 +1,10 @@
 extends "res://ui/menus/ingame/coop_upgrades_ui_player_container.gd"
 
-const MOD_ID = "Mojimoon-DoubleSidedUpgrades"
-var data = ModLoaderStore.mod_data[MOD_ID]
-var version = data.manifest.version_number
+const COOP_MOD_ID = "Mojimoon-DoubleSidedUpgrades"
+var coop_mod_data = ModLoaderStore.mod_data[COOP_MOD_ID]
+var coop_mod_version = coop_mod_data.manifest.version_number
 
-const VANILLA_STAT_VALUES = {
+const COOP_VANILLA_STAT_VALUES = {
 	"stat_max_hp": [3, 6, 9, 12],
 	"stat_hp_regeneration": [2, 3, 4, 5],
 	"stat_lifesteal": [1, 2, 3, 4],
@@ -23,9 +23,9 @@ const VANILLA_STAT_VALUES = {
 	"stat_harvesting": [5, 8, 10, 12]
 }
 
-const EffectScript = preload("res://items/global/effect.gd")
+const COOP_EFFECT_SCRIPT = preload("res://items/global/effect.gd")
 
-var settings_dict = {
+var coop_settings_dict = {
 	"DOUBLE_SIDED_UPGRADE_CHANCE": 0.5,
 	"GLOBAL_UPGRADE_MULT": 1.0,
 	"POSITIVE_UPGRADE_MULT": 2.0,
@@ -53,13 +53,13 @@ func show_upgrades_for_level(level: int) -> void :
 			upgrade_ui.set_upgrade(modified_upgrades[i], player_index)
 
 func _get_mod_config_values() -> Dictionary:
-	var conf = settings_dict.duplicate()
-	var config = ModLoaderConfig.get_config(MOD_ID, version)
+	var conf = coop_settings_dict.duplicate()
+	var config = ModLoaderConfig.get_config(COOP_MOD_ID, coop_mod_version)
 	if config != null:
-		for key in settings_dict.keys():
+		for key in coop_settings_dict.keys():
 			if config.data.has(key):
 				conf[key] = config.data[key]
-	ModLoaderLog.info("[Coop] Config read: %s" % str(conf), MOD_ID)
+	# ModLoaderLog.info("[Coop] Config read: %s" % str(conf), COOP_MOD_ID)
 	return conf
 
 func _my_round(value: float) -> int:
@@ -76,7 +76,7 @@ func _generate_new_upgrade(original_upgrade: UpgradeData, conf: Dictionary) -> U
 	if primary_stat_key == "":
 		return original_upgrade
 	
-	if not VANILLA_STAT_VALUES.has(primary_stat_key):
+	if not COOP_VANILLA_STAT_VALUES.has(primary_stat_key):
 		return _generate_normal_upgrade(original_upgrade, conf)
 	
 	if randf() > conf["DOUBLE_SIDED_UPGRADE_CHANCE"]:
@@ -91,14 +91,14 @@ func _generate_new_upgrade(original_upgrade: UpgradeData, conf: Dictionary) -> U
 		new_effect.value = positive_value
 		new_upgrade.effects.append(new_effect)
 	
-	var available_stats = VANILLA_STAT_VALUES.keys()
+	var available_stats = COOP_VANILLA_STAT_VALUES.keys()
 	available_stats.erase(primary_stat_key)
 	
 	var negative_stat = available_stats[randi() % available_stats.size()]
 	var tier_index = clamp(new_upgrade.tier, 0, 3)
-	var negative_base_value = VANILLA_STAT_VALUES[negative_stat][tier_index]
+	var negative_base_value = COOP_VANILLA_STAT_VALUES[negative_stat][tier_index]
 	
-	var negative_effect = EffectScript.new()
+	var negative_effect = COOP_EFFECT_SCRIPT.new()
 	negative_effect.key = negative_stat
 	negative_effect.value = _my_round(negative_base_value * conf["GLOBAL_UPGRADE_MULT"] * conf["NEGATIVE_UPGRADE_MULT"])
 	negative_effect.effect_sign = 3

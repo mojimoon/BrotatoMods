@@ -1,7 +1,7 @@
 extends "res://ui/menus/ingame/upgrades_ui_player_container.gd"
 
-const MOD_ID = "Mojimoon-DoubleSidedUpgrades"
-var data = ModLoaderStore.mod_data[MOD_ID]
+const MYMODID = "Mojimoon-DoubleSidedUpgrades"
+var data = ModLoaderStore.mod_data[MYMODID]
 var version = data.manifest.version_number
 
 const VANILLA_STAT_VALUES = {
@@ -23,7 +23,7 @@ const VANILLA_STAT_VALUES = {
 	"stat_harvesting": [5, 8, 10, 12]
 }
 
-const EffectScript = preload("res://items/global/effect.gd")
+const MyEffectScript = preload("res://items/global/effect.gd")
 
 var settings_dict = {
 	"DOUBLE_SIDED_UPGRADE_CHANCE": 0.5,
@@ -54,12 +54,12 @@ func show_upgrades_for_level(level: int) -> void :
 
 func _get_mod_config_values() -> Dictionary:
 	var conf = settings_dict.duplicate()
-	var config = ModLoaderConfig.get_config(MOD_ID, version)
+	var config = ModLoaderConfig.get_config(MYMODID, version)
 	if config != null:
 		for key in settings_dict.keys():
 			if config.data.has(key):
 				conf[key] = config.data[key]
-	ModLoaderLog.info("[Single] Config read: %s" % str(conf), MOD_ID)
+	# ModLoaderLog.info("[Single] Config read: %s" % str(conf), MYMODID)
 	return conf
 
 func _my_round(value: float) -> int:
@@ -100,7 +100,7 @@ func _generate_new_upgrade(original_upgrade: UpgradeData, conf: Dictionary) -> U
 	var tier_index = clamp(new_upgrade.tier, 0, 3)
 	var negative_base_value = VANILLA_STAT_VALUES[negative_stat][tier_index]
 	
-	var negative_effect = EffectScript.new()
+	var negative_effect = MyEffectScript.new()
 	negative_effect.key = negative_stat
 	negative_effect.value = _my_round(negative_base_value * conf["GLOBAL_UPGRADE_MULT"] * conf["NEGATIVE_UPGRADE_MULT"])
 	negative_effect.effect_sign = 3

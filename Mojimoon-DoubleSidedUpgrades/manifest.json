@@ -1,7 +1,7 @@
 {
     "name": "DoubleSidedUpgrades",
     "namespace": "Mojimoon",
-    "version_number": "1.2.2",
+    "version_number": "1.2.5",
     "description": "Adds a chance for upgrades to be double sided and cursed. Chances and strength of effects can be configured via ModOptions.",
     "website_url": "",
     "dependencies": [],
@@ -9,7 +9,7 @@
         "godot": {
             "incompatibilities": [],
             "authors": ["Mojimoon"],
-            "compatible_mod_loader_version": "3.0.0",
+            "compatible_mod_loader_version": ["3.0.0"],
             "compatible_game_version": ["0.6.1.6"],
             "optional_dependencies": ["dami-ModOptions"],
             "config_schema": {

@@ -15,7 +15,7 @@ var settings_dict = {
 
 
 func _init() -> void:
-	ModLoaderLog.info("Init", MOD_ID)
+	# ModLoaderLog.info("Init", MOD_ID)
 	var dir = ModLoaderMod.get_unpacked_dir() + "Mojimoon-DoubleSidedUpgrades/extensions/"
 
 	ModLoaderMod.install_script_extension(dir + "ui/menus/ingame/upgrades_ui_player_container_extension.gd")
@@ -28,14 +28,14 @@ func _ready() -> void:
 func _config() -> void:
 	var ModsConfigInterface = get_node_or_null("/root/ModLoader/dami-ModOptions/ModsConfigInterface")
 	if ModsConfigInterface != null:
-		ModLoaderLog.info("Connect setting_changed", MOD_ID)
+		# ModLoaderLog.info("Connect setting_changed", MOD_ID)
 		if not ModsConfigInterface.is_connected("setting_changed", self, "setting_changed"):
 			ModsConfigInterface.connect("setting_changed", self, "setting_changed")
 
 	var config = ModLoaderConfig.get_config(MOD_ID, version)
 	var defaultConfig = ModLoaderConfig.get_default_config(MOD_ID)
 	if data != null:
-		ModLoaderLog.info("Current Version is %s." % version, MOD_ID)
+		# ModLoaderLog.info("Current Version is %s." % version, MOD_ID)
 		if config != null:
 			for key in settings_dict.keys():
 				if not config.data.has(key):
@@ -44,7 +44,7 @@ func _config() -> void:
 					ModsConfigInterface.on_setting_changed(key, config.data[key], MOD_ID)
 			config.save_path = "user://configs/Mojimoon-DoubleSidedUpgrades/" + version + ".json"
 			config.save_to_file()
-			ModLoaderLog.info("Loaded config data: %s" % str(config.data), MOD_ID)
+			# ModLoaderLog.info("Loaded config data: %s" % str(config.data), MOD_ID)
 		else:
 			if defaultConfig != null:
 				config = ModLoaderConfig.create_config(MOD_ID, version, defaultConfig.data)
@@ -61,9 +61,9 @@ func setting_changed(setting_name, value, mod_name) -> void:
 		return
 	var config = ModLoaderConfig.get_current_config(MOD_ID)
 	if config == null:
-		ModLoaderLog.info("setting_changed ignored because current config is null", MOD_ID)
+		# ModLoaderLog.info("setting_changed ignored because current config is null", MOD_ID)
 		return
 	config.save_path = "user://configs/Mojimoon-DoubleSidedUpgrades/" + version + ".json"
 	config.data[setting_name] = value
 	config.save_to_file()
-	ModLoaderLog.info("setting_changed %s=%s" % [str(setting_name), str(value)], MOD_ID)
+	# ModLoaderLog.info("setting_changed %s=%s" % [str(setting_name), str(value)], MOD_ID)
