@@ -1,68 +1,69 @@
 extends Node
 
 const MOD_ID = "Mojimoon-DoubleSidedUpgrades"
-var config: ModConfig
-var config_changed = false
+var data = ModLoaderStore.mod_data[MOD_ID]
+var version = data.manifest.version_number
+
+var settings_dict = {
+	"DOUBLE_SIDED_UPGRADE_CHANCE": 0.5,
+	"GLOBAL_UPGRADE_MULT": 1.0,
+	"POSITIVE_UPGRADE_MULT": 2.0,
+	"NEGATIVE_UPGRADE_MULT": -1.0,
+	"CURSED_UPGRADE": true,
+	"FORCE_CURSED_UPGRADE": false
+}
 
 
 func _init() -> void:
+	ModLoaderLog.info("Init", MOD_ID)
 	var dir = ModLoaderMod.get_unpacked_dir() + "Mojimoon-DoubleSidedUpgrades/extensions/"
 
-	ModLoaderMod.install_script_extension(dir + "ui/menus/pages/main_menu.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/ingame/upgrades_ui_player_container_extension.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/ingame/coop_upgrades_ui_player_container_extension.gd")
-	set_process(true)
 
-func _process(_delta):
-	if ProgressData.SAVE_DIR == "":
+
+func _ready() -> void:
+	call_deferred("_config")
+
+func _config() -> void:
+	var ModsConfigInterface = get_node_or_null("/root/ModLoader/dami-ModOptions/ModsConfigInterface")
+	if ModsConfigInterface != null:
+		ModLoaderLog.info("Connect setting_changed", MOD_ID)
+		if not ModsConfigInterface.is_connected("setting_changed", self, "setting_changed"):
+			ModsConfigInterface.connect("setting_changed", self, "setting_changed")
+
+	var config = ModLoaderConfig.get_config(MOD_ID, version)
+	var defaultConfig = ModLoaderConfig.get_default_config(MOD_ID)
+	if data != null:
+		ModLoaderLog.info("Current Version is %s." % version, MOD_ID)
+		if config != null:
+			for key in settings_dict.keys():
+				if not config.data.has(key):
+					config.data[key] = settings_dict[key]
+				if ModsConfigInterface != null:
+					ModsConfigInterface.on_setting_changed(key, config.data[key], MOD_ID)
+			config.save_path = "user://configs/Mojimoon-DoubleSidedUpgrades/" + version + ".json"
+			config.save_to_file()
+			ModLoaderLog.info("Loaded config data: %s" % str(config.data), MOD_ID)
+		else:
+			if defaultConfig != null:
+				config = ModLoaderConfig.create_config(MOD_ID, version, defaultConfig.data)
+			else:
+				config = ModLoaderConfig.create_config(MOD_ID, version, {})
+	else:
+		if defaultConfig != null:
+			config = ModLoaderConfig.create_config(MOD_ID, version, defaultConfig.data)
+		else:
+			config = ModLoaderConfig.create_config(MOD_ID, version, {})
+
+func setting_changed(setting_name, value, mod_name) -> void:
+	if mod_name != MOD_ID:
 		return
-	set_process(false)
-
-	var save_path = ProgressData.SAVE_DIR.plus_file(MOD_ID + ".json")
-	if load_settings(save_path):
-		init_mod_options()
-
-func _exit_tree():
-	save_settings()
-
-func load_settings(save_path: String) -> bool:
-	var data = _ModLoaderFile.get_json_as_dict(save_path)
-	config = ModConfig.new(MOD_ID, data, save_path)
-	var default_config = ModLoaderConfig.get_default_config(MOD_ID)
-	var has_default = default_config != null && default_config.is_valid
-	if !config.is_valid:
-		if !has_default:
-			return false
-		config = ModConfig.new(MOD_ID, default_config.data, save_path)
-		config_changed = true
-	if has_default:
-		if ModLoaderConfig.get_current_config(MOD_ID) == null:
-			ModLoaderConfig.set_current_config(default_config)
-		for key in config.data:
-			if !default_config.data.has(key):
-				config.data.erase(key)
-				config_changed = true
-		for key in default_config.data:
-			if !config.data.has(key):
-				config.data[key] = default_config.data[key]
-				config_changed = true
-	return true
-
-func save_settings() -> bool:
-	if !config_changed || !config.is_valid():
-		return false
-	return ModLoaderConfig.update_config(config) != null
-
-func init_mod_options():
-	var mci = get_node_or_null("/root/ModLoader/dami-ModOptions/ModsConfigInterface")
-	if mci == null:
+	var config = ModLoaderConfig.get_current_config(MOD_ID)
+	if config == null:
+		ModLoaderLog.info("setting_changed ignored because current config is null", MOD_ID)
 		return
-	for key in config.data:
-		mci.on_setting_changed(key, config.data[key], MOD_ID)
-	mci.connect("setting_changed", self, "mod_options_setting_changed")
-
-func mod_options_setting_changed(setting_name: String, value, mod_name: String):
-	if mod_name != MOD_ID || !config.data.has(setting_name):
-		return
+	config.save_path = "user://configs/Mojimoon-DoubleSidedUpgrades/" + version + ".json"
 	config.data[setting_name] = value
-	config_changed = true
+	config.save_to_file()
+	ModLoaderLog.info("setting_changed %s=%s" % [str(setting_name), str(value)], MOD_ID)

@@ -1,5 +1,9 @@
 extends "res://ui/menus/ingame/coop_upgrades_ui_player_container.gd"
 
+const MOD_ID = "Mojimoon-DoubleSidedUpgrades"
+var data = ModLoaderStore.mod_data[MOD_ID]
+var version = data.manifest.version_number
+
 const VANILLA_STAT_VALUES = {
 	"stat_max_hp": [3, 6, 9, 12],
 	"stat_hp_regeneration": [2, 3, 4, 5],
@@ -21,15 +25,23 @@ const VANILLA_STAT_VALUES = {
 
 const EffectScript = preload("res://items/global/effect.gd")
 
+var settings_dict = {
+	"DOUBLE_SIDED_UPGRADE_CHANCE": 0.5,
+	"GLOBAL_UPGRADE_MULT": 1.0,
+	"POSITIVE_UPGRADE_MULT": 2.0,
+	"NEGATIVE_UPGRADE_MULT": -1.0,
+	"CURSED_UPGRADE": true,
+	"FORCE_CURSED_UPGRADE": false
+}
+
 func show_upgrades_for_level(level: int) -> void :
 	.show_upgrades_for_level(level)
 
-	var options = $"/root/DoubleSidedUpgradesOptions"
-	options.load_mod_options()
+	var conf = _get_mod_config_values()
 
 	var modified_upgrades = []
 	for original_upgrade in _old_upgrades:
-		var new_upgrade = _generate_new_upgrade(original_upgrade, options)
+		var new_upgrade = _generate_new_upgrade(original_upgrade, conf)
 		modified_upgrades.append(new_upgrade)
 	
 	_old_upgrades = modified_upgrades
@@ -40,10 +52,20 @@ func show_upgrades_for_level(level: int) -> void :
 		if upgrade_ui.visible and i < modified_upgrades.size():
 			upgrade_ui.set_upgrade(modified_upgrades[i], player_index)
 
+func _get_mod_config_values() -> Dictionary:
+	var conf = settings_dict.duplicate()
+	var config = ModLoaderConfig.get_config(MOD_ID, version)
+	if config != null:
+		for key in settings_dict.keys():
+			if config.data.has(key):
+				conf[key] = config.data[key]
+	ModLoaderLog.info("[Coop] Config read: %s" % str(conf), MOD_ID)
+	return conf
+
 func _my_round(value: float) -> int:
 	return int(round(value))
 
-func _generate_new_upgrade(original_upgrade: UpgradeData, conf) -> UpgradeData:
+func _generate_new_upgrade(original_upgrade: UpgradeData, conf: Dictionary) -> UpgradeData:
 
 	var primary_stat_key = ""
 	for effect in original_upgrade.effects:
@@ -57,7 +79,7 @@ func _generate_new_upgrade(original_upgrade: UpgradeData, conf) -> UpgradeData:
 	if not VANILLA_STAT_VALUES.has(primary_stat_key):
 		return _generate_normal_upgrade(original_upgrade, conf)
 	
-	if randf() > conf.double_sided_upgrade_chance:
+	if randf() > conf["DOUBLE_SIDED_UPGRADE_CHANCE"]:
 		return _generate_normal_upgrade(original_upgrade, conf)
 	
 	var new_upgrade = original_upgrade.duplicate()
@@ -65,7 +87,7 @@ func _generate_new_upgrade(original_upgrade: UpgradeData, conf) -> UpgradeData:
 	for original_effect in original_upgrade.effects:
 		var new_effect = original_effect.duplicate()
 		var positive_value = original_effect.value
-		positive_value = _my_round(positive_value * conf.global_upgrade_mult * conf.positive_upgrade_mult)
+		positive_value = _my_round(positive_value * conf["GLOBAL_UPGRADE_MULT"] * conf["POSITIVE_UPGRADE_MULT"])
 		new_effect.value = positive_value
 		new_upgrade.effects.append(new_effect)
 	
@@ -78,7 +100,7 @@ func _generate_new_upgrade(original_upgrade: UpgradeData, conf) -> UpgradeData:
 	
 	var negative_effect = EffectScript.new()
 	negative_effect.key = negative_stat
-	negative_effect.value = _my_round(negative_base_value * conf.global_upgrade_mult * conf.negative_upgrade_mult)
+	negative_effect.value = _my_round(negative_base_value * conf["GLOBAL_UPGRADE_MULT"] * conf["NEGATIVE_UPGRADE_MULT"])
 	negative_effect.effect_sign = 3
 
 	negative_effect.set("key_hash", Keys[negative_stat+'_hash'])
@@ -87,26 +109,26 @@ func _generate_new_upgrade(original_upgrade: UpgradeData, conf) -> UpgradeData:
 
 	return _try_curse(new_upgrade, conf)
 
-func _generate_normal_upgrade(original_upgrade: UpgradeData, conf) -> UpgradeData:
+func _generate_normal_upgrade(original_upgrade: UpgradeData, conf: Dictionary) -> UpgradeData:
 	
 	var new_upgrade = original_upgrade.duplicate()
 	new_upgrade.effects = []
 	for original_effect in original_upgrade.effects:
 		var new_effect = original_effect.duplicate()
-		var new_value = _my_round(original_effect.value * conf.global_upgrade_mult)
+		var new_value = _my_round(original_effect.value * conf["GLOBAL_UPGRADE_MULT"])
 		new_effect.value = new_value
 		new_upgrade.effects.append(new_effect)
 
 	return _try_curse(new_upgrade, conf)
 
-func _try_curse(upgrade: UpgradeData, conf) -> UpgradeData:
-	if not conf.cursed_upgrade:
+func _try_curse(upgrade: UpgradeData, conf: Dictionary) -> UpgradeData:
+	if not conf["CURSED_UPGRADE"]:
 		return upgrade
 	
 	for dlc_id in RunData.enabled_dlcs:
 		var dlc_data = ProgressData.get_dlc_data(dlc_id)
 		if dlc_data and dlc_data.has_method("curse_item"):
-			if conf.force_cursed_upgrade:
+			if conf["FORCE_CURSED_UPGRADE"]:
 				upgrade = dlc_data.curse_item(upgrade, player_index)
 			else:
 				upgrade = dlc_data.update_item_effects(upgrade, player_index)
