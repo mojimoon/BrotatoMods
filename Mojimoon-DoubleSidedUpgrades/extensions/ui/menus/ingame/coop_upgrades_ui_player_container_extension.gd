@@ -1,4 +1,4 @@
-extends "res://ui/menus/ingame/upgrades_ui_player_container.gd"
+extends "res://ui/menus/ingame/coop_upgrades_ui_player_container.gd"
 
 const UpgradeModifierScript = preload("res://mods-unpacked/Mojimoon-DoubleSidedUpgrades/extensions/ui/menus/ingame/helpers/upgrade_modifier.gd")
 

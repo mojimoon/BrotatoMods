@@ -10,6 +10,7 @@ func _init() -> void:
 
 	ModLoaderMod.install_script_extension(dir + "ui/menus/pages/main_menu.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/ingame/upgrades_ui_player_container_extension.gd")
+	ModLoaderMod.install_script_extension(dir + "ui/menus/ingame/coop_upgrades_ui_player_container_extension.gd")
 	set_process(true)
 
 func _process(_delta):
