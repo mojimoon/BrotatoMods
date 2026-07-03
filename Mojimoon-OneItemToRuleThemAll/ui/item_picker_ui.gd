@@ -136,13 +136,15 @@ func _populate_available() -> void:
 		var wrapper = Control.new()
 		wrapper.rect_min_size = Vector2(48, 48)
 		wrapper.mouse_filter = Control.MOUSE_FILTER_PASS
+		_available_grid.add_child(wrapper)
 
+		# 必须先 add_child 再 set_element：InventoryElement 的 _icon/_curse 是
+		# onready 变量，在入树 _ready 之前为 null，提前 set_element 会崩溃中断。
 		var el = INVENTORY_ELEMENT.instance()
+		wrapper.add_child(el)
 		el.rect_scale = Vector2(0.5, 0.5)
 		el.set_element(item_data)
 		el.connect("element_pressed", self, "_on_available_pressed", [item_data.my_id])
-		wrapper.add_child(el)
-		_available_grid.add_child(wrapper)
 
 
 func _refresh_selected() -> void:
@@ -159,9 +161,12 @@ func _refresh_selected() -> void:
 		var wrapper = Control.new()
 		wrapper.rect_min_size = Vector2(48, 48)
 		wrapper.mouse_filter = Control.MOUSE_FILTER_PASS
+		_selected_grid.add_child(wrapper)
 
 		var el = INVENTORY_ELEMENT.instance()
+		wrapper.add_child(el)
 		el.rect_scale = Vector2(0.5, 0.5)
+		# 诅咒预览：duplicate 一份并标记 is_cursed，不影响原物品
 		if _mod.force_cursed:
 			var d = item_data.duplicate()
 			d.is_cursed = true
@@ -169,8 +174,6 @@ func _refresh_selected() -> void:
 		else:
 			el.set_element(item_data)
 		el.connect("element_pressed", self, "_on_selected_pressed", [item_id])
-		wrapper.add_child(el)
-		_selected_grid.add_child(wrapper)
 
 
 # ---------- 信号回调 ----------

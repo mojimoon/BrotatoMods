@@ -139,3 +139,37 @@ func _curse_item(item_data, player_index: int):
 # 重置 A-B-A-B 计数器（新一局开始时由 run_data 扩展调用）
 func reset_counter() -> void:
 	replace_counter = 0
+
+
+# ============================================================
+# 按钮定位 helper（兼容其他 mod，如 cave-modtools 的 CaveItemConfigBtn）
+# ============================================================
+# 把 btn 挂到 back_button 下，并排到已有按钮的最右侧，避免与 cave-modtools 等重叠。
+# 应在 call_deferred 中调用，确保其他 mod 的按钮已就位。
+static func place_config_button(back_button: Node, btn: Button) -> void:
+	if back_button == null or btn == null:
+		return
+	back_button.add_child(btn)
+
+	# 扫描已有 Button 子节点，找最右边的作为左邻
+	var left_neighbour: Button = null
+	var max_right: float = -1.0
+	for child in back_button.get_children():
+		if child is Button and child != btn and child.is_inside_tree():
+			var right: float = child.rect_position.x + child.rect_size.x
+			if right > max_right:
+				max_right = right
+				left_neighbour = child
+
+	var base_x: float = back_button.rect_size.x
+	if left_neighbour != null:
+		base_x = left_neighbour.rect_position.x + left_neighbour.rect_size.x
+	btn.rect_position = Vector2(base_x + 18.0, 0.0)
+
+	# focus 链：只设自己的 left neighbour，不覆盖其他按钮的 right neighbour
+	# （避免与 cave-modtools 已设的 focus_neighbour_right 冲突）
+	if left_neighbour != null:
+		btn.focus_neighbour_left = btn.get_path_to(left_neighbour)
+	else:
+		btn.focus_neighbour_left = btn.get_path_to(back_button)
+

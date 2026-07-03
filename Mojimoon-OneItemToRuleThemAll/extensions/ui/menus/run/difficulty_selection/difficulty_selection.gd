@@ -1,9 +1,10 @@
 extends "res://ui/menus/run/difficulty_selection/difficulty_selection.gd"
 
 # 在难度选择界面右上角加“替换物品”按钮，点击打开物品选择弹窗。
-# 参考 cave-modtools 的 difficulty_selection 扩展。
+# 兼容 cave-modtools：call_deferred 延迟到其他 mod 按钮就位后，再扫描排在最右。
 
 const FONT_26 = preload("res://resources/fonts/actual/base/font_26.tres")
+const ModMain = preload("res://mods-unpacked/Mojimoon-OneItemToRuleThemAll/mod_main.gd")
 const UI_SCENE_PATH = "res://mods-unpacked/Mojimoon-OneItemToRuleThemAll/ui/item_picker_ui.tscn"
 
 var _moji_picker_btn: Button = null
@@ -11,7 +12,7 @@ var _moji_picker_btn: Button = null
 
 func _ready() -> void:
 	._ready()
-	_init_picker_button()
+	call_deferred("_init_picker_button")
 
 
 func _init_picker_button() -> void:
@@ -29,11 +30,7 @@ func _init_picker_button() -> void:
 	if FONT_26 != null:
 		_moji_picker_btn.add_font_override("font", FONT_26)
 
-	back_button.add_child(_moji_picker_btn)
-	_moji_picker_btn.rect_position = Vector2(back_button.rect_size.x + 18, 0)
-
-	_moji_picker_btn.focus_neighbour_left = _moji_picker_btn.get_path_to(back_button)
-	back_button.focus_neighbour_right = back_button.get_path_to(_moji_picker_btn)
+	ModMain.place_config_button(back_button, _moji_picker_btn)
 
 	_moji_picker_btn.connect("pressed", self, "_on_picker_btn_pressed")
 
