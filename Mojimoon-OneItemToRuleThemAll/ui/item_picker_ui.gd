@@ -180,7 +180,6 @@ func _add_option_checkbox(parent: Control, key: String, state_path: String, meth
 
 
 # 启用态着色：勾选的选项文字绿色，未勾选恢复默认；
-# 所有 checkbox 的 hover 色都固定为各自正常色，避免 hover 变白干扰观察。
 func _update_option_colors() -> void:
 	for key in _option_checkboxes:
 		var cb: CheckBox = _option_checkboxes[key]
@@ -191,11 +190,9 @@ func _update_option_colors() -> void:
 			cb.add_color_override("font_color_disabled", _OPTION_GREEN)
 		else:
 			cb.remove_color_override("font_color")
+			cb.remove_color_override("font_color_hover")
 			cb.remove_color_override("font_color_pressed")
 			cb.remove_color_override("font_color_disabled")
-			# hover 色设为当前正常色（remove 后即主题默认值），避免 hover 变白
-			var normal_color: Color = cb.get_color("font_color")
-			cb.add_color_override("font_color_hover", normal_color)
 
 
 # ---------- 物品网格 ----------

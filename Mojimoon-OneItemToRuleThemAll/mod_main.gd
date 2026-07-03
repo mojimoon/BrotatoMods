@@ -38,35 +38,54 @@ func _ready() -> void:
 
 
 # ============================================================
-# 本地化（参考 cave-modtools；用程序化 Translation 避免 .translation 二进制依赖）
+# 本地化（运行时解析 translations/mojimoon_oitrta.csv，单数据源）
 # ============================================================
-const _I18N = {
-	"MOJI_BTN_OPEN": {"en": "Replace Items", "zh": "替换物品", "zh_TW": "替換物品"},
-	"MOJI_TITLE": {"en": "Replace Items Settings", "zh": "替换物品设置", "zh_TW": "替換物品設定"},
-	"MOJI_SELECTED": {"en": "Selected targets: %d", "zh": "已选目标：%d 个", "zh_TW": "已選目標：%d 個"},
-	"MOJI_CURSE": {"en": "Curse", "zh": "诅咒", "zh_TW": "詛咒"},
-	"MOJI_CLEAR": {"en": "Clear All", "zh": "一键清空", "zh_TW": "一鍵清空"},
-	"MOJI_HINT": {
-		"en": "Click an item to add as replacement target (multiple targets rotate A-B-A-B; click selected to remove)",
-		"zh": "点击物品添加为替换目标（多个目标将按 A-B-A-B 顺序轮流替换；点击已选物品可移除）",
-		"zh_TW": "點擊物品添加為替換目標（多個目標將按 A-B-A-B 順序輪流替換；點擊已選物品可移除）"
-	},
-	"MOJI_REPLACE_STARTING": {"en": "Replace starting items", "zh": "替换起始物品", "zh_TW": "替換起始物品"},
-	"MOJI_REPLACE_SHOP": {"en": "Replace shop items", "zh": "替换商店物品", "zh_TW": "替換商店物品"},
-	"MOJI_SHOP_ALWAYS_APPEAR": {"en": "Shop always appear", "zh": "商店固定出现", "zh_TW": "商店固定出現"},
-	"MOJI_REPLACE_CRATE": {"en": "Replace crate items", "zh": "替换箱子物品", "zh_TW": "替換箱子物品"},
-	"MOJI_REPLACE_LEGENDARY": {"en": "Replace legendary crate items", "zh": "替换传奇箱子物品", "zh_TW": "替換傳奇箱子物品"},
-	"MOJI_OPTIONS": {"en": "Replace options", "zh": "替换选项", "zh_TW": "替換選項"}
-}
+const CSV_PATH = "res://mods-unpacked/Mojimoon-OneItemToRuleThemAll/translations/mojimoon_oitrta.csv"
 
 func _register_translations() -> void:
-	var locales = ["en", "zh", "zh_TW"]
-	for locale in locales:
+	var file = File.new()
+	if not file.file_exists(CSV_PATH):
+		ModLoaderLog.error("i18n csv not found: " + CSV_PATH, MOD_ID)
+		return
+	var err = file.open(CSV_PATH, File.READ)
+	if err != OK:
+		ModLoaderLog.error("Failed to open i18n csv: " + str(err), MOD_ID)
+		return
+
+	# 解析 CSV：第一行 locale header，后续每行 key + 各 locale 翻译
+	var locales: Array = []
+	var translations: Dictionary = {}	# locale -> Translation
+	var header = file.get_csv_line()
+	if header == null or header.size() < 2:
+		file.close()
+		ModLoaderLog.error("i18n csv header invalid", MOD_ID)
+		return
+	for i in range(1, header.size()):
+		var locale = header[i].strip_edges()
+		locales.push_back(locale)
 		var t = Translation.new()
 		t.locale = locale
-		for key in _I18N:
-			t.add_message(key, _I18N[key].get(locale, key))
-		TranslationServer.add_translation(t)
+		translations[locale] = t
+
+	while !file.eof_reached():
+		var row = file.get_csv_line()
+		if row == null or row.size() < 2:
+			continue
+		var key = row[0].strip_edges()
+		if key == "":
+			continue
+		for i in range(1, min(row.size(), header.size())):
+			var value = row[i]
+			# get_csv_line 已处理引号包裹；空值回退到 key 本身
+			if value == "":
+				value = key
+			translations[locales[i - 1]].add_message(key, value)
+
+	file.close()
+
+	for locale in locales:
+		TranslationServer.add_translation(translations[locale])
+	ModLoaderLog.info("Loaded i18n: %d locales" % locales.size(), MOD_ID)
 
 
 # ============================================================
