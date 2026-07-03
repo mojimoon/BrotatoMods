@@ -115,7 +115,16 @@ func _build_ui() -> void:
 	sel_header.add_child(cursed_lbl)
 
 	_cursed_checkbox = CheckBox.new()
-	_cursed_checkbox.pressed = _mod.force_cursed if _mod else false
+	var dlc_active: bool = ProgressData.is_dlc_available_and_active("abyssal_terrors")
+	if dlc_active:
+		_cursed_checkbox.pressed = _mod.force_cursed if _mod else false
+		_cursed_checkbox.hint_tooltip = tr("MOJI_CURSE_HINT")
+	else:
+		_cursed_checkbox.disabled = true
+		_cursed_checkbox.pressed = false
+		_cursed_checkbox.hint_tooltip = tr("MOJI_CURSE_DLC_REQUIRED")
+		if _mod:
+			_mod.force_cursed = false
 	_cursed_checkbox.focus_mode = Control.FOCUS_NONE
 	_cursed_checkbox.connect("toggled", self, "_on_cursed_toggled")
 	sel_header.add_child(_cursed_checkbox)

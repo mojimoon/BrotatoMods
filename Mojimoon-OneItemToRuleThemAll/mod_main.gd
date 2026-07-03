@@ -39,6 +39,7 @@ func _ready() -> void:
 
 # ============================================================
 # 本地化（运行时解析 translations/mojimoon_oitrta.csv，单数据源）
+# 用 get_as_text + 手动 CSV 解析，避免 get_csv_line 在某些环境的异常
 # ============================================================
 const CSV_PATH = "res://mods-unpacked/Mojimoon-OneItemToRuleThemAll/translations/mojimoon_oitrta.csv"
 
@@ -51,41 +52,78 @@ func _register_translations() -> void:
 	if err != OK:
 		ModLoaderLog.error("Failed to open i18n csv: " + str(err), MOD_ID)
 		return
+	var text: String = file.get_as_text()
+	file.close()
 
-	# 解析 CSV：第一行 locale header，后续每行 key + 各 locale 翻译
-	var locales: Array = []
-	var translations: Dictionary = {}	# locale -> Translation
-	var header = file.get_csv_line()
-	if header == null or header.size() < 2:
-		file.close()
-		ModLoaderLog.error("i18n csv header invalid", MOD_ID)
+	var lines: PoolStringArray = text.split("\n", false)
+	if lines.size() < 2:
+		ModLoaderLog.error("i18n csv too short: " + str(lines.size()) + " lines", MOD_ID)
 		return
+
+	# 第一行 locale header
+	var header: PoolStringArray = _parse_csv_line(lines[0])
+	if header.size() < 2:
+		ModLoaderLog.error("i18n csv header invalid: " + str(header.size()) + " cols", MOD_ID)
+		return
+
+	var locales: Array = []
+	var translations: Dictionary = {}
 	for i in range(1, header.size()):
 		var locale = header[i].strip_edges()
+		if locale == "":
+			continue
 		locales.push_back(locale)
 		var t = Translation.new()
 		t.locale = locale
 		translations[locale] = t
 
-	while !file.eof_reached():
-		var row = file.get_csv_line()
-		if row == null or row.size() < 2:
+	# 后续每行 key + 各 locale 翻译
+	for line_idx in range(1, lines.size()):
+		var row: PoolStringArray = _parse_csv_line(lines[line_idx])
+		if row.size() < 2:
 			continue
 		var key = row[0].strip_edges()
 		if key == "":
 			continue
 		for i in range(1, min(row.size(), header.size())):
 			var value = row[i]
-			# get_csv_line 已处理引号包裹；空值回退到 key 本身
 			if value == "":
 				value = key
 			translations[locales[i - 1]].add_message(key, value)
 
-	file.close()
-
 	for locale in locales:
 		TranslationServer.add_translation(translations[locale])
-	ModLoaderLog.info("Loaded i18n: %d locales" % locales.size(), MOD_ID)
+	ModLoaderLog.info("Loaded i18n: %d locales, %d keys" % [locales.size(), lines.size() - 1], MOD_ID)
+
+
+# 手动 CSV 行解析：正确处理引号包裹（含转义 ""）和逗号分隔
+static func _parse_csv_line(line: String) -> PoolStringArray:
+	var result: PoolStringArray = PoolStringArray()
+	var current: String = ""
+	var in_quotes: bool = false
+	var i: int = 0
+	while i < line.length():
+		var ch: String = line[i]
+		if in_quotes:
+			if ch == "\"":
+				if i + 1 < line.length() and line[i + 1] == "\"":
+					current += "\""
+					i += 1
+				else:
+					in_quotes = false
+			else:
+				current += ch
+		else:
+			if ch == "\"":
+				in_quotes = true
+			elif ch == ",":
+				result.append(current)
+				current = ""
+			else:
+				current += ch
+		i += 1
+	result.append(current)
+	return result
 
 
 # ============================================================
