@@ -6,6 +6,8 @@ A collection of mods for the game [Brotato](https://store.steampowered.com/app/1
 
 [Steam Workshop Link](https://steamcommunity.com/sharedfiles/filedetails/?id=3671945570)
 
+> Cursed & Double Sided Upgrades / 诅咒和双面升级
+
 ![](img/dsu-icon-v2.png)
 
 Have you ever thought about the upgrades in Brotato being a bit too fixed? Then this mod is for you! It introduces the **cursed** and **double-sided** upgrade system and **configurable upgrades effect** strength. **And now supports co-op!**
@@ -172,5 +174,153 @@ Works with other hook mods such as Recurse.
 ![](img/imperfect-hook-mod-1.png)
 
 </details>
+
+-->
+
+# [OneItemToRuleThemAll](Mojimoon-OneItemToRuleThemAll)
+
+[Steam Workshop Link](https://steamcommunity.com/sharedfiles/filedetails/?id=3756660211)
+
+> One Item to Rule Them All / 所有物品变为一个
+
+Replace all in-game items (starting / shop / crate) with your chosen target items. Inspired by the famous Slay the Spire mod "One Relic to Rule Them All".
+
+**Easy to use:**
+
+After selecting a character, click the **"Replace Items"** button at the top-left of the weapon/difficulty selection screen to open the config window. Select one or more target items, and all generated items in the game will be replaced with your chosen items. 
+
+Click on a selected item to remove it.
+
+**Key features:**
+
+- **Multi-item rotation** — Select multiple target items and they cycle in order (A-B-A-B...)
+- **Curse support** — If "Curse" is enabled, replaced items will automatically be cursed (random strength scaling with wave, matching vanilla curse behavior). Cursed original items pass their curse to the replacement. *Requires Abyssal Terrors DLC*
+- **Auto-save settings** — Settings are saved automatically and persist across sessions
+- **14 languages** — en (English) / fr (Français) / zh (简体中文) / ja (日本語) / ko (한국어) / zh_TW (繁體中文) / ru (Русский) / pl (Polski) / es (Español) / pt (Português) / de (Deutsch) / tr (Türkçe) / it (Italiano)
+
+**Configuration options:**
+
+In the config window, you can choose which sources of items to replace:
+
+- **Starting items** (default: **off**) — Character's starting items (excludes character itself and weapons)
+- **Shop items** (default: **on**) — All shop items (excludes weapons)
+- **Shop always appear** (default: **off**) — Replace one shop slot per wave (skips guaranteed items and locked items). Mutually exclusive with the "Shop items" option; only one can be enabled at a time
+- **Crate items** (default: **on**)
+- **Legendary crate items** (default: **off**)
+
+There are many fun combinations to try, like Saver + Piggy Bank, and feel free to share your ideas in the comments!
+
+**Enjoy the game!**
+
+<!--
+
+Replace all in-game items (starting / shop / crate) with your chosen target items. Inspired by the famous Slay the Spire mod "One Relic to Rule Them All".
+
+[b]Easy to use:[/b]
+
+After selecting a character, click the [b]"Replace Items"[/b] button at the top-left of the weapon/difficulty selection screen to open the config window. Select one or more target items, and all generated items in the game will be replaced with your chosen items. 
+
+Click on a selected item to remove it.
+
+[b]Key features:[/b]
+
+[list]
+[*][b]Multi-item rotation[/b] — Select multiple target items and they cycle in order (A-B-A-B...)
+[*][b]Curse support[/b] — If "Curse" is enabled, replaced items will automatically be cursed (random strength scaling with wave, matching vanilla curse behavior). Cursed original items pass their curse to the replacement. [i]Requires Abyssal Terrors DLC[/i]
+[*][b]Auto-save settings[/b] — Settings are saved automatically and persist across sessions
+[*][b]14 languages[/b] — en (English) / fr (Français) / zh (简体中文) / ja (日本語) / ko (한국어) / zh_TW (繁體中文) / ru (Русский) / pl (Polski) / es (Español) / pt (Português) / de (Deutsch) / tr (Türkçe) / it (Italiano)
+[/list]
+
+[b]Configuration options:[/b]
+
+In the config window, you can choose which sources of items to replace:
+
+[list]
+[*][b]Starting items[/b] (default: [b]off[/b]) — Character's starting items (excludes character itself and weapons)
+[*][b]Shop items[/b] (default: [b]on[/b]) — All shop items (excludes weapons)
+[*][b]Shop always appear[/b] (default: [b]off[/b]) — Replace one shop slot per wave (skips guaranteed items and locked items). Mutually exclusive with the "Shop items" option; only one can be enabled at a time
+[*][b]Crate items[/b] (default: [b]on[/b])
+[*][b]Legendary crate items[/b] (default: [b]off[/b])
+[/list]
+
+There are many fun combinations to try, like Saver + Piggy Bank, and feel free to share your ideas in the comments!
+
+[pullquote]If you like this mod, please consider liking, favoriting and sharing it, thank you! Comments and suggestions are also very welcome![/pullquote]
+
+[img]https://images.steamusercontent.com/ugc/44567523600397314/6B6642339A9CBFF3E081B3CC347F70D6EFD2F0D7/[/img]
+
+GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/url]
+
+-->
+
+---
+
+将游戏中的所有物品替换为一个，灵感来自著名的杀戮尖塔 mod "One Relic to Rule Them All"。
+
+**用法很简单：**
+
+选择角色后，在武器/难度选择界面左上角点击 **"替换物品"** 按钮打开配置弹窗，选择一个或多个目标物品，游戏生成的物品会被替换为你选的物品。
+
+点击已选物品可移除。
+
+**核心特性：**
+
+- **多物品轮流替换** —— 选多个目标物品时，按顺序循环替换（A-B-A-B...）
+- **诅咒支持** —— 可选"诅咒"开关，被替换的物品自动被诅咒（强度随波次随机提升，与原版自然诅咒一致）。原物品若被诅咒，替换物也会继承诅咒。*需要 Abyssal Terrors DLC*
+- **自动保存设置** —— 退出重进不丢失
+- **14 种语言本地化** —— en (English) / fr (Français) / zh (简体中文) / ja (日本語) / ko (한국어) / zh_TW (繁體中文) / ru (Русский) / pl (Polski) / es (Español) / pt (Português) / de (Deutsch) / tr (Türkçe) / it (Italiano)
+
+**选项配置：**
+
+在配置弹窗中，你可以选择替换哪些来源的物品：
+
+- **起始物品**（默认：**关**） —— 角色开局自带的物品（不含角色自身和武器）
+- **商店物品**（默认：**开**） —— 商店所有物品（不含武器）
+- **商店固定出现**（默认：**关**） —— 每波固定替换商店一个槽位（自动跳过渔夫的诱饵和锁定物品）。和商店物品选项互斥，二者只能启用一个
+- **普通箱子物品**（默认：**开**）
+- **传奇箱子物品**（默认：**关**）
+
+有很多好玩的组合，不妨试试节俭者 + 存钱罐？你也可以把你想到的发评论区里！
+
+**祝您玩得开心！**
+
+<!--
+
+将游戏中的所有物品替换为一个，灵感来自著名的杀戮尖塔 mod "One Relic to Rule Them All"。
+
+[b]用法很简单：[/b]
+
+选择角色后，在武器/难度选择界面左上角点击 [b]"替换物品"[/b] 按钮打开配置弹窗，选择一个或多个目标物品，游戏生成的物品会被替换为你选的物品。
+
+点击已选物品可移除。
+
+[b]核心特性：[/b]
+
+[list]
+[*][b]多物品轮流替换[/b] —— 选多个目标物品时，按顺序循环替换（A-B-A-B...）
+[*][b]诅咒支持[/b] —— 可选"诅咒"开关，被替换的物品自动被诅咒（强度随波次随机提升，与原版自然诅咒一致）。原物品若被诅咒，替换物也会继承诅咒。[i]需要 Abyssal Terrors DLC[/i]
+[*][b]自动保存设置[/b] —— 退出重进不丢失
+[*][b]14 种语言本地化[/b] —— en (English) / fr (Français) / zh (简体中文) / ja (日本語) / ko (한국어) / zh_TW (繁體中文) / ru (Русский) / pl (Polski) / es (Español) / pt (Português) / de (Deutsch) / tr (Türkçe) / it (Italiano)
+[/list]
+
+[b]选项配置：[/b]
+
+在配置弹窗中，你可以选择替换哪些来源的物品：
+
+[list]
+[*][b]起始物品[/b]（默认：[b]关[/b]） —— 角色开局自带的物品（不含角色自身和武器）
+[*][b]商店物品[/b]（默认：[b]开[/b]） —— 商店所有物品（不含武器）
+[*][b]商店固定出现[/b]（默认：[b]关[/b]） —— 每波固定替换商店一个槽位（自动跳过渔夫的诱饵和锁定物品）。和商店物品选项互斥，二者只能启用一个
+[*][b]普通箱子物品[/b]（默认：[b]开[/b]）
+[*][b]传奇箱子物品[/b]（默认：[b]关[/b]）
+[/list]
+
+有很多好玩的组合，不妨试试节俭者 + 存钱罐？你也可以把你想到的发评论区里！
+
+[pullquote]如果你喜欢这个 mod，欢迎点赞、收藏、转发，多谢啦！有问题或建议欢迎在评论区留言！[/pullquote]
+
+[img]https://images.steamusercontent.com/ugc/44567523600397314/6B6642339A9CBFF3E081B3CC347F70D6EFD2F0D7/[/img]
+
+GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/url]
 
 -->
