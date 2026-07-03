@@ -143,6 +143,8 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 
 </details>
 
+<!--
+
 ## [Imperfect Hook](Mojimoon-ImperfectHook)
 
 [Steam Workshop Link](https://steamcommunity.com/sharedfiles/filedetails/?id=3678338295)
@@ -170,3 +172,5 @@ Works with other hook mods such as Recurse.
 ![](img/imperfect-hook-mod-1.png)
 
 </details>
+
+-->
