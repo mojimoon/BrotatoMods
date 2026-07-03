@@ -235,14 +235,16 @@ func _on_available_pressed(_element, item_id: String) -> void:
 	if _mod.target_item_ids.has(item_id):
 		return
 	_mod.target_item_ids.append(item_id)
-	_refresh_selected()
+	call_deferred("_refresh_selected")
 
 
 func _on_selected_pressed(_element, item_id: String) -> void:
 	if _mod == null:
 		return
 	_mod.target_item_ids.erase(item_id)
-	_refresh_selected()
+	# 必须延迟刷新：当前 InventoryElement 正在发射 element_pressed 信号，
+	# 直接 _refresh_selected() 会 free() 掉正在发信号的节点 → 闪退。
+	call_deferred("_refresh_selected")
 
 
 func _on_cursed_toggled(pressed: bool) -> void:

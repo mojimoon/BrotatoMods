@@ -119,12 +119,16 @@ func get_replacement(orig_item, player_index: int):
 
 # 对物品施加诅咒。优先用 DLC abyssal_terrors 的 curse_item（参考 dlcs/dlc_1/dlc_1_data.gd:49）；
 # DLC 未启用时仅标记 is_cursed（降级处理）。
+# turn_randomization_off=false：使用原版"按波次提升 + 随机"的诅咒强度
+# （base 40% + 2%/wave，random ±30%），与商店/箱子自然掉落的诅咒一致。
+# 注：原版起始诅咒物品（如诅咒鱼钩）用 turn_randomization_off=true，固定 38%
+# （40 + 2*min(20,-1)），本 mod 不沿用此固定值。
 func _curse_item(item_data, player_index: int):
 	var progress_data = _autoload("ProgressData")
 	if progress_data != null:
 		var dlc = progress_data.get_dlc_data("abyssal_terrors")
 		if dlc != null and dlc.has_method("curse_item"):
-			return dlc.curse_item(item_data, player_index, true)
+			return dlc.curse_item(item_data, player_index, false)
 	if item_data != null:
 		item_data.is_cursed = true
 	return item_data
