@@ -266,6 +266,7 @@ func _on_available_pressed(_element, item_id: String) -> void:
 	if _mod.target_item_ids.has(item_id):
 		return
 	_mod.target_item_ids.append(item_id)
+	_mod._save_settings()
 	call_deferred("_refresh_selected")
 
 
@@ -273,6 +274,7 @@ func _on_selected_pressed(_element, item_id: String) -> void:
 	if _mod == null:
 		return
 	_mod.target_item_ids.erase(item_id)
+	_mod._save_settings()
 	# 必须延迟刷新：当前 InventoryElement 正在发射 element_pressed 信号，
 	# 直接 _refresh_selected() 会 free() 掉正在发信号的节点 → 闪退。
 	call_deferred("_refresh_selected")
@@ -282,6 +284,7 @@ func _on_cursed_toggled(pressed: bool) -> void:
 	if _mod == null:
 		return
 	_mod.force_cursed = pressed
+	_mod._save_settings()
 	_refresh_selected()
 
 
@@ -289,6 +292,7 @@ func _on_clear_pressed() -> void:
 	if _mod == null:
 		return
 	_mod.target_item_ids.clear()
+	_mod._save_settings()
 	_refresh_selected()
 
 
@@ -297,6 +301,7 @@ func _on_clear_pressed() -> void:
 func _on_option_toggled_starting(pressed: bool) -> void:
 	if _mod: _mod.cfg_replace_starting = pressed
 	_update_option_colors()
+	_save_if_mod()
 
 func _on_option_toggled_shop(pressed: bool) -> void:
 	if _mod: _mod.cfg_replace_shop = pressed
@@ -305,6 +310,7 @@ func _on_option_toggled_shop(pressed: bool) -> void:
 		var cb = _option_checkboxes.get("MOJI_SHOP_ALWAYS_APPEAR")
 		if cb: cb.pressed = false
 	_update_option_colors()
+	_save_if_mod()
 
 func _on_option_toggled_shop_first(pressed: bool) -> void:
 	if _mod: _mod.cfg_replace_shop_first = pressed
@@ -313,17 +319,26 @@ func _on_option_toggled_shop_first(pressed: bool) -> void:
 		var cb = _option_checkboxes.get("MOJI_REPLACE_SHOP")
 		if cb: cb.pressed = false
 	_update_option_colors()
+	_save_if_mod()
 
 func _on_option_toggled_crate(pressed: bool) -> void:
 	if _mod: _mod.cfg_replace_crate = pressed
 	_update_option_colors()
+	_save_if_mod()
 
 func _on_option_toggled_legendary(pressed: bool) -> void:
 	if _mod: _mod.cfg_replace_legendary_crate = pressed
 	_update_option_colors()
+	_save_if_mod()
+
+
+func _save_if_mod() -> void:
+	if _mod != null:
+		_mod._save_settings()
 
 
 func _on_close_pressed() -> void:
+	_save_if_mod()
 	queue_free()
 
 

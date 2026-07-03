@@ -2,19 +2,20 @@ extends Node
 
 # Mojimoon-OneItemToRuleThemAll
 # 将游戏生成的物品替换为目标物品，支持多目标 A-B-A-B 轮流、诅咒开关与原物品诅咒继承。
-# 替换选项在弹窗内配置（不再使用 mod config），仅存内存，每局重选。
+# 替换选项在弹窗内配置，持久化到 user://（JSON，不暴露给玩家）。
 
 const MOD_ID = "Mojimoon-OneItemToRuleThemAll"
 const VERSION = "1.0.0"
+const SETTINGS_PATH = "user://Mojimoon-OneItemToRuleThemAll/settings.json"
 
 # ============================================================
-# 运行时状态（每局开始前在弹窗配置，仅存内存）
+# 运行时状态（弹窗配置，持久化到 JSON）
 # ============================================================
 # 玩家选中的目标物品 my_id 列表（String）。空 = 不替换。
 var target_item_ids: Array = []
 # 弹窗"是否诅咒"全局开关：为 true 时所有替换物都被诅咒。
 var force_cursed: bool = false
-# A-B-A-B 轮流计数器，跨所有 hook 全局递增。
+# A-B-A-B 轮流计数器，跨所有 hook 全局递增（不持久化，每局重置）。
 var replace_counter: int = 0
 
 # ---------- 替换选项（弹窗内 checkbox 配置，默认值）----------
@@ -35,6 +36,63 @@ func _init() -> void:
 
 func _ready() -> void:
 	_register_translations()
+	_load_settings()
+
+
+# ============================================================
+# 设置持久化（JSON，存 user://，不使用 ModConfig）
+# ============================================================
+func _save_settings() -> void:
+	var data: Dictionary = {
+		"version": VERSION,
+		"target_item_ids": target_item_ids,
+		"force_cursed": force_cursed,
+		"cfg_replace_starting": cfg_replace_starting,
+		"cfg_replace_shop": cfg_replace_shop,
+		"cfg_replace_shop_first": cfg_replace_shop_first,
+		"cfg_replace_crate": cfg_replace_crate,
+		"cfg_replace_legendary_crate": cfg_replace_legendary_crate
+	}
+	var dir = Directory.new()
+	var dir_path = SETTINGS_PATH.get_base_dir()
+	if not dir.dir_exists(dir_path):
+		dir.make_dir_recursive(dir_path)
+	var file = File.new()
+	var err = file.open(SETTINGS_PATH, File.WRITE)
+	if err != OK:
+		ModLoaderLog.error("Failed to save settings: " + str(err), MOD_ID)
+		return
+	file.store_string(JSON.print(data, "\t"))
+	file.close()
+
+
+func _load_settings() -> void:
+	var file = File.new()
+	if not file.file_exists(SETTINGS_PATH):
+		return
+	var err = file.open(SETTINGS_PATH, File.READ)
+	if err != OK:
+		ModLoaderLog.error("Failed to load settings: " + str(err), MOD_ID)
+		return
+	var text: String = file.get_as_text()
+	file.close()
+
+	var parse_result: JSONParseResult = JSON.parse(text)
+	if parse_result.error != OK:
+		ModLoaderLog.error("Settings JSON parse error: " + parse_result.error_string, MOD_ID)
+		return
+	var data: Dictionary = parse_result.result
+
+	# 逐字段读取，缺失字段用默认值
+	target_item_ids = data.get("target_item_ids", [])
+	force_cursed = bool(data.get("force_cursed", false))
+	cfg_replace_starting = bool(data.get("cfg_replace_starting", false))
+	cfg_replace_shop = bool(data.get("cfg_replace_shop", true))
+	cfg_replace_shop_first = bool(data.get("cfg_replace_shop_first", false))
+	cfg_replace_crate = bool(data.get("cfg_replace_crate", true))
+	cfg_replace_legendary_crate = bool(data.get("cfg_replace_legendary_crate", false))
+	ModLoaderLog.info("Settings loaded: %d targets" % target_item_ids.size(), MOD_ID)
+
 
 
 # ============================================================

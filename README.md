@@ -10,12 +10,12 @@ A collection of mods for the game [Brotato](https://store.steampowered.com/app/1
 
 Have you ever thought about the upgrades in Brotato being a bit too fixed? Then this mod is for you! It introduces the **cursed** and **double-sided** upgrade system and **configurable upgrades effect** strength. **And now supports co-op!**
 
-## What does it do?
+### What does it do?
 
 - 50% of the upgrades will be double-sided, meaning they will have both a positive and a negative effect. The positive effect will be +200% of the original stat increase, while the negative effect will be -100% of another stat. For example, the T4 damage upgrade usually gives you +16% damage, but with this mod, you can now choose a double-sided upgrade that gives you +32% damage but -60 range.
 - If DLC Abyssal Terrors is installed, upgrades share the same chance to be cursed as other items, which increases the positive effect and reduces the negative effect (if any).
 
-## Mod Options
+### Mod Options
 
 By subscribing to [dami-ModOptions](https://steamcommunity.com/sharedfiles/filedetails/?id=2944608034) (you can find it on the right sidebar), you can configure the following settings in-game (this is not required if you are fine with the default settings):
 
@@ -26,7 +26,7 @@ By subscribing to [dami-ModOptions](https://steamcommunity.com/sharedfiles/filed
 - CURSED_UPGRADE: enable cursed upgrades. Only works if you have DLC Abyssal Terrors installed (default: true)
 - FORCE_CURSED_UPGRADE: force all upgrades to be cursed. Only works if CURSED_UPGRADE is enabled (default: false)
 
-## Try it out!
+### Try it out!
 
 There are many fun ways to play with these settings. If you are a masochist, try -100% Mutant and see your stats weaken as you level up! If you want to be overpowered, check out +500% Baby and see how crazy it is to get 5 weapon slots from one upgrade!
 
@@ -71,12 +71,12 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 你是否觉得Brotato中的升级有点过于固定了？那你可找对地方了！这个 mod 引入了 **诅咒** 和 **双面** 升级系统，以及 **可自定义的升级效果** 强度。**现已支持合作模式！**
 
-## 干什么的？
+### 干什么的？
 
 - 50% 的升级会变成双面升级，拥有一个正面效果和一个负面效果。正面效果会增加 200% 的原属性，而负面效果会减少 100% 的另一个主属性。例如，T4 的伤害升级是 +16% 伤害，但有了这个 mod，你现在可以选择一个双面升级，获得 +32% 伤害但 -60 范围。
 - 如果你有 DLC 深海魔怪，升级和其他物品有同样的几率被诅咒，增强正面效果并减少负面效果。
 
-## Mod Options
+### Mod Options
 
 通过订阅 [dami-ModOptions](https://steamcommunity.com/sharedfiles/filedetails/?id=2944608034)（可以在页面右侧找到），你可以在游戏中配置以下设置（如果你对默认设置满意的话，这不是必需的）：
 
@@ -87,7 +87,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 - CURSED_UPGRADE：允许升级被诅咒。只有在你安装了 DLC 深海魔怪的情况下才有效（默认：true）
 - FORCE_CURSED_UPGRADE：强制所有升级都被诅咒。只有在启用 CURSED_UPGRADE 的情况下才有效（默认：false）
 
-## 来试试吧！
+### 来试试吧！
 
 有很多有趣的玩法可以尝试。如果你是个抖M，不妨试试 -100% 异变体，看看全红的升级好不好受。或者如果你想要一些乐子，试试 +500% 宝宝，看看升级一次拿 5 个武器栏有多爽！
 
