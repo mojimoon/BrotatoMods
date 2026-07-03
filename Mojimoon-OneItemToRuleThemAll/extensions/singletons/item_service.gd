@@ -27,8 +27,8 @@ func get_player_shop_items(wave: int, player_index: int, args) -> Array:
 			result.push_back([item, entry[1]])
 		return result
 	elif m.cfg_replace_shop_first:
-		# new_items[0] 是第一个非锁住的新物品
-		if new_items.size() > 0 and new_items[0][0] is ItemData:
+		# new_items[0] 是除锁定物品外第一个槽位的内容（武器或物品都替换）
+		if new_items.size() > 0:
 			var entry = new_items[0]
 			entry[0] = m.get_replacement(entry[0], player_index)
 	return new_items

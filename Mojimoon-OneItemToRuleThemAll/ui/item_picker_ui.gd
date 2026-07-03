@@ -22,6 +22,9 @@ var _available_grid: GridContainer
 var _selected_label: Label
 var _cursed_checkbox: CheckBox
 var _mod = null
+# 选项 checkbox 引用，用于互斥联动与启用态着色
+var _option_checkboxes: Dictionary = {}	# key -> CheckBox
+const _OPTION_GREEN: Color = Color(0.45, 0.95, 0.45)
 
 
 func _ready() -> void:
@@ -94,6 +97,8 @@ func _build_ui() -> void:
 	_add_option_checkbox(options_row, "MOJI_REPLACE_SHOP_FIRST", "cfg_replace_shop_first", "_on_option_toggled_shop_first")
 	_add_option_checkbox(options_row, "MOJI_REPLACE_CRATE", "cfg_replace_crate", "_on_option_toggled_crate")
 	_add_option_checkbox(options_row, "MOJI_REPLACE_LEGENDARY", "cfg_replace_legendary_crate", "_on_option_toggled_legendary")
+	# 初始着色
+	_update_option_colors()
 
 	# ---- 已选区 ----
 	_selected_label = Label.new()
@@ -171,6 +176,23 @@ func _add_option_checkbox(parent: Control, key: String, state_path: String, meth
 		cb.pressed = _mod.get(state_path)
 	cb.connect("toggled", self, method)
 	parent.add_child(cb)
+	_option_checkboxes[key] = cb
+
+
+# 启用态着色：勾选的选项文字绿色，未勾选恢复默认
+func _update_option_colors() -> void:
+	for key in _option_checkboxes:
+		var cb: CheckBox = _option_checkboxes[key]
+		if cb.pressed:
+			cb.add_color_override("font_color", _OPTION_GREEN)
+			cb.add_color_override("font_color_hover", _OPTION_GREEN)
+			cb.add_color_override("font_color_pressed", _OPTION_GREEN)
+			cb.add_color_override("font_color_disabled", _OPTION_GREEN)
+		else:
+			cb.remove_color_override("font_color")
+			cb.remove_color_override("font_color_hover")
+			cb.remove_color_override("font_color_pressed")
+			cb.remove_color_override("font_color_disabled")
 
 
 # ---------- 物品网格 ----------
@@ -262,16 +284,34 @@ func _on_clear_pressed() -> void:
 
 
 # ---------- 替换选项回调 ----------
+# shop / shop_first 互斥：勾选一个自动取消另一个
 func _on_option_toggled_starting(pressed: bool) -> void:
 	if _mod: _mod.cfg_replace_starting = pressed
+	_update_option_colors()
+
 func _on_option_toggled_shop(pressed: bool) -> void:
 	if _mod: _mod.cfg_replace_shop = pressed
+	if pressed and _mod:
+		_mod.cfg_replace_shop_first = false
+		var cb = _option_checkboxes.get("MOJI_REPLACE_SHOP_FIRST")
+		if cb: cb.pressed = false
+	_update_option_colors()
+
 func _on_option_toggled_shop_first(pressed: bool) -> void:
 	if _mod: _mod.cfg_replace_shop_first = pressed
+	if pressed and _mod:
+		_mod.cfg_replace_shop = false
+		var cb = _option_checkboxes.get("MOJI_REPLACE_SHOP")
+		if cb: cb.pressed = false
+	_update_option_colors()
+
 func _on_option_toggled_crate(pressed: bool) -> void:
 	if _mod: _mod.cfg_replace_crate = pressed
+	_update_option_colors()
+
 func _on_option_toggled_legendary(pressed: bool) -> void:
 	if _mod: _mod.cfg_replace_legendary_crate = pressed
+	_update_option_colors()
 
 
 func _on_close_pressed() -> void:
