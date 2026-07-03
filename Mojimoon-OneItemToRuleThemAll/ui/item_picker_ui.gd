@@ -11,7 +11,11 @@ const FONT_26 = preload("res://resources/fonts/actual/base/font_26.tres")
 # 物品图标尺寸（原版 InventoryElement 默认 96x96）
 const EL_SCALE = 0.75
 const EL_SIZE = 72.0
-const GRID_COLUMNS = 20
+const GRID_COLUMNS = 16
+
+# 稀有度底色基础 StyleBox（弹窗无游戏主题，Button.normal 默认为空样式，
+# 需先注入 StyleBoxFlat 才能让 update_background_color 的 bg_color 生效）
+var _base_stylebox: StyleBoxFlat
 
 var _selected_grid: GridContainer
 var _available_grid: GridContainer
@@ -22,6 +26,14 @@ var _mod = null
 
 func _ready() -> void:
 	_mod = ModMain._get_mod()
+	# 准备稀有度底色基础 StyleBoxFlat（InventoryElement.update_background_color
+	# 依赖 get_stylebox("normal") 返回有 bg_color 属性的 StyleBox）
+	_base_stylebox = StyleBoxFlat.new()
+	_base_stylebox.bg_color = Color(0, 0, 0, 0.25)
+	_base_stylebox.corner_radius_top_left = 4
+	_base_stylebox.corner_radius_top_right = 4
+	_base_stylebox.corner_radius_bottom_left = 4
+	_base_stylebox.corner_radius_bottom_right = 4
 	_build_ui()
 	set_process_unhandled_input(true)
 
@@ -117,11 +129,8 @@ func _build_ui() -> void:
 	sel_scroll.scroll_horizontal_enabled = true
 	vbox.add_child(sel_scroll)
 
-	var sel_center = CenterContainer.new()
-	sel_center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	sel_scroll.add_child(sel_center)
 	_selected_grid = _make_grid()
-	sel_center.add_child(_selected_grid)
+	sel_scroll.add_child(_selected_grid)
 
 	# ---- 可选区 ----
 	var avail_label = Label.new()
@@ -136,12 +145,8 @@ func _build_ui() -> void:
 	avail_scroll.scroll_horizontal_enabled = true
 	vbox.add_child(avail_scroll)
 
-	var avail_center = CenterContainer.new()
-	avail_center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	avail_center.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	avail_scroll.add_child(avail_center)
 	_available_grid = _make_grid()
-	avail_center.add_child(_available_grid)
+	avail_scroll.add_child(_available_grid)
 
 	_refresh_selected()
 	_populate_available()
@@ -150,7 +155,8 @@ func _build_ui() -> void:
 func _make_grid() -> GridContainer:
 	var g = GridContainer.new()
 	g.columns = GRID_COLUMNS
-	g.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# 用 SHRINK_CENTER 让网格只占内容宽度，不撑满 ScrollContainer（避免溢出弹窗边界）
+	g.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	g.add_constant_override("hseparation", 4)
 	g.add_constant_override("vseparation", 4)
 	return g
@@ -182,6 +188,8 @@ func _populate_available() -> void:
 		# 必须先 add_child 再 set_element：onready 变量入树 _ready 前为 null
 		var el = INVENTORY_ELEMENT.instance()
 		wrapper.add_child(el)
+		# 注入 StyleBoxFlat 基础，让 update_background_color 的 bg_color 能生效（稀有度底色）
+		el.add_stylebox_override("normal", _base_stylebox.duplicate())
 		el.rect_scale = Vector2(EL_SCALE, EL_SCALE)
 		el.set_element(item_data)
 		el.connect("element_pressed", self, "_on_available_pressed", [item_data.my_id])
@@ -207,6 +215,8 @@ func _refresh_selected() -> void:
 
 		var el = INVENTORY_ELEMENT.instance()
 		wrapper.add_child(el)
+		# 注入 StyleBoxFlat 基础，让 update_background_color 的 bg_color 能生效（稀有度底色）
+		el.add_stylebox_override("normal", _base_stylebox.duplicate())
 		el.rect_scale = Vector2(EL_SCALE, EL_SCALE)
 		# 诅咒预览：duplicate 一份并标记 is_cursed，不影响原物品
 		if _mod.force_cursed:
