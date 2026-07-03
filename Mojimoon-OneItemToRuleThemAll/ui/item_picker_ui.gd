@@ -1,11 +1,17 @@
 extends PanelContainer
 
-# 物品选择弹窗：选择一个或多个目标物品 + 是否诅咒 + 一键清空。
+# 物品选择弹窗：选择一个或多个目标物品 + 是否诅咒 + 一键清空 + 替换选项。
 # 样式参考 cave-modtools 的 shop_override_ui。
+# 稀有度底色由 InventoryElement.set_element 自动调用 update_background_color 实现。
 
 const ModMain = preload("res://mods-unpacked/Mojimoon-OneItemToRuleThemAll/mod_main.gd")
 const INVENTORY_ELEMENT = preload("res://items/global/inventory_element.tscn")
 const FONT_26 = preload("res://resources/fonts/actual/base/font_26.tres")
+
+# 物品图标尺寸（原版 InventoryElement 默认 96x96）
+const EL_SCALE = 0.75
+const EL_SIZE = 72.0
+const GRID_COLUMNS = 20
 
 var _selected_grid: GridContainer
 var _available_grid: GridContainer
@@ -17,7 +23,6 @@ var _mod = null
 func _ready() -> void:
 	_mod = ModMain._get_mod()
 	_build_ui()
-	# 拦截 ui_cancel，避免被底层菜单处理导致界面错乱
 	set_process_unhandled_input(true)
 
 
@@ -49,7 +54,7 @@ func _build_ui() -> void:
 	vbox.add_child(header)
 
 	var title = Label.new()
-	title.text = "替换物品设置"
+	title.text = tr("MOJI_TITLE")
 	_apply_font(title)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
@@ -62,6 +67,22 @@ func _build_ui() -> void:
 	close_btn.connect("pressed", self, "_on_close_pressed")
 	header.add_child(close_btn)
 
+	# ---- 替换选项 ----
+	var options_label = Label.new()
+	options_label.text = tr("MOJI_OPTIONS")
+	_apply_font(options_label)
+	vbox.add_child(options_label)
+
+	var options_row = HBoxContainer.new()
+	options_row.add_constant_override("separation", 16)
+	vbox.add_child(options_row)
+
+	_add_option_checkbox(options_row, "MOJI_REPLACE_STARTING", "cfg_replace_starting", "_on_option_toggled_starting")
+	_add_option_checkbox(options_row, "MOJI_REPLACE_SHOP", "cfg_replace_shop", "_on_option_toggled_shop")
+	_add_option_checkbox(options_row, "MOJI_REPLACE_SHOP_FIRST", "cfg_replace_shop_first", "_on_option_toggled_shop_first")
+	_add_option_checkbox(options_row, "MOJI_REPLACE_CRATE", "cfg_replace_crate", "_on_option_toggled_crate")
+	_add_option_checkbox(options_row, "MOJI_REPLACE_LEGENDARY", "cfg_replace_legendary_crate", "_on_option_toggled_legendary")
+
 	# ---- 已选区 ----
 	_selected_label = Label.new()
 	_apply_font(_selected_label)
@@ -72,18 +93,18 @@ func _build_ui() -> void:
 	vbox.add_child(sel_header)
 
 	var cursed_lbl = Label.new()
-	cursed_lbl.text = "诅咒:"
+	cursed_lbl.text = tr("MOJI_CURSE") + ":"
 	_apply_font(cursed_lbl)
 	sel_header.add_child(cursed_lbl)
 
 	_cursed_checkbox = CheckBox.new()
-	_cursed_checkbox.pressed = _mod.force_cursed
+	_cursed_checkbox.pressed = _mod.force_cursed if _mod else false
 	_cursed_checkbox.focus_mode = Control.FOCUS_NONE
 	_cursed_checkbox.connect("toggled", self, "_on_cursed_toggled")
 	sel_header.add_child(_cursed_checkbox)
 
 	var clear_btn = Button.new()
-	clear_btn.text = "一键清空"
+	clear_btn.text = tr("MOJI_CLEAR")
 	clear_btn.rect_min_size = Vector2(160, 44)
 	clear_btn.focus_mode = Control.FOCUS_NONE
 	_apply_font(clear_btn)
@@ -91,21 +112,20 @@ func _build_ui() -> void:
 	sel_header.add_child(clear_btn)
 
 	var sel_scroll = ScrollContainer.new()
-	sel_scroll.rect_min_size = Vector2(0, 150)
+	sel_scroll.rect_min_size = Vector2(0, int(EL_SIZE) + 24)
 	sel_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sel_scroll.scroll_horizontal_enabled = true
 	vbox.add_child(sel_scroll)
 
-	_selected_grid = GridContainer.new()
-	_selected_grid.columns = 20
-	_selected_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_selected_grid.add_constant_override("hseparation", 4)
-	_selected_grid.add_constant_override("vseparation", 4)
-	sel_scroll.add_child(_selected_grid)
+	var sel_center = CenterContainer.new()
+	sel_center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sel_scroll.add_child(sel_center)
+	_selected_grid = _make_grid()
+	sel_center.add_child(_selected_grid)
 
 	# ---- 可选区 ----
 	var avail_label = Label.new()
-	avail_label.text = "点击物品添加为替换目标（多个目标将轮流替换；点击已选物品可移除）"
+	avail_label.text = tr("MOJI_HINT")
 	_apply_font(avail_label)
 	avail_label.rect_min_size = Vector2(0, 30)
 	vbox.add_child(avail_label)
@@ -116,17 +136,38 @@ func _build_ui() -> void:
 	avail_scroll.scroll_horizontal_enabled = true
 	vbox.add_child(avail_scroll)
 
-	_available_grid = GridContainer.new()
-	_available_grid.columns = 20
-	_available_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_available_grid.add_constant_override("hseparation", 4)
-	_available_grid.add_constant_override("vseparation", 4)
-	avail_scroll.add_child(_available_grid)
+	var avail_center = CenterContainer.new()
+	avail_center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	avail_center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	avail_scroll.add_child(avail_center)
+	_available_grid = _make_grid()
+	avail_center.add_child(_available_grid)
 
 	_refresh_selected()
 	_populate_available()
 
 
+func _make_grid() -> GridContainer:
+	var g = GridContainer.new()
+	g.columns = GRID_COLUMNS
+	g.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	g.add_constant_override("hseparation", 4)
+	g.add_constant_override("vseparation", 4)
+	return g
+
+
+func _add_option_checkbox(parent: Control, key: String, state_path: String, method: String) -> void:
+	var cb = CheckBox.new()
+	cb.text = tr(key)
+	cb.focus_mode = Control.FOCUS_NONE
+	_apply_font(cb)
+	if _mod:
+		cb.pressed = _mod.get(state_path)
+	cb.connect("toggled", self, method)
+	parent.add_child(cb)
+
+
+# ---------- 物品网格 ----------
 func _populate_available() -> void:
 	var items = ItemService.items
 	var sorted = items.duplicate()
@@ -134,15 +175,14 @@ func _populate_available() -> void:
 
 	for item_data in sorted:
 		var wrapper = Control.new()
-		wrapper.rect_min_size = Vector2(48, 48)
+		wrapper.rect_min_size = Vector2(EL_SIZE, EL_SIZE)
 		wrapper.mouse_filter = Control.MOUSE_FILTER_PASS
 		_available_grid.add_child(wrapper)
 
-		# 必须先 add_child 再 set_element：InventoryElement 的 _icon/_curse 是
-		# onready 变量，在入树 _ready 之前为 null，提前 set_element 会崩溃中断。
+		# 必须先 add_child 再 set_element：onready 变量入树 _ready 前为 null
 		var el = INVENTORY_ELEMENT.instance()
 		wrapper.add_child(el)
-		el.rect_scale = Vector2(0.5, 0.5)
+		el.rect_scale = Vector2(EL_SCALE, EL_SCALE)
 		el.set_element(item_data)
 		el.connect("element_pressed", self, "_on_available_pressed", [item_data.my_id])
 
@@ -151,7 +191,9 @@ func _refresh_selected() -> void:
 	for c in _selected_grid.get_children():
 		c.free()
 
-	_selected_label.text = "已选目标：%d 个" % _mod.target_item_ids.size()
+	if _mod == null:
+		return
+	_selected_label.text = tr("MOJI_SELECTED") % _mod.target_item_ids.size()
 
 	for item_id in _mod.target_item_ids:
 		var item_data = ItemService.get_element_safe(ItemService.items, item_id)
@@ -159,13 +201,13 @@ func _refresh_selected() -> void:
 			continue
 
 		var wrapper = Control.new()
-		wrapper.rect_min_size = Vector2(48, 48)
+		wrapper.rect_min_size = Vector2(EL_SIZE, EL_SIZE)
 		wrapper.mouse_filter = Control.MOUSE_FILTER_PASS
 		_selected_grid.add_child(wrapper)
 
 		var el = INVENTORY_ELEMENT.instance()
 		wrapper.add_child(el)
-		el.rect_scale = Vector2(0.5, 0.5)
+		el.rect_scale = Vector2(EL_SCALE, EL_SCALE)
 		# 诅咒预览：duplicate 一份并标记 is_cursed，不影响原物品
 		if _mod.force_cursed:
 			var d = item_data.duplicate()
@@ -178,6 +220,8 @@ func _refresh_selected() -> void:
 
 # ---------- 信号回调 ----------
 func _on_available_pressed(_element, item_id: String) -> void:
+	if _mod == null:
+		return
 	if _mod.target_item_ids.has(item_id):
 		return
 	_mod.target_item_ids.append(item_id)
@@ -185,18 +229,37 @@ func _on_available_pressed(_element, item_id: String) -> void:
 
 
 func _on_selected_pressed(_element, item_id: String) -> void:
+	if _mod == null:
+		return
 	_mod.target_item_ids.erase(item_id)
 	_refresh_selected()
 
 
 func _on_cursed_toggled(pressed: bool) -> void:
+	if _mod == null:
+		return
 	_mod.force_cursed = pressed
 	_refresh_selected()
 
 
 func _on_clear_pressed() -> void:
+	if _mod == null:
+		return
 	_mod.target_item_ids.clear()
 	_refresh_selected()
+
+
+# ---------- 替换选项回调 ----------
+func _on_option_toggled_starting(pressed: bool) -> void:
+	if _mod: _mod.cfg_replace_starting = pressed
+func _on_option_toggled_shop(pressed: bool) -> void:
+	if _mod: _mod.cfg_replace_shop = pressed
+func _on_option_toggled_shop_first(pressed: bool) -> void:
+	if _mod: _mod.cfg_replace_shop_first = pressed
+func _on_option_toggled_crate(pressed: bool) -> void:
+	if _mod: _mod.cfg_replace_crate = pressed
+func _on_option_toggled_legendary(pressed: bool) -> void:
+	if _mod: _mod.cfg_replace_legendary_crate = pressed
 
 
 func _on_close_pressed() -> void:

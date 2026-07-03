@@ -11,32 +11,7 @@
             "authors": ["Mojimoon"],
             "compatible_mod_loader_version": ["3.0.0"],
             "compatible_game_version": ["0.6.1.6"],
-            "optional_dependencies": ["dami-ModOptions"],
-            "config_schema": {
-                "type": "object",
-                "properties": {
-                    "REPLACE_STARTING_ITEMS": {
-                        "type": "boolean",
-                        "default": false,
-                        "description": "If true, starting items are replaced by the target items. Default is false."
-                    },
-                    "REPLACE_SHOP_ITEMS": {
-                        "type": "boolean",
-                        "default": true,
-                        "description": "If true, shop items are replaced by the target items. Default is true."
-                    },
-                    "REPLACE_CRATE_ITEMS": {
-                        "type": "boolean",
-                        "default": true,
-                        "description": "If true, items from crates (and loot/treasure map) are replaced by the target items. Default is true."
-                    },
-                    "REPLACE_LEGENDARY_CRATE_ITEMS": {
-                        "type": "boolean",
-                        "default": false,
-                        "description": "If true, items from legendary crates are replaced by the target items. Default is false."
-                    }
-                }
-            }
+            "optional_dependencies": []
         }
     }
 }

@@ -1,0 +1,13 @@
+key,en,zh,zh_TW
+"MOJI_BTN_OPEN","Replace Items","替换物品","替換物品"
+"MOJI_TITLE","Replace Items Settings","替换物品设置","替換物品設定"
+"MOJI_SELECTED","Selected targets: %d","已选目标：%d 个","已選目標：%d 個"
+"MOJI_CURSE","Curse","诅咒","詛咒"
+"MOJI_CLEAR","Clear All","一键清空","一鍵清空"
+"MOJI_HINT","Click an item to add as replacement target (multiple targets rotate A-B-A-B; click selected to remove)","点击物品添加为替换目标（多个目标将按 A-B-A-B 顺序轮流替换；点击已选物品可移除）","點擊物品添加為替換目標（多個目標將按 A-B-A-B 順序輪流替換；點擊已選物品可移除）"
+"MOJI_REPLACE_STARTING","Replace starting items","替换起始物品","替換起始物品"
+"MOJI_REPLACE_SHOP","Replace shop items","替换商店物品","替換商店物品"
+"MOJI_REPLACE_SHOP_FIRST","Replace shop first item only","仅替换商店第一个","僅替換商店第一個"
+"MOJI_REPLACE_CRATE","Replace crate items","替换箱子物品","替換箱子物品"
+"MOJI_REPLACE_LEGENDARY","Replace legendary crate items","替换传奇箱子物品","替換傳奇箱子物品"
+"MOJI_OPTIONS","Replace options","替换选项","替換選項"

@@ -24,7 +24,7 @@ func _init_picker_button() -> void:
 
 	_moji_picker_btn = Button.new()
 	_moji_picker_btn.name = "MojiPickerBtn"
-	_moji_picker_btn.text = "替换物品"
+	_moji_picker_btn.text = tr("MOJI_BTN_OPEN")
 	_moji_picker_btn.rect_min_size = Vector2(220, 50)
 	_moji_picker_btn.focus_mode = Control.FOCUS_ALL
 	if FONT_26 != null:
