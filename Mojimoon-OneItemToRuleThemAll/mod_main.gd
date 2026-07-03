@@ -20,7 +20,7 @@ var replace_counter: int = 0
 # ---------- 替换选项（弹窗内 checkbox 配置，默认值）----------
 var cfg_replace_starting: bool = false
 var cfg_replace_shop: bool = true
-var cfg_replace_shop_first: bool = false	# 仅替换商店第一个（不替换锁住的）
+var cfg_replace_shop_first: bool = false	# MOJI_SHOP_ALWAYS_APPEAR：每波固定替换一个槽位（跳过 guaranteed items）
 var cfg_replace_crate: bool = true
 var cfg_replace_legendary_crate: bool = false
 
@@ -53,7 +53,7 @@ const _I18N = {
 	},
 	"MOJI_REPLACE_STARTING": {"en": "Replace starting items", "zh": "替换起始物品", "zh_TW": "替換起始物品"},
 	"MOJI_REPLACE_SHOP": {"en": "Replace shop items", "zh": "替换商店物品", "zh_TW": "替換商店物品"},
-	"MOJI_REPLACE_SHOP_FIRST": {"en": "Replace shop first item only", "zh": "仅替换商店第一个", "zh_TW": "僅替換商店第一個"},
+	"MOJI_SHOP_ALWAYS_APPEAR": {"en": "Shop always appear", "zh": "商店固定出现", "zh_TW": "商店固定出現"},
 	"MOJI_REPLACE_CRATE": {"en": "Replace crate items", "zh": "替换箱子物品", "zh_TW": "替換箱子物品"},
 	"MOJI_REPLACE_LEGENDARY": {"en": "Replace legendary crate items", "zh": "替换传奇箱子物品", "zh_TW": "替換傳奇箱子物品"},
 	"MOJI_OPTIONS": {"en": "Replace options", "zh": "替换选项", "zh_TW": "替換選項"}

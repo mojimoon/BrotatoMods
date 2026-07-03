@@ -17,7 +17,7 @@ func get_player_shop_items(wave: int, player_index: int, args) -> Array:
 	if m == null or m.target_item_ids.empty():
 		return new_items
 
-	# 优先级：replace_shop（全部）> replace_shop_first（仅第一个）
+	# 优先级：replace_shop（全部）> replace_shop_first（MOJI_SHOP_ALWAYS_APPEAR）
 	if m.cfg_replace_shop:
 		var result: Array = []
 		for entry in new_items:
@@ -27,10 +27,18 @@ func get_player_shop_items(wave: int, player_index: int, args) -> Array:
 			result.push_back([item, entry[1]])
 		return result
 	elif m.cfg_replace_shop_first:
-		# new_items[0] 是除锁定物品外第一个槽位的内容（武器或物品都替换）
+		# 替换 new_items 中最后一个 ItemData；若没有（全是武器）则替换最后一个条目。
+		# guaranteed_shop_items 由角色效果产生，通常排在 new_items 前部，
+		# 取最后一个物品槽可避开对 guaranteed items 的影响。
 		if new_items.size() > 0:
-			var entry = new_items[0]
-			entry[0] = m.get_replacement(entry[0], player_index)
+			var target_idx = -1
+			for i in range(new_items.size() - 1, -1, -1):
+				if new_items[i][0] is ItemData:
+					target_idx = i
+					break
+			if target_idx == -1:
+				target_idx = new_items.size() - 1
+			new_items[target_idx][0] = m.get_replacement(new_items[target_idx][0], player_index)
 	return new_items
 
 
