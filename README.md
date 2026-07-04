@@ -4,7 +4,7 @@ A collection of mods for the game [Brotato](https://store.steampowered.com/app/1
 
 ## [Double Sided Upgrades](Mojimoon-DoubleSidedUpgrades)
 
-[Steam Workshop Link](https://steamcommunity.com/sharedfiles/filedetails/?id=3671945570)
+[Steam Workshop Link](https://steamcommunity.com/sharedfiles/filedetails/?id=3671945570) | [Client Link](https://link.steam.watch/url/CommunityFilePage/3671945570)
 
 > Cursed & Double Sided Upgrades / 诅咒和双面升级
 
@@ -179,9 +179,9 @@ Works with other hook mods such as Recurse.
 
 # [OneItemToRuleThemAll](Mojimoon-OneItemToRuleThemAll)
 
-[Steam Workshop Link](https://steamcommunity.com/sharedfiles/filedetails/?id=3756660211)
+[Steam Workshop Link](https://steamcommunity.com/sharedfiles/filedetails/?id=3757246252) | [Client Link](https://link.steam.watch/url/CommunityFilePage/3757246252)
 
-> One Item to Rule Them All. / 所有物品变为一个
+> One Item to Rule Them All. / 所有物品变为同一个
 
 ![](img/oitrta-icon.png)
 
@@ -332,3 +332,38 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 ![](img/oitrta-4.jpg)
 
 </details>
+
+<!--
+
+(For QQ)
+
+宣传一下我写的新 mod
+
+One Item to Rule Them All / 所有物品变为一个
+
+将游戏中的所有物品替换为一个，灵感来自著名的杀戮尖塔 mod "One Relic to Rule Them All"。
+
+用法很简单：
+
+选择角色后，在武器/难度选择界面左上角点击 "替换物品" 按钮打开配置弹窗，选择一个或多个目标物品，游戏生成的物品会被替换为你选的物品。
+
+核心特性：
+
+- 多物品轮流替换 —— 选多个目标物品时，按顺序循环替换（A-B-A-B...）点击已选物品可移除。
+- 诅咒支持 —— 可选"诅咒"开关，被替换的物品自动被诅咒（强度随波次随机提升，与原版自然诅咒一致）。原物品若被诅咒，替换物也会继承诅咒。需要 Abyssal Terrors DLC
+- 自动保存设置 —— 退出重进不丢失
+- 14 种语言本地化 —— en (English) / fr (Français) / zh (简体中文) / ja (日本語) / ko (한국어) / zh_TW (繁體中文) / ru (Русский) / pl (Polski) / es (Español) / pt (Português) / de (Deutsch) / tr (Türkçe) / it (Italiano)
+
+选项配置：
+
+在配置弹窗中，你可以选择替换哪些来源的物品：
+
+- 起始物品（默认：关） —— 角色开局自带的物品（不含角色自身和武器）
+- 商店物品（默认：开） —— 商店所有物品（不含武器）
+- 商店固定出现（默认：关） —— 每波固定替换商店一个槽位（自动跳过渔夫的诱饵和锁定物品）。和商店物品选项互斥，二者只能启用一个
+- 普通箱子物品（默认：开）
+- 传奇箱子物品（默认：关）
+
+如果你喜欢这个 mod，欢迎点赞、收藏、转发，多谢啦！有问题或建议欢迎在评论区留言！
+
+-->
