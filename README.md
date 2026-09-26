@@ -153,28 +153,24 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 
 ![](img/oitrta-v2-icon.png)
 
-**What if every crate held a Piggy Bank? What if the shop sold nothing but Pearls?**
+**What if every item turned into a Potato, a Gentle Alien, a Candy Bag...?** This mod is all you need: One Item to Rule Them All.
 
-Pick your items, and Brotato will hand you nothing else. Every item the game generates, from the shop and crates to your starting kit, becomes the ones you chose. Inspired by the Slay the Spire mod *One Relic to Rule Them All*.
+**Now with a major upgrade**: a brand-new UI, smoother controls, and independent replacement for T4 crates!
 
-### Get started in 10 seconds
+### How to use
 
-1. Pick a character, then click **Replace Items** in the top-left corner of the weapon or difficulty selection screen.
-2. Click items in the list to add them to the **General Replacement Pool**.
-3. Start the run. That's it: your settings are saved automatically.
+After picking a character, click **Replace Items** in the top-left corner of the weapon/difficulty selection screen. Pick the items you want from the list, then start the run. That's it!
 
 ### Features
 
 - **A-B-A-B rotation**: pick several items and they take turns, in the order you chose them.
 - **T4 Crate Pool**: give T4 crates their own items, or replace only the first few.
-- **Curse support**: turn the game's randomness into a cursed-item run. *Requires the Abyssal Terrors DLC.*
-- **Easy config window**: search, rarity colors, numbered pools, and a live description of exactly what will be replaced.
-- **Master switch**: turn the mod off for a run without losing your picks.
-- **13 languages**: English, Français, 简体中文, 日本語, 한국어, 繁體中文, Русский, Polski, Español, Português, Deutsch, Türkçe, Italiano.
+- **Detailed yet intuitive UI**: item search, rarity colors, numbered pools, and a live description of exactly what will be replaced.
+- **Full language support**: English, Français, 简体中文, 日本語, 한국어, 繁體中文, Русский, Polski, Español, Português, Deutsch, Türkçe, Italiano.
 
 ### Options
 
-**Options → Enable** (default: **on**): the master switch. When it's off, nothing is replaced and your settings are kept.
+**Enable** (default: **on**): the master switch. When it's off, nothing is replaced and your settings are kept.
 
 **What to Replace**
 
@@ -182,68 +178,56 @@ Pick your items, and Brotato will hand you nothing else. Every item the game gen
 | --- | --- | --- |
 | Starting items | Off | Your character's starting items (the character itself and weapons are untouched). |
 | All items in shop | **On** | Every item slot in the shop (weapons are untouched). |
-| Shops always sell | Off | Each wave, one shop slot is guaranteed to be one of your items. Only one of this and "All items in shop" can be on. |
-| Crates | **On** | Items from crates, including Treasure Map's extra item. |
+| Shops always sell | Off | Each wave, one shop slot is guaranteed to be one of your items. |
+| Crates | **On** | Items from crates. |
 
-**Curse** (default: off): replaced items are cursed, with random strength that grows with the wave, just like natural curses. If the original item was cursed, its replacement always is too. *Requires the Abyssal Terrors DLC.*
+**Curse** (default: off): replaced items are always cursed (random strength that grows with the wave, just like naturally cursed items). *Requires the Abyssal Terrors DLC*.
 
-**General Replacement Pool**: the items used for everything under *What to Replace*. The card spells out what will be replaced, so you always know what you're getting.
+Even when it's off, a curse on the original item carries over to its replacement.
 
-**T4 Crate Pool**
+All of the above are replaced with items from the **General Replacement Pool**. You can also choose how T4 crates are replaced:
 
-| Mode | What happens to T4 crates |
+| Mode | T4 crates |
 | --- | --- |
 | Off (default) | Still generated randomly. |
-| Same as above | Use the General Replacement Pool, sharing its rotation. |
-| Independent | Use their own pool below, rotating A-B-A-B. |
+| Same as above | Use the General Replacement Pool. |
+| Independent | Use the Independent Replacement Pool, rotating A-B-A-B. |
 | One-time | The first N T4 crates become your N items, in order. After that, back to random. |
 
-> **Tip:** One-time mode is perfect for "guarantee my first T4 crate is X" without turning every T4 crate into X.
+### Try these combos
 
-### Try these
+Content creators on Bilibili have already come up with plenty of fun combos (videos in Chinese):
 
-- **Saver + Piggy Bank**: let the interest roll in.
-- **Druid + Garden + Pearl**: the Druid's dream garden.
-- **Any character + One-time T4**: a scripted opening, then pure chaos.
+- [Loud + Gentle Alien](https://www.bilibili.com/video/BV1XHhZ6wEwJ/): more enemies, more materials; more materials, more enemies
+- [Jack + Candy Bag](https://www.bilibili.com/video/BV1jeag6kEDy/): snowball your stats and grab red items for free
+- [Demon + Potato](https://www.bilibili.com/video/BV1VDhb6SEbd/): just stats
 
-Found a fun combo? Share it in the comments!
+Got a fun combo of your own? Post a video or share it in the comments!
 
-### Good to know
-
-- Click an item in the list to add it to the highlighted pool, and click it again to remove it. Click a card to switch pools.
-- Pearl's bonus pearl is always a pearl; it is never replaced.
-- Don't enable v1 and v2 at the same time, or items will be replaced twice.
-
-**Enjoy the game!**
+Note: this is an entirely different mod. **Do not enable v1 and v2 at the same time.**
 
 <!-- BBCode
 
-[b]What if every crate held a Piggy Bank? What if the shop sold nothing but Pearls?[/b]
+[b]What if every item turned into a Potato, a Gentle Alien, a Candy Bag...?[/b] This mod is all you need: One Item to Rule Them All.
 
-Pick your items, and Brotato will hand you nothing else. Every item the game generates, from the shop and crates to your starting kit, becomes the ones you chose. Inspired by the Slay the Spire mod [i]One Relic to Rule Them All[/i].
+[b]Now with a major upgrade[/b]: a brand-new UI, smoother controls, and independent replacement for T4 crates!
 
-[h1]Get started in 10 seconds[/h1]
+[h1]How to use[/h1]
 
-[olist]
-[*]Pick a character, then click [b]Replace Items[/b] in the top-left corner of the weapon or difficulty selection screen.
-[*]Click items in the list to add them to the [b]General Replacement Pool[/b].
-[*]Start the run. That's it: your settings are saved automatically.
-[/olist]
+After picking a character, click [b]Replace Items[/b] in the top-left corner of the weapon/difficulty selection screen. Pick the items you want from the list, then start the run. That's it!
 
 [h1]Features[/h1]
 
 [list]
 [*][b]A-B-A-B rotation[/b]: pick several items and they take turns, in the order you chose them.
 [*][b]T4 Crate Pool[/b]: give T4 crates their own items, or replace only the first few.
-[*][b]Curse support[/b]: turn the game's randomness into a cursed-item run. [i]Requires the Abyssal Terrors DLC.[/i]
-[*][b]Easy config window[/b]: search, rarity colors, numbered pools, and a live description of exactly what will be replaced.
-[*][b]Master switch[/b]: turn the mod off for a run without losing your picks.
-[*][b]13 languages[/b]: English, Français, 简体中文, 日本語, 한국어, 繁體中文, Русский, Polski, Español, Português, Deutsch, Türkçe, Italiano.
+[*][b]Detailed yet intuitive UI[/b]: item search, rarity colors, numbered pools, and a live description of exactly what will be replaced.
+[*][b]Full language support[/b]: English, Français, 简体中文, 日本語, 한국어, 繁體中文, Русский, Polski, Español, Português, Deutsch, Türkçe, Italiano.
 [/list]
 
 [h1]Options[/h1]
 
-[b]Options → Enable[/b] (default: [b]on[/b]): the master switch. When it's off, nothing is replaced and your settings are kept.
+[b]Enable[/b] (default: [b]on[/b]): the master switch. When it's off, nothing is replaced and your settings are kept.
 
 [h2]What to Replace[/h2]
 
@@ -251,43 +235,37 @@ Pick your items, and Brotato will hand you nothing else. Every item the game gen
 [tr][th]Option[/th][th]Default[/th][th]What it does[/th][/tr]
 [tr][td]Starting items[/td][td]Off[/td][td]Your character's starting items (the character itself and weapons are untouched).[/td][/tr]
 [tr][td]All items in shop[/td][td][b]On[/b][/td][td]Every item slot in the shop (weapons are untouched).[/td][/tr]
-[tr][td]Shops always sell[/td][td]Off[/td][td]Each wave, one shop slot is guaranteed to be one of your items. Only one of this and "All items in shop" can be on.[/td][/tr]
-[tr][td]Crates[/td][td][b]On[/b][/td][td]Items from crates, including Treasure Map's extra item.[/td][/tr]
+[tr][td]Shops always sell[/td][td]Off[/td][td]Each wave, one shop slot is guaranteed to be one of your items.[/td][/tr]
+[tr][td]Crates[/td][td][b]On[/b][/td][td]Items from crates.[/td][/tr]
 [/table]
 
-[b]Curse[/b] (default: off): replaced items are cursed, with random strength that grows with the wave, just like natural curses. If the original item was cursed, its replacement always is too. [i]Requires the Abyssal Terrors DLC.[/i]
+[b]Curse[/b] (default: off): replaced items are always cursed (random strength that grows with the wave, just like naturally cursed items). [i]Requires the Abyssal Terrors DLC[/i].
 
-[b]General Replacement Pool[/b]: the items used for everything under [i]What to Replace[/i]. The card spells out what will be replaced, so you always know what you're getting.
+Even when it's off, a curse on the original item carries over to its replacement.
 
-[h2]T4 Crate Pool[/h2]
+All of the above are replaced with items from the [b]General Replacement Pool[/b]. You can also choose how T4 crates are replaced:
 
 [table]
-[tr][th]Mode[/th][th]What happens to T4 crates[/th][/tr]
+[tr][th]Mode[/th][th]T4 crates[/th][/tr]
 [tr][td]Off (default)[/td][td]Still generated randomly.[/td][/tr]
-[tr][td]Same as above[/td][td]Use the General Replacement Pool, sharing its rotation.[/td][/tr]
-[tr][td]Independent[/td][td]Use their own pool below, rotating A-B-A-B.[/td][/tr]
+[tr][td]Same as above[/td][td]Use the General Replacement Pool.[/td][/tr]
+[tr][td]Independent[/td][td]Use the Independent Replacement Pool, rotating A-B-A-B.[/td][/tr]
 [tr][td]One-time[/td][td]The first N T4 crates become your N items, in order. After that, back to random.[/td][/tr]
 [/table]
 
-[quote][b]Tip:[/b] One-time mode is perfect for "guarantee my first T4 crate is X" without turning every T4 crate into X.[/quote]
+[h1]Try these combos[/h1]
 
-[h1]Try these[/h1]
-
-[list]
-[*][b]Saver + Piggy Bank[/b]: let the interest roll in.
-[*][b]Druid + Garden + Pearl[/b]: the Druid's dream garden.
-[*][b]Any character + One-time T4[/b]: a scripted opening, then pure chaos.
-[/list]
-
-Found a fun combo? Share it in the comments!
-
-[h1]Good to know[/h1]
+Content creators on Bilibili have already come up with plenty of fun combos (videos in Chinese):
 
 [list]
-[*]Click an item in the list to add it to the highlighted pool, and click it again to remove it. Click a card to switch pools.
-[*]Pearl's bonus pearl is always a pearl; it is never replaced.
-[*]Don't enable v1 and v2 at the same time, or items will be replaced twice.
+[*][url=https://www.bilibili.com/video/BV1XHhZ6wEwJ/]Loud + Gentle Alien[/url]: more enemies, more materials; more materials, more enemies
+[*][url=https://www.bilibili.com/video/BV1jeag6kEDy/]Jack + Candy Bag[/url]: snowball your stats and grab red items for free
+[*][url=https://www.bilibili.com/video/BV1VDhb6SEbd/]Demon + Potato[/url]: just stats
 [/list]
+
+Got a fun combo of your own? Post a video or share it in the comments!
+
+Note: this is an entirely different mod. [pullquote]Do not enable v1 and v2 at the same time.[/pullquote]
 
 [pullquote]If you like this mod, please consider liking, favoriting and sharing it, thank you! Comments and suggestions are also very welcome![/pullquote]
 
@@ -327,7 +305,9 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 | 商店通常销售 | 关 | 每波商店固定有一个槽位是你选的物品。 |
 | 箱子 | **开** | 箱子开出的物品。 |
 
-**诅咒**（默认：关）：替换后的物品固定被诅咒（强度随机并随波次提升，和游戏里自然出现的诅咒物品一致）。即使关闭，原物品被诅咒时，也会传递到替换后的物品上。
+**诅咒**（默认：关）：替换后的物品固定被诅咒（强度随机并随波次提升，和游戏里自然出现的诅咒物品一致）。*需要深海魔怪 DLC*。
+
+即使关闭，原物品被诅咒时，也会传递到替换后的物品上。
 
 以上这些物品会被替换成 **通用替换池** 中的物品。此外，你还可以选择 T4 箱子的替换方式：
 
@@ -352,32 +332,26 @@ B 站 UP 主们已经做了很多有趣的组合，欢迎参考：
 
 <!-- BBCode
 
-[b]如果每个箱子里都是存钱罐？如果商店只卖珍珠？[/b]
+[b]假如所有道具变成土豆、外星绅士、糖果袋……[/b] 你只需要这个 mod，One Item to Rule Them All。
 
-选好物品，土豆兄弟就只会给你这些。商店、箱子、开局自带……游戏生成的每一件物品都会变成你选的那些。灵感来自杀戮尖塔 mod [i]One Relic to Rule Them All[/i]。
+[b]现已迎来重大升级[/b]，全新 UI、交互优化、支持 T4 箱子独立替换！
 
-[h1]10 秒上手[/h1]
+[h1]如何使用[/h1]
 
-[olist]
-[*]选择角色后，在武器/难度选择界面左上角点击 [b]替换物品[/b]。
-[*]在物品列表中点击物品，加入 [b]通用替换池[/b]。
-[*]开始游戏。就这么简单，设置会自动保存。
-[/olist]
+选择角色后，在武器/难度选择界面左上角点击 [b]替换物品[/b]。在物品列表中选择想要替换的物品，然后开始游戏。就这么简单！
 
 [h1]特色[/h1]
 
 [list]
 [*][b]A-B-A-B 轮流替换[/b]：选多件物品时，按选择顺序轮流出现。
 [*][b]T4 箱子池[/b]：给 T4 箱子单独指定物品，或者只替换前几个。
-[*][b]诅咒支持[/b]：把一局变成诅咒物品大乱斗。[i]需要深海魔怪 DLC。[/i]
-[*][b]好用的配置窗口[/b]：搜索、稀有度底色、带序号的替换池，还会实时告诉你哪些东西会被替换。
-[*][b]总开关[/b]：想正常玩一局？关掉就行，已选的物品不会丢。
-[*][b]13 种语言[/b]：English、Français、简体中文、日本語、한국어、繁體中文、Русский、Polski、Español、Português、Deutsch、Türkçe、Italiano。
+[*][b]详细又直观的 UI[/b]：搜索道具、稀有度底色、带序号的替换池，还会实时告诉你哪些东西会被替换。
+[*][b]全语言支持[/b]：English、Français、简体中文、日本語、한국어、繁體中文、Русский、Polski、Español、Português、Deutsch、Türkçe、Italiano。
 [/list]
 
 [h1]选项说明[/h1]
 
-[b]选项 → 启用[/b]（默认：[b]开[/b]）：总开关。关闭后不做任何替换，设置保留。
+[b]启用[/b]（默认：[b]开[/b]）：总开关。关闭后不做任何替换，设置保留。
 
 [h2]替换对象[/h2]
 
@@ -385,43 +359,37 @@ B 站 UP 主们已经做了很多有趣的组合，欢迎参考：
 [tr][th]选项[/th][th]默认[/th][th]作用[/th][/tr]
 [tr][td]起始物品[/td][td]关[/td][td]角色开局自带的物品（不含角色本身和武器）。[/td][/tr]
 [tr][td]所有商店物品[/td][td][b]开[/b][/td][td]商店里的所有物品槽位（不含武器）。[/td][/tr]
-[tr][td]商店通常销售[/td][td]关[/td][td]每波商店固定有一个槽位是你选的物品。与“所有商店物品”只能二选一。[/td][/tr]
-[tr][td]箱子[/td][td][b]开[/b][/td][td]箱子开出的物品，包括藏宝图的额外物品。[/td][/tr]
+[tr][td]商店通常销售[/td][td]关[/td][td]每波商店固定有一个槽位是你选的物品。[/td][/tr]
+[tr][td]箱子[/td][td][b]开[/b][/td][td]箱子开出的物品。[/td][/tr]
 [/table]
 
-[b]诅咒[/b]（默认：关）：替换后的物品被诅咒，强度随机并随波次提升，和游戏里自然出现的诅咒物品一致。原物品被诅咒时，替换物一定也会被诅咒。[i]需要深海魔怪 DLC。[/i]
+[b]诅咒[/b]（默认：关）：替换后的物品固定被诅咒（强度随机并随波次提升，和游戏里自然出现的诅咒物品一致）。[i]需要深海魔怪 DLC[/i]。
 
-[b]通用替换池[/b]：“替换对象”中各项使用的物品。卡片里会写明哪些东西会被替换成这些物品，一目了然。
+即使关闭，原物品被诅咒时，也会传递到替换后的物品上。
 
-[h2]T4 箱子池[/h2]
+以上这些物品会被替换成 [b]通用替换池[/b] 中的物品。此外，你还可以选择 T4 箱子的替换方式：
 
 [table]
-[tr][th]模式[/th][th]T4 箱子会怎样[/th][/tr]
+[tr][th]模式[/th][th]T4 箱子[/th][/tr]
 [tr][td]禁用（默认）[/td][td]仍然随机生成。[/td][/tr]
-[tr][td]同上[/td][td]使用上方的通用替换池，并和它共用轮流顺序。[/td][/tr]
-[tr][td]独立[/td][td]使用下方的独立替换池，A-B-A-B 轮流。[/td][/tr]
+[tr][td]同上[/td][td]使用通用替换池。[/td][/tr]
+[tr][td]独立[/td][td]使用独立替换池，A-B-A-B 轮流替换。[/td][/tr]
 [tr][td]单次[/td][td]前 N 个 T4 箱子按顺序变成你选的 N 件物品，之后恢复随机。[/td][/tr]
 [/table]
 
-[quote][b]小技巧：[/b]想要“第一个 T4 箱子必出某件神器”，又不想每个 T4 箱子都一样？用单次模式就对了。[/quote]
-
 [h1]试试这些组合[/h1]
 
-[list]
-[*][b]节俭者 + 存钱罐[/b]：躺着吃利息。
-[*][b]德鲁伊 + 花园 + 珍珠[/b]：德鲁伊的梦幻花园。
-[*][b]任意角色 + T4 单次[/b]：开局按剧本走，之后听天由命。
-[/list]
-
-你也有好玩的组合？欢迎发到评论区！
-
-[h1]小提示[/h1]
+B 站 UP 主们已经做了很多有趣的组合，欢迎参考：
 
 [list]
-[*]点击列表中的物品加入高亮的替换池，再次点击移除；点击卡片可切换替换池。
-[*]珍珠额外开出的珍珠始终是珍珠，不会被替换。
-[*]不要同时启用 v1 和 v2，否则物品会被替换两次。
+[*][url=https://www.bilibili.com/video/BV1XHhZ6wEwJ/]大嗓门 + 外星绅士[/url]：怪物越多经济越多，经济越多怪物越多
+[*][url=https://www.bilibili.com/video/BV1jeag6kEDy/]杰克 + 糖果袋[/url]：滚雪球还能白嫖红色道具
+[*][url=https://www.bilibili.com/video/BV1VDhb6SEbd/]恶魔 + 土豆[/url]：纯粹的数值
 [/list]
+
+你也有好玩的组合？欢迎发视频或分享到评论区！
+
+注意：这是一个全新的 mod，[b]请不要同时启用 v1 和 v2[/b]。
 
 [pullquote]如果你喜欢这个 mod，欢迎点赞、收藏、转发，多谢啦！有问题或建议欢迎在评论区留言！[/pullquote]
 
@@ -444,3 +412,17 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 ![](img/oitrta-v2-4.jpg)
 
 </details>
+
+<!--
+
+假如所有道具变成 (One Item to Rule Them All v2)
+
+假如所有道具都变成土豆、外星绅士、糖果袋……？装上这个 mod 就能实现！
+
+v2 迎来重大升级：全新 UI、交互优化，还支持 T4 箱子独立替换。开局前选好物品，商店和箱子里就只剩你选的那些。
+
+B 站 UP 主们已经玩出了不少花样：大嗓门 + 外星绅士、杰克 + 糖果袋、恶魔 + 土豆……你也来试试？
+
+创意工坊：https://steamcommunity.com/sharedfiles/filedetails/?id=3808638762
+
+-->
