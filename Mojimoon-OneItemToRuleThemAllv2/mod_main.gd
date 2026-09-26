@@ -18,12 +18,24 @@ var force_cursed: bool = false
 # A-B-A-B 轮流计数器，跨所有 hook 全局递增（不持久化，每局重置）。
 var replace_counter: int = 0
 
+# ---------- 传奇箱子 ----------
+# 传奇箱子替换模式
+enum LegendaryMode { NONE, UNIFIED, SEQUENTIAL, ONCE }
+# NONE       不替换
+# UNIFIED    统一替换：使用常规替换池
+# SEQUENTIAL 顺序替换：使用传奇箱子专用池，A-B-A-B 轮流
+# ONCE       单次替换：使用传奇箱子专用池，每个物品只替换一次，用完后自然随机生成
+var legendary_mode: int = LegendaryMode.NONE
+# 传奇箱子专用替换池（my_id 列表），仅 SEQUENTIAL / ONCE 使用
+var legendary_item_ids: Array = []
+# 传奇箱子专用计数器（不持久化，每局重置）
+var legendary_counter: int = 0
+
 # ---------- 替换选项（弹窗内 checkbox 配置，默认值）----------
 var cfg_replace_starting: bool = false
 var cfg_replace_shop: bool = true
 var cfg_replace_shop_first: bool = false	# MOJI_SHOP_ALWAYS_APPEAR：每波固定替换一个槽位（跳过 guaranteed items）
 var cfg_replace_crate: bool = true
-var cfg_replace_legendary_crate: bool = false
 
 
 func _init() -> void:
@@ -51,7 +63,8 @@ func _save_settings() -> void:
 		"cfg_replace_shop": cfg_replace_shop,
 		"cfg_replace_shop_first": cfg_replace_shop_first,
 		"cfg_replace_crate": cfg_replace_crate,
-		"cfg_replace_legendary_crate": cfg_replace_legendary_crate
+		"legendary_mode": legendary_mode,
+		"legendary_item_ids": legendary_item_ids
 	}
 	var dir = Directory.new()
 	var dir_path = SETTINGS_PATH.get_base_dir()
@@ -90,8 +103,13 @@ func _load_settings() -> void:
 	cfg_replace_shop = bool(data.get("cfg_replace_shop", true))
 	cfg_replace_shop_first = bool(data.get("cfg_replace_shop_first", false))
 	cfg_replace_crate = bool(data.get("cfg_replace_crate", true))
-	cfg_replace_legendary_crate = bool(data.get("cfg_replace_legendary_crate", false))
-	ModLoaderLog.info("Settings loaded: %d targets" % target_item_ids.size(), MOD_ID)
+	legendary_item_ids = data.get("legendary_item_ids", [])
+	if data.has("legendary_mode"):
+		legendary_mode = int(clamp(int(data.get("legendary_mode", 0)), LegendaryMode.NONE, LegendaryMode.ONCE))
+	else:
+		# 旧版本迁移：cfg_replace_legendary_crate=true 等价于"统一替换"
+		legendary_mode = LegendaryMode.UNIFIED if bool(data.get("cfg_replace_legendary_crate", false)) else LegendaryMode.NONE
+	ModLoaderLog.info("Settings loaded: %d targets, %d legendary targets, legendary mode %d" % [target_item_ids.size(), legendary_item_ids.size(), legendary_mode], MOD_ID)
 
 
 
@@ -204,7 +222,7 @@ static func _get_mod() -> Node:
 	return tree.root.get_node_or_null("/root/ModLoader/" + MOD_ID)
 
 
-# 取下一个替换物品。
+# 取下一个替换物品（常规替换池）。
 # - A-B-A-B 轮流：按 replace_counter 取模选择目标
 # - 诅咒继承：force_cursed 或 orig_item.is_cursed 时，对新物品施加诅咒
 # 返回新物品（duplicate），不修改原物品；未配置目标时原样返回。
@@ -214,7 +232,38 @@ func get_replacement(orig_item, player_index: int):
 
 	var target_id: String = target_item_ids[replace_counter % target_item_ids.size()]
 	replace_counter += 1
+	return _make_replacement(target_id, orig_item, player_index)
 
+
+# 传奇箱子替换，按 legendary_mode 分派。不替换时原样返回。
+func get_legendary_replacement(orig_item, player_index: int):
+	if legendary_mode == LegendaryMode.UNIFIED:
+		return get_replacement(orig_item, player_index)
+	if not has_legendary_replacement():
+		return orig_item
+
+	var target_id: String
+	if legendary_mode == LegendaryMode.SEQUENTIAL:
+		target_id = legendary_item_ids[legendary_counter % legendary_item_ids.size()]
+	else:	# ONCE
+		target_id = legendary_item_ids[legendary_counter]
+	legendary_counter += 1
+	return _make_replacement(target_id, orig_item, player_index)
+
+
+# 传奇箱子是否可能被替换（供扩展脚本做早退判断）
+func has_legendary_replacement() -> bool:
+	if legendary_mode == LegendaryMode.UNIFIED:
+		return not target_item_ids.empty()
+	if legendary_mode == LegendaryMode.SEQUENTIAL:
+		return not legendary_item_ids.empty()
+	if legendary_mode == LegendaryMode.ONCE:
+		return legendary_counter < legendary_item_ids.size()
+	return false
+
+
+# 按 target_id 生成替换物品，并处理诅咒。找不到目标时原样返回。
+func _make_replacement(target_id: String, orig_item, player_index: int):
 	var item_service = _autoload("ItemService")
 	if item_service == null:
 		return orig_item
@@ -252,6 +301,7 @@ func _curse_item(item_data, player_index: int):
 # 重置 A-B-A-B 计数器（新一局开始时由 run_data 扩展调用）
 func reset_counter() -> void:
 	replace_counter = 0
+	legendary_counter = 0
 
 
 # ============================================================

@@ -2,7 +2,7 @@ extends "res://singletons/item_service.gd"
 
 # 替换商店 / 箱子 / 传奇箱子 / 战利品 物品为目标物品。
 # - 商店：cfg_replace_shop 替换所有 item 位；cfg_replace_shop_first 仅替换第一个（不替换锁住的）
-# - 箱子：区分普通/传奇，分别受 cfg_replace_crate / cfg_replace_legendary_crate 控制
+# - 箱子：普通箱子受 cfg_replace_crate 控制；传奇箱子按 legendary_mode 分派（见 mod_main.get_legendary_replacement）
 # - 战利品（藏宝图等）：归入 cfg_replace_crate 控制
 # 诅咒传递 + A-B-A-B 轮流由 mod 节点的 get_replacement 处理。
 
@@ -46,13 +46,13 @@ func get_player_shop_items(wave: int, player_index: int, args) -> Array:
 func process_item_box(consumable_data, wave: int, player_index: int):
 	var item = .process_item_box(consumable_data, wave, player_index)
 	var m = ModMain._get_mod()
-	if m == null or m.target_item_ids.empty():
+	if m == null or not item is ItemData:
 		return item
 
 	var is_legendary: bool = consumable_data != null and consumable_data.my_id_hash == Keys.consumable_legendary_item_box_hash
-	var do_replace: bool = m.cfg_replace_legendary_crate if is_legendary else m.cfg_replace_crate
-
-	if do_replace and item is ItemData:
+	if is_legendary:
+		return m.get_legendary_replacement(item, player_index)
+	if m.cfg_replace_crate:
 		return m.get_replacement(item, player_index)
 	return item
 
