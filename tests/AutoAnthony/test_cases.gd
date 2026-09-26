@@ -1,0 +1,794 @@
+extends Reference
+
+# 东尼算法无头测试：在反编译的游戏工程里运行，使用真实的 ItemService / RunData / ModLoader。
+# 由 run_aa.gd 在 autoload 就绪后加载；请使用同目录的 run_tests.sh（会同步 mod、隔离 user://）。
+
+const MOD_ID = "Mojimoon-AutoAnthony"
+const MOD_DIR = "res://mods-unpacked/" + MOD_ID + "/"
+const SEEDS = [1, 42, 777, 20260927, 99999]
+
+var Catalog
+var Valuation
+var Generator
+var TriggerEffect
+var Runtime
+
+var m
+var isvc
+var rd
+var tree: SceneTree
+var _current_test = ""
+var _failures: Array = []
+var _checks = 0
+
+
+func run(p_tree: SceneTree):
+	tree = p_tree
+	if OS.get_environment("AA_TEST") != "1":
+		printerr("Refusing to run: use run_tests.sh (it isolates user:// from your real saves).")
+		return 2
+	m = tree.root.get_node_or_null("ModLoader/" + MOD_ID)
+	isvc = tree.root.get_node("ItemService")
+	rd = tree.root.get_node("RunData")
+	if m == null:
+		printerr("Mod node not found: is the mod in res://mods-unpacked?")
+		return 2
+	Catalog = load(MOD_DIR + "aa/catalog.gd")
+	Valuation = load(MOD_DIR + "aa/valuation.gd")
+	Generator = load(MOD_DIR + "aa/generator.gd")
+	TriggerEffect = load(MOD_DIR + "aa/trigger_effect.gd")
+	Runtime = load(MOD_DIR + "aa/runtime.gd")
+	_unlock_everything()
+	print("user dir: ", OS.get_user_data_dir())
+
+	var tests: Array = []
+	for method in get_method_list():
+		if method.name.begins_with("test_"):
+			tests.push_back(method.name)
+	tests.sort()
+	for t in tests:
+		_current_test = t
+		_reset()
+		var state = call(t)
+		if state is GDScriptFunctionState:
+			yield(state, "completed")
+		print("  ran ", t)
+	m.on_menu_reset()
+
+	print("")
+	print("%d checks, %d failures" % [_checks, _failures.size()])
+	for f in _failures:
+		printerr("FAIL ", f)
+	if _failures.empty():
+		print("ALL TESTS PASSED")
+	return 0 if _failures.empty() else 1
+
+
+# ============================================================
+# 工具
+# ============================================================
+func _check(cond: bool, msg: String) -> void:
+	_checks += 1
+	if not cond:
+		_failures.push_back(_current_test + ": " + msg)
+
+
+func _eq(actual, expected, msg: String) -> void:
+	_check(actual == expected, "%s (expected %s, got %s)" % [msg, str(expected), str(actual)])
+
+
+func _reset() -> void:
+	m.on_menu_reset()
+	m.enabled = true
+	m.cfg_items = true
+	m.cfg_characters = false
+	m.cfg_weapons = false
+	m.cfg_mode = 0
+	m.cfg_trigger_rate = 1
+	m.cfg_native_ratio = 0
+	m.cfg_fixed_seed = true
+	m.cfg_seed = 42
+	_setup_player("character_well_rounded")
+	rd.current_wave = 5
+
+
+func _setup_player(char_id: String) -> void:
+	rd.set_player_count(1, true)
+	rd.enabled_dlcs = []
+	var ch = isvc.get_element_safe(isvc.characters, char_id)
+	rd.add_character(ch, 0)
+
+
+func _unlock_everything() -> void:
+	var pd = tree.root.get_node("ProgressData")
+	pd.items_unlocked = []
+	for it in isvc.items:
+		pd.items_unlocked.push_back(it.my_id_hash)
+	pd.weapons_unlocked = []
+	for w in isvc.weapons:
+		if not pd.weapons_unlocked.has(w.weapon_id_hash):
+			pd.weapons_unlocked.push_back(w.weapon_id_hash)
+	isvc.init_unlocked_pool()
+
+
+func _cfg() -> Dictionary:
+	return m.get_cfg()
+
+
+func _gen(p_seed: int, cfg = null) -> Dictionary:
+	var g = Generator.new(cfg if cfg != null else _cfg(), p_seed)
+	return g.generate(isvc.items, [], [])
+
+
+func _texts(effects: Array) -> String:
+	var s = ""
+	for e in effects:
+		s += e.get_text(0, false) + "|"
+	return s
+
+
+func _plan_signature(plan: Dictionary) -> String:
+	var ids = plan.items.keys()
+	ids.sort()
+	var s = ""
+	for id in ids:
+		s += id + ":" + _texts(plan.items[id].effects) + "\n"
+	return s
+
+
+func _item(id: String):
+	return isvc.get_element_safe(isvc.items, id)
+
+
+func _has_up_mechanic(effects: Array) -> bool:
+	for e in effects:
+		if e.has_meta("aa_value") and e.get_meta("aa_value") > 0:
+			return true
+	return false
+
+
+# 生成结果的估算价值（属性行 + 触发条款；机制行按来源估值；负面按补偿比例）
+func _value_of(gen, effects: Array, tier: int) -> float:
+	var v = 0.0
+	for e in effects:
+		if e is TriggerEffect:
+			v += Valuation.clause_value(e.to_clause(), Catalog.PERM_MULT[tier]) * (1.0 if e.value >= 0 else Catalog.DOWNSIDE_COMPENSATION)
+		elif gen.is_plain_stat(e):
+			v += Valuation.stat_line_value(e.key, e.value) * (1.0 if e.value >= 0 else Catalog.DOWNSIDE_COMPENSATION)
+		elif e.has_meta("aa_value"):
+			var mv = e.get_meta("aa_value")
+			v += mv * (1.0 if mv >= 0 else Catalog.DOWNSIDE_COMPENSATION)
+	return v
+
+
+# ============================================================
+# 基础
+# ============================================================
+func test_01_mod_loaded_and_effect_registered() -> void:
+	m.register_effect_script()
+	_check(TriggerEffect in isvc.effects, "trigger effect script registered in ItemService.effects")
+	_eq(TriggerEffect.get_id(), "aa_trigger", "effect id")
+
+
+func test_02_catalog_consistency() -> void:
+	for t in Catalog.TRIGGERS:
+		_check(Catalog.LEGAL.has(t), "LEGAL has trigger " + t)
+		for p in Catalog.LEGAL[t]:
+			_check(Catalog.PAYLOADS.has(p), "payload %s of %s exists" % [p, t])
+		if Catalog.TRIGGERS[t].kind == "state":
+			_eq(Catalog.LEGAL[t], ["temp_stat"], "state trigger %s only drives temp stats" % t)
+		if Catalog.TRIGGERS[t].kind == "shop":
+			for p in Catalog.LEGAL[t]:
+				_check(p in ["perm_stat", "gold"], "shop trigger %s payload %s is shop-safe" % [t, p])
+	_check(not "heal" in Catalog.LEGAL["heal"], "no heal->heal loop")
+	_check(not "gold" in Catalog.LEGAL["gold"], "no gold->gold loop")
+	for k in Catalog.NATIVE_TRIGGER_MAP:
+		var pair = Catalog.NATIVE_TRIGGER_MAP[k]
+		_check(pair[1] in Catalog.LEGAL[pair[0]], "native combo %s is legal in the generic system" % k)
+	for s in Catalog.STATS:
+		_check(Utils.is_stat_key(Keys.generate_hash(s)), "catalog stat %s is a game stat key" % s)
+	for id in Catalog.ANCHORED_ITEMS:
+		_check(_item(id) != null, "anchored item exists: " + id)
+
+
+# ============================================================
+# 生成
+# ============================================================
+func test_10_generation_is_deterministic() -> void:
+	var a = _plan_signature(_gen(42))
+	var b = _plan_signature(_gen(42))
+	var c = _plan_signature(_gen(43))
+	_check(a == b, "same seed -> same pool")
+	_check(a != c, "different seed -> different pool")
+	_check(a.length() > 1000, "pool is non-trivial")
+
+
+func test_11_generated_items_are_well_formed() -> void:
+	for s in SEEDS:
+		var gen = Generator.new(_cfg(), s)
+		var plan = gen.generate(isvc.items, [], [])
+		_check(plan.items.size() > 120, "seed %d: most items reassembled (%d)" % [s, plan.items.size()])
+		for id in plan.items:
+			var p = plan.items[id]
+			_check(not id in Catalog.ANCHORED_ITEMS, "anchored item not reassembled: " + id)
+			_check(p.effects.size() >= 1, "%s has effects" % id)
+			var has_pos = false
+			for e in p.effects:
+				if e.value > 0:
+					has_pos = true
+				var text = e.get_text(0, false)
+				_check(text != "" and text.find("AA_") == -1, "%s line renders (%s) %s/%s/%s" % [id, text, e.key, e.custom_key, e.get_script().resource_path])
+				if e is TriggerEffect:
+					_check(e.payload in Catalog.LEGAL[e.trigger], "%s legal combo %s/%s" % [id, e.trigger, e.payload])
+					_check(e.value != 0, "%s trigger value non-zero" % id)
+					_check(e.chance >= 5 and e.chance <= 100, "%s chance in range" % id)
+					_check(e.param >= 1, "%s param >= 1" % id)
+					if e.payload in ["temp_stat", "timed_stat"]:
+						_check(not e.stat in Catalog.TEMP_STAT_BANNED, "%s temp stat allowed" % id)
+					if e.trigger == "interval":
+						_check(e.param <= 30, "%s interval sane" % id)
+				elif gen.is_plain_stat(e):
+					_check(e.value % Catalog.stat_unit(e.key) == 0, "%s value multiple of unit" % id)
+			_check(has_pos or _has_up_mechanic(p.effects), "%s has a positive line: %s" % [id, _texts(p.effects)])
+
+
+# 价值审计：平衡模式下生成道具的估算价值应贴近原版价格预算
+func test_12_value_audit() -> void:
+	var ratios = []
+	var trig_count = {}
+	var pay_count = {}
+	var with_trigger = 0
+	var total = 0
+	for s in SEEDS:
+		var gen = Generator.new(_cfg(), s)
+		var plan = gen.generate(isvc.items, [], [])
+		for id in plan.items:
+			var item = _item(id)
+			var budget = max(3.0, item.value - Catalog.TIER_INTERCEPT[item.tier])
+			var v = _value_of(gen, plan.items[id].effects, item.tier)
+			ratios.push_back(v / budget)
+			if v / budget < 0.5 and s == SEEDS[0]:
+				print("AUDIT low ", id, " budget=", budget, " v=", v, " ", _texts(plan.items[id].effects))
+			total += 1
+			var has_t = false
+			for e in plan.items[id].effects:
+				if e is TriggerEffect:
+					has_t = true
+					trig_count[e.trigger] = trig_count.get(e.trigger, 0) + 1
+					pay_count[e.payload] = pay_count.get(e.payload, 0) + 1
+			if has_t:
+				with_trigger += 1
+	ratios.sort()
+	var n = ratios.size()
+	var median = ratios[n / 2]
+	var p10 = ratios[int(n * 0.1)]
+	var p90 = ratios[int(n * 0.9)]
+	print("AUDIT value/budget: p10=%.2f median=%.2f p90=%.2f (n=%d)" % [p10, median, p90, n])
+	print("AUDIT items with a trigger clause: %d / %d" % [with_trigger, total])
+	print("AUDIT triggers: ", trig_count)
+	print("AUDIT payloads: ", pay_count)
+	_check(median > 0.8 and median < 1.25, "median value/budget near 1 (%.2f)" % median)
+	_check(p10 > 0.5, "p10 value/budget not too low (%.2f)" % p10)
+	_check(p90 < 1.7, "p90 value/budget not too high (%.2f)" % p90)
+	_check(trig_count.size() >= 12, "most triggers occur (%d)" % trig_count.size())
+	_check(pay_count.size() == Catalog.PAYLOADS.size(), "all payloads occur (%d)" % pay_count.size())
+
+
+func test_13_native_ratio_keeps_items() -> void:
+	var cfg = _cfg()
+	cfg.native_ratio = 50
+	var n50 = _gen(7, cfg).items.size()
+	var n0 = _gen(7).items.size()
+	_check(n50 < n0 * 0.7 and n50 > n0 * 0.3, "about half kept native (%d of %d)" % [n50, n0])
+
+
+func test_14_modes() -> void:
+	var cfg = _cfg()
+	var base = 0.0
+	var aggressive = 0.0
+	var g0 = Generator.new(cfg, 5)
+	var p0 = g0.generate(isvc.items, [], [])
+	cfg.mode = 1
+	var g1 = Generator.new(cfg, 5)
+	var p1 = g1.generate(isvc.items, [], [])
+	for id in p0.items:
+		base += _value_of(g0, p0.items[id].effects, _item(id).tier)
+	for id in p1.items:
+		aggressive += _value_of(g1, p1.items[id].effects, _item(id).tier)
+	_check(aggressive > base * 1.1, "aggressive mode has more total value (%.0f vs %.0f)" % [aggressive, base])
+	cfg.mode = 0
+	cfg.trigger_rate = 2
+	var plan_many = _gen(5, cfg)
+	cfg.trigger_rate = 0
+	var plan_few = _gen(5, cfg)
+	var c_many = 0
+	var c_few = 0
+	for id in plan_many.items:
+		for e in plan_many.items[id].effects:
+			if e is TriggerEffect:
+				c_many += 1
+	for id in plan_few.items:
+		for e in plan_few.items[id].effects:
+			if e is TriggerEffect:
+				c_few += 1
+	_check(c_many > c_few * 2, "trigger rate setting works (%d vs %d)" % [c_many, c_few])
+
+
+# 原版触发组合都能被通用系统重新表达：对每一种原版组合，生成器都能产出同类条款
+func test_15_every_native_combo_is_reachable() -> void:
+	var seen = {}
+	for s in range(1, 40):
+		var gen = Generator.new(_cfg(), s)
+		gen._collect_priors(isvc.items, isvc.characters, isvc.weapons)
+		gen.rng.seed = s
+		for i in 30:
+			var c = gen.gen_clause(30.0, 6.0, false)
+			if not c.empty():
+				seen[c.trigger + "/" + c.payload] = true
+	for k in Catalog.NATIVE_TRIGGER_MAP:
+		var pair = Catalog.NATIVE_TRIGGER_MAP[k]
+		_check(seen.has(pair[0] + "/" + pair[1]), "native combo reachable: %s -> %s/%s" % [k, pair[0], pair[1]])
+	var legal_total = 0
+	for t in Catalog.LEGAL:
+		legal_total += Catalog.LEGAL[t].size()
+	print("AUDIT distinct trigger/payload combos generated: %d of %d legal" % [seen.size(), legal_total])
+	_check(seen.size() > legal_total * 0.8, "most legal combos reachable")
+
+
+func test_16_clause_fits_budget() -> void:
+	var gen = Generator.new(_cfg(), 3)
+	gen._collect_priors(isvc.items, isvc.characters, isvc.weapons)
+	gen.rng.seed = 3
+	for target in [5.0, 15.0, 40.0, 90.0]:
+		var ok = 0
+		for i in 50:
+			var c = gen.gen_clause(target, 5.5, false)
+			if c.empty():
+				continue
+			var v = Valuation.clause_value(c, 5.5)
+			_check(v > 0 and v <= target * 1.35 + 0.01 and v >= target * 0.4 - 0.01, "clause value %.1f fits target %.0f (%s)" % [v, target, str(c)])
+			ok += 1
+		_check(ok >= 40, "clauses found for target %.0f (%d/50)" % [target, ok])
+	var neg = gen.gen_clause(-10.0, 5.5, true)
+	_check(not neg.empty() and neg.value < 0 and neg.payload == "temp_stat", "negative clause is a temp-stat downside")
+
+
+# ============================================================
+# 生命周期：开局物化、回菜单还原、存档往返
+# ============================================================
+func test_20_start_run_and_restore() -> void:
+	var potato = _item("item_potato")
+	var orig_effects = potato.effects
+	var orig_name = potato.name
+	m.start_new_run()
+	_check(m.active_state != null, "active after start")
+	_eq(int(m.active_state.seed), 42, "fixed seed used")
+	_check(potato.effects != orig_effects, "potato reassembled in place")
+	_check(potato.name != orig_name, "name composed")
+	_eq(potato.tracking_text, "[EMPTY]", "tracking text hidden")
+	_eq(potato.value, 95, "price preserved")
+	_eq(potato.tier, 3, "tier preserved")
+	var anchored = _item("item_coupon")
+	var coupon_before = anchored.effects
+	m.on_menu_reset()
+	_check(potato.effects == orig_effects, "restored effects")
+	_eq(potato.name, orig_name, "restored name")
+	_check(anchored.effects == coupon_before, "anchored untouched")
+	_eq(m.active_state, null, "inactive after reset")
+
+
+func test_21_disabled_does_nothing() -> void:
+	m.enabled = false
+	var potato = _item("item_potato")
+	var orig = potato.effects
+	m.start_new_run()
+	_eq(m.active_state, null, "no state when disabled")
+	_check(potato.effects == orig, "untouched when disabled")
+
+
+# 开局前已持有的初始道具要从"旧效果"切到"新效果"，玩家属性随之变化且不重复叠加
+func test_22_owned_starting_items_are_materialized() -> void:
+	var shirt = _item("item_lumberjack_shirt")
+	rd.add_item(shirt, 0)
+	var effects_before = rd.get_player_effects(0).duplicate(true)
+	m.start_new_run()
+	var new_effects = shirt.effects
+	var expected = effects_before.duplicate(true)
+	# 反推：移除原效果、加上新效果后的属性应与实际一致
+	for e in m._backups[shirt.get_instance_id()].effects:
+		if Utils.is_stat_key(e.key_hash) and e.storage_method == 0 and e.custom_key == "":
+			expected[e.key_hash] -= e.value
+	for e in new_effects:
+		if Utils.is_stat_key(e.key_hash) and e.storage_method == 0 and e.custom_key == "":
+			expected[e.key_hash] += e.value
+	var actual = rd.get_player_effects(0)
+	for s in Catalog.STATS:
+		var h = Keys.generate_hash(s)
+		_eq(actual[h], expected[h], "stat %s after materialize" % s)
+	m.on_menu_reset()
+
+
+func test_23_trigger_effect_serialization_roundtrip() -> void:
+	var c = {"trigger": "kill", "param": 8, "chance": 100, "payload": "temp_stat", "stat": "stat_attack_speed", "value": 2, "value2": 0, "cap": 20}
+	var e = TriggerEffect.make(c)
+	var item = _item("item_potato").duplicate()
+	item.effects = [e]
+	var ser = item.serialize()
+	var parsed = JSON.parse(JSON.print(ser)).result
+	m.register_effect_script()
+	var back = _item("item_potato").duplicate()
+	back.deserialize_and_merge(parsed)
+	_eq(back.effects.size(), 1, "effect survived")
+	if back.effects.size() == 1:
+		var b = back.effects[0]
+		_check(b is TriggerEffect, "type preserved")
+		_eq(JSON.print(b.to_clause()), JSON.print(e.to_clause()), "fields preserved")
+		_eq(b.get_text(0, false), e.get_text(0, false), "text preserved")
+
+
+func test_24_state_roundtrip_and_resume_repair() -> void:
+	m.start_new_run()
+	var state = rd.get_state()
+	_check(state.has("aa_state") and state.aa_state != null, "aa_state saved")
+	var sig_before = _texts(_item("item_potato").effects)
+	# 模拟启动时存档先于本 mod 注册被反序列化：玩家持有的生成道具丢失了触发条款
+	var victim = null
+	for id in m.plan.items:
+		for e in m.plan.items[id].effects:
+			if e is TriggerEffect:
+				victim = _item(id)
+				break
+		if victim != null:
+			break
+	_check(victim != null, "some item has a trigger")
+	var owned = victim.duplicate()
+	var stripped = []
+	for e in victim.effects:
+		if not e is TriggerEffect:
+			stripped.push_back(e)
+	owned.effects = stripped
+	rd.players_data[0].items.push_back(owned)
+	var saved = JSON.parse(JSON.print({"aa_state": state.aa_state})).result
+	m.on_menu_reset()
+	_check(_texts(_item("item_potato").effects) != sig_before, "reset restored potato")
+	m.on_resume({"aa_state": saved.aa_state, "shop_items": [[], [], [], []]})
+	_eq(_texts(_item("item_potato").effects), sig_before, "resume rebuilds identical pool from saved seed")
+	var has_trigger = false
+	for e in owned.effects:
+		if e is TriggerEffect:
+			has_trigger = true
+	_check(has_trigger, "owned item repaired with its trigger clause")
+	m.on_resume({})
+	_eq(m.active_state, null, "vanilla save resumes vanilla")
+
+
+func test_25_curse_compatible() -> void:
+	var pd = tree.root.get_node("ProgressData")
+	var dlc = pd.get_dlc_data("abyssal_terrors")
+	if dlc == null:
+		print("  (DLC data unavailable, skipped)")
+		return
+	var c = {"trigger": "hit", "chance": 100, "payload": "temp_stat", "stat": "stat_armor", "value": 2}
+	var item = _item("item_potato").duplicate()
+	item.effects = [TriggerEffect.make(c)]
+	item.is_cursed = false
+	var cursed = dlc.curse_item(item, 0, true)
+	_check(cursed.is_cursed, "cursed")
+	_check(cursed.effects[0] is TriggerEffect, "trigger kept its type")
+	_check(cursed.effects[0].value >= 2, "positive trigger value boosted or kept (%d)" % cursed.effects[0].value)
+
+
+# ============================================================
+# 角色 / 武器
+# ============================================================
+func test_30_character_keeps_identity() -> void:
+	m.cfg_characters = true
+	for cid in ["character_ranger", "character_apprentice", "character_masochist", "character_explorer"]:
+		_setup_player(cid)
+		var ch = isvc.get_element_safe(isvc.characters, cid)
+		var before = ch.effects
+		m.start_new_run()
+		_check(m.plan.characters.has(cid), cid + " reassembled")
+		var after = ch.effects
+		_eq(after.size(), before.size(), cid + " same number of lines")
+		for e in before:
+			var gen = Generator.new(_cfg(), 1)
+			if not gen.is_plain_stat(e) and gen.native_trigger_of(e) == null:
+				_check(e in after, "%s identity line kept: %s" % [cid, e.key])
+		var p = rd.players_data[0]
+		_check(p.current_character == ch, "current character is the generated resource")
+		m.on_menu_reset()
+		_check(ch.effects == before, cid + " restored")
+
+
+func test_31_weapons_swap_within_type() -> void:
+	m.cfg_weapons = true
+	m.cfg_items = false
+	var g = Generator.new(m.get_cfg(), 11)
+	var out = g.generate_weapons(isvc.weapons)
+	_check(out.size() > 100, "weapons mapped (%d)" % out.size())
+	var changed = 0
+	for id in out:
+		var w = isvc.get_element_safe(isvc.weapons, id)
+		var donor = isvc.get_element_safe(isvc.weapons, out[id].donor)
+		_eq(donor.type, w.type, "%s donor %s same type" % [id, donor.my_id])
+		if donor.weapon_id != w.weapon_id:
+			changed += 1
+		for e in out[id].effects:
+			if e is WeaponStackEffect:
+				_eq(e.weapon_stacked_id, w.weapon_id, "stack effect retargeted on " + id)
+	_check(changed > out.size() / 2, "most weapons got another family's effects (%d)" % changed)
+
+
+# ============================================================
+# 运行时触发总线
+# ============================================================
+func _make_runtime(clauses: Array):
+	var holder = _item("item_potato").duplicate()
+	var effects = []
+	for c in clauses:
+		effects.push_back(TriggerEffect.make(c))
+	holder.effects = effects
+	rd.players_data[0].items.push_back(holder)
+	var rt = Runtime.new()
+	tree.root.add_child(rt)
+	rt.mod = m
+	rt.rebuild_all()
+	return rt
+
+
+func test_40_runtime_gating_and_payloads() -> void:
+	TempStats.reset()
+	var rt = _make_runtime([
+		{"trigger": "kill", "param": 3, "payload": "temp_stat", "stat": "stat_armor", "value": 2, "cap": 2},
+		{"trigger": "level_up", "payload": "perm_stat", "stat": "stat_luck", "value": 5},
+		{"trigger": "wave_end", "payload": "gold", "value": 7},
+		{"trigger": "consumable", "payload": "xp", "value": 4},
+	])
+	var armor = Keys.stat_armor_hash
+	for i in 2:
+		rt.fire("kill", 0)
+	_eq(TempStats.get_stat(armor, 0), 0.0, "every-3 gate holds")
+	rt.fire("kill", 0)
+	_eq(int(TempStats.get_stat(armor, 0) / rd.get_stat_gain(armor, 0)), 2, "fires on 3rd kill")
+	for i in 9:
+		rt.fire("kill", 0)
+	_eq(int(TempStats.get_stat(armor, 0) / rd.get_stat_gain(armor, 0)), 4, "per-wave cap of 2 respected")
+	var luck_before = rd.get_player_effects(0)[Keys.stat_luck_hash]
+	rt.fire("level_up", 0)
+	_eq(rd.get_player_effects(0)[Keys.stat_luck_hash], luck_before + 5, "permanent stat on level up")
+	var gold_before = rd.get_player_gold(0)
+	rt.fire("wave_end", 0)
+	_eq(rd.get_player_gold(0), gold_before + 7, "gold at wave end")
+	var xp_before = rd.get_player_xp(0)
+	rt.fire("consumable", 0)
+	_check(rd.get_player_xp(0) > xp_before, "xp on consumable")
+	rt.on_wave_end()
+	rt.fire("kill", 0)
+	rt.fire("kill", 0)
+	rt.fire("kill", 0)
+	_eq(int(TempStats.get_stat(armor, 0) / rd.get_stat_gain(armor, 0)), 6, "cap resets on new wave")
+	rt.queue_free()
+	TempStats.reset()
+
+
+func test_41_runtime_chance_and_unrelated_events() -> void:
+	TempStats.reset()
+	var rt = _make_runtime([
+		{"trigger": "hit", "chance": 50, "payload": "temp_stat", "stat": "stat_dodge", "value": 1},
+	])
+	seed(123)
+	for i in 400:
+		rt.fire("hit", 0)
+	var got = int(TempStats.get_stat(Keys.stat_dodge_hash, 0) / rd.get_stat_gain(Keys.stat_dodge_hash, 0))
+	_check(got > 150 and got < 250, "50%% chance fires about half the time (%d/400)" % got)
+	rt.fire("dodge", 0)
+	rt.fire("kill", 0)
+	_eq(int(TempStats.get_stat(Keys.stat_dodge_hash, 0) / rd.get_stat_gain(Keys.stat_dodge_hash, 0)), got, "other events do not fire it")
+	rt.queue_free()
+	TempStats.reset()
+
+
+func test_42_shop_triggers() -> void:
+	m.start_new_run()
+	var holder = _item("item_potato").duplicate()
+	holder.effects = [
+		TriggerEffect.make({"trigger": "reroll", "payload": "perm_stat", "stat": "stat_max_hp", "value": 1}),
+		TriggerEffect.make({"trigger": "buy", "payload": "gold", "value": 3}),
+	]
+	rd.players_data[0].items.push_back(holder)
+	var hp = rd.get_player_effects(0)[Keys.stat_max_hp_hash]
+	m.fire_shop("reroll", 0)
+	_eq(rd.get_player_effects(0)[Keys.stat_max_hp_hash], hp + 1, "reroll -> +1 max hp")
+	var g = rd.get_player_gold(0)
+	m.fire_shop("buy", 0)
+	_eq(rd.get_player_gold(0), g + 3, "buy -> gold")
+	m.on_menu_reset()
+
+
+# ============================================================
+# 文本与界面
+# ============================================================
+func test_50_all_translation_keys_exist() -> void:
+	var f = File.new()
+	f.open(MOD_DIR + "translations/autoanthony.csv", File.READ)
+	var keys = {}
+	for line in f.get_as_text().split("\n", false):
+		var k = line.split(",")[0].replace("\"", "")
+		keys[k] = true
+	f.close()
+	for t in Catalog.TRIGGERS:
+		if not t in ["kill", "gold", "interval"]:
+			_check(keys.has("AA_T_" + t.to_upper()), "trigger text for " + t)
+	for s in Catalog.ADJ_BY_STAT:
+		_check(keys.has(Catalog.ADJ_BY_STAT[s]), "adjective " + Catalog.ADJ_BY_STAT[s])
+	for t in Catalog.ADJ_BY_TRIGGER:
+		_check(keys.has(Catalog.ADJ_BY_TRIGGER[t]), "adjective " + Catalog.ADJ_BY_TRIGGER[t])
+	# 扫描源码中引用的 AA_ key
+	var re = RegEx.new()
+	re.compile("\"(AA_[A-Z0-9_]+)\"")
+	for path in ["aa/trigger_effect.gd", "aa/generator.gd", "ui/settings_ui.gd", "mod_main.gd", "extensions/ui/menus/run/weapon_selection.gd"]:
+		var src = File.new()
+		src.open(MOD_DIR + path, File.READ)
+		for mt in re.search_all(src.get_as_text()):
+			var k = mt.get_string(1)
+			if k.ends_with("_"):
+				continue
+			_check(keys.has(k), "%s: key %s exists" % [path, k])
+		src.close()
+
+
+func test_51_ui_builds_and_previews() -> void:
+	var scene = load(MOD_DIR + "ui/settings_ui.tscn")
+	var ui = scene.instance()
+	tree.root.add_child(ui)
+	var text = ui.build_preview_text(42)
+	_check(text.length() > 2000, "preview lists items")
+	_check(text.find("AA_") == -1, "preview has no raw keys")
+	ui._on_mode_pressed(2)
+	_eq(m.cfg_mode, 2, "mode chip")
+	ui._on_target_toggled(true, "cfg_weapons")
+	_eq(m.cfg_weapons, true, "weapons chip")
+	ui.queue_free()
+	yield(tree, "idle_frame")
+
+
+func test_52_sample_items_printed() -> void:
+	# 输出几件样例道具到日志，便于人工审阅
+	var plan = _gen(20260927)
+	var n = 0
+	for id in ["item_potato", "item_coffee", "item_alien_tongue", "item_cyberball", "item_vigilante_ring", "item_triangle_of_power", "item_medikit", "item_bag"]:
+		if plan.items.has(id):
+			var p = plan.items[id]
+			print("AUDIT sample ", id, " [", _item(id).value, "] ", tr(p.adj), ": ", _texts(p.effects))
+			n += 1
+	_check(n >= 5, "samples printed")
+
+
+# ============================================================
+# 集成：真实的战斗场景（main.tscn）里触发总线的挂接
+# ============================================================
+func test_90_battle_integration() -> void:
+	m.start_new_run()
+	var fist = isvc.get_element_safe(isvc.weapons, "weapon_fist_1")
+	var _w = rd.add_weapon(fist, 0)
+	var holder = _item("item_potato").duplicate()
+	holder.effects = [
+		TriggerEffect.make({"trigger": "wave_start", "payload": "temp_stat", "stat": "stat_armor", "value": 3}),
+		TriggerEffect.make({"trigger": "kill", "payload": "gold", "value": 5}),
+		TriggerEffect.make({"trigger": "hit", "payload": "temp_stat", "stat": "stat_dodge", "value": 2}),
+		TriggerEffect.make({"trigger": "interval", "param": 1, "payload": "xp", "value": 1}),
+		TriggerEffect.make({"trigger": "still", "payload": "temp_stat", "stat": "stat_luck", "value": 7}),
+	]
+	rd.add_item(holder, 0)
+	rd.current_wave = 1
+	TempStats.reset()
+	var _e = tree.change_scene("res://main.tscn")
+	for i in 10:
+		yield(tree, "idle_frame")
+	var main = tree.current_scene
+	_check(main != null and main.get_node_or_null("AutoAnthonyRuntime") != null, "runtime node created in main scene")
+	if main == null or main.get_node_or_null("AutoAnthonyRuntime") == null:
+		return
+	var armor = TempStats.get_stat(Keys.stat_armor_hash, 0)
+	_check(armor > 0, "wave_start temp stat applied (%s)" % str(armor))
+
+	yield(tree.create_timer(1.5), "timeout")
+	_check(TempStats.get_stat(Keys.stat_luck_hash, 0) > 0, "standing still -> state stat on")
+	_check(rd.get_player_xp(0) > 0, "interval xp fired (%s)" % str(rd.get_player_xp(0)))
+
+	var player = main._players[0]
+	var dodge_before = TempStats.get_stat(Keys.stat_dodge_hash, 0)
+	var args = TakeDamageArgs.new(-1)
+	args.bypass_invincibility = true
+	args.dodgeable = false
+	var _r = player.take_damage(1, args)
+	_check(TempStats.get_stat(Keys.stat_dodge_hash, 0) > dodge_before, "hit trigger via took_damage signal")
+
+	# 等待敌人出现并击杀一个
+	var enemy = null
+	for i in 40:
+		var enemies = main._entity_spawner.get_all_enemies(false)
+		if not enemies.empty():
+			enemy = enemies[0]
+			break
+		yield(tree.create_timer(0.25), "timeout")
+	_check(enemy != null, "an enemy spawned")
+	if enemy != null:
+		var gold_before = rd.get_player_gold(0)
+		var kill_args = TakeDamageArgs.new(0)
+		var _k = enemy.take_damage(999999, kill_args)
+		yield(tree, "idle_frame")
+		_check(rd.get_player_gold(0) >= gold_before + 5, "kill trigger gave materials (%d -> %d)" % [gold_before, rd.get_player_gold(0)])
+
+	# 触发条款的文本在道具说明里正常显示
+	var txt = holder.get_effects_text(0)
+	_check(txt.find("AA_") == -1 and txt.length() > 40, "item description renders")
+	main._cleaning_up = true
+	m.on_menu_reset()
+
+
+func test_91_menu_buttons_and_shop_hook() -> void:
+	var fist = isvc.get_element_safe(isvc.weapons, "weapon_fist_1")
+	for path in [MenuData.weapon_selection_scene, MenuData.difficulty_selection_scene]:
+		var _e = tree.change_scene(path)
+		for i in 6:
+			yield(tree, "idle_frame")
+		var sc = tree.current_scene
+		var back = sc.get_node_or_null("%BackButton") if sc != null else null
+		_check(back != null and back.has_node("AutoAnthonyBtn"), "config button on " + path)
+		if back != null and back.has_node("AutoAnthonyBtn"):
+			back.get_node("AutoAnthonyBtn").emit_signal("pressed")
+			yield(tree, "idle_frame")
+			var opened = false
+			for c in sc.get_children():
+				if c is CanvasLayer and c.get_child_count() > 0 and c.get_child(0).name == "AutoAnthonySettings":
+					opened = true
+					c.get_child(0)._on_close_pressed()
+			_check(opened, "settings popup opens on " + path)
+	var _w = rd.add_weapon(fist, 0)
+	m.start_new_run()
+	var holder = _item("item_potato").duplicate()
+	holder.effects = [TriggerEffect.make({"trigger": "reroll", "payload": "gold", "value": 50})]
+	rd.add_item(holder, 0)
+	rd.current_wave = 3
+	rd.add_gold(100, 0)
+	var _e = tree.change_scene("res://ui/menus/shop/shop.tscn")
+	for i in 6:
+		yield(tree, "idle_frame")
+	var shop = tree.current_scene
+	var g = rd.get_player_gold(0)
+	shop._on_RerollButton_pressed(0)
+	_check(rd.get_player_gold(0) > g + 40, "reroll trigger fired through the shop hook (%d -> %d)" % [g, rd.get_player_gold(0)])
+	m.on_menu_reset()
+
+
+func test_53_character_and_weapon_samples() -> void:
+	var cfg = _cfg()
+	cfg.characters = true
+	var gen = Generator.new(cfg, 20260927)
+	var chars = []
+	for cid in ["character_apprentice", "character_masochist", "character_golem", "character_well_rounded", "character_lucky"]:
+		chars.push_back(isvc.get_element_safe(isvc.characters, cid))
+	var plan = gen.generate([], chars, [])
+	for cid in plan.characters:
+		print("AUDIT character ", cid, " -> ", tr(plan.characters[cid].adj), ": ", _texts(plan.characters[cid].effects))
+		var gen2 = Generator.new(_cfg(), 1)
+		var ch = isvc.get_element_safe(isvc.characters, cid)
+		var native_trig = 0
+		for e in ch.effects:
+			if gen2.native_trigger_of(e) != null:
+				native_trig += 1
+		var no_heal = false
+		for e in ch.effects:
+			if e.key == "no_heal" and e.value > 0:
+				no_heal = true
+		for e in plan.characters[cid].effects:
+			if no_heal and e is TriggerEffect:
+				_check(e.trigger != "heal" and e.payload != "heal", cid + " no heal-related clause on a no-heal character")
+			if gen2.native_trigger_of(e) != null:
+				_check(false, cid + " still has a native trigger line (should be re-expressed): " + e.key)
+	var w = gen.generate_weapons(isvc.weapons)
+	for id in ["weapon_torch_2", "weapon_knife_1", "weapon_wrench_1", "weapon_stick_1", "weapon_pistol_1"]:
+		if w.has(id):
+			print("AUDIT weapon ", id, " <- ", w[id].donor, ": ", _texts(w[id].effects))

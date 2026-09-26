@@ -426,3 +426,11 @@ B 站 UP 主们已经玩出了不少花样：大嗓门 + 外星绅士、杰克 +
 创意工坊：https://steamcommunity.com/sharedfiles/filedetails/?id=3808638762
 
 -->
+
+## [Auto-Anthonyology](Mojimoon-AutoAnthony)
+
+> Auto-Anthonyology / 东尼算法
+
+Inspired by the Slay the Spire 2 mod *AutoAnthony*: every run, items (optionally your character and weapons) are decomposed into components and reassembled under the same value budget. Triggers are no longer welded to one effect — a generic `trigger × payload × gate` clause lets any trigger (kill, hit, dodge, level up, every N seconds, standing still, reroll…) drive any legal effect (temporary / permanent / timed stats, heal, materials, XP, damage, explosions). Open **Auto-Anthony** in the top-left corner of the weapon / difficulty selection screen.
+
+受《杀戮尖塔 2》东尼算法启发：每局把道具（可选角色、武器）拆成组件，按同等价值重新组装。触发扳机不再与某一种效果焊死——通用的“扳机 × 载荷 × 门控”条款让任意扳机都能驱动任意合法效果。设计思路见 [Mojimoon-AutoAnthony/README.md](Mojimoon-AutoAnthony/README.md)。

@@ -1,0 +1,17 @@
+{
+    "name": "AutoAnthony",
+    "namespace": "Mojimoon",
+    "version_number": "1.0.0",
+    "description": "东尼算法：每局把原版道具（可选角色、武器）拆成组件，按价值预算重新组装；任意触发扳机都能与任意效果自由组合。Auto-Anthonyology: every run, items (optionally characters and weapons) are decomposed into components and reassembled under the same value budget; any trigger can drive any effect.",
+    "website_url": "",
+    "dependencies": [],
+    "extra": {
+        "godot": {
+            "incompatibilities": [],
+            "authors": ["Mojimoon"],
+            "compatible_mod_loader_version": ["3.0.0"],
+            "compatible_game_version": ["0.6.1.6"],
+            "optional_dependencies": []
+        }
+    }
+}
