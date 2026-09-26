@@ -163,7 +163,7 @@ After picking a character, click **Replace Items** in the top-left corner of the
 
 ### Features
 
-- **A-B-A-B rotation**: pick several items and they take turns, in the order you chose them.
+- **Round-robin rotation**: pick several items and they take turns (e.g., A-B-A-B), in the order you chose them.
 - **T4 Crate Pool**: give T4 crates their own items, or replace only the first few.
 - **Detailed yet intuitive UI**: item search, rarity colors, numbered pools, and a live description of exactly what will be replaced.
 - **Full language support**: English, Français, 简体中文, 日本語, 한국어, 繁體中文, Русский, Polski, Español, Português, Deutsch, Türkçe, Italiano.
@@ -219,7 +219,7 @@ After picking a character, click [b]Replace Items[/b] in the top-left corner of 
 [h1]Features[/h1]
 
 [list]
-[*][b]A-B-A-B rotation[/b]: pick several items and they take turns, in the order you chose them.
+[*][b]Round-robin rotation[/b]: pick several items and they take turns (e.g., A-B-A-B), in the order you chose them.
 [*][b]T4 Crate Pool[/b]: give T4 crates their own items, or replace only the first few.
 [*][b]Detailed yet intuitive UI[/b]: item search, rarity colors, numbered pools, and a live description of exactly what will be replaced.
 [*][b]Full language support[/b]: English, Français, 简体中文, 日本語, 한국어, 繁體中文, Русский, Polski, Español, Português, Deutsch, Türkçe, Italiano.
