@@ -10,7 +10,7 @@ extends Control
 # 样式参考 cave-modtools（base_theme + StyleBoxFlat 圆角卡片 / 强调色按钮）。
 # 稀有度底色由 InventoryElement.set_element 自动调用 update_background_color 实现。
 
-const ModMain = preload("res://mods-unpacked/Mojimoon-OneItemToRuleThemAll/mod_main.gd")
+const ModMain = preload("res://mods-unpacked/Mojimoon-OneItemToRuleThemAllv2/mod_main.gd")
 const INVENTORY_ELEMENT = preload("res://items/global/inventory_element.tscn")
 const FONT_TITLE = preload("res://resources/fonts/actual/base/font_32_outline.tres")
 const FONT_NORMAL = preload("res://resources/fonts/actual/base/font_26.tres")

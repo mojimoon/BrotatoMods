@@ -4,8 +4,8 @@ extends "res://ui/menus/run/weapon_selection.gd"
 # 兼容 cave-modtools：call_deferred 延迟到其他 mod 按钮就位后，再扫描排在最右。
 
 const FONT_26 = preload("res://resources/fonts/actual/base/font_26.tres")
-const ModMain = preload("res://mods-unpacked/Mojimoon-OneItemToRuleThemAll/mod_main.gd")
-const UI_SCENE_PATH = "res://mods-unpacked/Mojimoon-OneItemToRuleThemAll/ui/item_picker_ui.tscn"
+const ModMain = preload("res://mods-unpacked/Mojimoon-OneItemToRuleThemAllv2/mod_main.gd")
+const UI_SCENE_PATH = "res://mods-unpacked/Mojimoon-OneItemToRuleThemAllv2/ui/item_picker_ui.tscn"
 
 var _moji_picker_btn: Button = null
 

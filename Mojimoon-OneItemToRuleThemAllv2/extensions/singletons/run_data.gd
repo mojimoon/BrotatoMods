@@ -6,7 +6,7 @@ extends "res://singletons/run_data.gd"
 # 跳过 CharacterData（角色也是 ItemData 子类，会被误替换）和 WeaponData。
 # 同时在开局重置 A-B-A-B 计数器。
 
-const ModMain = preload("res://mods-unpacked/Mojimoon-OneItemToRuleThemAll/mod_main.gd")
+const ModMain = preload("res://mods-unpacked/Mojimoon-OneItemToRuleThemAllv2/mod_main.gd")
 
 
 func add_starting_items_and_weapons() -> void:

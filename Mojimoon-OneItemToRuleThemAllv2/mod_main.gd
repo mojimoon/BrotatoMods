@@ -1,12 +1,14 @@
 extends Node
 
-# Mojimoon-OneItemToRuleThemAll
+# Mojimoon-OneItemToRuleThemAllv2
 # 将游戏生成的物品替换为目标物品，支持多目标 A-B-A-B 轮流、诅咒开关与原物品诅咒继承。
 # 替换选项在弹窗内配置，持久化到 user://（JSON，不暴露给玩家）。
 
-const MOD_ID = "Mojimoon-OneItemToRuleThemAll"
+const MOD_ID = "Mojimoon-OneItemToRuleThemAllv2"
 const VERSION = "1.0.0"
-const SETTINGS_PATH = "user://Mojimoon-OneItemToRuleThemAll/settings.json"
+const SETTINGS_PATH = "user://Mojimoon-OneItemToRuleThemAllv2/settings.json"
+# v1 的设置路径：v2 首次运行时从这里导入
+const LEGACY_SETTINGS_PATH = "user://Mojimoon-OneItemToRuleThemAll/settings.json"
 
 # ============================================================
 # 运行时状态（弹窗配置，持久化到 JSON）
@@ -81,9 +83,12 @@ func _save_settings() -> void:
 
 func _load_settings() -> void:
 	var file = File.new()
-	if not file.file_exists(SETTINGS_PATH):
-		return
-	var err = file.open(SETTINGS_PATH, File.READ)
+	var path: String = SETTINGS_PATH
+	if not file.file_exists(path):
+		path = LEGACY_SETTINGS_PATH
+		if not file.file_exists(path):
+			return
+	var err = file.open(path, File.READ)
 	if err != OK:
 		ModLoaderLog.error("Failed to load settings: " + str(err), MOD_ID)
 		return
@@ -117,7 +122,7 @@ func _load_settings() -> void:
 # 本地化（运行时解析 translations/mojimoon_oitrta.csv，单数据源）
 # 用 get_as_text + 手动 CSV 解析，避免 get_csv_line 在某些环境的异常
 # ============================================================
-const CSV_PATH = "res://mods-unpacked/Mojimoon-OneItemToRuleThemAll/translations/mojimoon_oitrta.csv"
+const CSV_PATH = "res://mods-unpacked/Mojimoon-OneItemToRuleThemAllv2/translations/mojimoon_oitrta.csv"
 
 func _register_translations() -> void:
 	var file = File.new()

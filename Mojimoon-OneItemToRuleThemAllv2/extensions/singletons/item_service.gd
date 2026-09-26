@@ -6,7 +6,7 @@ extends "res://singletons/item_service.gd"
 # - 战利品（藏宝图等）：归入 cfg_replace_crate 控制
 # 诅咒传递 + A-B-A-B 轮流由 mod 节点的 get_replacement 处理。
 
-const ModMain = preload("res://mods-unpacked/Mojimoon-OneItemToRuleThemAll/mod_main.gd")
+const ModMain = preload("res://mods-unpacked/Mojimoon-OneItemToRuleThemAllv2/mod_main.gd")
 
 
 # 商店物品
