@@ -155,7 +155,7 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 
 **What if every item turned into a Potato, a Gentle Alien, a Candy Bag...?** This mod is all you need: One Item to Rule Them All.
 
-**Now with a major upgrade**: a brand-new UI, smoother controls, and independent replacement for T4 crates!
+**Now with a major upgrade**: a brand-new UI, better UX, and independent replacement for T4 crates!
 
 ### How to use
 
@@ -210,7 +210,7 @@ Note: this is an entirely different mod. **Do not enable v1 and v2 at the same t
 
 [b]What if every item turned into a Potato, a Gentle Alien, a Candy Bag...?[/b] This mod is all you need: One Item to Rule Them All.
 
-[b]Now with a major upgrade[/b]: a brand-new UI, smoother controls, and independent replacement for T4 crates!
+[b]Now with a major upgrade[/b]: a brand-new UI, better UX, and independent replacement for T4 crates!
 
 [h1]How to use[/h1]
 
