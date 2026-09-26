@@ -4,7 +4,7 @@ A collection of mods for the game [Brotato](https://store.steampowered.com/app/1
 
 ## [Double Sided Upgrades](Mojimoon-DoubleSidedUpgrades)
 
-[Steam Workshop Link](https://steamcommunity.com/sharedfiles/filedetails/?id=3671945570) | [Client Link](https://link.steam.watch/url/CommunityFilePage/3671945570)
+[Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3671945570) | [Open in Steam Client](https://link.steam.watch/url/CommunityFilePage/3671945570)
 
 > Cursed & Double Sided Upgrades / 诅咒和双面升级
 
@@ -145,45 +145,13 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 
 </details>
 
-<!--
-
-## [Imperfect Hook](Mojimoon-ImperfectHook)
-
-[Steam Workshop Link](https://steamcommunity.com/sharedfiles/filedetails/?id=3678338295)
-
-![](img/imperfect-hook-icon.png)
-
-This mod forces the fish hook to curse locked items. Nothing else.
-
-This is effective the same as save/load scumming until your item is cursed. It does not guarantee that the fish hook will appear, nor does it change the curse strength to 110%. Suitable for those who find a perfect hook too imba but are running out of patience with savescumming.
-
-Works with other hook mods such as Recurse.
-
----
-
-这个 mod 会让鱼钩必定诅咒锁定物品，仅此而已。
-
-这样做的效果和 S/L 刷诅咒物品是一样的。这个 mod 不保证鱼钩一定会出现，也不会把诅咒强度改成 110%。如果你觉得完美鱼钩太超模了，但又厌烦了 S/L 刷诅咒，不妨来试一试。
-
-可以和其他鱼钩 mod（比如 Recurse）一起使用。
-
-<details>
-
-<summary>Screenshots</summary>
-
-![](img/imperfect-hook-mod-1.png)
-
-</details>
-
--->
-
 ## [One Item to Rule Them All v2](Mojimoon-OneItemToRuleThemAllv2)
 
-[Steam Workshop Link](https://steamcommunity.com/sharedfiles/filedetails/?id=3808638762) | [Client Link](https://link.steam.watch/url/CommunityFilePage/3808638762)
+[Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3808638762) | [Open in Steam Client](https://link.steam.watch/url/CommunityFilePage/3808638762)
 
-> One Item to Rule Them All. / 所有物品变为同一个
+> One Item to Rule Them All v2 / 假如所有道具变成
 
-![](img/oitrtav2-icon.png)
+![](img/oitrta-v2-icon.png)
 
 **What if every crate held a Piggy Bank? What if the shop sold nothing but Pearls?**
 
@@ -331,28 +299,24 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 ---
 
-**如果每个箱子里都是存钱罐？如果商店只卖珍珠？**
+**假如所有道具变成土豆、外星绅士、糖果袋……** 你只需要这个 mod，One Item to Rule Them All。
 
-选好物品，土豆兄弟就只会给你这些。商店、箱子、开局自带……游戏生成的每一件物品都会变成你选的那些。灵感来自杀戮尖塔 mod *One Relic to Rule Them All*。
+**现已迎来重大升级**，全新 UI、交互优化、支持 T4 箱子独立替换！
 
-### 10 秒上手
+### 如何使用
 
-1. 选择角色后，在武器/难度选择界面左上角点击 **替换物品**。
-2. 在物品列表中点击物品，加入 **通用替换池**。
-3. 开始游戏。就这么简单，设置会自动保存。
+选择角色后，在武器/难度选择界面左上角点击 **替换物品**。在物品列表中选择想要替换的物品，然后开始游戏。就这么简单！
 
 ### 特色
 
 - **A-B-A-B 轮流替换**：选多件物品时，按选择顺序轮流出现。
 - **T4 箱子池**：给 T4 箱子单独指定物品，或者只替换前几个。
-- **诅咒支持**：把一局变成诅咒物品大乱斗。*需要深海魔怪 DLC。*
-- **好用的配置窗口**：搜索、稀有度底色、带序号的替换池，还会实时告诉你哪些东西会被替换。
-- **总开关**：想正常玩一局？关掉就行，已选的物品不会丢。
-- **13 种语言**：English、Français、简体中文、日本語、한국어、繁體中文、Русский、Polski、Español、Português、Deutsch、Türkçe、Italiano。
+- **详细又直观的 UI**：搜索道具、稀有度底色、带序号的替换池，还会实时告诉你哪些东西会被替换。
+- **全语言支持**：English、Français、简体中文、日本語、한국어、繁體中文、Русский、Polski、Español、Português、Deutsch、Türkçe、Italiano。
 
 ### 选项说明
 
-**选项 → 启用**（默认：**开**）：总开关。关闭后不做任何替换，设置保留。
+**启用**（默认：**开**）：总开关。关闭后不做任何替换，设置保留。
 
 **替换对象**
 
@@ -360,39 +324,31 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 | --- | --- | --- |
 | 起始物品 | 关 | 角色开局自带的物品（不含角色本身和武器）。 |
 | 所有商店物品 | **开** | 商店里的所有物品槽位（不含武器）。 |
-| 商店通常销售 | 关 | 每波商店固定有一个槽位是你选的物品。与“所有商店物品”只能二选一。 |
-| 箱子 | **开** | 箱子开出的物品，包括藏宝图的额外物品。 |
+| 商店通常销售 | 关 | 每波商店固定有一个槽位是你选的物品。 |
+| 箱子 | **开** | 箱子开出的物品。 |
 
-**诅咒**（默认：关）：替换后的物品被诅咒，强度随机并随波次提升，和游戏里自然出现的诅咒物品一致。原物品被诅咒时，替换物一定也会被诅咒。*需要深海魔怪 DLC。*
+**诅咒**（默认：关）：替换后的物品固定被诅咒（强度随机并随波次提升，和游戏里自然出现的诅咒物品一致）。即使关闭，原物品被诅咒时，也会传递到替换后的物品上。
 
-**通用替换池**：“替换对象”中各项使用的物品。卡片里会写明哪些东西会被替换成这些物品，一目了然。
+以上这些物品会被替换成 **通用替换池** 中的物品。此外，你还可以选择 T4 箱子的替换方式：
 
-**T4 箱子池**
-
-| 模式 | T4 箱子会怎样 |
+| 模式 | T4 箱子 |
 | --- | --- |
 | 禁用（默认） | 仍然随机生成。 |
-| 同上 | 使用上方的通用替换池，并和它共用轮流顺序。 |
-| 独立 | 使用下方的独立替换池，A-B-A-B 轮流。 |
+| 同上 | 使用通用替换池。 |
+| 独立 | 使用独立替换池，A-B-A-B 轮流替换。 |
 | 单次 | 前 N 个 T4 箱子按顺序变成你选的 N 件物品，之后恢复随机。 |
-
-> **小技巧：** 想要“第一个 T4 箱子必出某件神器”，又不想每个 T4 箱子都一样？用单次模式就对了。
 
 ### 试试这些组合
 
-- **节俭者 + 存钱罐**：躺着吃利息。
-- **德鲁伊 + 花园 + 珍珠**：德鲁伊的梦幻花园。
-- **任意角色 + T4 单次**：开局按剧本走，之后听天由命。
+B 站 UP 主们已经做了很多有趣的组合，欢迎参考：
 
-你也有好玩的组合？欢迎发到评论区！
+- [大嗓门 + 外星绅士](https://www.bilibili.com/video/BV1XHhZ6wEwJ/)：怪物越多经济越多，经济越多怪物越多
+- [杰克 + 糖果袋](https://www.bilibili.com/video/BV1jeag6kEDy/)：滚雪球还能白嫖红色道具
+- [恶魔 + 土豆](https://www.bilibili.com/video/BV1VDhb6SEbd/)：纯粹的数值
 
-### 小提示
+你也有好玩的组合？欢迎发视频或分享到评论区！
 
-- 点击列表中的物品加入高亮的替换池，再次点击移除；点击卡片可切换替换池。
-- 珍珠额外开出的珍珠始终是珍珠，不会被替换。
-- 不要同时启用 v1 和 v2，否则物品会被替换两次。
-
-**祝您玩得开心！**
+注意：这是一个全新的 mod，**请不要同时启用 v1 和 v2**。
 
 <!-- BBCode
 
@@ -474,3 +430,17 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/url]
 
 -->
+
+<details>
+
+<summary>Screenshots</summary>
+
+![](img/oitrta-v2-1.jpg)
+
+![](img/oitrta-v2-2.jpg)
+
+![](img/oitrta-v2-3.jpg)
+
+![](img/oitrta-v2-4.jpg)
+
+</details>
