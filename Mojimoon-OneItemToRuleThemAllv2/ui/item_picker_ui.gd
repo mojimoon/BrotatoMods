@@ -106,18 +106,28 @@ func _ready() -> void:
 func _input(event: InputEvent) -> void:
 	if not (event is InputEventMouseButton and event.pressed and event.button_index == BUTTON_LEFT):
 		return
+	_select_pool_at(get_global_mouse_position())
+
+
+# 把 point（画布全局坐标）所在卡片设为当前替换池；T4 箱子池仅在独立/单次模式下可选
+func _select_pool_at(point: Vector2) -> void:
+	var pool = _pool_at(point)
+	if pool == -1:
+		return
+	if pool == POOL_LEGENDARY and not _is_legendary_pool_visible():
+		return
+	if _active_pool != pool:
+		_active_pool = pool
+		_refresh_active_pool()
+
+
+# 返回 point 所在的替换池卡片，不在任何卡片内返回 -1
+func _pool_at(point: Vector2) -> int:
 	for pool in [POOL_REGULAR, POOL_LEGENDARY]:
 		var card: Control = _pool_cards[pool]
-		if card == null or not card.is_visible_in_tree():
-			continue
-		if not card.get_global_rect().has_point(card.get_global_mouse_position()):
-			continue
-		if pool == POOL_LEGENDARY and not _is_legendary_pool_visible():
-			return
-		if _active_pool != pool:
-			_active_pool = pool
-			_refresh_active_pool()
-		return
+		if card != null and card.is_visible_in_tree() and card.get_global_rect().has_point(point):
+			return pool
+	return -1
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -550,6 +560,9 @@ func _make_element(parent: Control, item_data, cursed: bool, method: String, bin
 
 
 func _fit_available_columns() -> void:
+	# 构建过程中 ScrollContainer 先于网格触发 resized
+	if _avail_grid == null:
+		return
 	# 预留滚动条宽度
 	var width: float = _avail_scroll.rect_size.x - 16.0
 	_avail_grid.columns = int(max(1, floor((width + EL_SEP) / (EL_SIZE + EL_SEP))))

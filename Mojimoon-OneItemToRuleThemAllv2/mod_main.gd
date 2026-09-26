@@ -171,7 +171,8 @@ func _register_translations() -> void:
 		if key == "":
 			continue
 		for i in range(1, min(row.size(), header.size())):
-			var value = row[i]
+			# 支持 \n 等转义（CSV 按行解析，单元格内不能有真实换行）
+			var value = row[i].c_unescape()
 			if value == "":
 				value = key
 			translations[locales[i - 1]].add_message(key, value)
