@@ -29,7 +29,7 @@ trap 'rm -rf "$SANDBOX"' EXIT
 LOG="$SANDBOX/test.log"
 
 cd "$PROJECT"
-APPDATA=$(cygpath -w "$SANDBOX") OITRTA_TEST=1 timeout 600 "$GODOT" --no-window --path . \
+APPDATA=$(cygpath -w "$SANDBOX") OITRTA_TEST=1 timeout 600 "$GODOT" --no-window --audio-driver Dummy --path . \
 	-s "res://mods/tests/OneItemToRuleThemAllv2/run_oitrta.gd" > "$LOG" 2>&1
 STATUS=$?
 

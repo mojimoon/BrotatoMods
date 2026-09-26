@@ -11,9 +11,9 @@ extends Reference
 #   限时属性（N 秒）                w × v × min(1, 次数 × N / 波长)
 #   永久属性（逐次累积）            w × v × 次数 × 累积倍率（与购买时剩余波数有关）
 #   回血 / 材料 / 经验 / 伤害       每波总量 × 对应单位价值
-# 频率统一用"每波期望次数"表示（波长按 55 秒估计），见 TRIGGERS。
+# 频率统一用"每波期望次数"表示（波长按 60 秒估计，大部分波次为 60 秒），见 TRIGGERS。
 
-const WAVE_SECONDS = 55.0
+const WAVE_SECONDS = 60.0
 
 # 稀有度截距（Tier 0..3）：原版价格中与效果无关的部分
 const TIER_INTERCEPT = [7.0, 20.0, 24.0, 15.0]
@@ -75,12 +75,12 @@ const EXPLOSION_TARGETS = 2.5	# 爆炸平均命中数
 #   w: 基础出现权重（与原版先验相加）
 # ------------------------------------------------------------
 const TRIGGERS = {
-	"kill": {"kind": "event", "e": 110.0, "timing": 0.5, "gate": "every", "w": 1.0},
-	"hit": {"kind": "event", "e": 7.0, "timing": 0.5, "gate": "chance", "w": 1.0},
+	"kill": {"kind": "event", "e": 120.0, "timing": 0.5, "gate": "every", "w": 1.0},
+	"hit": {"kind": "event", "e": 8.0, "timing": 0.5, "gate": "chance", "w": 1.0},
 	"dodge": {"kind": "event", "e": 4.0, "timing": 0.5, "gate": "chance", "w": 0.7},
 	"consumable": {"kind": "event", "e": 7.0, "timing": 0.5, "gate": "chance", "w": 0.8},
-	"gold": {"kind": "event", "e": 110.0, "timing": 0.5, "gate": "every", "w": 0.6},
-	"heal": {"kind": "event", "e": 12.0, "timing": 0.5, "gate": "chance", "w": 0.4},
+	"gold": {"kind": "event", "e": 120.0, "timing": 0.5, "gate": "every", "w": 0.6},
+	"heal": {"kind": "event", "e": 13.0, "timing": 0.5, "gate": "chance", "w": 0.4},
 	"level_up": {"kind": "event", "e": 1.3, "timing": 0.5, "gate": "none", "w": 0.9},
 	"wave_start": {"kind": "event", "e": 1.0, "timing": 1.0, "gate": "none", "w": 0.8},
 	"wave_end": {"kind": "event", "e": 1.0, "timing": 0.0, "gate": "none", "w": 0.8},
