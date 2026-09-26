@@ -13,6 +13,8 @@ const LEGACY_SETTINGS_PATH = "user://Mojimoon-OneItemToRuleThemAll/settings.json
 # ============================================================
 # 运行时状态（弹窗配置，持久化到 JSON）
 # ============================================================
+# 总开关：关闭时不做任何替换（设置保留）。
+var enabled: bool = true
 # 玩家选中的目标物品 my_id 列表（String）。空 = 不替换。
 var target_item_ids: Array = []
 # 弹窗"是否诅咒"全局开关：为 true 时所有替换物都被诅咒。
@@ -59,6 +61,7 @@ func _ready() -> void:
 func _save_settings() -> void:
 	var data: Dictionary = {
 		"version": VERSION,
+		"enabled": enabled,
 		"target_item_ids": target_item_ids,
 		"force_cursed": force_cursed,
 		"cfg_replace_starting": cfg_replace_starting,
@@ -102,6 +105,7 @@ func _load_settings() -> void:
 	var data: Dictionary = parse_result.result
 
 	# 逐字段读取，缺失字段用默认值
+	enabled = bool(data.get("enabled", true))
 	target_item_ids = data.get("target_item_ids", [])
 	force_cursed = bool(data.get("force_cursed", false))
 	cfg_replace_starting = bool(data.get("cfg_replace_starting", false))
@@ -232,7 +236,7 @@ static func _get_mod() -> Node:
 # - 诅咒继承：force_cursed 或 orig_item.is_cursed 时，对新物品施加诅咒
 # 返回新物品（duplicate），不修改原物品；未配置目标时原样返回。
 func get_replacement(orig_item, player_index: int):
-	if target_item_ids.empty():
+	if not enabled or target_item_ids.empty():
 		return orig_item
 
 	var target_id: String = target_item_ids[replace_counter % target_item_ids.size()]
@@ -242,6 +246,8 @@ func get_replacement(orig_item, player_index: int):
 
 # 传奇箱子替换，按 legendary_mode 分派。不替换时原样返回。
 func get_legendary_replacement(orig_item, player_index: int):
+	if not enabled:
+		return orig_item
 	if legendary_mode == LegendaryMode.UNIFIED:
 		return get_replacement(orig_item, player_index)
 	if not has_legendary_replacement():

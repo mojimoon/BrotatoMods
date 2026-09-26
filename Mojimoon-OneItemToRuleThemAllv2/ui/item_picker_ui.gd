@@ -2,9 +2,9 @@ extends Control
 
 # 物品选择弹窗。布局（自上而下）：
 #   标题栏：标题 + 关闭
-#   替换选项卡片：起始 / 商店 / 商店总是有售 / 箱子 开关 + 诅咒开关
-#   常规替换池卡片：已选物品（带序号）+ 清空
-#   传奇箱子卡片：四种模式 + 模式说明 + 专用替换池（仅顺序/单次模式显示）
+#   选项卡片：总开关 / 替换对象（起始 / 商店 / 商店通常销售 / 箱子）/ 诅咒开关
+#   通用替换池卡片：说明（随替换对象变化）+ 已选物品（带序号）+ 清空
+#   T4 箱子池卡片：四种模式 + 模式说明 + 独立替换池（仅独立/单次模式显示）
 #   全部物品卡片：搜索 + 物品网格（点击添加到"当前替换池"）
 # 两个替换池通过点击卡片切换"当前替换池"，当前池高亮边框，网格中已在当前池的物品带同色描边。
 # 样式参考 cave-modtools（base_theme + StyleBoxFlat 圆角卡片 / 强调色按钮）。
@@ -56,9 +56,15 @@ var _mod = null
 var _base_stylebox: StyleBoxFlat
 
 var _option_chips: Dictionary = {}	# 配置字段 -> Button
-var _curse_chip: Button
+var _enable_switch: CheckButton
+var _curse_switch: CheckButton
 var _mode_buttons: Array = []
 var _mode_desc: Label
+var _regular_desc: Label
+# 总开关关闭时变暗的区域
+var _dimmable: Array = []
+# 缩小后的开关图标（原图 100x50 太大）
+var _switch_icons: Dictionary = {}
 
 # 按 POOL_* 索引
 var _pool_cards: Array = [null, null]
@@ -93,6 +99,25 @@ func _ready() -> void:
 		_active_pool = POOL_LEGENDARY
 	_refresh_all()
 	set_process_unhandled_input(true)
+
+
+# 点击卡片切换当前替换池。卡片里的按钮 / 物品 / 滚动容器会吞掉鼠标事件，
+# gui_input 冒泡不可靠，所以在 _input（GUI 分发之前）按卡片矩形判断，且不消费事件。
+func _input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton and event.pressed and event.button_index == BUTTON_LEFT):
+		return
+	for pool in [POOL_REGULAR, POOL_LEGENDARY]:
+		var card: Control = _pool_cards[pool]
+		if card == null or not card.is_visible_in_tree():
+			continue
+		if not card.get_global_rect().has_point(card.get_global_mouse_position()):
+			continue
+		if pool == POOL_LEGENDARY and not _is_legendary_pool_visible():
+			return
+		if _active_pool != pool:
+			_active_pool = pool
+			_refresh_active_pool()
+		return
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -134,6 +159,7 @@ func _build_ui() -> void:
 
 	var footer = _label(tr("MOJI_HINT"), FONT_SMALL, C_TEXT_DIM)
 	footer.align = Label.ALIGN_CENTER
+	footer.autowrap = true
 	root.add_child(footer)
 
 
@@ -157,11 +183,27 @@ func _build_options_card(parent: Control) -> void:
 	var card = _card(parent)
 	card.add_stylebox_override("panel", _card_style(C_BORDER, false))
 
+	var vbox = VBoxContainer.new()
+	vbox.add_constant_override("separation", 8)
+	card.add_child(vbox)
+
+	# 第一行：选项 + 总开关
+	var head = HBoxContainer.new()
+	head.add_constant_override("separation", 10)
+	vbox.add_child(head)
+	head.add_child(_label(tr("MOJI_OPTIONS"), FONT_NORMAL, C_TEXT))
+	head.add_child(_spacer())
+	_enable_switch = _switch(tr("MOJI_ENABLE"), _mod.enabled)
+	_enable_switch.connect("toggled", self, "_on_enable_toggled")
+	head.add_child(_enable_switch)
+
+	# 第二行：替换对象 + 诅咒开关
 	var row = HBoxContainer.new()
 	row.add_constant_override("separation", 8)
-	card.add_child(row)
+	vbox.add_child(row)
+	_dimmable.push_back(row)
 
-	row.add_child(_label(tr("MOJI_OPTIONS"), FONT_SMALL, C_TEXT_DIM))
+	row.add_child(_label(tr("MOJI_WHAT_TO_REPLACE"), FONT_SMALL, C_TEXT_DIM))
 	for opt in OPTIONS:
 		var chip = _button(tr(opt[1]), FONT_SMALL)
 		chip.toggle_mode = true
@@ -172,22 +214,20 @@ func _build_options_card(parent: Control) -> void:
 
 	row.add_child(_spacer())
 
-	_curse_chip = _button(tr("MOJI_CURSE"), FONT_SMALL)
-	_curse_chip.toggle_mode = true
-	if ProgressData.is_dlc_available_and_active("abyssal_terrors"):
-		_curse_chip.pressed = _mod.force_cursed
-		_curse_chip.hint_tooltip = tr("MOJI_CURSE_HINT")
-	else:
-		_curse_chip.disabled = true
-		_curse_chip.hint_tooltip = tr("MOJI_CURSE_DLC_REQUIRED")
-	_curse_chip.connect("toggled", self, "_on_cursed_toggled")
-	row.add_child(_curse_chip)
+	var dlc_active = ProgressData.is_dlc_available_and_active("abyssal_terrors")
+	var curse_text = tr("MOJI_CURSE")
+	if not dlc_active:
+		curse_text += " (" + tr("MOJI_CURSE_DLC_REQUIRED") + ")"
+	_curse_switch = _switch(curse_text, dlc_active and _mod.force_cursed)
+	_curse_switch.disabled = not dlc_active
+	_curse_switch.connect("toggled", self, "_on_cursed_toggled")
+	row.add_child(_curse_switch)
 
 
 func _build_regular_card(parent: Control) -> void:
 	var card = _card(parent)
-	card.connect("gui_input", self, "_on_pool_card_gui_input", [POOL_REGULAR])
 	_pool_cards[POOL_REGULAR] = card
+	_dimmable.push_back(card)
 
 	var vbox = VBoxContainer.new()
 	vbox.add_constant_override("separation", 8)
@@ -199,13 +239,17 @@ func _build_regular_card(parent: Control) -> void:
 	head.add_child(_label(tr("MOJI_POOL_REGULAR"), FONT_NORMAL, C_ACCENT_REGULAR))
 	_add_pool_count_and_clear(head, POOL_REGULAR)
 
+	_regular_desc = _label("", FONT_SMALL, C_TEXT_DIM)
+	_regular_desc.autowrap = true
+	vbox.add_child(_regular_desc)
+
 	vbox.add_child(_pool_row(POOL_REGULAR))
 
 
 func _build_legendary_card(parent: Control) -> void:
 	var card = _card(parent)
-	card.connect("gui_input", self, "_on_pool_card_gui_input", [POOL_LEGENDARY])
 	_pool_cards[POOL_LEGENDARY] = card
+	_dimmable.push_back(card)
 
 	var vbox = VBoxContainer.new()
 	vbox.add_constant_override("separation", 8)
@@ -226,7 +270,6 @@ func _build_legendary_card(parent: Control) -> void:
 		btn.toggle_mode = true
 		btn.group = group
 		btn.pressed = i == _mod.legendary_mode
-		btn.hint_tooltip = tr(MODE_DESC_KEYS[i])
 		btn.connect("pressed", self, "_on_mode_pressed", [i])
 		modes.add_child(btn)
 		_mode_buttons.push_back(btn)
@@ -244,6 +287,7 @@ func _build_legendary_card(parent: Control) -> void:
 func _build_available_card(parent: Control) -> void:
 	var card = _card(parent)
 	card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_dimmable.push_back(card)
 	card.add_stylebox_override("panel", _card_style(C_BORDER, false))
 
 	var vbox = VBoxContainer.new()
@@ -338,6 +382,7 @@ func _is_legendary_pool_visible() -> bool:
 
 func _refresh_all() -> void:
 	_refresh_option_styles()
+	_refresh_enabled()
 	_refresh_legendary_mode()
 	_refresh_pool(POOL_REGULAR)
 	_refresh_pool(POOL_LEGENDARY)
@@ -347,14 +392,53 @@ func _refresh_option_styles() -> void:
 	for path in _option_chips:
 		var chip: Button = _option_chips[path]
 		_apply_chip_style(chip, chip.pressed, C_ACCENT_OPTION)
-	_apply_chip_style(_curse_chip, _curse_chip.pressed, C_ACCENT_CURSE)
+	_refresh_regular_desc()
+
+
+# 总开关关闭时其余区域变暗（仍可编辑）
+func _refresh_enabled() -> void:
+	var m = Color(1, 1, 1, 1) if _mod.enabled else Color(1, 1, 1, 0.4)
+	for c in _dimmable:
+		c.modulate = m
+
+
+# 通用替换池说明：按已启用的替换对象拼接
+func _refresh_regular_desc() -> void:
+	var nouns: Array = []
+	if _mod.cfg_replace_starting:
+		nouns.push_back(tr("MOJI_NOUN_STARTING"))
+	if _mod.cfg_replace_shop:
+		nouns.push_back(tr("MOJI_NOUN_SHOP"))
+	if _mod.cfg_replace_crate:
+		nouns.push_back(tr("MOJI_NOUN_CRATE"))
+
+	var parts: Array = []
+	if not nouns.empty():
+		var sep = tr("MOJI_LIST_SEP")
+		var joined = ""
+		for i in nouns.size():
+			if i > 0:
+				joined += sep
+			joined += nouns[i]
+		parts.push_back(_capitalize_first(tr("MOJI_DESC_REPLACED") % joined))
+	if _mod.cfg_replace_shop_first:
+		parts.push_back(tr("MOJI_DESC_SHOP_SELLS"))
+	if parts.empty():
+		parts.push_back(tr("MOJI_DESC_NOTHING"))
+
+	var text = ""
+	for p in parts:
+		if text != "" and not _is_cjk():
+			text += " "
+		text += p
+	_regular_desc.text = text
 
 
 func _refresh_legendary_mode() -> void:
 	var mode: int = _mod.legendary_mode
 	for i in _mode_buttons.size():
 		_apply_chip_style(_mode_buttons[i], i == mode, C_ACCENT_LEGENDARY)
-	_mode_desc.text = tr(MODE_DESC_KEYS[mode])
+	_refresh_mode_desc()
 
 	var pool_visible = _is_legendary_pool_visible()
 	_legendary_pool_box.visible = pool_visible
@@ -363,6 +447,14 @@ func _refresh_legendary_mode() -> void:
 	if not pool_visible and _active_pool == POOL_LEGENDARY:
 		_active_pool = POOL_REGULAR
 	_refresh_active_pool()
+
+
+func _refresh_mode_desc() -> void:
+	var mode: int = _mod.legendary_mode
+	var text = tr(MODE_DESC_KEYS[mode])
+	if mode == ModMain.LegendaryMode.ONCE:
+		text = text % _mod.legendary_item_ids.size()
+	_mode_desc.text = text
 
 
 # 当前替换池：卡片高亮 + "点击添加到"提示 + 网格描边
@@ -391,6 +483,8 @@ func _refresh_pool(pool: int) -> void:
 
 	var ids = _get_pool(pool)
 	_pool_counts[pool].text = tr("MOJI_SELECTED") % ids.size()
+	if pool == POOL_LEGENDARY:
+		_refresh_mode_desc()
 
 	if ids.empty():
 		var empty = _label(tr("MOJI_EMPTY_POOL"), FONT_SMALL, C_TEXT_DIM)
@@ -444,7 +538,6 @@ func _make_element(parent: Control, item_data, cursed: bool, method: String, bin
 	el.add_stylebox_override("normal", _base_stylebox.duplicate())
 	el.rect_scale = Vector2(EL_SCALE, EL_SCALE)
 	el.focus_mode = Control.FOCUS_NONE
-	el.hint_tooltip = tr(item_data.name)
 	# 诅咒预览：duplicate 一份并标记 is_cursed，不影响原物品
 	if cursed:
 		var d = item_data.duplicate()
@@ -484,15 +577,6 @@ func _on_pool_item_pressed(_element, pool: int, item_id: String) -> void:
 	call_deferred("_refresh_active_pool")
 
 
-func _on_pool_card_gui_input(event: InputEvent, pool: int) -> void:
-	if event is InputEventMouseButton and event.pressed and event.button_index == BUTTON_LEFT:
-		if pool == POOL_LEGENDARY and not _is_legendary_pool_visible():
-			return
-		if _active_pool != pool:
-			_active_pool = pool
-			_refresh_active_pool()
-
-
 func _on_clear_pressed(pool: int) -> void:
 	_get_pool(pool).clear()
 	_mod._save_settings()
@@ -523,6 +607,12 @@ func _on_option_toggled(pressed: bool, path: String) -> void:
 			_option_chips[other].pressed = false
 	_mod._save_settings()
 	_refresh_option_styles()
+
+
+func _on_enable_toggled(pressed: bool) -> void:
+	_mod.enabled = pressed
+	_mod._save_settings()
+	_refresh_enabled()
 
 
 func _on_cursed_toggled(pressed: bool) -> void:
@@ -615,6 +705,47 @@ func _apply_action_style(btn: Button, accent: Color) -> void:
 	btn.add_color_override("font_color_pressed", C_TEXT)
 
 
+# 开关（CheckButton，沿用游戏的开关图标，缩小到 56x28）
+func _switch(text: String, on: bool) -> CheckButton:
+	var sw = CheckButton.new()
+	sw.text = text
+	sw.pressed = on
+	sw.focus_mode = Control.FOCUS_NONE
+	sw.add_font_override("font", FONT_SMALL)
+	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
+		sw.add_stylebox_override(state, StyleBoxEmpty.new())
+	for icon_name in ["on", "off", "on_disabled", "off_disabled"]:
+		var src_name = "on" if icon_name.begins_with("on") else "off"
+		var icon = _small_switch_icon(sw.get_icon(src_name))
+		if icon != null:
+			sw.add_icon_override(icon_name, icon)
+	sw.add_color_override("font_color", C_TEXT)
+	sw.add_color_override("font_color_hover", C_TEXT)
+	sw.add_color_override("font_color_pressed", C_TEXT)
+	sw.add_color_override("font_color_hover_pressed", C_TEXT)
+	sw.add_color_override("font_color_disabled", C_TEXT_DIM.darkened(0.3))
+	return sw
+
+
+func _small_switch_icon(src: Texture) -> Texture:
+	if src == null:
+		return null
+	var key = src.get_rid().get_id()
+	if _switch_icons.has(key):
+		return _switch_icons[key]
+	var img: Image = src.get_data()
+	if img == null:
+		return src
+	img = img.duplicate()
+	if img.is_compressed():
+		img.decompress()
+	img.resize(56, 28, Image.INTERPOLATE_BILINEAR)
+	var tex = ImageTexture.new()
+	tex.create_from_image(img, Texture.FLAG_FILTER)
+	_switch_icons[key] = tex
+	return tex
+
+
 func _button(text: String, font: Font) -> Button:
 	var btn = Button.new()
 	btn.text = text
@@ -630,6 +761,18 @@ func _label(text: String, font: Font, color: Color) -> Label:
 	lbl.add_font_override("font", font)
 	lbl.add_color_override("font_color", color)
 	return lbl
+
+
+func _capitalize_first(text: String) -> String:
+	if text.empty():
+		return text
+	return text.substr(0, 1).to_upper() + text.substr(1)
+
+
+# 中日文句子之间不加空格
+func _is_cjk() -> bool:
+	var locale = TranslationServer.get_locale()
+	return locale.begins_with("zh") or locale.begins_with("ja")
 
 
 func _spacer() -> Control:
