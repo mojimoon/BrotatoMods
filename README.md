@@ -177,71 +177,149 @@ Works with other hook mods such as Recurse.
 
 -->
 
-# [OneItemToRuleThemAll](Mojimoon-OneItemToRuleThemAll)
+## [One Item to Rule Them All v2](Mojimoon-OneItemToRuleThemAllv2)
 
-[Steam Workshop Link](https://steamcommunity.com/sharedfiles/filedetails/?id=3757246252) | [Client Link](https://link.steam.watch/url/CommunityFilePage/3757246252)
+[Steam Workshop Link](https://steamcommunity.com/sharedfiles/filedetails/?id=3808638762) | [Client Link](https://link.steam.watch/url/CommunityFilePage/3808638762)
 
 > One Item to Rule Them All. / 所有物品变为同一个
 
-![](img/oitrta-icon.png)
+![](img/oitrtav2-icon.png)
 
-Replace all in-game items (starting / shop / crate) with your chosen target items. Inspired by the famous Slay the Spire mod "One Relic to Rule Them All".
+**What if every crate held a Piggy Bank? What if the shop sold nothing but Pearls?**
 
-**Easy to use:**
+Pick your items, and Brotato will hand you nothing else. Every item the game generates, from the shop and crates to your starting kit, becomes the ones you chose. Inspired by the Slay the Spire mod *One Relic to Rule Them All*.
 
-After selecting a character, click the **"Replace Items"** button at the top-left of the weapon/difficulty selection screen to open the config window. Select one or more target items, and all generated items in the game will be replaced with your chosen items.
+### Get started in 10 seconds
 
-**Key features:**
+1. Pick a character, then click **Replace Items** in the top-left corner of the weapon or difficulty selection screen.
+2. Click items in the list to add them to the **General Replacement Pool**.
+3. Start the run. That's it: your settings are saved automatically.
 
-- **Multi-item rotation** — Select multiple target items and they cycle in order (A-B-A-B...) Click on a selected item to remove it.
-- **Curse support** — If "Curse" is enabled, replaced items will automatically be cursed (random strength scaling with wave, matching vanilla curse behavior). Cursed original items pass their curse to the replacement. *Requires Abyssal Terrors DLC*
-- **Auto-save settings** — Settings are saved automatically and persist across sessions
-- **14 languages** — en (English) / fr (Français) / zh (简体中文) / ja (日本語) / ko (한국어) / zh_TW (繁體中文) / ru (Русский) / pl (Polski) / es (Español) / pt (Português) / de (Deutsch) / tr (Türkçe) / it (Italiano)
+### Features
 
-**Configuration options:**
+- **A-B-A-B rotation**: pick several items and they take turns, in the order you chose them.
+- **T4 Crate Pool**: give T4 crates their own items, or replace only the first few.
+- **Curse support**: turn the game's randomness into a cursed-item run. *Requires the Abyssal Terrors DLC.*
+- **Easy config window**: search, rarity colors, numbered pools, and a live description of exactly what will be replaced.
+- **Master switch**: turn the mod off for a run without losing your picks.
+- **13 languages**: English, Français, 简体中文, 日本語, 한국어, 繁體中文, Русский, Polski, Español, Português, Deutsch, Türkçe, Italiano.
 
-In the config window, you can choose which sources of items to replace:
+### Options
 
-- **Starting items** (default: **off**) — Character's starting items (excludes character itself and weapons)
-- **Shop items** (default: **on**) — All shop items (excludes weapons)
-- **Shop always appear** (default: **off**) — Replace one shop slot per wave (skips guaranteed items and locked items). Mutually exclusive with the "Shop items" option; only one can be enabled at a time
-- **Crate items** (default: **on**)
-- **Legendary crate items** (default: **off**)
+**Options → Enable** (default: **on**): the master switch. When it's off, nothing is replaced and your settings are kept.
 
-There are many fun combinations to try, like Saver + Piggy Bank or Druid + Garden + Pearl. Feel free to share your ideas in the comments!
+**What to Replace**
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| Starting items | Off | Your character's starting items (the character itself and weapons are untouched). |
+| All items in shop | **On** | Every item slot in the shop (weapons are untouched). |
+| Shops always sell | Off | Each wave, one shop slot is guaranteed to be one of your items. Only one of this and "All items in shop" can be on. |
+| Crates | **On** | Items from crates, including Treasure Map's extra item. |
+
+**Curse** (default: off): replaced items are cursed, with random strength that grows with the wave, just like natural curses. If the original item was cursed, its replacement always is too. *Requires the Abyssal Terrors DLC.*
+
+**General Replacement Pool**: the items used for everything under *What to Replace*. The card spells out what will be replaced, so you always know what you're getting.
+
+**T4 Crate Pool**
+
+| Mode | What happens to T4 crates |
+| --- | --- |
+| Off (default) | Still generated randomly. |
+| Same as above | Use the General Replacement Pool, sharing its rotation. |
+| Independent | Use their own pool below, rotating A-B-A-B. |
+| One-time | The first N T4 crates become your N items, in order. After that, back to random. |
+
+> **Tip:** One-time mode is perfect for "guarantee my first T4 crate is X" without turning every T4 crate into X.
+
+### Try these
+
+- **Saver + Piggy Bank**: let the interest roll in.
+- **Druid + Garden + Pearl**: the Druid's dream garden.
+- **Any character + One-time T4**: a scripted opening, then pure chaos.
+
+Found a fun combo? Share it in the comments!
+
+### Good to know
+
+- Click an item in the list to add it to the highlighted pool, and click it again to remove it. Click a card to switch pools.
+- Pearl's bonus pearl is always a pearl; it is never replaced.
+- Don't enable v1 and v2 at the same time, or items will be replaced twice.
 
 **Enjoy the game!**
 
-<!--
+<!-- BBCode
 
-Replace all in-game items (starting / shop / crate) with your chosen target items. Inspired by the famous Slay the Spire mod "One Relic to Rule Them All".
+[b]What if every crate held a Piggy Bank? What if the shop sold nothing but Pearls?[/b]
 
-[h1]Easy to use:[/h1]
+Pick your items, and Brotato will hand you nothing else. Every item the game generates, from the shop and crates to your starting kit, becomes the ones you chose. Inspired by the Slay the Spire mod [i]One Relic to Rule Them All[/i].
 
-After selecting a character, click the [b]"Replace Items"[/b] button at the top-left of the weapon/difficulty selection screen to open the config window. Select one or more target items, and all generated items in the game will be replaced with your chosen items.
+[h1]Get started in 10 seconds[/h1]
 
-[h1]Key features:[/h1]
+[olist]
+[*]Pick a character, then click [b]Replace Items[/b] in the top-left corner of the weapon or difficulty selection screen.
+[*]Click items in the list to add them to the [b]General Replacement Pool[/b].
+[*]Start the run. That's it: your settings are saved automatically.
+[/olist]
 
-[list]
-[*][b]Multi-item rotation[/b] — Select multiple target items and they cycle in order (A-B-A-B...) Click on a selected item to remove it.
-[*][b]Curse support[/b] — If "Curse" is enabled, replaced items will automatically be cursed (random strength scaling with wave, matching vanilla curse behavior). Cursed original items pass their curse to the replacement. [i]Requires Abyssal Terrors DLC[/i]
-[*][b]Auto-save settings[/b] — Settings are saved automatically and persist across sessions
-[*][b]14 languages[/b] — en (English) / fr (Français) / zh (简体中文) / ja (日本語) / ko (한국어) / zh_TW (繁體中文) / ru (Русский) / pl (Polski) / es (Español) / pt (Português) / de (Deutsch) / tr (Türkçe) / it (Italiano)
-[/list]
-
-[h1]Configuration options:[/h1]
-
-In the config window, you can choose which sources of items to replace:
+[h1]Features[/h1]
 
 [list]
-[*][b]Starting items[/b] (default: [b]off[/b]) — Character's starting items (excludes character itself and weapons)
-[*][b]Shop items[/b] (default: [b]on[/b]) — All shop items (excludes weapons)
-[*][b]Shop always appear[/b] (default: [b]off[/b]) — Replace one shop slot per wave (skips guaranteed items and locked items). Mutually exclusive with the "Shop items" option; only one can be enabled at a time
-[*][b]Crate items[/b] (default: [b]on[/b])
-[*][b]Legendary crate items[/b] (default: [b]off[/b])
+[*][b]A-B-A-B rotation[/b]: pick several items and they take turns, in the order you chose them.
+[*][b]T4 Crate Pool[/b]: give T4 crates their own items, or replace only the first few.
+[*][b]Curse support[/b]: turn the game's randomness into a cursed-item run. [i]Requires the Abyssal Terrors DLC.[/i]
+[*][b]Easy config window[/b]: search, rarity colors, numbered pools, and a live description of exactly what will be replaced.
+[*][b]Master switch[/b]: turn the mod off for a run without losing your picks.
+[*][b]13 languages[/b]: English, Français, 简体中文, 日本語, 한국어, 繁體中文, Русский, Polski, Español, Português, Deutsch, Türkçe, Italiano.
 [/list]
 
-There are many fun combinations to try, like Saver + Piggy Bank or Druid + Garden + Pearl. Feel free to share your ideas in the comments!
+[h1]Options[/h1]
+
+[b]Options → Enable[/b] (default: [b]on[/b]): the master switch. When it's off, nothing is replaced and your settings are kept.
+
+[h2]What to Replace[/h2]
+
+[table]
+[tr][th]Option[/th][th]Default[/th][th]What it does[/th][/tr]
+[tr][td]Starting items[/td][td]Off[/td][td]Your character's starting items (the character itself and weapons are untouched).[/td][/tr]
+[tr][td]All items in shop[/td][td][b]On[/b][/td][td]Every item slot in the shop (weapons are untouched).[/td][/tr]
+[tr][td]Shops always sell[/td][td]Off[/td][td]Each wave, one shop slot is guaranteed to be one of your items. Only one of this and "All items in shop" can be on.[/td][/tr]
+[tr][td]Crates[/td][td][b]On[/b][/td][td]Items from crates, including Treasure Map's extra item.[/td][/tr]
+[/table]
+
+[b]Curse[/b] (default: off): replaced items are cursed, with random strength that grows with the wave, just like natural curses. If the original item was cursed, its replacement always is too. [i]Requires the Abyssal Terrors DLC.[/i]
+
+[b]General Replacement Pool[/b]: the items used for everything under [i]What to Replace[/i]. The card spells out what will be replaced, so you always know what you're getting.
+
+[h2]T4 Crate Pool[/h2]
+
+[table]
+[tr][th]Mode[/th][th]What happens to T4 crates[/th][/tr]
+[tr][td]Off (default)[/td][td]Still generated randomly.[/td][/tr]
+[tr][td]Same as above[/td][td]Use the General Replacement Pool, sharing its rotation.[/td][/tr]
+[tr][td]Independent[/td][td]Use their own pool below, rotating A-B-A-B.[/td][/tr]
+[tr][td]One-time[/td][td]The first N T4 crates become your N items, in order. After that, back to random.[/td][/tr]
+[/table]
+
+[quote][b]Tip:[/b] One-time mode is perfect for "guarantee my first T4 crate is X" without turning every T4 crate into X.[/quote]
+
+[h1]Try these[/h1]
+
+[list]
+[*][b]Saver + Piggy Bank[/b]: let the interest roll in.
+[*][b]Druid + Garden + Pearl[/b]: the Druid's dream garden.
+[*][b]Any character + One-time T4[/b]: a scripted opening, then pure chaos.
+[/list]
+
+Found a fun combo? Share it in the comments!
+
+[h1]Good to know[/h1]
+
+[list]
+[*]Click an item in the list to add it to the highlighted pool, and click it again to remove it. Click a card to switch pools.
+[*]Pearl's bonus pearl is always a pearl; it is never replaced.
+[*]Don't enable v1 and v2 at the same time, or items will be replaced twice.
+[/list]
 
 [pullquote]If you like this mod, please consider liking, favoriting and sharing it, thank you! Comments and suggestions are also very welcome![/pullquote]
 
@@ -253,117 +331,146 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 ---
 
-将游戏中的所有物品替换为一个，灵感来自著名的杀戮尖塔 mod "One Relic to Rule Them All"。
+**如果每个箱子里都是存钱罐？如果商店只卖珍珠？**
 
-**用法很简单：**
+选好物品，土豆兄弟就只会给你这些。商店、箱子、开局自带……游戏生成的每一件物品都会变成你选的那些。灵感来自杀戮尖塔 mod *One Relic to Rule Them All*。
 
-选择角色后，在武器/难度选择界面左上角点击 **"替换物品"** 按钮打开配置弹窗，选择一个或多个目标物品，游戏生成的物品会被替换为你选的物品。
+### 10 秒上手
 
-**核心特性：**
+1. 选择角色后，在武器/难度选择界面左上角点击 **替换物品**。
+2. 在物品列表中点击物品，加入 **通用替换池**。
+3. 开始游戏。就这么简单，设置会自动保存。
 
-- **多物品轮流替换** —— 选多个目标物品时，按顺序循环替换（A-B-A-B...）点击已选物品可移除。
-- **诅咒支持** —— 可选"诅咒"开关，被替换的物品自动被诅咒（强度随波次随机提升，与原版自然诅咒一致）。原物品若被诅咒，替换物也会继承诅咒。*需要 Abyssal Terrors DLC*
-- **自动保存设置** —— 退出重进不丢失
-- **14 种语言本地化** —— en (English) / fr (Français) / zh (简体中文) / ja (日本語) / ko (한국어) / zh_TW (繁體中文) / ru (Русский) / pl (Polski) / es (Español) / pt (Português) / de (Deutsch) / tr (Türkçe) / it (Italiano)
+### 特色
 
-**选项配置：**
+- **A-B-A-B 轮流替换**：选多件物品时，按选择顺序轮流出现。
+- **T4 箱子池**：给 T4 箱子单独指定物品，或者只替换前几个。
+- **诅咒支持**：把一局变成诅咒物品大乱斗。*需要深海魔怪 DLC。*
+- **好用的配置窗口**：搜索、稀有度底色、带序号的替换池，还会实时告诉你哪些东西会被替换。
+- **总开关**：想正常玩一局？关掉就行，已选的物品不会丢。
+- **13 种语言**：English、Français、简体中文、日本語、한국어、繁體中文、Русский、Polski、Español、Português、Deutsch、Türkçe、Italiano。
 
-在配置弹窗中，你可以选择替换哪些来源的物品：
+### 选项说明
 
-- **起始物品**（默认：**关**） —— 角色开局自带的物品（不含角色自身和武器）
-- **商店物品**（默认：**开**） —— 商店所有物品（不含武器）
-- **商店固定出现**（默认：**关**） —— 每波固定替换商店一个槽位（自动跳过渔夫的诱饵和锁定物品）。和商店物品选项互斥，二者只能启用一个
-- **普通箱子物品**（默认：**开**）
-- **传奇箱子物品**（默认：**关**）
+**选项 → 启用**（默认：**开**）：总开关。关闭后不做任何替换，设置保留。
 
-有很多好玩的组合，不妨试试节俭者 + 存钱罐？或是德鲁伊 + 花园 + 珍珠？你也可以把你想到的发评论区里！
+**替换对象**
+
+| 选项 | 默认 | 作用 |
+| --- | --- | --- |
+| 起始物品 | 关 | 角色开局自带的物品（不含角色本身和武器）。 |
+| 所有商店物品 | **开** | 商店里的所有物品槽位（不含武器）。 |
+| 商店通常销售 | 关 | 每波商店固定有一个槽位是你选的物品。与“所有商店物品”只能二选一。 |
+| 箱子 | **开** | 箱子开出的物品，包括藏宝图的额外物品。 |
+
+**诅咒**（默认：关）：替换后的物品被诅咒，强度随机并随波次提升，和游戏里自然出现的诅咒物品一致。原物品被诅咒时，替换物一定也会被诅咒。*需要深海魔怪 DLC。*
+
+**通用替换池**：“替换对象”中各项使用的物品。卡片里会写明哪些东西会被替换成这些物品，一目了然。
+
+**T4 箱子池**
+
+| 模式 | T4 箱子会怎样 |
+| --- | --- |
+| 禁用（默认） | 仍然随机生成。 |
+| 同上 | 使用上方的通用替换池，并和它共用轮流顺序。 |
+| 独立 | 使用下方的独立替换池，A-B-A-B 轮流。 |
+| 单次 | 前 N 个 T4 箱子按顺序变成你选的 N 件物品，之后恢复随机。 |
+
+> **小技巧：** 想要“第一个 T4 箱子必出某件神器”，又不想每个 T4 箱子都一样？用单次模式就对了。
+
+### 试试这些组合
+
+- **节俭者 + 存钱罐**：躺着吃利息。
+- **德鲁伊 + 花园 + 珍珠**：德鲁伊的梦幻花园。
+- **任意角色 + T4 单次**：开局按剧本走，之后听天由命。
+
+你也有好玩的组合？欢迎发到评论区！
+
+### 小提示
+
+- 点击列表中的物品加入高亮的替换池，再次点击移除；点击卡片可切换替换池。
+- 珍珠额外开出的珍珠始终是珍珠，不会被替换。
+- 不要同时启用 v1 和 v2，否则物品会被替换两次。
 
 **祝您玩得开心！**
 
-<!--
+<!-- BBCode
 
-将游戏中的所有物品替换为一个，灵感来自著名的杀戮尖塔 mod "One Relic to Rule Them All"。
+[b]如果每个箱子里都是存钱罐？如果商店只卖珍珠？[/b]
 
-[h1]用法很简单：[/h1]
+选好物品，土豆兄弟就只会给你这些。商店、箱子、开局自带……游戏生成的每一件物品都会变成你选的那些。灵感来自杀戮尖塔 mod [i]One Relic to Rule Them All[/i]。
 
-选择角色后，在武器/难度选择界面左上角点击 [b]"替换物品"[/b] 按钮打开配置弹窗，选择一个或多个目标物品，游戏生成的物品会被替换为你选的物品。
+[h1]10 秒上手[/h1]
 
-[h1]核心特性：[/h1]
+[olist]
+[*]选择角色后，在武器/难度选择界面左上角点击 [b]替换物品[/b]。
+[*]在物品列表中点击物品，加入 [b]通用替换池[/b]。
+[*]开始游戏。就这么简单，设置会自动保存。
+[/olist]
 
-[list]
-[*][b]多物品轮流替换[/b] —— 选多个目标物品时，按顺序循环替换（A-B-A-B...）点击已选物品可移除。
-[*][b]诅咒支持[/b] —— 可选"诅咒"开关，被替换的物品自动被诅咒（强度随波次随机提升，与原版自然诅咒一致）。原物品若被诅咒，替换物也会继承诅咒。[i]需要 Abyssal Terrors DLC[/i]
-[*][b]自动保存设置[/b] —— 退出重进不丢失
-[*][b]14 种语言本地化[/b] —— en (English) / fr (Français) / zh (简体中文) / ja (日本語) / ko (한국어) / zh_TW (繁體中文) / ru (Русский) / pl (Polski) / es (Español) / pt (Português) / de (Deutsch) / tr (Türkçe) / it (Italiano)
-[/list]
-
-[h1]选项配置：[/h1]
-
-在配置弹窗中，你可以选择替换哪些来源的物品：
+[h1]特色[/h1]
 
 [list]
-[*][b]起始物品[/b]（默认：[b]关[/b]） —— 角色开局自带的物品（不含角色自身和武器）
-[*][b]商店物品[/b]（默认：[b]开[/b]） —— 商店所有物品（不含武器）
-[*][b]商店固定出现[/b]（默认：[b]关[/b]） —— 每波固定替换商店一个槽位（自动跳过渔夫的诱饵和锁定物品）。和商店物品选项互斥，二者只能启用一个
-[*][b]普通箱子物品[/b]（默认：[b]开[/b]）
-[*][b]传奇箱子物品[/b]（默认：[b]关[/b]）
+[*][b]A-B-A-B 轮流替换[/b]：选多件物品时，按选择顺序轮流出现。
+[*][b]T4 箱子池[/b]：给 T4 箱子单独指定物品，或者只替换前几个。
+[*][b]诅咒支持[/b]：把一局变成诅咒物品大乱斗。[i]需要深海魔怪 DLC。[/i]
+[*][b]好用的配置窗口[/b]：搜索、稀有度底色、带序号的替换池，还会实时告诉你哪些东西会被替换。
+[*][b]总开关[/b]：想正常玩一局？关掉就行，已选的物品不会丢。
+[*][b]13 种语言[/b]：English、Français、简体中文、日本語、한국어、繁體中文、Русский、Polski、Español、Português、Deutsch、Türkçe、Italiano。
 [/list]
 
-有很多好玩的组合，不妨试试节俭者 + 存钱罐？或是德鲁伊 + 花园 + 珍珠？你也可以把你想到的发评论区里！
+[h1]选项说明[/h1]
+
+[b]选项 → 启用[/b]（默认：[b]开[/b]）：总开关。关闭后不做任何替换，设置保留。
+
+[h2]替换对象[/h2]
+
+[table]
+[tr][th]选项[/th][th]默认[/th][th]作用[/th][/tr]
+[tr][td]起始物品[/td][td]关[/td][td]角色开局自带的物品（不含角色本身和武器）。[/td][/tr]
+[tr][td]所有商店物品[/td][td][b]开[/b][/td][td]商店里的所有物品槽位（不含武器）。[/td][/tr]
+[tr][td]商店通常销售[/td][td]关[/td][td]每波商店固定有一个槽位是你选的物品。与“所有商店物品”只能二选一。[/td][/tr]
+[tr][td]箱子[/td][td][b]开[/b][/td][td]箱子开出的物品，包括藏宝图的额外物品。[/td][/tr]
+[/table]
+
+[b]诅咒[/b]（默认：关）：替换后的物品被诅咒，强度随机并随波次提升，和游戏里自然出现的诅咒物品一致。原物品被诅咒时，替换物一定也会被诅咒。[i]需要深海魔怪 DLC。[/i]
+
+[b]通用替换池[/b]：“替换对象”中各项使用的物品。卡片里会写明哪些东西会被替换成这些物品，一目了然。
+
+[h2]T4 箱子池[/h2]
+
+[table]
+[tr][th]模式[/th][th]T4 箱子会怎样[/th][/tr]
+[tr][td]禁用（默认）[/td][td]仍然随机生成。[/td][/tr]
+[tr][td]同上[/td][td]使用上方的通用替换池，并和它共用轮流顺序。[/td][/tr]
+[tr][td]独立[/td][td]使用下方的独立替换池，A-B-A-B 轮流。[/td][/tr]
+[tr][td]单次[/td][td]前 N 个 T4 箱子按顺序变成你选的 N 件物品，之后恢复随机。[/td][/tr]
+[/table]
+
+[quote][b]小技巧：[/b]想要“第一个 T4 箱子必出某件神器”，又不想每个 T4 箱子都一样？用单次模式就对了。[/quote]
+
+[h1]试试这些组合[/h1]
+
+[list]
+[*][b]节俭者 + 存钱罐[/b]：躺着吃利息。
+[*][b]德鲁伊 + 花园 + 珍珠[/b]：德鲁伊的梦幻花园。
+[*][b]任意角色 + T4 单次[/b]：开局按剧本走，之后听天由命。
+[/list]
+
+你也有好玩的组合？欢迎发到评论区！
+
+[h1]小提示[/h1]
+
+[list]
+[*]点击列表中的物品加入高亮的替换池，再次点击移除；点击卡片可切换替换池。
+[*]珍珠额外开出的珍珠始终是珍珠，不会被替换。
+[*]不要同时启用 v1 和 v2，否则物品会被替换两次。
+[/list]
 
 [pullquote]如果你喜欢这个 mod，欢迎点赞、收藏、转发，多谢啦！有问题或建议欢迎在评论区留言！[/pullquote]
 
 [img]https://images.steamusercontent.com/ugc/44567523600397314/6B6642339A9CBFF3E081B3CC347F70D6EFD2F0D7/[/img]
 
 GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/url]
-
--->
-
-<details>
-
-<summary>Screenshots</summary>
-
-![](img/oitrta-1.jpg)
-
-![](img/oitrta-2.jpg)
-
-![](img/oitrta-3.jpg)
-
-![](img/oitrta-4.jpg)
-
-</details>
-
-<!--
-
-(For QQ)
-
-宣传一下我写的新 mod
-
-One Item to Rule Them All / 所有物品变为一个
-
-将游戏中的所有物品替换为一个，灵感来自著名的杀戮尖塔 mod "One Relic to Rule Them All"。
-
-用法很简单：
-
-选择角色后，在武器/难度选择界面左上角点击 "替换物品" 按钮打开配置弹窗，选择一个或多个目标物品，游戏生成的物品会被替换为你选的物品。
-
-核心特性：
-
-- 多物品轮流替换 —— 选多个目标物品时，按顺序循环替换（A-B-A-B...）点击已选物品可移除。
-- 诅咒支持 —— 可选"诅咒"开关，被替换的物品自动被诅咒（强度随波次随机提升，与原版自然诅咒一致）。原物品若被诅咒，替换物也会继承诅咒。需要 Abyssal Terrors DLC
-- 自动保存设置 —— 退出重进不丢失
-- 14 种语言本地化 —— en (English) / fr (Français) / zh (简体中文) / ja (日本語) / ko (한국어) / zh_TW (繁體中文) / ru (Русский) / pl (Polski) / es (Español) / pt (Português) / de (Deutsch) / tr (Türkçe) / it (Italiano)
-
-选项配置：
-
-在配置弹窗中，你可以选择替换哪些来源的物品：
-
-- 起始物品（默认：关） —— 角色开局自带的物品（不含角色自身和武器）
-- 商店物品（默认：开） —— 商店所有物品（不含武器）
-- 商店固定出现（默认：关） —— 每波固定替换商店一个槽位（自动跳过渔夫的诱饵和锁定物品）。和商店物品选项互斥，二者只能启用一个
-- 普通箱子物品（默认：开）
-- 传奇箱子物品（默认：关）
-
-如果你喜欢这个 mod，欢迎点赞、收藏、转发，多谢啦！有问题或建议欢迎在评论区留言！
 
 -->
