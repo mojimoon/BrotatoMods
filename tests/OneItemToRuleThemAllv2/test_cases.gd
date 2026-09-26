@@ -475,21 +475,18 @@ func test_19_settings_roundtrip() -> void:
 	_remove(m.SETTINGS_PATH)
 
 
-func test_20_settings_legacy_migration() -> void:
-	_remove(m.SETTINGS_PATH)
-	_write_json(m.LEGACY_SETTINGS_PATH, {"target_item_ids": [A], "cfg_replace_legendary_crate": true})
+func test_20_settings_defaults_and_clamp() -> void:
+	_write_json(m.SETTINGS_PATH, {"target_item_ids": [A]})
+	m.enabled = false
+	m.legendary_mode = m.LegendaryMode.ONCE
 	m._load_settings()
-	_eq(m.target_item_ids, [A], "v1 pool imported")
-	_eq(m.legendary_mode, m.LegendaryMode.UNIFIED, "v1 legendary on => same as above")
-	_eq(m.enabled, true, "enabled defaults to true")
-	_write_json(m.LEGACY_SETTINGS_PATH, {"cfg_replace_legendary_crate": false})
-	m._load_settings()
-	_eq(m.legendary_mode, m.LegendaryMode.NONE, "v1 legendary off => off")
+	_eq(m.target_item_ids, [A], "pool loaded")
+	_eq(m.enabled, true, "missing enabled defaults to true")
+	_eq(m.legendary_mode, m.LegendaryMode.NONE, "missing mode defaults to off")
 	_write_json(m.SETTINGS_PATH, {"legendary_mode": 99})
 	m._load_settings()
 	_eq(m.legendary_mode, m.LegendaryMode.ONCE, "out-of-range mode clamped")
 	_remove(m.SETTINGS_PATH)
-	_remove(m.LEGACY_SETTINGS_PATH)
 
 
 # ============================================================

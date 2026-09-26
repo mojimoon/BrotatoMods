@@ -7,8 +7,6 @@ extends Node
 const MOD_ID = "Mojimoon-OneItemToRuleThemAllv2"
 const VERSION = "1.0.0"
 const SETTINGS_PATH = "user://Mojimoon-OneItemToRuleThemAllv2/settings.json"
-# v1 的设置路径：v2 首次运行时从这里导入
-const LEGACY_SETTINGS_PATH = "user://Mojimoon-OneItemToRuleThemAll/settings.json"
 
 # ============================================================
 # 运行时状态（弹窗配置，持久化到 JSON）
@@ -86,12 +84,9 @@ func _save_settings() -> void:
 
 func _load_settings() -> void:
 	var file = File.new()
-	var path: String = SETTINGS_PATH
-	if not file.file_exists(path):
-		path = LEGACY_SETTINGS_PATH
-		if not file.file_exists(path):
-			return
-	var err = file.open(path, File.READ)
+	if not file.file_exists(SETTINGS_PATH):
+		return
+	var err = file.open(SETTINGS_PATH, File.READ)
 	if err != OK:
 		ModLoaderLog.error("Failed to load settings: " + str(err), MOD_ID)
 		return
@@ -113,11 +108,7 @@ func _load_settings() -> void:
 	cfg_replace_shop_first = bool(data.get("cfg_replace_shop_first", false))
 	cfg_replace_crate = bool(data.get("cfg_replace_crate", true))
 	legendary_item_ids = data.get("legendary_item_ids", [])
-	if data.has("legendary_mode"):
-		legendary_mode = int(clamp(int(data.get("legendary_mode", 0)), LegendaryMode.NONE, LegendaryMode.ONCE))
-	else:
-		# 旧版本迁移：cfg_replace_legendary_crate=true 等价于"统一替换"
-		legendary_mode = LegendaryMode.UNIFIED if bool(data.get("cfg_replace_legendary_crate", false)) else LegendaryMode.NONE
+	legendary_mode = int(clamp(int(data.get("legendary_mode", LegendaryMode.NONE)), LegendaryMode.NONE, LegendaryMode.ONCE))
 	ModLoaderLog.info("Settings loaded: %d targets, %d legendary targets, legendary mode %d" % [target_item_ids.size(), legendary_item_ids.size(), legendary_mode], MOD_ID)
 
 
