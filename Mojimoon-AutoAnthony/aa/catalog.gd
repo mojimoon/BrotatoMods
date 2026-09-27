@@ -88,27 +88,27 @@ const EXPLOSION_TARGETS = 2.5	# 爆炸平均命中数
 const TRIGGERS = {
 	"kill": {"kind": "event", "e": 120.0, "timing": 0.5, "gate": "every", "w": 1.0},
 	"hit": {"kind": "event", "e": 10.0, "timing": 0.5, "gate": "chance", "w": 1.0},
-	"dodge": {"kind": "event", "e": 4.0, "timing": 0.5, "gate": "chance", "w": 0.7},
-	"consumable": {"kind": "event", "e": 7.0, "timing": 0.5, "gate": "chance", "w": 0.8},
+	"dodge": {"kind": "event", "e": 4.0, "timing": 0.5, "gate": "chance", "w": 1.0},
+	"consumable": {"kind": "event", "e": 7.0, "timing": 0.5, "gate": "chance", "w": 1.0},
 	"gold": {"kind": "event", "e": 120.0, "timing": 0.5, "gate": "every", "w": 0.6},
 	"heal": {"kind": "event", "e": 20.0, "timing": 0.5, "gate": "chance", "w": 0.4},
 	"level_up": {"kind": "event", "e": 1.3, "timing": 0.5, "gate": "none", "w": 0.9},
 	"wave_start": {"kind": "event", "e": 1.0, "timing": 1.0, "gate": "none", "w": 0.8},
 	"wave_end": {"kind": "event", "e": 1.0, "timing": 0.0, "gate": "none", "w": 0.8},
 	"interval": {"kind": "event", "e": 0.0, "timing": 0.5, "gate": "none", "w": 0.9},
-	"still": {"kind": "state", "e": 0.25, "timing": 1.0, "gate": "none", "w": 0.7},
-	"moving": {"kind": "state", "e": 0.75, "timing": 1.0, "gate": "none", "w": 0.4},
+	"still": {"kind": "state", "e": 0.25, "timing": 1.0, "gate": "none", "w": 1.0},
+	"moving": {"kind": "state", "e": 0.75, "timing": 1.0, "gate": "none", "w": 1.0},
 	"low_hp": {"kind": "state", "e": 0.15, "timing": 1.0, "gate": "none", "w": 0.5},
 	"full_hp": {"kind": "state", "e": 0.45, "timing": 1.0, "gate": "none", "w": 0.4},
 	"reroll": {"kind": "shop", "e": 3.0, "timing": 0.0, "gate": "chance", "w": 0.5},
 	# 暴击击杀（触手、狩猎奖杯）/ 击杀燃烧中的敌人（鬼火）：击杀的子集，频率取决于构筑；绑定暴击 / 元素词条
 	"crit_kill": {"kind": "event", "e": 30.0, "timing": 0.5, "gate": "every", "w": 0.7},
-	"burning_kill": {"kind": "event", "e": 25.0, "timing": 0.5, "gate": "every", "w": 0.6},
-	# 每走 N 步（徒步旅行者）：移动时约每秒 4–5 步，每波约 200 步
-	"steps": {"kind": "event", "e": 200.0, "timing": 0.5, "gate": "every", "w": 0.5},
+	"burning_kill": {"kind": "event", "e": 25.0, "timing": 0.5, "gate": "every", "w": 0.3},
+	# 每走 N 步（徒步旅行者）：移动时约每秒 3.33 步，每波约 200 步，实际强度不足，需要低估
+	"steps": {"kind": "event", "e": 120.0, "timing": 0.5, "gate": "every", "w": 0.3},
 	# 波次进行到一半时（赛博格）
-	"half_wave": {"kind": "event", "e": 1.0, "timing": 0.5, "gate": "none", "w": 0.5},
-	"buy": {"kind": "shop", "e": 3.0, "timing": 0.0, "gate": "chance", "w": 0.4},
+	"half_wave": {"kind": "event", "e": 1.0, "timing": 0.5, "gate": "none", "w": 0.3},
+	"buy": {"kind": "shop", "e": 3.0, "timing": 0.0, "gate": "chance", "w": 0.3},
 }
 
 # 实际受击次数（用于"受伤时清空"条款的估值）
@@ -125,12 +125,12 @@ const PAYLOADS = {
 	"temp_stat": {"w": 0.4},
 	"perm_stat": {"w": 0.3},
 	"timed_stat": {"w": 0.5},
-	"heal": {"w": 0.6},
+	"heal": {"w": 0.5},
 	"gold": {"w": 0.5},
 	"xp": {"w": 0.3},
 	"damage": {"w": 0.6},
 	"explode": {"w": 0.5},
-	"grant": {"w": 2.5},
+	"grant": {"w": 2.0},
 }
 
 # 合法组合：触发扳机 -> 允许的载荷
