@@ -1220,9 +1220,10 @@ func test_87_hourglass_and_goldfish_in_shop() -> void:
 	_setup_player("character_well_rounded")
 	var fist = isvc.get_element_safe(isvc.weapons, "weapon_fist_1")
 	var _w = rd.add_weapon(fist, 0)
-	m.start_new_run()
+	# 先从原版道具收集机制（开局后金鱼 / 沙漏本身也被重组）
 	var gen = Generator.new(_cfg(), 1)
 	gen._collect_priors(isvc.items, isvc.characters, isvc.weapons)
+	m.start_new_run()
 	# 金鱼：刷新后持有者消失
 	var fish_holder = _item("item_cake").duplicate()
 	fish_holder.effects = [gen._mechanic_copy(_find_mech(gen, "increase_tier_on_reroll"), -1.0, "item_cake")]
@@ -1762,3 +1763,45 @@ func test_99b_tier_rules() -> void:
 			enemy_neg += 1
 			_check(c.value > 0 and Valuation.clause_value(c, 4.0) < 0, "enemy downside clause increases enemy stat")
 	_check(enemy_neg > 20, "negative trigger clauses can raise enemy stats (%d)" % enemy_neg)
+
+
+# ============================================================
+# 核心属性道具：T1–T3 每档、每个重要输出 / 收获属性各一件，唯一正面效果为该属性，价值 × 1.08
+# ============================================================
+func test_100_core_stat_items() -> void:
+	var ratios = [[], []]
+	for sd in SEEDS:
+		var gen = Generator.new(_cfg(), sd)
+		var plan = gen.generate(isvc.items, isvc.characters, [], [])
+		var seen = {}
+		for id in plan.items:
+			var p = plan.items[id]
+			var tier = _item(id).tier
+			if p.has("core"):
+				var k = str(tier) + "/" + p.core
+				_check(not seen.has(k), "one core item per tier/stat " + k)
+				seen[k] = true
+				_check(tier in Catalog.CORE_TIERS, "core item tier " + id)
+				_check(gen.is_plain_stat(p.effects[0]) and p.effects[0].key == p.core and p.effects[0].value > 0, id + " first line is the core stat")
+				for j in range(1, p.effects.size()):
+					_check(not _is_good(p.effects[j]) or Catalog.is_downside_mechanic(p.effects[j]) or (p.effects[j] is TriggerEffect and p.effects[j].is_downside()), id + " other lines are downsides: " + p.effects[j].get_text(0, false))
+				if tier == 2:
+					_check(p.effects.size() >= 2, id + " T3 core item carries a downside")
+				ratios[0].push_back(p.effects[0].value * Catalog.stat_w(p.core) / p.budget)
+			else:
+				ratios[1].push_back(p.budget / gen.item_budget(_item(id)))
+		for t in Catalog.CORE_TIERS:
+			for st in Catalog.CORE_STATS:
+				_check(seen.has(str(t) + "/" + st), "seed %d has core %d/%s" % [sd, t, st])
+	ratios[0].sort()
+	print("AUDIT core items: n=%d, core-line value / budget median %.2f" % [ratios[0].size(), ratios[0][ratios[0].size() / 2]])
+	# 保留原版滑条：被保留原版的道具不会被选为核心道具
+	var cfg = _cfg()
+	cfg.native_ratio = 50
+	var g2 = Generator.new(cfg, 3)
+	var p2 = g2.generate(isvc.items, isvc.characters, [], [])
+	var n_core = 0
+	for id in p2.items:
+		if p2.items[id].has("core"):
+			n_core += 1
+	_eq(n_core, Catalog.CORE_STATS.size() * Catalog.CORE_TIERS.size(), "core items survive native_ratio 50%")

@@ -22,8 +22,7 @@ const WAVE_SECONDS = 60.0
 const TIER_INTERCEPT = [11.5, 30.0, 40.9, 39.0]
 # 永久累积倍率：Tier 越高通常购买越晚、剩余波数越少。角色视为整局持有。
 # 由原版"每波永久成长"道具反推（警戒戒指 6.4、机械臂 3.5、魔法叶 3.3、鬼火 2.5、宝宝乌贼 6.1），中位约 3.5
-# 期望剩余波数 T1–T4 = 11 / 9 / 7 / 5（累积倍率 = (波数 + 1) / 2）
-const PERM_MULT = [6.0, 5.0, 4.0, 3.0]
+const PERM_MULT = [5.0, 4.5, 4.0, 3.5]
 # 高频扳机上永久效果的每波上限最大值
 const PERM_CAP_MAX = 10
 const PERM_MULT_CHARACTER = 7.0
@@ -497,7 +496,7 @@ const NEXT_WAVE_POS_KINDS = {"xp_gain": 0.7, "loot_aliens": 0.3}
 # 每个额外战利品外星人（一次性）的价值：原版诱饵 34 材料（+2 再生、下一波 +2 个）反推约 4.6
 const LOOT_ALIEN_VALUE = 4.6
 # "下一波"正面行附带同一行为下负面行的概率（原版芹菜茶、孔雀都是成对的）
-const NEXT_WAVE_PAIR_CHANCE = 0.35
+const NEXT_WAVE_PAIR_CHANCE = 0.5
 # 属性类触发条款附带同一扳机负面部分的概率
 const PAIRED_CLAUSE_CHANCE = 0.4
 
@@ -551,3 +550,19 @@ const CHAR_COMPONENT_WEIGHTS = {"class_bonus": 0.45, "burn_bonus": 0.15, "pacifi
 const T4_BANNED_POSITIVE_STATS = ["stat_harvesting"]
 # 负面触发条款使用敌人属性（生命 / 伤害 / 速度提高）的概率
 const NEGATIVE_CLAUSE_ENEMY_CHANCE = 0.3
+
+# 核心属性道具：T1–T3 每档、每个重要输出 / 收获属性各保证一件"唯一正面效果就是该属性"的道具（可附带负面），
+# 隐含价值 × 1.08，作为构筑的过渡
+const CORE_STATS = [
+	"stat_percent_damage", "stat_melee_damage", "stat_ranged_damage", "stat_elemental_damage",
+	"stat_engineering", "stat_attack_speed", "stat_harvesting", "xp_gain",
+]
+const CORE_TIERS = [0, 1, 2]
+const CORE_VALUE_MULT = 1.08
+const CORE_DOWNSIDE_CHANCE = 0.75
+# 核心道具单行上限相对普通上限的倍数（数值更高的单属性道具）
+const CORE_LINE_CAP_MULT = 1.5
+
+# 原版 DLC 诅咒按道具 ID 特判的属性行（鬼火的元素伤害行会写入 value3，普通效果没有该字段）：
+# 这些道具上不生成对应的普通属性行
+const ITEM_STAT_BANS = {"item_will_o_the_wisp": ["stat_elemental_damage"]}

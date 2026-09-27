@@ -27,6 +27,7 @@ cp -r "$PROJECT/mods/$MOD" "$PROJECT/mods-unpacked/$MOD"
 SANDBOX=$(mktemp -d)
 trap 'rm -rf "$SANDBOX"' EXIT
 LOG="$SANDBOX/test.log"
+trap '[ -n "$AA_KEEP_LOG" ] && cp "$LOG" "$AA_KEEP_LOG"; rm -rf "$SANDBOX"' EXIT
 
 cd "$PROJECT"
 APPDATA=$(cygpath -w "$SANDBOX") AA_TEST=1 timeout 600 "$GODOT" --no-window --audio-driver Dummy --path . \

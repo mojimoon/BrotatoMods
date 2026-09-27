@@ -63,6 +63,8 @@ var neg_cat := ""
 var anchor_stat := ""
 # 当前生成道具的稀有度（T4 不出现 +收获）
 var cur_tier := -1
+# 当前道具不能生成的普通属性行（catalog.ITEM_STAT_BANS）
+var cur_stat_bans: Array = []
 # 计数型 / 属性修改的原版先验
 var counter_prior: Dictionary = {}
 var gain_mod_prior := 0.0
@@ -96,17 +98,57 @@ func generate(items: Array, all_characters: Array, selected: Array, weapons: Arr
 	_collect_priors(items, all_characters, weapons)
 	var plan = {"items": {}, "characters": {}, "weapons": {}, "seed": seed_value}
 	if cfg.get("items", true):
+		var gen_items = []
 		for item in items:
-			if _is_reassemblable_item(item):
-				var r = generate_item(item)
-				if not r.empty():
-					plan.items[item.my_id] = r
+			if _is_reassemblable_item(item) and not _keeps_native(item):
+				gen_items.push_back(item)
+		var core = pick_core_items(gen_items)
+		for item in gen_items:
+			var r = generate_item(item, core.get(item.my_id, ""))
+			if not r.empty():
+				plan.items[item.my_id] = r
+		cur_stat_bans = []
 	if cfg.get("characters", false):
 		for ch in selected:
 			plan.characters[ch.my_id] = generate_character(ch)
 	if cfg.get("weapons", false):
 		plan.weapons = generate_weapons(weapons)
 	return plan
+
+
+# "保留原版道具"滑条：按道具 ID 的种子决定是否保留原版
+func _keeps_native(item) -> bool:
+	_seed_for(item.my_id)
+	return rng.randf() < float(cfg.get("native_ratio", 0)) / 100.0
+
+
+# 核心属性道具的分配：T1–T3 每档为每个核心属性各挑一件道具（种子确定；优先挑价格接近该档中位数的道具）
+# 返回 {道具 ID: 属性}
+func pick_core_items(gen_items: Array) -> Dictionary:
+	var res = {}
+	for t in Catalog.CORE_TIERS:
+		var pool = []
+		for it in gen_items:
+			if it.tier == t and not Catalog.ITEM_STAT_BANS.has(it.my_id):
+				pool.push_back(it)
+		pool.sort_custom(self, "_sort_by_id")
+		rng.seed = hash(str(seed_value) + "/core/" + str(t))
+		var stats = Catalog.CORE_STATS.duplicate()
+		for st in stats:
+			if pool.empty():
+				break
+			var weights = {}
+			for k in pool.size():
+				var d = abs(log(max(1.0, pool[k].value) / tier_price_median[t]))
+				weights[k] = 1.0 / (0.25 + d)
+			var k = _pick_weighted(weights)
+			res[pool[k].my_id] = st
+			pool.remove(k)
+	return res
+
+
+static func _sort_by_id(a, b) -> bool:
+	return a.my_id < b.my_id
 
 
 func _seed_for(id: String) -> void:
@@ -475,6 +517,8 @@ func _pick_stat(neg: bool, exclude: Array = [], allowed = null) -> String:
 	for s in src:
 		if not neg and cur_tier == 3 and s in Catalog.T4_BANNED_POSITIVE_STATS:
 			continue
+		if s in cur_stat_bans:
+			continue
 		if s in exclude:
 			continue
 		if allowed != null and not s in allowed:
@@ -531,10 +575,13 @@ func _trigger_rate() -> float:
 # ============================================================
 # 道具
 # ============================================================
-func generate_item(item) -> Dictionary:
+func generate_item(item, core_stat: String = "") -> Dictionary:
 	_seed_for(item.my_id)
 	if rng.randf() < float(cfg.get("native_ratio", 0)) / 100.0:
 		return {}
+	cur_stat_bans = Catalog.ITEM_STAT_BANS.get(item.my_id, [])
+	if core_stat != "":
+		return _generate_core_item(item, core_stat)
 	# T3 道具如果只有一条效果，不能是单纯的数值效果：重掷（强制带特殊行）
 	var r = {}
 	for attempt in 4:
@@ -570,47 +617,9 @@ func _generate_item_once(item, force_special: bool) -> Dictionary:
 	# 1) 代价：负面效果的实际强度 = 换来的预算 × 负面除数
 	var downsides = []
 	if neg_cat != "-":
-		var comp = budget_total * rng.randf_range(0.1, 0.35)
-		var got = 0.0
-		var r = rng.randf()
-		if r >= 0.25 and r < 0.33:
-			var sc = gen_scaling(comp * divisor, true)
-			if not sc.empty():
-				downsides.push_back(sc.effect)
-				got = neg_value(abs(sc.value))
-		elif r >= 0.45 and r < 0.52:
-			var cd = gen_char_downside(comp, perm_mult)
-			if not cd.empty():
-				downsides += cd.effects
-				got = cd.value
-		elif r >= 0.37 and r < 0.41:
-			var nd = gen_next_wave_downside(comp, perm_mult)
-			if not nd.empty():
-				downsides += nd.effects
-				got = nd.value
-		elif r >= 0.33 and r < 0.37:
-			var gm = gen_gain_mod(comp * divisor, true)
-			if not gm.empty():
-				downsides.push_back(gm.effect)
-				got = neg_value(abs(gm.value))
-		elif r < 0.15:
-			var c = gen_clause(-comp * divisor, perm_mult, true)
-			if not c.empty():
-				_note_clause(c)
-				downsides.push_back(TriggerEffect.make(c))
-				got = neg_value(abs(Valuation.clause_value(c, perm_mult)))
-		elif r < 0.25:
-			var m = _pick_mechanic(tier, true, comp * 2.0)
-			if m != null:
-				downsides.push_back(_mechanic_copy(m, -1.0, item.my_id))
-				got = abs(m.value)
-		if got == 0.0:
-			var s = _pick_stat(true, used_stats)
-			var v = int(min(_round_to_unit(comp * divisor / Catalog.stat_w(s), s), _line_cap(s, true)))
-			downsides.push_back(_stat_effect(s, -v))
-			used_stats.push_back(s)
-			got = neg_value(v * Catalog.stat_w(s))
-		budget += got
+		var dres = _gen_downsides(item, budget_total * rng.randf_range(0.1, 0.35), perm_mult, used_stats)
+		downsides = dres.effects
+		budget += dres.got
 
 	# 2) 特殊行：数量按原版同稀有度"带特殊行的比例" × 触发效果滑条；约 70% 为触发条款，其余为搬运机制
 	var p_special = special_share_by_tier[tier] * _trigger_rate()
@@ -739,6 +748,86 @@ func _generate_item_once(item, force_special: bool) -> Dictionary:
 		"budget": budget_total,
 		"class": cls,
 	}
+
+
+# 核心属性道具：唯一的正面效果是 stat 的一行数值（隐含价值 × CORE_VALUE_MULT），多数附带代价以提高数值；
+# T3 必带代价（T3 单行道具不能是单纯数值）
+func _generate_core_item(item, stat: String) -> Dictionary:
+	cur_tier = item.tier
+	var perm_mult: float = Catalog.PERM_MULT[item.tier]
+	var budget: float = item_budget(item) * Catalog.HIDDEN_TIER_MULT[item.tier] * Catalog.CORE_VALUE_MULT * _avg_mult() * _variance_mult()
+	var budget_total = budget
+	pos_cat = ""
+	neg_cat = "*"
+	anchor_stat = stat
+	var used_stats = [stat]
+	var downsides = []
+	if item.tier == 2 or rng.randf() < Catalog.CORE_DOWNSIDE_CHANCE:
+		var dres = _gen_downsides(item, budget_total * rng.randf_range(0.15, 0.4), perm_mult, used_stats)
+		downsides = dres.effects
+		budget += dres.got
+	var cap = int(ceil(_line_cap(stat, false) * Catalog.CORE_LINE_CAP_MULT))
+	var v = int(min(_round_to_unit(budget / Catalog.stat_w(stat), stat), cap))
+	var ordered = [_stat_effect(stat, v)] + downsides
+	pos_cat = ""
+	neg_cat = ""
+	anchor_stat = ""
+	cur_tier = -1
+	return {
+		"effects": ordered,
+		"adj": _adj(Catalog.ADJ_BY_STAT.get(stat, Catalog.ADJ_MECHANIC)),
+		"tags": _tags_for(ordered),
+		"main_stats": main_stats(ordered),
+		"budget": budget_total,
+		"class": [Catalog.STAT_CATEGORY.get(stat, "A"), "*" if not downsides.empty() else "-"],
+		"core": stat,
+	}
+
+
+# 代价：换来 comp 预算的负面效果（实际强度 = comp × 负面除数）
+func _gen_downsides(item, comp: float, perm_mult: float, used_stats: Array) -> Dictionary:
+	var tier: int = item.tier
+	var downsides = []
+	var got = 0.0
+	var r = rng.randf()
+	if r >= 0.25 and r < 0.33:
+		var sc = gen_scaling(comp * divisor, true)
+		if not sc.empty():
+			downsides.push_back(sc.effect)
+			got = neg_value(abs(sc.value))
+	elif r >= 0.45 and r < 0.52:
+		var cd = gen_char_downside(comp, perm_mult)
+		if not cd.empty():
+			downsides += cd.effects
+			got = cd.value
+	elif r >= 0.37 and r < 0.41:
+		var nd = gen_next_wave_downside(comp, perm_mult)
+		if not nd.empty():
+			downsides += nd.effects
+			got = nd.value
+	elif r >= 0.33 and r < 0.37:
+		var gm = gen_gain_mod(comp * divisor, true)
+		if not gm.empty():
+			downsides.push_back(gm.effect)
+			got = neg_value(abs(gm.value))
+	elif r < 0.15:
+		var c = gen_clause(-comp * divisor, perm_mult, true)
+		if not c.empty():
+			_note_clause(c)
+			downsides.push_back(TriggerEffect.make(c))
+			got = neg_value(abs(Valuation.clause_value(c, perm_mult)))
+	elif r < 0.25:
+		var m = _pick_mechanic(tier, true, comp * 2.0)
+		if m != null:
+			downsides.push_back(_mechanic_copy(m, -1.0, item.my_id))
+			got = abs(m.value)
+	if got == 0.0:
+		var s = _pick_stat(true, used_stats)
+		var v = int(min(_round_to_unit(comp * divisor / Catalog.stat_w(s), s), _line_cap(s, true)))
+		downsides.push_back(_stat_effect(s, -v))
+		used_stats.push_back(s)
+		got = neg_value(v * Catalog.stat_w(s))
+	return {"effects": downsides, "got": got}
 
 
 # 单行数值上限：原版该属性单行最大值的 1.25 倍（至少 5 个单位）
