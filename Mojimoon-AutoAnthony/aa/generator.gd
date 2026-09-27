@@ -885,12 +885,12 @@ func _preserved_lines(item) -> Array:
 	return out
 
 
-# 核心属性道具：唯一的正面效果是 stat 的一行数值（隐含价值 × CORE_VALUE_MULT），多数附带代价以提高数值；
+# 核心属性道具：唯一的正面效果是 stat 的一行数值，多数附带代价以提高数值；
 # T3 必带代价（T3 单行道具不能是单纯数值）
 func _generate_core_item(item, stat: String) -> Dictionary:
 	cur_tier = item.tier
 	var perm_mult: float = Catalog.PERM_MULT[item.tier]
-	var budget: float = item_budget(item) * Catalog.HIDDEN_TIER_MULT[item.tier] * Catalog.CORE_VALUE_MULT * _avg_mult() * _variance_mult()
+	var budget: float = item_budget(item) * Catalog.HIDDEN_TIER_MULT[item.tier] * _avg_mult() * _variance_mult()
 	var budget_total = budget
 	pos_cat = ""
 	neg_cat = "*"

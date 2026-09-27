@@ -551,14 +551,13 @@ const T4_BANNED_POSITIVE_STATS = ["stat_harvesting"]
 # 负面触发条款使用敌人属性（生命 / 伤害 / 速度提高）的概率
 const NEGATIVE_CLAUSE_ENEMY_CHANCE = 0.3
 
-# 核心属性道具：T1–T3 每档、每个重要输出 / 收获属性各保证一件"唯一正面效果就是该属性"的道具（可附带负面），
-# 隐含价值 × 1.08，作为构筑的过渡
+# 核心属性道具：T1–T3 每档、每个重要输出 / 收获属性各保证一件"唯一正面效果就是该属性"的道具（可附带负面），作为构筑的过渡
 const CORE_STATS = [
 	"stat_percent_damage", "stat_melee_damage", "stat_ranged_damage", "stat_elemental_damage",
 	"stat_engineering", "stat_attack_speed", "stat_harvesting", "xp_gain",
 ]
 const CORE_TIERS = [0, 1, 2]
-const CORE_VALUE_MULT = 1.08
+const CORE_VALUE_MULT = 1
 # 核心道具单行上限相对普通上限的倍数（数值更高的单属性道具）
 const CORE_LINE_CAP_MULT = 1.5
 
