@@ -101,6 +101,11 @@ const TRIGGERS = {
 	"buy": {"kind": "shop", "e": 3.0, "timing": 0.0, "gate": "chance", "w": 0.4},
 }
 
+# 实际受击次数（用于"受伤时清空"条款的估值）
+const REAL_HITS_PER_WAVE = 7.0
+# 本波属性条款带"受伤时清空"的概率
+const RESET_ON_HIT_CHANCE = 0.25
+
 const INTERVAL_CHOICES = [3, 4, 5, 6, 8, 10, 12, 15]
 
 # ------------------------------------------------------------
@@ -180,13 +185,24 @@ const REPEAT_PENALTY_TRIGGER = 0.15
 const REPEAT_PENALTY_PAYLOAD = 0.08
 
 # 行为写死在道具 ID 上的道具：保持原样，也不作为机制组件的来源
+# 道具 ID 本身还有额外含义的道具（望远镜的升级预览、诱饵的渔夫计数、口袋工厂计入建筑数、美西螈的商店刷新规则、
+# 金鱼 / 沙漏 / 镜子的"用后变成另一件道具"）：道具本身保持原样，但它们的效果可以出现在其他重组道具上
 const ANCHORED_ITEMS = [
-	"item_spyglass", "item_coupon", "item_hourglass", "item_goldfish", "item_goldfish_used",
-	"item_axolotl", "item_bait", "item_whistle", "item_crown", "item_pocket_factory",
-	"item_recycling_machine", "item_mirror", "item_broken_mirror", "item_broken_hourglass",
-	"item_crystal", "item_scared_sausage", "item_builder_turret_0", "item_builder_turret_1",
-	"item_builder_turret_2", "item_builder_turret_3", "item_fairy", "item_pearl",
-	"item_treasure_map", "item_piggy_bank", "item_fish_hook",
+	"item_spyglass", "item_bait", "item_pocket_factory", "item_axolotl",
+	"item_goldfish", "item_goldfish_used", "item_hourglass", "item_broken_hourglass",
+	"item_mirror", "item_broken_mirror",
+	"item_builder_turret_0", "item_builder_turret_1", "item_builder_turret_2", "item_builder_turret_3",
+]
+# 不作为组件来源的道具（建造者的角色专属炮台）
+const MECHANIC_SOURCE_EXCLUDED = ["item_builder_turret_0", "item_builder_turret_1", "item_builder_turret_2", "item_builder_turret_3"]
+# 效果里存"持有者道具 ID"的机制：搬运时改为新持有者的 ID
+const HOLDER_KEYED = ["duplicate_item", "increase_tier_on_reroll"]
+# 生效后持有者道具会被移除的机制：在同一行里注明
+const CONSUMED_KEYS = ["duplicate_item", "increase_tier_on_reroll", "item_hourglass"]
+# 虽非普通求和存储、但数值含义线性、可按预算缩放的机制
+const SCALAR_EXTRA_KEYS = [
+	"extra_item_in_crate", "curse_locked_items", "remove_speed", "number_of_enemies", "duplicate_item",
+	"gain_pct_gold_start_wave", "loot_alien_chance", "loot_alien_speed",
 ]
 # 固定机制中的负面效果（当作代价使用）：key -> 哪种符号是坏的
 #   1 = 正值不利（敌人更强、价格更高、诅咒……），-1 = 负值不利（下波开局少血），0 = 总是不利
@@ -220,8 +236,7 @@ const STAT_TEXT_KEYS = {
 # 不适合搬运的机制 key（依赖其他行或道具 ID 语义）
 const MECHANIC_BANNED_KEYS = [
 	"stats_next_wave", "starting_item", "starting_weapon", "cursed_starting_item",
-	"curse_locked_items", "extra_item_in_crate", "duplicate_item", "increase_tier_on_reroll",
-	"item_hourglass", "remove_speed", "fog_visibility", "number_of_enemies",
+	"fog_visibility",
 ]
 
 # 名称形容词：按主要效果选择

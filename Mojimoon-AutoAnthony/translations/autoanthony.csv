@@ -79,3 +79,5 @@ key,en,fr,zh,ja,ko,zh_TW,ru,pl,es,pt,de,tr,it
 "AA_UI_RENAME","Rename items","","重组名称","","","重组名称","","","","","","",""
 "AA_UI_AVG","Average value","","平均数值","","","平均数值","","","","","","",""
 "AA_UI_VARIANCE","Variance","","浮动范围","","","浮动范围","","","","","","",""
+"AA_NOTE_CONSUMED"," (this item disappears once it takes effect)","","（生效后此道具消失）","","","（生效后此道具消失）","","","","","","",""
+"AA_RESET_ON_HIT",", lost when you take damage","","，受到伤害时清空","","","，受到伤害时清空","","","","","","",""

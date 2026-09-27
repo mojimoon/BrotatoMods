@@ -58,7 +58,7 @@ func rebuild(player_index: int) -> void:
 					list.push_back(old[id])
 				else:
 					var show = Valuation.raw_rate(e.trigger, e.param, e.chance) <= FEEDBACK_MAX_RATE and not e.trigger in ["still", "moving"]
-					list.push_back({"effect": e, "count": 0, "fired": 0, "active": false, "show": show})
+					list.push_back({"effect": e, "count": 0, "fired": 0, "active": false, "show": show, "stack": 0})
 	# 被移除的状态加成要撤销
 	for id in old:
 		var still_there = false
@@ -101,7 +101,20 @@ func fire(event: String, player_index: int, pos = null) -> void:
 			continue
 		en.fired += 1
 		execute(e, player_index, pos, en.show)
+		if e.reset and e.payload == "temp_stat":
+			en.stack = en.get("stack", 0) + e.value
+	if event == "hit":
+		_reset_on_hit(player_index)
 	_depth -= 1
+
+
+# "受伤时清空"：撤销该条款本波累积的临时属性
+func _reset_on_hit(player_index: int) -> void:
+	for en in entries[player_index]:
+		var e = en.effect
+		if e.reset and en.get("stack", 0) != 0:
+			TempStats.remove_stat(Keys.generate_hash(e.stat), en.stack, player_index)
+			en.stack = 0
 
 
 # 玩家的原版 took_damage 信号：闪避或实际受到伤害时转发
@@ -136,6 +149,8 @@ func _physics_process(delta: float) -> void:
 					if (e.cap <= 0 or en.fired < e.cap) and (e.chance >= 100 or randf() * 100.0 < e.chance):
 						en.fired += 1
 						execute(e, p, null, en.show)
+						if e.reset and e.payload == "temp_stat":
+							en.stack = en.get("stack", 0) + e.value
 			elif Catalog.TRIGGERS[e.trigger].kind == "state":
 				var want = _state_holds(e.trigger, player)
 				if want != en.active:
@@ -276,3 +291,4 @@ func on_wave_end() -> void:
 			en.active = false
 			en.fired = 0
 			en.count = 0
+			en.stack = 0

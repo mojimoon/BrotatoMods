@@ -23,6 +23,7 @@ var A: String
 var B: String
 var L1: String
 var L2: String
+var C1: String
 
 var tree: SceneTree
 var _current_test = ""
@@ -51,6 +52,7 @@ func run(p_tree: SceneTree):
 	B = isvc.items[1].my_id
 	L1 = isvc.items[2].my_id
 	L2 = isvc.items[3].my_id
+	C1 = isvc.items[4].my_id
 	print("user dir: ", OS.get_user_data_dir())
 
 	var tests: Array = []
@@ -97,6 +99,7 @@ func _reset() -> void:
 	m.cfg_replace_starting = false
 	m.cfg_replace_shop = true
 	m.cfg_replace_shop_first = false
+	m.cfg_replace_shop_once = false
 	m.cfg_replace_crate = true
 	m.reset_counter()
 	_setup_player()
@@ -148,11 +151,11 @@ func _rand_item(seed_n: int) -> String:
 	return _id(isvc.get_rand_item_for_wave(WAVE, 0))
 
 
-func _shop(seed_n: int) -> Array:
+func _shop(seed_n: int, wave: int = WAVE) -> Array:
 	_seed(seed_n)
 	var args = ItemServiceGetShopItemsArgs.new([[]], 0)
 	var ids: Array = []
-	for entry in isvc.get_player_shop_items(WAVE, 0, args):
+	for entry in isvc.get_player_shop_items(wave, 0, args):
 		ids.push_back(_id(entry[0]))
 	return ids
 
@@ -217,6 +220,7 @@ func test_02_no_sources_selected_equals_disabled() -> void:
 	m.cfg_replace_starting = false
 	m.cfg_replace_shop = false
 	m.cfg_replace_shop_first = false
+	m.cfg_replace_shop_once = false
 	m.cfg_replace_crate = false
 	m.legendary_mode = m.LegendaryMode.NONE
 	_assert_no_effect("no sources")
@@ -234,6 +238,9 @@ func test_03_empty_general_pool_equals_disabled() -> void:
 	m.cfg_replace_shop = false
 	m.cfg_replace_shop_first = true
 	_assert_no_effect("empty general pool, shops always sell")
+	m.cfg_replace_shop_first = false
+	m.cfg_replace_shop_once = true
+	_assert_no_effect("empty general pool, sold once per wave")
 	_eq(_starting_items_after_run_start(), _starting_items_baseline(), "starting items untouched")
 
 
@@ -464,6 +471,8 @@ func test_19_settings_roundtrip() -> void:
 	m.legendary_item_ids = [L1]
 	m.legendary_mode = m.LegendaryMode.ONCE
 	m.cfg_replace_starting = true
+	m.cfg_replace_shop = false
+	m.cfg_replace_shop_once = true
 	m._save_settings()
 	_reset()
 	m._load_settings()
@@ -472,6 +481,8 @@ func test_19_settings_roundtrip() -> void:
 	_eq(m.legendary_item_ids, [L1], "T4 pool")
 	_eq(m.legendary_mode, m.LegendaryMode.ONCE, "mode")
 	_eq(m.cfg_replace_starting, true, "starting")
+	_eq(m.cfg_replace_shop, false, "all items in shop")
+	_eq(m.cfg_replace_shop_once, true, "sold once per wave")
 	_remove(m.SETTINGS_PATH)
 
 
@@ -571,18 +582,107 @@ func _center(c: Control) -> Vector2:
 	return r.position + r.size / 2
 
 
+# ============================================================
+# 每波销售一次
+# ============================================================
+# 连续刷新商店，收集与基准不同的槽位里出现的物品
+func _shop_once_appearances(wave: int, rerolls: int) -> Array:
+	var appeared: Array = []
+	for r in rerolls:
+		var s = 1000 * wave + r
+		var base: Array = _baseline("_shop", [s, wave])
+		var got: Array = _shop(s, wave)
+		_eq(got.size(), base.size(), "shop size wave %d reroll %d" % [wave, r])
+		for i in got.size():
+			if got[i] != base[i]:
+				appeared.push_back(got[i])
+	return appeared
+
+
+func test_23a_shop_once_per_wave() -> void:
+	m.target_item_ids = [A, B, L1, L2, C1]
+	m.cfg_replace_shop = false
+	m.cfg_replace_shop_once = true
+	# 5 件物品超过一次商店的物品槽位数，需要刷新才能全部出现；每件恰好一次，按选择顺序
+	_eq(_shop_once_appearances(WAVE, 6), [A, B, L1, L2, C1], "each item once per wave, in order")
+	_eq(m.replace_counter, 0, "general rotation counter untouched")
+	# 同一波后续刷新：恢复随机
+	_eq(_shop_once_appearances(WAVE, 3), [], "back to random after all items appeared")
+	# 下一波重新开始
+	_eq(_shop_once_appearances(WAVE + 1, 6), [A, B, L1, L2, C1], "refills next wave")
+	# 新一局重置
+	_shop_once_appearances(WAVE + 2, 1)
+	m.reset_counter()
+	var first = _shop_once_appearances(WAVE + 2, 1)
+	_check(not first.empty() and first[0] == A, "reset on new run starts from the first item")
+
+
+func test_23b_shop_once_first_shop_fills_item_slots() -> void:
+	m.target_item_ids = [A, B]
+	m.cfg_replace_shop = false
+	m.cfg_replace_shop_once = true
+	for s in SEEDS:
+		m.reset_counter()
+		var base: Array = _baseline("_shop", [s])
+		var got: Array = _shop(s)
+		var item_slots = 0
+		for id in base:
+			if _item(id) != null:
+				item_slots += 1
+		var expected: Array = [A, B].slice(0, min(2, max(1, item_slots)) - 1)
+		var appeared: Array = []
+		for i in got.size():
+			if got[i] != base[i]:
+				appeared.push_back(got[i])
+		_eq(appeared, expected, "first shop shows as many items as fit (seed %d, %d item slots)" % [s, item_slots])
+		# 武器槽位不被占用（除非根本没有物品槽位）
+		if item_slots > 0:
+			for i in got.size():
+				if _item(base[i]) == null:
+					_eq(got[i], base[i], "weapon slot %d kept (seed %d)" % [i, s])
+
+
+func test_23c_shop_once_disabled_or_off() -> void:
+	m.target_item_ids = [A, B]
+	m.cfg_replace_shop = false
+	m.cfg_replace_shop_once = true
+	m.enabled = false
+	_eq(_shop_once_appearances(WAVE, 2), [], "master switch off")
+	m.enabled = true
+	# 关闭期间不应消耗本波队列
+	_eq(_shop_once_appearances(WAVE, 3), [A, B], "queue not consumed while disabled")
+	m.cfg_replace_shop_once = false
+	m.reset_counter()
+	_eq(_shop_once_appearances(WAVE, 3), [], "option off")
+
+
 func test_24_ui_descriptions() -> void:
 	TranslationServer.set_locale("en")
 	var ui = yield(_open_ui(), "completed")
-	_eq(ui._regular_desc.text, "All items in shop, crates will be replaced with the following items.", "default desc")
+	_eq(ui._regular_desc.text, "Crates, all items in shop will be replaced with the following items.", "default desc")
 
 	ui._option_chips["cfg_replace_starting"].pressed = true
-	_eq(ui._regular_desc.text, "Starting items, all items in shop, crates will be replaced with the following items.", "starting on")
+	_eq(ui._regular_desc.text, "Starting items, crates, all items in shop will be replaced with the following items.", "starting on")
 
 	ui._option_chips["cfg_replace_shop_first"].pressed = true
 	_eq(m.cfg_replace_shop, false, "shops always sell turns off all-shop")
 	_eq(ui._option_chips["cfg_replace_shop"].pressed, false, "all-shop chip unpressed")
-	_eq(ui._regular_desc.text, "Starting items, crates will be replaced with the following items. The shop usually sells one of the following items.", "shops always sell")
+	_eq(ui._regular_desc.text, "Starting items, crates will be replaced with the following items. Upon each shop reroll, one of the slots is guaranteed to be one of the following items.", "shops always sell")
+
+	ui._option_chips["cfg_replace_shop_once"].pressed = true
+	_eq(m.cfg_replace_shop_first, false, "sold once per wave turns off shops always sell")
+	_eq(ui._option_chips["cfg_replace_shop_first"].pressed, false, "shops always sell chip unpressed")
+	_eq(ui._regular_desc.text, "Starting items, crates will be replaced with the following items. Each wave, the shop sells each of the following items once, then goes back to random.", "sold once per wave")
+
+	ui._option_chips["cfg_replace_shop"].pressed = true
+	_eq(m.cfg_replace_shop_once, false, "all items in shop turns off sold once per wave")
+	_eq(m.cfg_replace_shop_first, false, "still off")
+	_eq(ui._option_chips["cfg_replace_shop_once"].pressed, false, "sold once chip unpressed")
+
+	# 非商店选项不参与互斥
+	ui._option_chips["cfg_replace_crate"].pressed = false
+	_eq(m.cfg_replace_shop, true, "crate toggle leaves shop options alone")
+	ui._option_chips["cfg_replace_crate"].pressed = true
 
 	for key in ui._option_chips:
 		ui._option_chips[key].pressed = false
@@ -592,7 +692,7 @@ func test_24_ui_descriptions() -> void:
 	ui._option_chips["cfg_replace_starting"].pressed = true
 	ui._option_chips["cfg_replace_crate"].pressed = true
 	ui._option_chips["cfg_replace_shop_first"].pressed = true
-	_eq(ui._regular_desc.text, "起始物品、箱子被替换为以下物品。商店通常销售一件以下商品。", "zh joins without spaces")
+	_eq(ui._regular_desc.text, "起始物品、箱子被替换为以下物品。每次商店刷新时，固定有一个槽位是以下物品之一。", "zh joins without spaces")
 	TranslationServer.set_locale("en")
 
 	ui._enable_switch.pressed = false

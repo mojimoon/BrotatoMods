@@ -24,8 +24,13 @@ static func fires_per_wave(trigger: String, param: int, chance: int, cap: int) -
 
 
 # 本波临时属性的平均叠层（线性累积；有上限时在达到上限后保持）
-static func avg_stack(trigger: String, param: int, chance: int, cap: int) -> float:
+static func avg_stack(trigger: String, param: int, chance: int, cap: int, reset: bool = false) -> float:
 	var t = Catalog.TRIGGERS[trigger]
+	if reset and t.kind == "event" and t.timing > 0.0 and t.timing < 1.0:
+		# 受击清空：受击间隔近似指数分布（实际约每波 7 次），平均叠层 = 触发频率 × 平均受击间隔
+		var normal = avg_stack(trigger, param, chance, cap, false)
+		var rate = raw_rate(trigger, param, chance) / Catalog.WAVE_SECONDS
+		return min(normal, rate * Catalog.WAVE_SECONDS / Catalog.REAL_HITS_PER_WAVE)
 	if t.kind == "state":
 		return t.e
 	var e = raw_rate(trigger, param, chance)
@@ -58,7 +63,7 @@ static func clause_value(c: Dictionary, perm_mult: float) -> float:
 
 	match payload:
 		"temp_stat":
-			return Catalog.stat_w(stat) * v * avg_stack(trigger, param, chance, cap)
+			return Catalog.stat_w(stat) * v * avg_stack(trigger, param, chance, cap, bool(c.get("reset", false)))
 		"perm_stat":
 			return Catalog.stat_w(stat) * v * fires_per_wave(trigger, param, chance, cap) * perm_mult
 		"timed_stat":

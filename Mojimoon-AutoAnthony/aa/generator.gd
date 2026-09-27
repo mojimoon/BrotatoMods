@@ -224,7 +224,7 @@ func _collect_priors(items: Array, characters: Array, weapons: Array) -> void:
 					trigger_stat_prior[sk] = trigger_stat_prior.get(sk, 0.0) + 1.0
 				continue
 			if src is ItemData and not src is CharacterData and not src is WeaponData and is_mechanic(e) \
-					and not src.my_id in Catalog.ANCHORED_ITEMS and src.tier >= 0 and src.tier <= 3 \
+					and not src.my_id in Catalog.MECHANIC_SOURCE_EXCLUDED and src.tier >= 0 and src.tier <= 3 \
 					and e.get_text(0, false) != "" and _mechanic_keys_exist(e, effect_keys):
 				mechs.push_back(e)
 		if src is ItemData and not src is CharacterData and not src is WeaponData and src.tier >= 0 and src.tier <= 3:
@@ -370,7 +370,8 @@ func _add_item_mechanics(src, mechs: Array, stat_value: float, pos_value: float)
 		each_down = max(3.0, (pos_value - budget) / downs)
 	for e in mechs:
 		var down = Catalog.is_downside_mechanic(e)
-		var scalar = e.get_script() == effect_script and e.storage_method == 0 and e.custom_key == "" \
+		var k = e.custom_key if e.custom_key != "" else e.key
+		var scalar = ((e.get_script() == effect_script and e.storage_method == 0 and e.custom_key == "") or k in Catalog.SCALAR_EXTRA_KEYS) \
 			and e.value != 0 and not e.key in Catalog.SCALAR_MECHANIC_EXCLUDED and not down
 		mechanics_by_tier[src.tier].push_back({
 			"effect": e, "value": -each_down if down else each_up, "down": down, "source": src.my_id,
@@ -566,7 +567,7 @@ func generate_item(item) -> Dictionary:
 		elif r < 0.25:
 			var m = _pick_mechanic(tier, true, comp * 2.0)
 			if m != null:
-				downsides.push_back(_mechanic_copy(m))
+				downsides.push_back(_mechanic_copy(m, -1.0, item.my_id))
 				got = abs(m.value)
 		if got == 0.0:
 			var s = _pick_stat(true, used_stats)
@@ -592,7 +593,7 @@ func generate_item(item) -> Dictionary:
 		if kind == "mechanic" and budget > 8.0:
 			var m = _pick_mechanic(tier, false, budget * 1.1)
 			if m != null:
-				var me = _mechanic_copy(m, budget * share)
+				var me = _mechanic_copy(m, budget * share, item.my_id)
 				var mv = me.get_meta("aa_value")
 				effects.push_back(me)
 				budget -= mv
@@ -706,8 +707,9 @@ func _stat_effect(stat: String, value: int) -> Effect:
 
 
 # 机制行复制时记下其估值，便于审计
-# target > 0 时，可缩放机制按预算调整数值（1 单位 .. 原版 1.5 倍），价值按比例折算
-func _mechanic_copy(m: Dictionary, target: float = -1.0):
+# target > 0 时，可缩放机制按预算调整数值（1 单位 .. 原版 1.5 倍），价值按比例折算。
+# holder_id：新持有者道具 ID（"持有者键"类机制需要改写 key）
+func _mechanic_copy(m: Dictionary, target: float = -1.0, holder_id: String = ""):
 	var e = m.effect.duplicate()
 	var v = m.value
 	if target > 0.0 and m.get("scalar", false):
@@ -717,9 +719,40 @@ func _mechanic_copy(m: Dictionary, target: float = -1.0):
 		var nv = int(clamp(want, 1, max(1.0, ceil(abs(native_v) * 1.5)))) * sg
 		e.value = nv
 		v = m.value * float(nv) / float(native_v)
+		# 丑牙：减速上限保持为单次减速的 4 倍（与原版诅咒逻辑一致）
+		if e.key == "remove_speed" and "value2" in e:
+			e.value2 = nv * 4
+	if holder_id != "":
+		_adapt_to_holder(e, holder_id)
 	e.set_meta("aa_value", v)
 	e.set_meta("aa_tags", m.get("tags", []))
 	return e
+
+
+# 原版按道具 ID 查找持有者的机制：改写为新持有者；生效后会移除持有者的，在同一行注明
+func _adapt_to_holder(e, holder_id: String) -> void:
+	var k = e.custom_key if e.custom_key != "" else e.key
+	if k in Catalog.HOLDER_KEYED:
+		e.key = holder_id
+		e.key_hash = Keys.generate_hash(holder_id)
+	elif k == "extra_item_in_crate" and e.key != "random":
+		# 珍珠：箱子里额外出现"这件道具自己"
+		e.key = holder_id
+		e.key_hash = Keys.generate_hash(holder_id)
+	if k in Catalog.CONSUMED_KEYS:
+		note_text(e, "AA_NOTE_CONSUMED")
+
+
+# 在效果原文后追加说明：生成一个新的描述 key（= 原文 + 说明），注册到当前语言与英文
+static func note_text(e, note_key: String) -> void:
+	var native_key = (e.text_key if e.text_key != "" else e.key).to_upper()
+	if native_key.begins_with("AA_N_"):
+		return
+	var new_key = "AA_N_" + native_key + "__" + note_key
+	var m = Engine.get_main_loop().root.get_node_or_null("/root/ModLoader/Mojimoon-AutoAnthony")
+	if m != null:
+		m.register_note(new_key, native_key, note_key)
+	e.text_key = new_key
 
 
 func _pick_mechanic(tier: int, downside: bool, max_abs_value: float):
@@ -1001,6 +1034,9 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 				c.value2 = [3, 4, 5, 6, 8][rng.randi() % 5]
 			if payload == "temp_stat" and t.kind == "event" and Valuation.raw_rate(trigger, 1, 100) > 6.0 and rng.randf() < 0.5:
 				c.cap = [10, 15, 20, 30][rng.randi() % 4]
+			if payload == "temp_stat" and not negative and t.kind == "event" and t.timing > 0.0 and t.timing < 1.0 \
+					and trigger != "hit" and rng.randf() < Catalog.RESET_ON_HIT_CHANCE:
+				c.reset = true
 		"perm_stat":
 			c.stat = _pick_stat(false)
 			c.value = Catalog.stat_unit(c.stat)

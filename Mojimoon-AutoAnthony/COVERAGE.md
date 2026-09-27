@@ -9,13 +9,13 @@
 | `trigger`（29 种） | 拆解为 (扳机, 载荷) 先验，由通用触发条款重新表达 | 单位价值 × 每波频率（见 README 第 4 节） |
 | `scaling`（27 种） | 计数 × 属性自由搭配重新生成（原版 GainStatForEveryStatEffect） | 目标属性权重 × 数值 × 计数期望 / 每 N；计数期望由原版道具校准 |
 | `gain_mod`（3 种） | 属性修改 ±XX% 重新生成（原版 StatGainsModificationEffect） | 属性权重 × 属性期望总量 × XX% |
-| `scalar`（30 种） | 原样搬运，并按预算缩放数值（1 单位 .. 原版 1.5 倍） | 来源道具剩余价值按数值比例折算 |
-| `mechanic`（48 种） | 原样搬运（炮台、宠物、爆炸、武器类加成……） | 道具：来源道具 (预算 − 属性行价值) / 机制数；角色：(角色总价值 − 可估值部分) / 机制数，限制 30–80 |
-| `downside`（13 种） | 作为代价搬运 | 来源道具因它多拿到的正面预算（至少 3） |
+| `scalar`（39 种） | 原样搬运，并按预算缩放数值（1 单位 .. 原版 1.5 倍） | 来源道具剩余价值按数值比例折算 |
+| `mechanic`（54 种） | 原样搬运（炮台、宠物、爆炸、武器类加成……） | 道具：来源道具 (预算 − 属性行价值) / 机制数；角色：(角色总价值 − 可估值部分) / 机制数，限制 30–80 |
+| `downside`（14 种） | 作为代价搬运 | 来源道具因它多拿到的正面预算（至少 3） |
 | `identity`（59 种） | 保留在角色上，不进入道具池（武器限制、初始装备、商店规则、负向机制……） | — |
-| `anchored`（21 种） | 所在道具行为写在道具 ID 上：整件道具保持原样，也不作为组件来源 | — |
-| `text`（6 种） | 纯描述行（由道具 ID 实现）：所在道具保持原样 | — |
-| `excluded`（3 种） | 依赖其他行或含义不对称（迷雾视野、敌人数量、减速上限……）：不搬运 | — |
+| `anchored`（3 种） | 建造者炮台的角色专属效果：不作为组件来源 | — |
+| `text`（6 种） | 纯描述行：需要的说明已合并进对应效果的同一行（“生效后此道具消失”“受到伤害时清空”），其余为音效 / 已用状态的提示 | — |
+| `excluded`（1 种） | 迷雾视野：只在迷雾事件中有意义，不搬运 | — |
 | `weapon`（36 种） | 武器专属效果：仅在“重组武器”时于同类型武器家族间整套交换 | 按等级对齐，不单独估值 |
 
 ## 明细
@@ -103,6 +103,7 @@
 | `burning_cooldown_reduction` | 1 | item | eyes_surgery Burning activates 20% faster |
 | `burning_spread` | 1 | item | snake Burning spreads to an additional nearby enemy |
 | `chance_double_gold` | 1 | item | metal_detector +5% chance to double the value of picked up materials |
+| `curse_locked_items` | 1 | item | fish_hook Locked items and weapons have a 20% chance to become cursed  |
 | `damage_against_bosses` | 2 | item,char | silver_bullet +25% damage against bosses and elites / c:jack +125% damage against bosses and elites |
 | `enemy_fruit_drops` | 2 | item,char | fruit_basket Enemies have a higher chance of dropping fruits / c:druid Enemies have a higher chance of dropping fruits |
 | `enemy_gold_drops` | 1 | item | starfish +20% materials dropped from enemies |
@@ -110,23 +111,31 @@
 | `extra_loot_aliens` | 1 | char | c:curious 2 additional loot aliens appear every wave |
 | `extra_loot_aliens_next_wave` | 1 | item | lure 2 additional loot aliens appear during the next wave |
 | `free_rerolls` | 1 | item | dangerous_bunny +1 free reroll in the shop |
+| `gain_pct_gold_start_wave` | 1 | item | piggy_bank +20% of your materials at the start of waves (stops working  |
 | `gold_drops` | 2 | item,char | evil_hat +70% materials dropped / c:jack +200% materials dropped |
 | `gold_on_cursed_enemy_kill` | 1 | item | black_flag +1 material when you kill a cursed enemy |
-| `harvesting_growth` | 1 | char | c:farmer Harvesting increases by an additional 3% at the end of a wav |
+| `harvesting_growth` | 2 | item,char | crown Harvesting increases by an additional 8% at the end of a wav / c:farmer Harvesting increases by an additional 3% at the end of a wav |
 | `hit_protection` | 1 | item | tardigrade Nullifies the damage of one hit taken every wave |
 | `increase_material_value` | 1 | char | c:buccaneer Picked up materials have +100% value |
 | `instant_gold_attracting` | 2 | item | baby_gecko +25% chance to instantly attract a material when it��s droppe / sifds_relic +100% chance to instantly attract a material when it��s dropp |
 | `item_box_gold` | 1 | item | bag +15 materials when you pick up a crate |
+| `item_hourglass` | 1 | item | hourglass Turns back time, decreasing the current wave count by 1 |
+| `items_price` | 1 | item | coupon -5 % Items Price |
 | `jellyshield_count` | 1 | item | jellyshield Spawns a Jellyshield pet that orbits around the player. It c |
 | `level_upgrades_modifications` | 1 | item | barnacle +35% stats gained from level upgrades |
+| `loot_alien_chance` | 1 | item | whistle +50% chance for loot aliens to appear |
+| `loot_alien_speed` | 1 | item | whistle +20% movement speed for loot aliens |
+| `number_of_enemies` | 7 | item,char | candle -10% Enemies / gentle_alien +5% Enemies |
 | `pierce_on_crit` | 1 | item | eyepatch Projectiles get +1 piercing on critical hit |
 | `piercing` | 3 | item,char | bandana Projectiles pierce through 1 additional target / sharp_bullet Projectiles pierce through 1 additional target |
 | `piercing_damage` | 1 | item | pumpkin +15% Piercing Damage. Can't go above base damage |
 | `projectiles` | 1 | char | c:renegade +2 projectiles |
-| `recycling_gains` | 1 | char | c:entrepreneur Gain 25% more materials from recycling items |
+| `recycling_gains` | 2 | item,char | recycling_machine Gain 35% more materials from recycling items / c:entrepreneur Gain 25% more materials from recycling items |
+| `reroll_price` | 1 | item | spyglass -25 % Reroll Price |
 | `stronger_loot_aliens_on_kill` | 1 | char | c:curious All future loot aliens become stronger when you kill a loot  |
 | `structure_attack_speed` | 1 | item | clockwork_wasp +10 % Structure attack speed |
 | `torture` | 1 | item | torture Restore 5 HP per second. Cannot heal any other way. |
+| `tree_turrets` | 1 | item | pocket_factory Killing a tree spawns a turret |
 | `trees` | 3 | item,char | tree More trees spawn / c:explorer More trees spawn |
 
 ### `mechanic`
@@ -143,6 +152,7 @@
 | `(EFFECT_PET_LOOTWORM)` | 1 | item | lootworm Spawns a Lootworm pet that collects materials and destroys t |
 | `(EFFECT_PET_RATZILLA)` | 1 | item | ratzilla Spawns a Ratzilla pet that deals 5 (+10%[/color |
 | `(EFFECT_PET_SCAPEGOAT)` | 1 | item | scapegoat Spawns a Scapegoat pet that moves around the map and gets ta |
+| `(EFFECT_SWAP_MAX_MIN_STAT_POS)` | 1 | item | axolotl Your highest (Max HP) and lowest (% Speed) positive primary  |
 | `(effect_garden)` | 1 | item | garden Spawns a garden that creates a fruit every 15 seconds |
 | `(effect_landmines)` | 1 | item | landmines A landmine spawns every 12 seconds dealing 10 ( |
 | `(effect_turret)` | 1 | item | turret Spawns a turret that shoots bullets dealing 10 ([color=white |
@@ -155,26 +165,31 @@
 | `alien_eyes` | 1 | item | alien_eyes Shoots 6 alien eyes around you every 3 seconds dealing 8 ([c |
 | `bonus_damage_against_targets_above_hp` | 1 | item | small_fish +10% damage against targets above 75% health |
 | `bonus_weapon_class_damage_against_cursed_enemies` | 1 | char | c:sailor +200% damage with Naval weapons against cursed enemies |
+| `burn_chance` | 1 | item | scared_sausage Attacks have a 25% chance to deal 3x1 (+100%[/c |
 | `burning_enemy_hp_percent_damage` | 1 | item | greek_fire Burning deals an additional 10% of current enemy HP as damag |
 | `consumable_heal_over_time` | 1 | item | jerky Consumables heal you over 4 seconds instead of instantly |
 | `dodge_cap` | 4 | item,char | ghost_outfit Dodge is capped at 70% / c:ghost Dodge is capped at 90% |
+| `duplicate_item` | 1 | item | mirror Duplicates the next item you get from the shop (item limits  |
 | `effect_weapon_class_bonus` | 3 | char | c:crazy +100 Range with Precise weapons / c:artificer +100 % Damage with Tool weapons |
 | `enemy_percent_damage_taken` | 2 | item,char | ice_cube Enemies take 10% more damage for 3 seconds when first hit by / c:diver Enemies take 300% more damage for 3 seconds when hit by Rang |
 | `explode_on_consumable_burning` | 1 | char | c:chef Consumables explode for 5x1 (+100%[img= |
 | `explode_on_overkill` | 1 | char | c:ogre Enemies taking double their max health as damage explode for |
 | `explode_when_below_hp` | 1 | item | sunken_bell Once per wave, you explode for 100 (+500%[/colo |
+| `extra_item_in_crate` | 2 | item | pearl +3% chance of finding an extra Pearl in a crate / treasure_map +20% chance of finding an extra item in a crate |
 | `gain_random_primary_stats_on_go_to_next_wave` | 1 | item | candy_bag Each wave grants 8 points randomly split between your primar |
 | `gain_stat_for_equipped_item_with_stat` | 1 | item | snowball +1 Elemental Damage every time you get an item that increase |
 | `gain_stat_for_every_step_after_equip` | 2 | char | c:hiker Earn 5 materials for every 10 steps you take during a wave / c:hiker +1 Max HP for every 80 steps you take during a wave |
 | `gain_stat_when_attack_killed_enemies` | 1 | char | c:dwarf +1 Engineering when killing at least 6 enemies with a direct |
 | `giant_crit_damage` | 1 | item | giant_belt Critical hits deal 10% of an enemy��s current health as bonus |
 | `hp_regen_bonus` | 1 | item | potion HP Regeneration is doubled when you have less than 50% healt |
+| `increase_tier_on_reroll` | 1 | item | goldfish Items will be 1 tier higher after the next reroll |
 | `knockback_aura` | 1 | item | lantern Knocks nearby enemies back every 3 seconds |
 | `minimum_weapon_cooldowns` | 1 | item | ball_and_chain Weapons have a minimum cooldown of 0.75 seconds between atta |
 | `modify_every_x_projectile` | 1 | item | seashell Every ranged weapon's 5th projectile has +3 projectiles |
 | `one_shot_trees` | 1 | item | lumberjack_shirt Trees die in one hit |
 | `projectiles_on_death` | 1 | item | baby_with_a_beard One bullet dealing 1 (+100%[img=15x15]r |
 | `reload_when_pickup_gold` | 1 | char | c:buccaneer Picking up a material resets the cooldown of all your weapon |
+| `remove_speed` | 1 | item | ugly_tooth Hitting an enemy removes 5% of their speed. Max 20% |
 | `structures_can_crit` | 1 | item | pile_of_books Your structures can crit |
 | `structures_cooldown_reduction` | 1 | item | improved_tools Increases the attack speed of your structures by 0% ([color= |
 | `unique_weapon_effects` | 3 | item | focus -3 % Attack Speed for every different weapon you have [+0] / spider +6 % Attack Speed for every different weapon you have [+0] |
@@ -191,14 +206,15 @@
 | `enemy_damage` | 2 | item | black_flag +10 % Enemy damage / starfish +15 % Enemy damage |
 | `enemy_health` | 2 | item | alien_baby +10 % Enemy health / black_flag +10 % Enemy health |
 | `extra_elite_next_wave_chance` | 1 | item | candy_bag Each wave, 10% chance to spawn an additional elite  |
+| `extra_enemies_next_wave` | 1 | item | bait Special enemies appear at the beginning of the next wave |
 | `hp_cap` | 1 | item | handcuffs Your Max HP is capped at its current value [15] |
-| `hp_start_next_wave` | 1 | item | weird_ghost Start the next wave with 1 HP |
+| `hp_start_next_wave` | 3 | item | weird_ghost Start the next wave with 1 HP / hourglass Start the next wave with 1 HP |
 | `hp_start_wave` | 1 | item | sad_tomato Start waves with -50% HP |
 | `lock_current_weapons` | 1 | item | knot Weapons can no longer be upgraded or recycled |
 | `lose_hp_per_second` | 2 | item | blood_donation You take 1 damage per second (does not give invulnerability  / bloody_hand You take 1 damage per second (does not give invulnerability  |
 | `piercing_damage` | 1 | item | sharp_bullet -20% Piercing Damage |
 | `speed_cap` | 1 | item | shackles Your Speed is capped at its current value [5] |
-| `stat_curse` | 3 | item | black_flag +5 Curse / corrupted_shard +1 Curse |
+| `stat_curse` | 4 | item | black_flag +5 Curse / fish_hook +1 Curse |
 
 ### `identity`
 
@@ -245,7 +261,7 @@
 | `no_heal` | 1 | char | c:golem You can��t heal in any way |
 | `no_melee_weapons` | 2 | char | c:ranger You can't equip melee weapons / c:renegade You can't equip melee weapons |
 | `no_ranged_weapons` | 4 | char | c:gladiator You can't equip ranged weapons / c:knight You can't equip ranged weapons |
-| `number_of_enemies` | 4 | char | c:old -10% Enemies / c:loud +50% Enemies |
+| `number_of_enemies` | 2 | char | c:old -10% Enemies / c:jack -70% Enemies |
 | `pacifist` | 1 | char | c:pacifist Gain 0.65 material and XP for every living enemy at the end  |
 | `poisoned_fruit` | 1 | char | c:druid 33% of fruits are poisoned and hurt you (ignores Dodge and A |
 | `remove_shop_items` | 2 | char | c:builder You can't have structures / c:gangster  |
@@ -268,27 +284,9 @@
 
 | 效果 key | 次数 | 来源 | 示例 |
 | --- | --- | --- | --- |
-| `(EFFECT_SWAP_MAX_MIN_STAT_POS)` | 1 | item | axolotl Your highest (Max HP) and lowest (% Speed) positive primary  |
-| `burn_chance` | 1 | item | scared_sausage Attacks have a 25% chance to deal 3x1 (+100%[/c |
-| `curse_locked_items` | 1 | item | fish_hook Locked items and weapons have a 20% chance to become cursed  |
-| `duplicate_item` | 1 | item | mirror Duplicates the next item you get from the shop (item limits  |
-| `extra_enemies_next_wave` | 1 | item | bait Special enemies appear at the beginning of the next wave |
-| `extra_item_in_crate` | 2 | item | pearl +3% chance of finding an extra Pearl in a crate / treasure_map +20% chance of finding an extra item in a crate |
-| `gain_pct_gold_start_wave` | 1 | item | piggy_bank +20% of your materials at the start of waves (stops working  |
-| `harvesting_growth` | 1 | item | crown Harvesting increases by an additional 8% at the end of a wav |
-| `hp_start_next_wave` | 2 | item | hourglass Start the next wave with 1 HP / broken_hourglass Start the next wave with 1 HP |
-| `increase_tier_on_reroll` | 1 | item | goldfish Items will be 1 tier higher after the next reroll |
-| `item_hourglass` | 1 | item | hourglass Turns back time, decreasing the current wave count by 1 |
-| `items_price` | 1 | item | coupon -5 % Items Price |
-| `loot_alien_chance` | 1 | item | whistle +50% chance for loot aliens to appear |
-| `loot_alien_speed` | 1 | item | whistle +20% movement speed for loot aliens |
 | `projectile` | 4 | item | builder_turret_0 +1 projectile when you reach 30 Structure Range [0/30] / builder_turret_1 +1 projectile |
 | `projectiles` | 2 | item | builder_turret_2 +2 projectiles / builder_turret_3 +3 projectiles |
-| `recycling_gains` | 1 | item | recycling_machine Gain 35% more materials from recycling items |
-| `reroll_price` | 1 | item | spyglass -25 % Reroll Price |
-| `stat_curse` | 1 | item | fish_hook +1 Curse |
 | `stat_engineering` | 4 | item | builder_turret_0 This turret's stats are derived from your best ranged weapon / builder_turret_1 This turret's stats are derived from your best ranged weapon |
-| `tree_turrets` | 1 | item | pocket_factory Killing a tree spawns a turret |
 
 ### `text`
 
@@ -306,8 +304,6 @@
 | 效果 key | 次数 | 来源 | 示例 |
 | --- | --- | --- | --- |
 | `fog_visibility` | 5 | item | campfire  / candle  |
-| `number_of_enemies` | 5 | item | candle -10% Enemies / gentle_alien +5% Enemies |
-| `remove_speed` | 1 | item | ugly_tooth Hitting an enemy removes 5% of their speed. Max 20% |
 
 ### `weapon`
 

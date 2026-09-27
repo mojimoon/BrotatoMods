@@ -177,9 +177,12 @@ After picking a character, click **Replace Items** in the top-left corner of the
 | Option | Default | What it does |
 | --- | --- | --- |
 | Starting items | Off | Your character's starting items (the character itself and weapons are untouched). |
-| All items in shop | **On** | Every item slot in the shop (weapons are untouched). |
-| Shops always sell | Off | Each wave, one shop slot is guaranteed to be one of your items. |
 | Crates | **On** | Items from crates. |
+| All items in shop | **On** | Every item slot in the shop (weapons are untouched). |
+| Shops always sell | Off | Upon each shop reroll, one of the slots is guaranteed to be one of the selected items. |
+| Sold once per wave | Off | Each wave, the shop will sell all of the selected items once, then back to random. |
+
+"All items in shop", "Shops always sell" and "Sold once per wave" are mutually exclusive, at most one of them can be enabled.
 
 **Curse** (default: off): replaced items are always cursed (random strength that grows with the wave, just like naturally cursed items). *Requires the Abyssal Terrors DLC*.
 
@@ -234,10 +237,13 @@ After picking a character, click [b]Replace Items[/b] in the top-left corner of 
 [table]
 [tr][th]Option[/th][th]Default[/th][th]What it does[/th][/tr]
 [tr][td]Starting items[/td][td]Off[/td][td]Your character's starting items (the character itself and weapons are untouched).[/td][/tr]
-[tr][td]All items in shop[/td][td][b]On[/b][/td][td]Every item slot in the shop (weapons are untouched).[/td][/tr]
-[tr][td]Shops always sell[/td][td]Off[/td][td]Each wave, one shop slot is guaranteed to be one of your items.[/td][/tr]
 [tr][td]Crates[/td][td][b]On[/b][/td][td]Items from crates.[/td][/tr]
+[tr][td]All items in shop[/td][td][b]On[/b][/td][td]Every item slot in the shop (weapons are untouched).[/td][/tr]
+[tr][td]Shops always sell[/td][td]Off[/td][td]Upon each shop reroll, one of the slots is guaranteed to be one of the selected items.[/td][/tr]
+[tr][td]Sold once per wave[/td][td]Off[/td][td]Each wave, the shop will sell all of the selected items once, then back to random.[/td][/tr]
 [/table]
+
+"All items in shop", "Shops always sell" and "Sold once per wave" are mutually exclusive, at most one of them can be enabled.
 
 [b]Curse[/b] (default: off): replaced items are always cursed (random strength that grows with the wave, just like naturally cursed items). [i]Requires the Abyssal Terrors DLC[/i].
 
@@ -301,9 +307,12 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 | 选项 | 默认 | 作用 |
 | --- | --- | --- |
 | 起始物品 | 关 | 角色开局自带的物品（不含角色本身和武器）。 |
-| 所有商店物品 | **开** | 商店里的所有物品槽位（不含武器）。 |
-| 商店通常销售 | 关 | 每波商店固定有一个槽位是你选的物品。 |
 | 箱子 | **开** | 箱子开出的物品。 |
+| 所有商店物品 | **开** | 商店里的所有物品槽位（不含武器）。 |
+| 商店通常销售 | 关 | 每次商店刷新时，固定有一个槽位是所选物品之一。 |
+| 每波销售一次 | 关 | 每波商店固定销售所选的所有物品各一次，这之后恢复随机。 |
+
+“所有商店物品”、“商店通常销售”和“每波销售一次”互斥，最多只能启用其中一个。
 
 **诅咒**（默认：关）：替换后的物品固定被诅咒（强度随机并随波次提升，和游戏里自然出现的诅咒物品一致）。*需要深海魔怪 DLC*。
 
@@ -358,10 +367,13 @@ B 站 UP 主们已经做了很多有趣的组合，欢迎参考：
 [table]
 [tr][th]选项[/th][th]默认[/th][th]作用[/th][/tr]
 [tr][td]起始物品[/td][td]关[/td][td]角色开局自带的物品（不含角色本身和武器）。[/td][/tr]
-[tr][td]所有商店物品[/td][td][b]开[/b][/td][td]商店里的所有物品槽位（不含武器）。[/td][/tr]
-[tr][td]商店通常销售[/td][td]关[/td][td]每波商店固定有一个槽位是你选的物品。[/td][/tr]
 [tr][td]箱子[/td][td][b]开[/b][/td][td]箱子开出的物品。[/td][/tr]
+[tr][td]所有商店物品[/td][td][b]开[/b][/td][td]商店里的所有物品槽位（不含武器）。[/td][/tr]
+[tr][td]商店通常销售[/td][td]关[/td][td]每次商店刷新时，固定有一个槽位是所选物品之一。[/td][/tr]
+[tr][td]每波销售一次[/td][td]关[/td][td]每波商店固定销售所选的所有物品各一次，这之后恢复随机。[/td][/tr]
 [/table]
+
+“所有商店物品”、“商店通常销售”和“每波销售一次”互斥，最多只能启用其中一个。
 
 [b]诅咒[/b]（默认：关）：替换后的物品固定被诅咒（强度随机并随波次提升，和游戏里自然出现的诅咒物品一致）。[i]需要深海魔怪 DLC[/i]。
 
@@ -427,10 +439,3 @@ B 站 UP 主们已经玩出了不少花样：大嗓门 + 外星绅士、杰克 +
 
 -->
 
-## [Auto-Anthonyology](Mojimoon-AutoAnthony)
-
-> Auto-Anthonyology / 东尼算法
-
-Inspired by the Slay the Spire 2 mod *AutoAnthony*: every run, items (optionally your character and weapons) are decomposed into components and reassembled under the same value budget. Triggers are no longer welded to one effect — a generic `trigger × payload × gate` clause lets any trigger (kill, hit, dodge, level up, every N seconds, standing still, reroll…) drive any legal effect (temporary / permanent / timed stats, heal, materials, XP, damage, explosions). Open **Auto-Anthony** in the top-left corner of the weapon / difficulty selection screen.
-
-受《杀戮尖塔 2》东尼算法启发：每局把道具（可选角色、武器）拆成组件，按同等价值重新组装。触发扳机不再与某一种效果焊死——通用的“扳机 × 载荷 × 门控”条款让任意扳机都能驱动任意合法效果。设计思路见 [Mojimoon-AutoAnthony/README.md](Mojimoon-AutoAnthony/README.md)。

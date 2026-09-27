@@ -1,7 +1,8 @@
 extends "res://singletons/item_service.gd"
 
 # 替换商店 / 箱子 / 传奇箱子 / 战利品 物品为目标物品。
-# - 商店：cfg_replace_shop 替换所有 item 位；cfg_replace_shop_first 仅替换第一个（不替换锁住的）
+# - 商店（三选一）：cfg_replace_shop 替换所有 item 位；cfg_replace_shop_first 每次刷新替换一个；
+#   cfg_replace_shop_once 每波依次放出所选物品各一次（均不影响锁住的物品）
 # - 箱子：普通箱子受 cfg_replace_crate 控制；传奇箱子按 legendary_mode 分派（见 mod_main.get_legendary_replacement）
 # - 战利品（藏宝图等）：归入 cfg_replace_crate 控制
 # 诅咒传递 + A-B-A-B 轮流由 mod 节点的 get_replacement 处理。
@@ -39,6 +40,20 @@ func get_player_shop_items(wave: int, player_index: int, args) -> Array:
 			if target_idx == -1:
 				target_idx = new_items.size() - 1
 			new_items[target_idx][0] = m.get_replacement(new_items[target_idx][0], player_index)
+	elif m.cfg_replace_shop_once:
+		# 占用靠后的物品槽位（避开排在前面的 guaranteed items），按选择顺序从左到右放置；
+		# 没有物品槽位（全是武器）时占用最后一个槽位。
+		var slots: Array = []
+		for i in new_items.size():
+			if new_items[i][0] is ItemData:
+				slots.push_back(i)
+		if slots.empty() and new_items.size() > 0:
+			slots.push_back(new_items.size() - 1)
+		var ids: Array = m.take_shop_once_ids(wave, player_index, slots.size())
+		slots = slots.slice(slots.size() - ids.size(), slots.size() - 1) if not ids.empty() else []
+		for k in ids.size():
+			var idx: int = slots[k]
+			new_items[idx][0] = m._make_replacement(ids[k], new_items[idx][0], player_index)
 	return new_items
 
 

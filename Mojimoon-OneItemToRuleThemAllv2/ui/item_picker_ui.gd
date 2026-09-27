@@ -31,10 +31,13 @@ const MODE_DESC_KEYS = ["MOJI_LEG_NONE_DESC", "MOJI_LEG_UNIFIED_DESC", "MOJI_LEG
 # [配置字段, 翻译 key]
 const OPTIONS = [
 	["cfg_replace_starting", "MOJI_REPLACE_STARTING"],
+	["cfg_replace_crate", "MOJI_REPLACE_CRATE"],
 	["cfg_replace_shop", "MOJI_REPLACE_SHOP"],
 	["cfg_replace_shop_first", "MOJI_SHOP_ALWAYS_APPEAR"],
-	["cfg_replace_crate", "MOJI_REPLACE_CRATE"],
+	["cfg_replace_shop_once", "MOJI_SHOP_ONCE_PER_WAVE"],
 ]
+# 商店的三种替换方式互斥，最多启用一个
+const SHOP_EXCLUSIVE = ["cfg_replace_shop", "cfg_replace_shop_first", "cfg_replace_shop_once"]
 
 # ---------- 配色 ----------
 const C_TEXT = Color(0.94, 0.96, 1.0)
@@ -417,10 +420,10 @@ func _refresh_regular_desc() -> void:
 	var nouns: Array = []
 	if _mod.cfg_replace_starting:
 		nouns.push_back(tr("MOJI_NOUN_STARTING"))
-	if _mod.cfg_replace_shop:
-		nouns.push_back(tr("MOJI_NOUN_SHOP"))
 	if _mod.cfg_replace_crate:
 		nouns.push_back(tr("MOJI_NOUN_CRATE"))
+	if _mod.cfg_replace_shop:
+		nouns.push_back(tr("MOJI_NOUN_SHOP"))
 
 	var parts: Array = []
 	if not nouns.empty():
@@ -433,6 +436,8 @@ func _refresh_regular_desc() -> void:
 		parts.push_back(_capitalize_first(tr("MOJI_DESC_REPLACED") % joined))
 	if _mod.cfg_replace_shop_first:
 		parts.push_back(tr("MOJI_DESC_SHOP_SELLS"))
+	if _mod.cfg_replace_shop_once:
+		parts.push_back(tr("MOJI_DESC_SHOP_ONCE"))
 	if parts.empty():
 		parts.push_back(tr("MOJI_DESC_NOTHING"))
 
@@ -606,18 +611,14 @@ func _on_mode_pressed(mode: int) -> void:
 	_refresh_legendary_mode()
 
 
-# 商店全部替换 / 商店总是有售 互斥
+# 所有商店物品 / 商店通常销售 / 每波销售一次 互斥
 func _on_option_toggled(pressed: bool, path: String) -> void:
 	_mod.set(path, pressed)
-	if pressed:
-		var other = ""
-		if path == "cfg_replace_shop":
-			other = "cfg_replace_shop_first"
-		elif path == "cfg_replace_shop_first":
-			other = "cfg_replace_shop"
-		if other != "":
-			_mod.set(other, false)
-			_option_chips[other].pressed = false
+	if pressed and SHOP_EXCLUSIVE.has(path):
+		for other in SHOP_EXCLUSIVE:
+			if other != path and _mod.get(other):
+				_mod.set(other, false)
+				_option_chips[other].pressed = false
 	_mod._save_settings()
 	_refresh_option_styles()
 

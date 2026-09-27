@@ -78,6 +78,22 @@ func register_effect_script() -> void:
 	_effect_registered = true
 
 
+# 效果原文 + 说明（例如"……（生效后此道具消失）"）：按当前语言生成组合描述并注册
+var _note_translations: Dictionary = {}
+
+
+func register_note(new_key: String, native_key: String, note_key: String) -> void:
+	var locale = TranslationServer.get_locale()
+	var t = _note_translations.get(locale)
+	if t == null:
+		t = Translation.new()
+		t.locale = locale
+		TranslationServer.add_translation(t)
+		_note_translations[locale] = t
+	if t.get_message(new_key) == "":
+		t.add_message(new_key, tr(native_key) + tr(note_key))
+
+
 static func _autoload(name_: String) -> Node:
 	var tree: SceneTree = Engine.get_main_loop() as SceneTree
 	if tree == null or tree.root == null:

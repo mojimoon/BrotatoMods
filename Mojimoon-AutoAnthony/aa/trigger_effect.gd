@@ -23,6 +23,8 @@ export(String) var payload := ""
 export(String) var stat := ""
 export(int) var value2 := 0
 export(int) var cap := 0
+# 受到伤害时清空本条款累积的本波属性（原版水晶）
+export(bool) var reset := false
 
 
 static func get_id() -> String:
@@ -43,6 +45,7 @@ static func make(c: Dictionary) -> Effect:
 	e.value = int(c.value)
 	e.value2 = int(c.get("value2", 0))
 	e.cap = int(c.get("cap", 0))
+	e.reset = bool(c.get("reset", false))
 	e.effect_sign = Effect.Sign.FROM_VALUE
 	return e
 
@@ -50,7 +53,7 @@ static func make(c: Dictionary) -> Effect:
 func to_clause() -> Dictionary:
 	return {
 		"trigger": trigger, "param": param, "chance": chance, "payload": payload,
-		"stat": stat, "value": value, "value2": value2, "cap": cap,
+		"stat": stat, "value": value, "value2": value2, "cap": cap, "reset": reset,
 	}
 
 
@@ -140,9 +143,12 @@ func _payload_text(colored: bool) -> String:
 
 
 func _cap_text() -> String:
-	if cap <= 0:
-		return ""
-	return tr("AA_CAP").replace("{0}", str(cap))
+	var t = ""
+	if cap > 0:
+		t += tr("AA_CAP").replace("{0}", str(cap))
+	if reset:
+		t += tr("AA_RESET_ON_HIT")
+	return t
 
 
 func serialize() -> Dictionary:
@@ -154,6 +160,7 @@ func serialize() -> Dictionary:
 	s.stat = stat
 	s.value2 = value2
 	s.cap = cap
+	s.reset = reset
 	return s
 
 
@@ -166,3 +173,4 @@ func deserialize_and_merge(s: Dictionary) -> void:
 	stat = str(s.get("stat", ""))
 	value2 = int(s.get("value2", 0))
 	cap = int(s.get("cap", 0))
+	reset = bool(s.get("reset", false))

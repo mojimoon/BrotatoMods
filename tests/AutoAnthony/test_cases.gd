@@ -417,7 +417,7 @@ func test_20_start_run_and_restore() -> void:
 	_eq(potato.tracking_text, "[EMPTY]", "tracking text hidden")
 	_eq(potato.value, 95, "price preserved")
 	_eq(potato.tier, 3, "tier preserved")
-	var anchored = _item("item_coupon")
+	var anchored = _item("item_spyglass")
 	var coupon_before = anchored.effects
 	m.on_menu_reset()
 	_check(potato.effects == orig_effects, "restored effects")
@@ -1120,7 +1120,7 @@ func test_80_native_effect_coverage() -> void:
 					k = "(" + e.text_key + ")"
 				if group[0] == "weapon" and not h in ["trigger", "scaling"]:
 					h = "weapon"
-				if src is ItemData and src.my_id in Catalog.ANCHORED_ITEMS and h in ["mechanic", "scalar", "downside", "excluded"]:
+				if src is ItemData and src.my_id in Catalog.MECHANIC_SOURCE_EXCLUDED:
 					h = "anchored"
 				var key = k + "|" + h
 				if not kinds.has(key):
@@ -1138,3 +1138,107 @@ func test_80_native_effect_coverage() -> void:
 		var parts = key.split("|")
 		print("COVER|%s|%s|%d|%s|%s" % [parts[0], parts[1], kinds[key].n, PoolStringArray(kinds[key].src).join(","), PoolStringArray(kinds[key].ex).join(" / ")])
 	print("AUDIT coverage kinds: %d" % keys.size())
+
+
+# ============================================================
+# 原版按道具 ID 实现的效果：搬运到其他道具后仍然可用
+# ============================================================
+func _find_mech(gen, key: String):
+	for t in 4:
+		for mech in gen.mechanics_by_tier[t]:
+			var k = mech.effect.custom_key if mech.effect.custom_key != "" else mech.effect.key
+			if k == key:
+				return mech
+	return null
+
+
+func test_85_id_bound_effects_are_adapted() -> void:
+	var gen = Generator.new(_cfg(), 1)
+	gen._collect_priors(isvc.items, isvc.characters, isvc.weapons)
+	for key in ["duplicate_item", "increase_tier_on_reroll", "item_hourglass", "extra_item_in_crate", "remove_speed",
+			"number_of_enemies", "curse_locked_items", "items_price", "reroll_price", "recycling_gains", "harvesting_growth",
+			"gain_pct_gold_start_wave", "loot_alien_chance", "tree_turrets", "burn_chance", "hp_start_next_wave"]:
+		_check(_find_mech(gen, key) != null, "mechanic available: " + key)
+	for t in 4:
+		for mech in gen.mechanics_by_tier[t]:
+			_check(not mech.source in Catalog.MECHANIC_SOURCE_EXCLUDED, "builder turret effects are not sources")
+	var mirror = _find_mech(gen, "duplicate_item")
+	if mirror != null:
+		var e = gen._mechanic_copy(mirror, 30.0, "item_potato")
+		_eq(e.key, "item_potato", "duplicate_item keyed to the new holder")
+		var txt = e.get_text(0, false)
+		_check(txt.find(tr("AA_NOTE_CONSUMED").strip_edges()) != -1 and txt.find("AA_") == -1, "consumed note rendered inline: " + txt)
+	var goldfish = _find_mech(gen, "increase_tier_on_reroll")
+	if goldfish != null:
+		_eq(gen._mechanic_copy(goldfish, -1.0, "item_potato").key, "item_potato", "increase_tier_on_reroll keyed to holder")
+	var pearl = null
+	for t in 4:
+		for mech in gen.mechanics_by_tier[t]:
+			if mech.effect.custom_key == "extra_item_in_crate" and mech.effect.key != "random":
+				pearl = mech
+	if pearl != null:
+		_eq(gen._mechanic_copy(pearl, -1.0, "item_potato").key, "item_potato", "pearl crate effect drops the holder itself")
+	var tooth = _find_mech(gen, "remove_speed")
+	if tooth != null:
+		var e2 = gen._mechanic_copy(tooth, tooth.value * 1.4, "item_potato")
+		_eq(e2.value2, e2.value * 4, "remove_speed cap stays 4x")
+	# 这些道具现在也参与重组
+	var plan = _gen(42)
+	for id in ["item_coupon", "item_crown", "item_pearl", "item_whistle", "item_crystal", "item_fish_hook"]:
+		_check(plan.items.has(id), id + " is reassembled")
+
+
+func test_86_reset_on_hit_clause() -> void:
+	TempStats.reset()
+	var rt = _make_runtime([
+		{"trigger": "kill", "payload": "temp_stat", "stat": "stat_armor", "value": 2, "reset": true},
+	])
+	for i in 3:
+		rt.fire("kill", 0)
+	var armor = int(TempStats.get_stat(Keys.stat_armor_hash, 0) / rd.get_stat_gain(Keys.stat_armor_hash, 0))
+	_eq(armor, 6, "stacks before hit")
+	rt.fire("hit", 0)
+	_eq(int(TempStats.get_stat(Keys.stat_armor_hash, 0)), 0, "reset on hit")
+	rt.fire("kill", 0)
+	_eq(int(TempStats.get_stat(Keys.stat_armor_hash, 0) / rd.get_stat_gain(Keys.stat_armor_hash, 0)), 2, "stacks again")
+	var c = {"trigger": "interval", "param": 1, "payload": "temp_stat", "stat": "stat_armor", "value": 1}
+	var v0 = Valuation.clause_value(c, 5.0)
+	c.reset = true
+	var v1 = Valuation.clause_value(c, 5.0)
+	_check(v1 < v0 * 0.5, "reset clause valued lower (%.1f vs %.1f)" % [v1, v0])
+	var txt = TriggerEffect.make(c).get_text(0, false)
+	_check(txt.find(tr("AA_RESET_ON_HIT").replace(",", "").replace("，", "").strip_edges()) != -1, "reset text inline: " + txt)
+	rt.queue_free()
+	TempStats.reset()
+
+
+func test_87_hourglass_and_goldfish_in_shop() -> void:
+	_setup_player("character_well_rounded")
+	var fist = isvc.get_element_safe(isvc.weapons, "weapon_fist_1")
+	var _w = rd.add_weapon(fist, 0)
+	m.start_new_run()
+	var gen = Generator.new(_cfg(), 1)
+	gen._collect_priors(isvc.items, isvc.characters, isvc.weapons)
+	# 金鱼：刷新后持有者消失
+	var fish_holder = _item("item_cake").duplicate()
+	fish_holder.effects = [gen._mechanic_copy(_find_mech(gen, "increase_tier_on_reroll"), -1.0, "item_cake")]
+	rd.add_item(fish_holder, 0)
+	# 沙漏：进入下一波时倒退一波并移除持有者
+	var glass_holder = _item("item_potato").duplicate()
+	glass_holder.effects = [gen._mechanic_copy(_find_mech(gen, "item_hourglass"), -1.0, "item_potato")]
+	rd.add_item(glass_holder, 0)
+	rd.current_wave = 5
+	rd.add_gold(200, 0)
+	var _e = tree.change_scene("res://ui/menus/shop/shop.tscn")
+	for i in 6:
+		yield(tree, "idle_frame")
+	var shop = tree.current_scene
+	shop._on_RerollButton_pressed(0)
+	_check(rd.get_nb_item(Keys.generate_hash("item_cake"), 0, false) == 0, "goldfish-like holder consumed by reroll")
+	shop._on_GoButton_pressed(0)
+	_eq(rd.current_wave, 5, "hourglass-like holder rewinds the wave (5 -> 6 -> 5)")
+	_check(rd.get_nb_item(Keys.generate_hash("item_potato"), 0, false) == 0, "hourglass-like holder removed")
+	_eq(int(rd.get_player_effects(0)[Keys.item_hourglass_hash]), 0, "hourglass counter back to 0")
+	for i in 6:
+		yield(tree, "idle_frame")
+	m.on_menu_reset()

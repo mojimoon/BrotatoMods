@@ -36,7 +36,13 @@ var legendary_counter: int = 0
 # ---------- 替换选项（弹窗内 checkbox 配置，默认值）----------
 var cfg_replace_starting: bool = false
 var cfg_replace_shop: bool = true
-var cfg_replace_shop_first: bool = false	# MOJI_SHOP_ALWAYS_APPEAR：每波固定替换一个槽位（跳过 guaranteed items）
+var cfg_replace_shop_first: bool = false	# MOJI_SHOP_ALWAYS_APPEAR：每次商店刷新固定替换一个槽位（跳过 guaranteed items）
+var cfg_replace_shop_once: bool = false	# MOJI_SHOP_ONCE_PER_WAVE：每波商店依次销售所选物品各一次
+# 以上三个商店选项（cfg_replace_shop / _first / _once）互斥
+
+# 每波销售一次：player_index -> { "wave": int, "queue": Array（本波尚未出现的物品 id）}
+# 不持久化，每局重置
+var _shop_once_state: Dictionary = {}
 var cfg_replace_crate: bool = true
 
 
@@ -65,6 +71,7 @@ func _save_settings() -> void:
 		"cfg_replace_starting": cfg_replace_starting,
 		"cfg_replace_shop": cfg_replace_shop,
 		"cfg_replace_shop_first": cfg_replace_shop_first,
+		"cfg_replace_shop_once": cfg_replace_shop_once,
 		"cfg_replace_crate": cfg_replace_crate,
 		"legendary_mode": legendary_mode,
 		"legendary_item_ids": legendary_item_ids
@@ -106,6 +113,7 @@ func _load_settings() -> void:
 	cfg_replace_starting = bool(data.get("cfg_replace_starting", false))
 	cfg_replace_shop = bool(data.get("cfg_replace_shop", true))
 	cfg_replace_shop_first = bool(data.get("cfg_replace_shop_first", false))
+	cfg_replace_shop_once = bool(data.get("cfg_replace_shop_once", false))
 	cfg_replace_crate = bool(data.get("cfg_replace_crate", true))
 	legendary_item_ids = data.get("legendary_item_ids", [])
 	legendary_mode = int(clamp(int(data.get("legendary_mode", LegendaryMode.NONE)), LegendaryMode.NONE, LegendaryMode.ONCE))
@@ -265,6 +273,21 @@ func has_legendary_replacement() -> bool:
 	return false
 
 
+# 每波销售一次：从该玩家本波的队列里取出最多 count 个物品 id（按选择顺序）。
+# 每个新的波次重新装满队列；取完后返回空数组（商店恢复随机）。
+func take_shop_once_ids(wave: int, player_index: int, count: int) -> Array:
+	if not enabled or target_item_ids.empty() or count <= 0:
+		return []
+	var state = _shop_once_state.get(player_index)
+	if state == null or state["wave"] != wave:
+		state = {"wave": wave, "queue": target_item_ids.duplicate()}
+		_shop_once_state[player_index] = state
+	var ids: Array = []
+	while ids.size() < count and not state["queue"].empty():
+		ids.push_back(state["queue"].pop_front())
+	return ids
+
+
 # 按 target_id 生成替换物品，并处理诅咒。找不到目标时原样返回。
 func _make_replacement(target_id: String, orig_item, player_index: int):
 	var item_service = _autoload("ItemService")
@@ -303,6 +326,7 @@ func _curse_item(item_data, player_index: int):
 
 # 重置 A-B-A-B 计数器（新一局开始时由 run_data 扩展调用）
 func reset_counter() -> void:
+	_shop_once_state.clear()
 	replace_counter = 0
 	legendary_counter = 0
 
