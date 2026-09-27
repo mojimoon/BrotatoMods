@@ -23,6 +23,8 @@ var _depth := 0
 var _explosion_effect = null
 var _explode_args = null
 var _damage_args = null
+# 计步（与原版徒步旅行者一致：移动时长 × 2 / 移动动画时长）
+var _steps: Array = [0.0, 0.0, 0.0, 0.0]
 
 
 func setup(p_main: Node, p_mod: Node) -> void:
@@ -95,7 +97,7 @@ func fire(event: String, player_index: int, pos = null) -> void:
 			continue
 		if e.cap > 0 and en.fired >= e.cap:
 			continue
-		if e.trigger in ["kill", "gold"] and e.param > 1:
+		if Catalog.TRIGGERS[e.trigger].gate == "every" and e.param > 1:
 			en.count += 1
 			if en.count < e.param:
 				continue
@@ -132,6 +134,7 @@ func on_player_took_damage(unit, value: int, _knockback, _is_crit: bool, is_dodg
 
 func _physics_process(delta: float) -> void:
 	_elapsed += delta
+	_count_steps(delta)
 	_poll_time += delta
 	if _poll_time < 0.2:
 		return
@@ -159,6 +162,20 @@ func _physics_process(delta: float) -> void:
 				if want != en.active:
 					_set_state(p, en, want)
 	var _unused = step
+
+
+func _count_steps(delta: float) -> void:
+	for p in RunData.get_player_count():
+		var player = _get_player(p)
+		if player == null or player.dead or player._current_movement == Vector2.ZERO:
+			continue
+		var anim_len = 0.5
+		if "_animation_player" in player and player._animation_player != null and player._animation_player.has_animation(player.animation_move):
+			anim_len = player._animation_player.get_animation(player.animation_move).length / max(0.01, player._animation_player.playback_speed)
+		var before = _steps[p]
+		_steps[p] += 2.0 * delta / max(0.05, anim_len)
+		for _i in range(int(before), int(_steps[p])):
+			fire("steps", p)
 
 
 func _state_holds(trigger: String, player) -> bool:

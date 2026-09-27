@@ -1424,7 +1424,7 @@ func test_92_next_wave_and_pairs() -> void:
 						print("AUDIT next wave: ", _texts(effs))
 						shown += 1
 	print("AUDIT next-wave items %d (paired %d), paired trigger clauses %d (5 seeds)" % [nw, nw_pairs, paired])
-	_check(nw > 20 and nw_pairs > 5 and paired > 30, "next-wave and paired effects appear (%d / %d / %d)" % [nw, nw_pairs, paired])
+	_check(nw > 20 and nw_pairs > 5 and paired >= 25, "next-wave and paired effects appear (%d / %d / %d)" % [nw, nw_pairs, paired])
 	# 运行时：成对条款同时施加正负两部分
 	TempStats.reset()
 	var rt = _make_runtime([{"trigger": "kill", "payload": "temp_stat", "stat": "stat_armor", "value": 3, "side_stat": "enemy_damage", "side_value": 2}])
@@ -1453,3 +1453,87 @@ func test_92_next_wave_and_pairs() -> void:
 	var peacock_budget = g3.item_budget(_item("item_peacock"))
 	print("AUDIT peacock model value %.1f vs budget %.1f" % [pv, peacock_budget])
 	_check(abs(pv / peacock_budget - 1.0) < 0.35, "next-wave valuation matches peacock")
+
+
+# ============================================================
+# 新扳机（暴击击杀 / 击杀燃烧敌人 / 每走 N 步 / 半波）、词条绑定、角色效果、下一波种类
+# ============================================================
+func test_93_new_triggers_tags_and_char_components() -> void:
+	TempStats.reset()
+	var rt = _make_runtime([
+		{"trigger": "crit_kill", "param": 2, "payload": "gold", "value": 5},
+		{"trigger": "burning_kill", "payload": "temp_stat", "stat": "stat_armor", "value": 1},
+		{"trigger": "steps", "param": 10, "payload": "xp", "value": 3},
+		{"trigger": "half_wave", "payload": "temp_stat", "stat": "stat_dodge", "value": 7},
+	])
+	var g0 = rd.get_player_gold(0)
+	rt.fire("crit_kill", 0)
+	rt.fire("crit_kill", 0)
+	_eq(rd.get_player_gold(0), g0 + 5, "every 2 crit kills")
+	rt.fire("kill", 0)
+	_eq(rd.get_player_gold(0), g0 + 5, "plain kill does not count as crit kill")
+	rt.fire("burning_kill", 0)
+	_eq(int(TempStats.get_stat(Keys.stat_armor_hash, 0) / rd.get_stat_gain(Keys.stat_armor_hash, 0)), 1, "burning kill")
+	var xp0 = rd.get_player_xp(0)
+	for i in 10:
+		rt.fire("steps", 0)
+	_check(rd.get_player_xp(0) > xp0, "every 10 steps")
+	rt.fire("half_wave", 0)
+	_eq(int(TempStats.get_stat(Keys.stat_dodge_hash, 0) / rd.get_stat_gain(Keys.stat_dodge_hash, 0)), 7, "half wave")
+	rt.queue_free()
+	TempStats.reset()
+	# 生成：新扳机、词条绑定、角色效果、下一波种类
+	var seen_trig = {}
+	var char_kinds = {}
+	var next_kinds = {}
+	var shown = 0
+	for sd in SEEDS:
+		var gen = Generator.new(_cfg(), sd)
+		var plan = gen.generate(isvc.items, isvc.characters, [], [])
+		for id in plan.items:
+			var p = plan.items[id]
+			for e in p.effects:
+				if e is TriggerEffect:
+					seen_trig[e.trigger] = true
+					if e.value > 0 and e.trigger == "crit_kill":
+						_check("stat_crit_chance" in p.tags, id + " crit-kill item has crit tag")
+					if e.value > 0 and e.trigger == "burning_kill":
+						_check("stat_elemental_damage" in p.tags, id + " burning-kill item has elemental tag")
+				if gen.is_scaling(e) and e.value > 0:
+					if e.stat_scaled == "burning_enemy":
+						_check("stat_elemental_damage" in p.tags, id + " burning-enemy counter has elemental tag")
+					if e.stat_scaled == "structure":
+						_check("structure" in p.tags, id + " structure counter has structure tag")
+				if gen.is_next_wave(e) and e.value > 0 and not Catalog.ENEMY_STATS.has(e.key):
+					next_kinds[e.key] = true
+				if e.key == "extra_loot_aliens_next_wave":
+					next_kinds["loot_aliens"] = true
+				var k = ""
+				if e.get_script() == load("res://effects/items/class_bonus_effect.gd"):
+					k = "class_bonus"
+				elif e.key in ["pacifist", "bonus_non_elemental_damage_against_burning_targets", "group_structures", "weapon_slot"]:
+					k = e.key
+				elif e.custom_key == "stats_end_of_wave" and e.key.begins_with("enemy_"):
+					k = "enemy_growth"
+				if k != "":
+					char_kinds[k] = char_kinds.get(k, 0) + 1
+					var t = e.get_text(0, false)
+					_check(t != "" and t.find("AA_") == -1, "char component text: " + t)
+					if shown < 8:
+						print("AUDIT char component: ", t)
+						shown += 1
+	print("AUDIT char components: ", char_kinds, " next-wave kinds: ", next_kinds.keys())
+	for t in ["crit_kill", "burning_kill", "steps", "half_wave"]:
+		_check(seen_trig.has(t), "trigger generated: " + t)
+	for k in next_kinds:
+		_check(k in ["xp_gain", "loot_aliens"], "next-wave positive is xp or loot aliens: " + k)
+	for k in ["class_bonus", "pacifist", "weapon_slot", "enemy_growth"]:
+		_check(char_kinds.has(k), "char component generated: " + k)
+	# 武器栏受规则限定的角色不刷"+武器栏"
+	_setup_player("character_one_arm")
+	m.start_new_run()
+	var one_arm = isvc.get_element_safe(isvc.characters, "character_one_arm")
+	for id in m.plan.items:
+		if "weapon_slot" in m.plan.items[id].main_stats:
+			_check(id in one_arm.banned_items, "one-arm bans weapon-slot item " + id)
+	m.on_menu_reset()

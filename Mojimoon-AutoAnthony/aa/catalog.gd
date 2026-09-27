@@ -101,6 +101,13 @@ const TRIGGERS = {
 	"low_hp": {"kind": "state", "e": 0.15, "timing": 1.0, "gate": "none", "w": 0.5},
 	"full_hp": {"kind": "state", "e": 0.45, "timing": 1.0, "gate": "none", "w": 0.4},
 	"reroll": {"kind": "shop", "e": 3.0, "timing": 0.0, "gate": "chance", "w": 0.5},
+	# 暴击击杀（触手、狩猎奖杯）/ 击杀燃烧中的敌人（鬼火）：击杀的子集，频率取决于构筑；绑定暴击 / 元素词条
+	"crit_kill": {"kind": "event", "e": 30.0, "timing": 0.5, "gate": "every", "w": 0.7},
+	"burning_kill": {"kind": "event", "e": 25.0, "timing": 0.5, "gate": "every", "w": 0.6},
+	# 每走 N 步（徒步旅行者）：移动时约每秒 4–5 步，每波约 200 步
+	"steps": {"kind": "event", "e": 200.0, "timing": 0.5, "gate": "every", "w": 0.5},
+	# 波次进行到一半时（赛博格）
+	"half_wave": {"kind": "event", "e": 1.0, "timing": 0.5, "gate": "none", "w": 0.5},
 	"buy": {"kind": "shop", "e": 3.0, "timing": 0.0, "gate": "chance", "w": 0.4},
 }
 
@@ -123,7 +130,7 @@ const PAYLOADS = {
 	"xp": {"w": 0.3},
 	"damage": {"w": 0.6},
 	"explode": {"w": 0.5},
-	"grant": {"w": 1.2},
+	"grant": {"w": 2.5},
 }
 
 # 合法组合：触发扳机 -> 允许的载荷
@@ -146,6 +153,10 @@ const LEGAL = {
 	"full_hp": ["temp_stat"],
 	"reroll": ["perm_stat", "gold"],
 	"buy": ["perm_stat", "gold"],
+	"crit_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode"],
+	"burning_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode"],
+	"steps": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp"],
+	"half_wave": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold"],
 }
 
 # ============================================================
@@ -171,6 +182,10 @@ const FREE_LEGAL = {
 	"full_hp": ["temp_stat", "grant"],
 	"reroll": ["perm_stat", "gold", "grant"],
 	"buy": ["perm_stat", "gold", "grant"],
+	"crit_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant"],
+	"burning_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant"],
+	"steps": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant"],
+	"half_wave": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant"],
 }
 # 战斗中实时读取、可"本波获得"的机制 key（其余求和型机制只能永久获得）
 const GRANT_TEMP_KEYS = [
@@ -208,13 +223,15 @@ const NATIVE_TRIGGER_MAP = {
 	"dmg_when_heal": ["heal", "damage"],
 	"heal_on_dodge": ["dodge", "heal"],
 	"heal_on_kill": ["kill", "heal"],
-	"heal_on_crit_kill": ["kill", "heal"],
+	"heal_on_crit_kill": ["crit_kill", "heal"],
 	"heal_when_pickup_gold": ["gold", "heal"],
-	"gold_on_crit_kill": ["kill", "gold"],
+	"gold_on_crit_kill": ["crit_kill", "gold"],
+	"gain_stat_for_every_step_after_equip": ["steps", "perm_stat"],
+	"convert_stats_half_wave": ["half_wave", "temp_stat"],
 	"explode_on_hit": ["hit", "explode"],
 	"explode_on_death": ["kill", "explode"],
 	"explode_on_consumable": ["consumable", "explode"],
-	"gain_stat_for_killed_enemies_while_burning": ["kill", "perm_stat"],
+	"gain_stat_for_killed_enemies_while_burning": ["burning_kill", "perm_stat"],
 	"effect_gain_stat_every_killed_enemies": ["kill", "perm_stat"],
 }
 # 原版先验在组合权重中的强度
@@ -305,6 +322,8 @@ const ADJ_BY_STAT = {
 	"consumable_heal": ["AA_ADJ_TASTY", "AA_ADJ_NOURISHING"],
 }
 const ADJ_BY_TRIGGER = {
+	"crit_kill": ["AA_ADJ_DEADLY", "AA_ADJ_EXECUTING"], "burning_kill": ["AA_ADJ_BLAZING", "AA_ADJ_SCORCHING"],
+	"steps": ["AA_ADJ_WANDERING", "AA_ADJ_HIKING"], "half_wave": ["AA_ADJ_MIDWAY", "AA_ADJ_TIMELY"],
 	"kill": ["AA_ADJ_HUNTING", "AA_ADJ_PREDATORY"], "hit": ["AA_ADJ_VENGEFUL", "AA_ADJ_SPITEFUL"],
 	"dodge": ["AA_ADJ_NIMBLE", "AA_ADJ_EVASIVE"], "consumable": ["AA_ADJ_HUNGRY", "AA_ADJ_GLUTTONOUS"],
 	"gold": ["AA_ADJ_GREEDY", "AA_ADJ_HOARDING"], "heal": ["AA_ADJ_BLESSED", "AA_ADJ_HOLY"],
@@ -406,9 +425,11 @@ const COUNTER_REF = {
 	"stat_dodge": 25.0, "knockback": 12.0,
 	"materials": 320.0, "structure": 3.0, "living_enemy": 24.0, "burning_enemy": 8.0, "living_tree": 3.0,
 	"percent_player_missing_health": 30.0, "different_item": 18.0, "common_item": 12.0, "legendary_item": 1.5,
+	"free_weapon_slots": 0.8,
 }
 # 可用的非属性计数与原版描述 key
 const COUNTER_TEXT = {
+	"free_weapon_slots": "EFFECT_GAIN_STAT_FOR_FREE_WEAPON_SLOTS",
 	"materials": "EFFECT_GAIN_STAT_FOR_EVERY_STAT", "structure": "EFFECT_GAIN_STAT_FOR_EVERY_STAT",
 	"living_enemy": "EFFECT_GAIN_STAT_FOR_EVERY_ENEMY", "burning_enemy": "EFFECT_GAIN_STAT_FOR_EVERY_BURNING_ENEMY",
 	"living_tree": "EFFECT_GAIN_STAT_FOR_EVERY_TREE",
@@ -444,7 +465,7 @@ const GAIN_MOD_STATS = [
 const GAIN_MOD_STEPS = [10, 15, 20, 25, 33, 40, 50]
 
 # 特殊行的类型比例：触发条款 / 计数型 / 属性修改 / 搬运机制
-const SPECIAL_KIND_WEIGHTS = {"trigger": 0.46, "scaling": 0.18, "gain_mod": 0.07, "mechanic": 0.2, "next_wave": 0.09}
+const SPECIAL_KIND_WEIGHTS = {"trigger": 0.42, "scaling": 0.16, "gain_mod": 0.07, "mechanic": 0.18, "next_wave": 0.08, "char": 0.09}
 # 可按预算缩放数值的机制（原版 Effect，数值线性含义）：缩放范围为原版数值的 1 单位 .. 1.5 倍
 const SCALAR_MECHANIC_EXCLUDED = ["hp_start_next_wave", "hp_start_wave", "speed_cap", "hp_cap", "lock_current_weapons", "dodge_cap", "one_shot_trees", "structures_can_crit"]
 
@@ -469,7 +490,10 @@ const NEXT_WAVE_STATS = [
 	"stat_armor", "stat_dodge", "stat_speed", "stat_luck", "stat_harvesting", "xp_gain",
 ]
 # "下一波"正面行的属性权重：原版只用于经验，这里偏向运营属性（经验、收获、幸运），其余属性权重较低
-const NEXT_WAVE_POS_WEIGHTS = {"xp_gain": 6.0, "stat_harvesting": 3.0, "stat_luck": 3.0}
+# 只允许 +经验（权重高）与"下一波额外出现战利品外星人"（原版诱饵）
+const NEXT_WAVE_POS_KINDS = {"xp_gain": 0.7, "loot_aliens": 0.3}
+# 每个额外战利品外星人（一次性）的价值：原版诱饵 34 材料（+2 再生、下一波 +2 个）反推约 4.6
+const LOOT_ALIEN_VALUE = 4.6
 # "下一波"正面行附带同一行为下负面行的概率（原版芹菜茶、孔雀都是成对的）
 const NEXT_WAVE_PAIR_CHANCE = 0.5
 # 属性类触发条款附带同一扳机负面部分的概率
@@ -478,3 +502,44 @@ const PAIRED_CLAUSE_CHANCE = 0.4
 
 static func remaining_waves(perm_mult: float) -> float:
 	return max(2.0, 2.0 * perm_mult - 1.0)
+
+
+# ============================================================
+# 词条绑定：触发扳机 / 计数 / 载荷 / 机制 key -> 额外词条（角色的"想要词条"据此命中）
+# 依据原版：暴击击杀类（触手、狩猎奖杯）带暴击；燃烧类（鬼火、希腊火、胆小香肠、蛇、眼部手术）带元素；
+# 静止类（珊瑚、雕像）带静止；建筑相关带构筑物。原版漏标的"每个燃烧敌人""每个建筑"在这里补上。
+# ============================================================
+const TAG_BINDINGS = {
+	"trigger:crit_kill": ["stat_crit_chance"], "trigger:burning_kill": ["stat_elemental_damage"],
+	"trigger:still": ["stand_still"], "trigger:consumable": ["consumable"], "trigger:steps": ["stat_speed"],
+	"counter:burning_enemy": ["stat_elemental_damage"], "counter:structure": ["structure"], "counter:pet": ["pet"],
+	"counter:materials": ["economy"],
+	"payload:explode": ["explosive"], "payload:gold": ["economy"], "payload:xp": ["xp_gain"],
+	"mech:pierce_on_crit": ["stat_crit_chance"], "mech:giant_crit_damage": ["stat_crit_chance"],
+	"mech:structures_can_crit": ["structure", "stat_crit_chance"],
+	"mech:burning_spread": ["stat_elemental_damage"], "mech:burning_cooldown_reduction": ["stat_elemental_damage"],
+	"mech:burn_chance": ["stat_elemental_damage"], "mech:burning_enemy_hp_percent_damage": ["stat_elemental_damage"],
+	"mech:bonus_non_elemental_damage_against_burning_targets": ["stat_elemental_damage"],
+	"mech:structure_attack_speed": ["structure"], "mech:tree_turrets": ["structure"], "mech:group_structures": ["structure"],
+	"mech:structures_cooldown_reduction": ["structure"], "mech:pacifist": ["economy"],
+	"mech:extra_loot_aliens_next_wave": ["economy"],
+}
+
+
+static func tags_for_binding(k: String) -> Array:
+	return TAG_BINDINGS.get(k, [])
+
+
+# ============================================================
+# 来自角色、默认进入道具池的效果（直接生成，不依赖"道具含角色效果"选项）
+#   武器类型加成（狂人、医生、斗士……）：使用 [类型] 武器 +X [属性]；价值 = 属性权重 × X × 该类型武器的平均占比
+#   武器栏：+1（原版角色为"设定值"，道具改为累加）；燃烧目标额外伤害（厨师）；构筑物聚集（工程师）；
+#   波末每个存活敌人获得材料与经验（和平主义者）；代价：每波结束敌人属性提高（船长）、−1 武器栏
+# ============================================================
+const CLASS_BONUS_SHARE = 0.35
+const CLASS_BONUS_STAT_W = {"stat_attack_speed": 1.4, "stat_percent_damage": 1.8, "stat_range": 0.6, "stat_lifesteal": 4.7, "stat_damage": 1.5}
+const BURN_BONUS_W = 0.12		# 燃烧目标额外伤害，每 1%
+const PACIFIST_W = 0.4			# 每 0.01 材料+经验 / 存活敌人（波末约 30 个存活敌人）
+const WEAPON_SLOT_W = 25.0
+const GROUP_STRUCTURES_VALUE = 6.0
+const CHAR_COMPONENT_WEIGHTS = {"class_bonus": 0.45, "burn_bonus": 0.15, "pacifist": 0.15, "weapon_slot": 0.15, "group_structures": 0.1}

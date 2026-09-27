@@ -6,18 +6,18 @@
 
 | 处理 | 含义 | 估值 |
 | --- | --- | --- |
-| `trigger`（28 种） | 拆解为 (扳机, 载荷) 先验，由通用触发条款重新表达 | 单位价值 × 每波频率（见 README 第 4 节） |
+| `trigger`（30 种） | 拆解为 (扳机, 载荷) 先验，由通用触发条款重新表达 | 单位价值 × 每波频率（见 README 第 4 节） |
 | `scaling`（27 种） | 计数 × 属性自由搭配重新生成（原版 GainStatForEveryStatEffect） | 目标属性权重 × 数值 × 计数期望 / 每 N；计数期望由原版道具校准 |
 | `next_wave`（1 种） | 下一波（芹菜茶 / 孔雀）：一次性，下一波开始时生效；约一半附带同一行为下的负面行（敌人属性或自身属性降低） | 一波的价值 = 整局价值 / 剩余波数（≈ 2 × 永久累积倍率 − 1）；孔雀校准吻合 |
 | `gain_mod`（3 种） | 属性修改 ±XX% 重新生成（原版 StatGainsModificationEffect） | 属性权重 × 属性期望总量 × XX% |
 | `scalar`（39 种） | 原样搬运，并按预算缩放数值（1 单位 .. 原版 1.5 倍） | 来源道具剩余价值按数值比例折算 |
-| `mechanic`（54 种） | 原样搬运（炮台、宠物、爆炸、武器类加成……） | 道具：来源道具 (预算 − 属性行价值) / 机制数；角色：(角色总价值 − 可估值部分) / 机制数，限制 30–80 |
+| `mechanic`（53 种） | 原样搬运（炮台、宠物、爆炸、武器类加成……） | 道具：来源道具 (预算 − 属性行价值) / 机制数；角色：(角色总价值 − 可估值部分) / 机制数，限制 30–80 |
 | `downside`（14 种） | 作为代价搬运 | 来源道具因它多拿到的正面预算（至少 3） |
-| `identity`（59 种） | 保留在角色上，不进入道具池（武器限制、初始装备、商店规则、负向机制……） | — |
+| `identity`（58 种） | 保留在角色上，不进入道具池（武器限制、初始装备、商店规则、负向机制……） | — |
 | `anchored`（3 种） | 建造者炮台的角色专属效果：不作为组件来源 | — |
 | `text`（6 种） | 纯描述行：需要的说明已合并进对应效果的同一行（“生效后此道具消失”“受到伤害时清空”），其余为音效 / 已用状态的提示 | — |
 | `excluded`（2 种） | 迷雾视野：只在迷雾事件中有意义，不搬运 | — |
-| `weapon`（36 种） | 武器专属效果：仅在“重组武器”时于同类型武器家族间整套交换 | 按等级对齐，不单独估值 |
+| `weapon`（35 种） | 武器专属效果：仅在“重组武器”时于同类型武器家族间整套交换 | 按等级对齐，不单独估值 |
 
 ## 明细
 
@@ -26,6 +26,7 @@
 | 效果 key | 次数 | 来源 | 示例 |
 | --- | --- | --- | --- |
 | `consumable_stats_while_max` | 3 | item,char | extra_stomach +1 Max HP when picking up a consumable while at maximum heal / c:farmer +1 Harvesting when picking up a consumable while at maximum  |
+| `convert_stats_half_wave` | 1 | char | c:cyborg 100% of your Ranged Damage are temporarily converted into En |
 | `decaying_stats_on_consumable` | 1 | item | cauldron +20 % Damage for 2 seconds after picking up a consumable |
 | `decaying_stats_on_hit` | 1 | item | saltwater +10 % Speed for 3 seconds when you take damage |
 | `dmg_on_dodge` | 1 | item | riposte 100% chance to deal 1 (300%[img=15x15]r |
@@ -36,6 +37,7 @@
 | `explode_on_consumable` | 2 | item,char | spicy_sauce Consumables have a 50% chance to explode for 15 ([color=whit / c:glutton Consumables have a 100% chance to explode for 10 ([color=whi |
 | `explode_on_death` | 1 | item | rip_and_tear Enemies have a 20% chance to explode for 10 (+5 |
 | `explode_on_hit` | 2 | item,char | krakens_eye You have a 50% chance to explode for 10 (+500%[ / c:bull You explode for 30 (+300%[img=15x15]res |
+| `gain_stat_for_every_step_after_equip` | 6 | char,weapon | c:hiker Earn 5 materials for every 10 steps you take during a wave / c:hiker +1 Max HP for every 80 steps you take during a wave |
 | `gain_stat_for_killed_enemies_while_burning` | 1 | item | will_o_the_wisp +1 Elemental Damage for every 30 burning enemies you kill du |
 | `gain_stats_on_reroll` | 2 | item | bone_dice +50% chance to get +1 % Damage when rerolling in the shop / bone_dice +10% chance to get -1 Max HP when rerolling in the shop |
 | `gold_on_crit_kill` | 6 | item,weapon | hunting_trophy 33% chance to gain 1 material when killing an enemy with a c / w:dagger_1 50% chance to gain 1 material when killing an enemy with a c |
@@ -184,7 +186,6 @@
 | `extra_item_in_crate` | 2 | item | pearl +3% chance of finding an extra Pearl in a crate / treasure_map +20% chance of finding an extra item in a crate |
 | `gain_random_primary_stats_on_go_to_next_wave` | 1 | item | candy_bag Each wave grants 8 points randomly split between your primar |
 | `gain_stat_for_equipped_item_with_stat` | 1 | item | snowball +1 Elemental Damage every time you get an item that increase |
-| `gain_stat_for_every_step_after_equip` | 2 | char | c:hiker Earn 5 materials for every 10 steps you take during a wave / c:hiker +1 Max HP for every 80 steps you take during a wave |
 | `gain_stat_when_attack_killed_enemies` | 1 | char | c:dwarf +1 Engineering when killing at least 6 enemies with a direct |
 | `giant_crit_damage` | 1 | item | giant_belt Critical hits deal 10% of an enemy��s current health as bonus |
 | `hp_regen_bonus` | 1 | item | potion HP Regeneration is doubled when you have less than 50% healt |
@@ -236,7 +237,6 @@
 | `charm_on_hit` | 1 | char | c:romantic Hitting an enemy that has less than 25% health has a 7% ([co |
 | `convert_bonus_gold` | 1 | char | c:builder Every 5 uncollected materials are converted into 1 % Structu |
 | `convert_stats_end_of_wave` | 1 | char | c:demon 50% of your Materials are converted into Max HP at the end o |
-| `convert_stats_half_wave` | 1 | char | c:cyborg 100% of your Ranged Damage are temporarily converted into En |
 | `cryptid` | 1 | char | c:cryptid Gain 12 material and XP for every living tree at the end of  |
 | `cursed_starting_item` | 1 | char | c:creature You start with 1 cursed Fish Hook |
 | `destroy_weapons` | 1 | char | c:arms_dealer All of your weapons are destroyed when entering a shop |
@@ -345,7 +345,6 @@
 | `effect_projectiles_on_hit` | 4 | weapon | w:cacti_club_1 Hitting an enemy spawns 3 projectiles dealing 1 ([color=whit / w:cacti_club_2 Hitting an enemy spawns 4 projectiles dealing 2 ([color=whit |
 | `effect_slow_in_zone` | 7 | weapon | w:taser_1 Slows enemies in a radius around the projectile / w:taser_2 Slows enemies in a radius around the projectile |
 | `enemy_percent_damage_taken` | 4 | weapon | w:lute_1 Enemies hit take 10% more damage for 3 seconds (max: 30%) / w:lute_2 Enemies hit take 10% more damage for 3 seconds (max: 50%) |
-| `gain_stat_for_every_step_after_equip` | 4 | weapon | w:hiking_stick_1 +1 Range for every 70 steps you take during a wave / w:hiking_stick_2 +1 Range for every 60 steps you take during a wave |
 | `lose_hp_per_second` | 1 | weapon | w:scythe_4 You take 3 damage per second (does not give invulnerability  |
 | `modify_every_x_projectile` | 4 | weapon | w:javelin_1 Every 5th projectile has +100 % Crit Chance / w:javelin_2 Every 4th projectile has +100 % Crit Chance |
 | `pierce_on_crit` | 4 | weapon | w:crossbow_1 Pierces up to 1 times on critical hit / w:crossbow_2 Pierces up to 2 times on critical hit |

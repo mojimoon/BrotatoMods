@@ -10,7 +10,7 @@ const Catalog = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/catalog.gd"
 static func raw_rate(trigger: String, param: int, chance: int) -> float:
 	var t = Catalog.TRIGGERS[trigger]
 	var e: float = Catalog.events_per_wave(trigger, param)
-	if t.gate == "every" and trigger != "interval":
+	if t.gate == "every":
 		e /= max(1, param)
 	return e * clamp(chance, 1, 100) / 100.0
 

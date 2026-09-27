@@ -342,11 +342,22 @@ func _rebuild_groups_and_bans(isvc) -> void:
 		groups[g] = members
 	isvc.item_groups = groups
 	for ch in isvc.characters:
-		if ch.banned_items.empty():
+		var orig_banned: Array = ch.banned_items
+		# 武器栏被规则限定的角色（独臂、野兽大师、公牛、多面手、宝宝……）：不出现"+武器栏"道具
+		var slot_rule = false
+		for e in ch.effects:
+			if e.key == "weapon_slot" or e.key == "weapon_slot_upgrades":
+				slot_rule = true
+		var extra = []
+		if slot_rule:
+			for id in plan.items:
+				if "weapon_slot" in plan.items[id].main_stats:
+					extra.push_back(id)
+		if orig_banned.empty() and extra.empty():
 			continue
 		var semantics = []
 		var kept = []
-		for id in ch.banned_items:
+		for id in orig_banned:
 			if plan.items.has(id):
 				var orig = _find(isvc.items, id)
 				var b = _backups.get(orig.get_instance_id()) if orig != null else null
@@ -360,8 +371,12 @@ func _rebuild_groups_and_bans(isvc) -> void:
 			for sem in semantics:
 				if sem in plan.items[id].main_stats and not id in kept:
 					kept.push_back(id)
+		for id in extra:
+			if not id in kept:
+				kept.push_back(id)
 		_backup(ch)
-		_backups[ch.get_instance_id()]["banned_items"] = ch.banned_items
+		if not _backups[ch.get_instance_id()].has("banned_items"):
+			_backups[ch.get_instance_id()]["banned_items"] = orig_banned
 		ch.banned_items = kept
 
 

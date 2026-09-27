@@ -43,11 +43,33 @@ func _on_enemy_died(enemy: Enemy, args: Entity.DieArgs) -> void:
 	var rt = _aa_rt()
 	if rt == null or not counts:
 		return
-	if args.killed_by_player_index >= 0:
-		rt.fire("kill", args.killed_by_player_index, pos)
-	else:
+	var burning = args.is_burning or (is_instance_valid(enemy) and enemy._is_burning)
+	var killers = [args.killed_by_player_index] if args.killed_by_player_index >= 0 else []
+	if killers.empty():
 		for player in _get_live_players():
-			rt.fire("kill", player.player_index, pos)
+			killers.push_back(player.player_index)
+	for p in killers:
+		rt.fire("kill", p, pos)
+		if burning:
+			rt.fire("burning_kill", p, pos)
+
+
+# 暴击击杀：原版在敌人受伤信号里带有是否暴击，死亡时 enemy.dead 已为真
+func _on_enemy_took_damage(enemy: Enemy, value: int, knockback_direction: Vector2, is_crit: bool, is_dodge: bool, is_protected: bool, armor_did_something: bool, args: TakeDamageArgs, hit_type: int, is_one_shot: bool) -> void:
+	._on_enemy_took_damage(enemy, value, knockback_direction, is_crit, is_dodge, is_protected, armor_did_something, args, hit_type, is_one_shot)
+	if not is_crit or not enemy.dead or _cleaning_up or args.from_player_index < 0:
+		return
+	var rt = _aa_rt()
+	if rt != null:
+		rt.fire("crit_kill", args.from_player_index, enemy.global_position)
+
+
+func _on_HalfWaveTimer_timeout() -> void:
+	._on_HalfWaveTimer_timeout()
+	var rt = _aa_rt()
+	if rt != null:
+		for p in RunData.get_player_count():
+			rt.fire("half_wave", p)
 
 
 func on_consumable_picked_up(consumable: Node, player_index: int) -> void:

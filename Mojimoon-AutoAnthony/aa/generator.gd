@@ -261,6 +261,7 @@ func _collect_priors(items: Array, characters: Array, weapons: Array) -> void:
 		special_share_by_tier[t] = special_share_by_tier[t] / n
 		if lines_by_tier[t].empty():
 			lines_by_tier[t] = [1, 2]
+	_collect_char_templates(characters)
 	if cfg.get("char_effects", false):
 		_collect_character_mechanics(characters, effect_keys)
 
@@ -565,6 +566,11 @@ func generate_item(item) -> Dictionary:
 			if not sc.empty():
 				downsides.push_back(sc.effect)
 				got = neg_value(abs(sc.value))
+		elif r >= 0.45 and r < 0.52:
+			var cd = gen_char_downside(comp, perm_mult)
+			if not cd.empty():
+				downsides += cd.effects
+				got = cd.value
 		elif r >= 0.37 and r < 0.45:
 			var nd = gen_next_wave_downside(comp, perm_mult)
 			if not nd.empty():
@@ -633,6 +639,14 @@ func generate_item(item) -> Dictionary:
 				done = true
 				if nw.value > main_line.value:
 					main_line = {"value": nw.value, "adj": _adj(Catalog.ADJ_BY_TRIGGER["wave_start"])}
+		elif kind == "char":
+			var ch = gen_char_component(budget * share)
+			if not ch.empty():
+				effects.push_back(ch.effect)
+				budget -= ch.value
+				done = true
+				if ch.value > main_line.value:
+					main_line = {"value": ch.value, "adj": _adj(Catalog.ADJ_MECHANIC)}
 		elif kind == "gain_mod":
 			var gm = gen_gain_mod(budget * share, false)
 			if not gm.empty():
@@ -812,6 +826,12 @@ func _tags_for(effects: Array) -> Array:
 					add.push_back(e.stat)
 				add.push_back(Catalog.TRIGGER_TAGS.get(e.trigger, ""))
 				add.push_back(Catalog.PAYLOAD_TAGS.get(e.payload, ""))
+				add += Catalog.tags_for_binding("trigger:" + e.trigger)
+				add += Catalog.tags_for_binding("payload:" + e.payload)
+				if e.grant != null and is_scaling(e.grant):
+					add += Catalog.tags_for_binding("counter:" + e.grant.stat_scaled)
+				elif e.grant != null:
+					add += Catalog.tags_for_binding("mech:" + e.grant.key)
 				add.push_back(Catalog.STAT_EXTRA_TAGS.get(e.stat, ""))
 				if e.grant != null:
 					if is_scaling(e.grant):
@@ -827,11 +847,14 @@ func _tags_for(effects: Array) -> Array:
 		elif is_scaling(e) or is_gain_mod(e):
 			if e.value > 0:
 				add.push_back(e.key if is_scaling(e) else e.stat_displayed)
+				if is_scaling(e):
+					add += Catalog.tags_for_binding("counter:" + e.stat_scaled)
 		elif is_next_wave(e):
 			if e.value > 0 and Catalog.STATS.has(e.key):
 				add.push_back(e.key)
 		elif e.has_meta("aa_tags") and e.get_meta("aa_value") > 0:
 			add += e.get_meta("aa_tags")
+			add += Catalog.tags_for_binding("mech:" + (e.custom_key if e.custom_key != "" else e.key))
 		for t in add:
 			if t != "" and not t in tags:
 				tags.push_back(t)
@@ -883,6 +906,8 @@ func main_stats(effects: Array) -> Array:
 			vals[e.key] = vals.get(e.key, 0.0) + Valuation.scaling_value(e.key, e.value, e.stat_scaled, e.nb_stat_scaled)
 		elif is_gain_mod(e) and e.stats_modified.size() > 0:
 			vals[e.stats_modified[0]] = vals.get(e.stats_modified[0], 0.0) + Valuation.gain_mod_value(e.stats_modified[0], e.value)
+		elif e.key == "weapon_slot":
+			vals["weapon_slot"] = vals.get("weapon_slot", 0.0) + Catalog.WEAPON_SLOT_W
 		elif is_next_wave(e) and Catalog.STATS.has(e.key):
 			vals[e.key] = vals.get(e.key, 0.0) + e.get_meta("aa_value", 5.0)
 		elif e.has_meta("aa_value"):
@@ -1009,26 +1034,159 @@ func _next_wave_effect(stat: String, value: int) -> Effect:
 
 func gen_next_wave(target: float, perm_mult: float, allow_pair: bool) -> Dictionary:
 	var W = Catalog.remaining_waves(perm_mult)
-	var nw_w = {}
-	for st in Catalog.NEXT_WAVE_STATS:
-		nw_w[st] = Catalog.NEXT_WAVE_POS_WEIGHTS.get(st, 0.4)
-	var stat = _pick_weighted(nw_w)
-	var unit = Catalog.stat_unit(stat)
+	var kind = _pick_weighted(Catalog.NEXT_WAVE_POS_KINDS)
 	var pair = allow_pair and rng.randf() < Catalog.NEXT_WAVE_PAIR_CHANCE
 	var comp = target * rng.randf_range(0.3, 0.6) if pair else 0.0
-	var raw = (target + comp) * W / Catalog.stat_w(stat)
-	var v = int(clamp(round(raw / unit) * unit, unit, _line_cap(stat, false) * 2))
-	var value = Valuation.next_wave_value(stat, v, perm_mult)
-	var out = [_next_wave_effect(stat, v)]
-	out[0].set_meta("aa_value", value)
+	var out = []
+	var value = 0.0
+	if kind == "loot_aliens":
+		var n = int(clamp(round((target + comp) / _loot_alien_value()), 1, 4))
+		var e = effect_script.new()
+		e.key = "extra_loot_aliens_next_wave"
+		e.key_hash = Keys.generate_hash(e.key)
+		e.custom_key_hash = Keys.generate_hash("")
+		e.text_key = "effect_extra_loot_aliens_next_wave"
+		e.value = n
+		value = n * _loot_alien_value()
+		e.set_meta("aa_value", value)
+		e.set_meta("aa_tags", Catalog.tags_for_binding("mech:extra_loot_aliens_next_wave"))
+		out.push_back(e)
+	else:
+		var stat = "xp_gain"
+		var unit = Catalog.stat_unit(stat)
+		var raw = (target + comp) * W / Catalog.stat_w(stat)
+		var v = int(clamp(round(raw / unit) * unit, unit, _line_cap(stat, false) * 2))
+		value = Valuation.next_wave_value(stat, v, perm_mult)
+		var e2 = _next_wave_effect(stat, v)
+		e2.set_meta("aa_value", value)
+		out.push_back(e2)
 	if pair:
-		var side = _next_wave_side(comp, perm_mult, [stat])
+		var side = _next_wave_side(comp, perm_mult, ["xp_gain"])
 		if not side.empty():
 			out.push_back(side.effect)
 			value -= side.value
 	if value < target * 0.4 or value > target * 1.6:
 		return {}
 	return {"effects": out, "value": value}
+
+
+# 每个额外战利品外星人的价值：优先取原版机制池的单位价值（诱饵），否则用目录默认值
+func _loot_alien_value() -> float:
+	for t in 4:
+		for m in mechanics_by_tier[t]:
+			if m.effect.key == "extra_loot_aliens_next_wave" and m.effect.value != 0:
+				return max(2.0, abs(m.value) / abs(m.effect.value))
+	return Catalog.LOOT_ALIEN_VALUE
+
+
+# ============================================================
+# 来自角色、默认进入道具池的效果。返回 {effect, value}
+# ============================================================
+var char_templates: Dictionary = {}		# 原版角色效果模板：class_bonus（列表）/ pacifist / burn_bonus / group_structures
+
+
+func _collect_char_templates(characters: Array) -> void:
+	char_templates = {"class_bonus": []}
+	var class_script = load("res://effects/items/class_bonus_effect.gd")
+	for ch in characters:
+		for e in ch.effects:
+			if e.get_script() == class_script:
+				char_templates.class_bonus.push_back(e)
+			elif e.key == "pacifist" and e.value > 0:
+				char_templates["pacifist"] = e
+			elif e.key == "bonus_non_elemental_damage_against_burning_targets" and e.value > 0:
+				char_templates["burn_bonus"] = e
+			elif e.key == "group_structures":
+				char_templates["group_structures"] = e
+
+
+func gen_char_component(target: float) -> Dictionary:
+	for _attempt in 4:
+		var kind = _pick_weighted(Catalog.CHAR_COMPONENT_WEIGHTS)
+		match kind:
+			"class_bonus":
+				if char_templates.class_bonus.empty() or ItemService.sets.empty():
+					continue
+				var tmpl = char_templates.class_bonus[rng.randi() % char_templates.class_bonus.size()]
+				var sets = []
+				for st in ItemService.sets:
+					if st.my_id != "set_legendary":
+						sets.push_back(st)
+				var chosen = sets[rng.randi() % sets.size()]
+				var w = Catalog.CLASS_BONUS_STAT_W.get(tmpl.stat_displayed_name, 1.5)
+				var unit = 10 if tmpl.stat_displayed_name == "stat_range" else 5
+				var raw = target / (w * Catalog.CLASS_BONUS_SHARE)
+				var v = int(clamp(round(raw / unit) * unit, unit, max(unit, tmpl.value * 1.5)))
+				var e = tmpl.duplicate()
+				e.set_id = chosen.my_id
+				e.set_id_hash = Keys.generate_hash(chosen.my_id)
+				e.stat_hash = Keys.generate_hash(e.stat_name)
+				e.value = v
+				var val = w * v * Catalog.CLASS_BONUS_SHARE
+				e.set_meta("aa_value", val)
+				e.set_meta("aa_tags", [tmpl.stat_displayed_name] if Catalog.STATS.has(tmpl.stat_displayed_name) else [])
+				return {"effect": e, "value": val}
+			"burn_bonus":
+				if not char_templates.has("burn_bonus"):
+					continue
+				var e2 = char_templates.burn_bonus.duplicate()
+				var v2 = int(clamp(round(target / Catalog.BURN_BONUS_W / 10.0) * 10, 10, 200))
+				e2.value = v2
+				var val2 = v2 * Catalog.BURN_BONUS_W
+				e2.set_meta("aa_value", val2)
+				e2.set_meta("aa_tags", Catalog.tags_for_binding("mech:bonus_non_elemental_damage_against_burning_targets"))
+				return {"effect": e2, "value": val2}
+			"pacifist":
+				if not char_templates.has("pacifist"):
+					continue
+				var e3 = char_templates.pacifist.duplicate()
+				var v3 = int(clamp(round(target / Catalog.PACIFIST_W / 5.0) * 5, 5, 65))
+				e3.value = v3
+				var val3 = v3 * Catalog.PACIFIST_W
+				e3.set_meta("aa_value", val3)
+				e3.set_meta("aa_tags", Catalog.tags_for_binding("mech:pacifist"))
+				return {"effect": e3, "value": val3}
+			"weapon_slot":
+				if target < Catalog.WEAPON_SLOT_W * 0.6:
+					continue
+				var e4 = _stat_effect("weapon_slot", 2 if target >= Catalog.WEAPON_SLOT_W * 1.8 else 1)
+				var val4 = e4.value * Catalog.WEAPON_SLOT_W
+				e4.set_meta("aa_value", val4)
+				e4.set_meta("aa_tags", [])
+				return {"effect": e4, "value": val4}
+			"group_structures":
+				if not char_templates.has("group_structures") or target > Catalog.GROUP_STRUCTURES_VALUE * 2.5:
+					continue
+				var e5 = char_templates.group_structures.duplicate()
+				e5.set_meta("aa_value", Catalog.GROUP_STRUCTURES_VALUE)
+				e5.set_meta("aa_tags", Catalog.tags_for_binding("mech:group_structures"))
+				return {"effect": e5, "value": Catalog.GROUP_STRUCTURES_VALUE}
+	return {}
+
+
+# 代价：每波结束时敌人属性提高（船长），或 −1 武器栏。返回 {effects, value（折算后的补偿）}
+func gen_char_downside(comp: float, perm_mult: float) -> Dictionary:
+	if comp >= Catalog.WEAPON_SLOT_W / divisor * 0.7 and comp <= Catalog.WEAPON_SLOT_W / divisor * 1.5 and rng.randf() < 0.3:
+		var e = _stat_effect("weapon_slot", -1)
+		var got = neg_value(Catalog.WEAPON_SLOT_W)
+		e.set_meta("aa_value", -got)
+		return {"effects": [e], "value": got}
+	var keys = Catalog.ENEMY_STATS.keys()
+	var stat = keys[rng.randi() % keys.size()]
+	var w = Catalog.stat_w(stat)
+	var v = int(clamp(round(comp * divisor / (w * perm_mult)), 1, 5))
+	var e2 = effect_script.new()
+	e2.key = stat
+	e2.key_hash = Keys.generate_hash(stat)
+	e2.custom_key = "stats_end_of_wave"
+	e2.custom_key_hash = Keys.generate_hash("stats_end_of_wave")
+	e2.storage_method = Effect.StorageMethod.KEY_VALUE
+	e2.text_key = "effect_gain_stat_end_of_wave"
+	e2.value = v
+	e2.effect_sign = Effect.Sign.NEGATIVE
+	var got2 = neg_value(w * v * perm_mult)
+	e2.set_meta("aa_value", -got2)
+	return {"effects": [e2], "value": got2}
 
 
 func gen_next_wave_downside(comp: float, perm_mult: float) -> Dictionary:
