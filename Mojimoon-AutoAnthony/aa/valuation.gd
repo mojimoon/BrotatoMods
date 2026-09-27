@@ -80,3 +80,13 @@ static func clause_value(c: Dictionary, perm_mult: float) -> float:
 # 普通属性行价值（负面行按补偿比例折算为负价值）
 static func stat_line_value(stat: String, value: int) -> float:
 	return Catalog.stat_w(stat) * value
+
+
+# 计数型："每有 nb 个 counter 获得 value 个 stat"
+static func scaling_value(stat: String, value: int, counter: String, nb: int) -> float:
+	return Catalog.stat_w(stat) * value * Catalog.counter_ref(counter) / max(1, nb)
+
+
+# 属性修改 ±pct%
+static func gain_mod_value(stat: String, pct: int) -> float:
+	return Catalog.stat_w(stat) * Catalog.counter_ref(stat) * pct / 100.0

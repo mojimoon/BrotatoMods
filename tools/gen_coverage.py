@@ -1,0 +1,36 @@
+# 用法：python mods/tools/gen_coverage.py <godot 测试日志> <输出 COVERAGE.md>
+import sys,collections,re
+log=open(sys.argv[1],encoding='utf8',errors='replace').read().splitlines()
+rows=[l.split('|',5) for l in log if l.startswith('COVER|')]
+H=collections.OrderedDict((t[0],(t[1],t[2])) for t in [
+ ('trigger','拆解为 (扳机, 载荷) 先验，由通用触发条款重新表达','单位价值 × 每波频率（见 README 第 4 节）'),
+ ('scaling','计数 × 属性自由搭配重新生成（原版 GainStatForEveryStatEffect）','目标属性权重 × 数值 × 计数期望 / 每 N；计数期望由原版道具校准'),
+ ('gain_mod','属性修改 ±XX% 重新生成（原版 StatGainsModificationEffect）','属性权重 × 属性期望总量 × XX%'),
+ ('scalar','原样搬运，并按预算缩放数值（1 单位 .. 原版 1.5 倍）','来源道具剩余价值按数值比例折算'),
+ ('mechanic','原样搬运（炮台、宠物、爆炸、武器类加成……）','道具：来源道具 (预算 − 属性行价值) / 机制数；角色：(角色总价值 − 可估值部分) / 机制数，限制 30–80'),
+ ('downside','作为代价搬运','来源道具因它多拿到的正面预算（至少 3）'),
+ ('identity','保留在角色上，不进入道具池（武器限制、初始装备、商店规则、负向机制……）','—'),
+ ('anchored','所在道具行为写在道具 ID 上：整件道具保持原样，也不作为组件来源','—'),
+ ('text','纯描述行（由道具 ID 实现）：所在道具保持原样','—'),
+ ('excluded','依赖其他行或含义不对称（迷雾视野、敌人数量、减速上限……）：不搬运','—'),
+ ('weapon','武器专属效果：仅在“重组武器”时于同类型武器家族间整套交换','按等级对齐，不单独估值'),
+])
+out=['# 原版效果覆盖表','',
+'本表由测试 `test_80_native_effect_coverage` 遍历原版全部道具、角色、武器自动生成，列出每一种**非纯属性增减**效果在东尼算法中的处理方式。纯属性行（22 种属性）统一按价格回归的权重重组，不在此列。','',
+'## 处理方式','','| 处理 | 含义 | 估值 |','| --- | --- | --- |']
+cnt=collections.Counter(r[2] for r in rows)
+for k,(desc,val) in H.items():
+    out.append('| `%s`（%d 种） | %s | %s |'%(k,cnt.get(k,0),desc,val))
+out+=['','## 明细','']
+for k in H:
+    rs=[r for r in rows if r[2]==k]
+    if not rs: continue
+    out+=['### `%s`'%k,'','| 效果 key | 次数 | 来源 | 示例 |','| --- | --- | --- | --- |']
+    for r in sorted(rs,key=lambda x:x[1]):
+        ex=r[5].replace('|','/').replace('[color=white]','').replace('[/color]','')
+        import re
+        ex=re.sub(r'\[img=[^\]]*\][^\[]*\[/img\]','',ex)
+        out.append('| `%s` | %s | %s | %s |'%(r[1],r[3],r[4],ex))
+    out.append('')
+open(sys.argv[2],'w',encoding='utf8',newline='\n').write('\n'.join(out)+'\n')
+print(len(rows))

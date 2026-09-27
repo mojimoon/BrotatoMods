@@ -61,6 +61,15 @@ var posneg: Dictionary = {}
 var pos_cat := ""
 var neg_cat := ""
 var anchor_stat := ""
+# 计数型 / 属性修改的原版先验
+var counter_prior: Dictionary = {}
+var gain_mod_prior := 0.0
+# 重复惩罚：本次生成中已出现的扳机 / 载荷 / 组合计数
+var used_combo: Dictionary = {}
+var used_trigger: Dictionary = {}
+var used_payload: Dictionary = {}
+var scaling_script: Script
+var gain_mod_script: Script
 var effect_script: Script
 # 条款约束（角色重组时使用）：禁用的扳机 / 载荷（反协同，如"无法回血"的角色不出现回血相关条款）
 var banned_triggers: Array = []
@@ -73,6 +82,8 @@ func _init(p_cfg: Dictionary, p_seed: int) -> void:
 	divisor = float(cfg.get("divisor", Catalog.DOWNSIDE_DIVISOR))
 	rng = RandomNumberGenerator.new()
 	effect_script = load("res://items/global/effect.gd")
+	scaling_script = load("res://effects/items/gain_stat_for_every_stat_effect.gd")
+	gain_mod_script = load("res://effects/items/stat_gains_modification_effect.gd")
 
 
 # ============================================================
@@ -131,8 +142,16 @@ func native_trigger_of(e):
 	return null
 
 
+func is_scaling(e) -> bool:
+	return e.get_script() == scaling_script
+
+
+func is_gain_mod(e) -> bool:
+	return e.get_script() == gain_mod_script
+
+
 func is_mechanic(e) -> bool:
-	if is_plain_stat(e) or native_trigger_of(e) != null:
+	if is_plain_stat(e) or native_trigger_of(e) != null or is_scaling(e) or is_gain_mod(e):
 		return false
 	if e.get_script() == effect_script and e.key == "":
 		return false	# 纯描述行（由道具 ID 实现）
@@ -188,6 +207,12 @@ func _collect_priors(items: Array, characters: Array, weapons: Array) -> void:
 				stat_value += line_value(e.key, e.value)
 				continue
 			has_special = true
+			if is_scaling(e):
+				counter_prior[e.stat_scaled] = counter_prior.get(e.stat_scaled, 0.0) + 1.0
+				continue
+			if is_gain_mod(e):
+				gain_mod_prior += 1.0
+				continue
 			var nt = native_trigger_of(e)
 			if nt != null:
 				trigger_prior[nt[0]] += 1.0
@@ -244,6 +269,12 @@ func classify(effects: Array) -> String:
 			v = Catalog.stat_w(e.key) * e.value
 		elif e is TriggerEffect:
 			cat = Catalog.PAYLOAD_CATEGORY.get(e.payload, Catalog.STAT_CATEGORY.get(e.stat, ""))
+			v = 10.0 * sign(e.value)
+		elif is_scaling(e):
+			cat = Catalog.STAT_CATEGORY.get(e.key, "")
+			v = 10.0 * sign(e.value)
+		elif is_gain_mod(e) and e.stats_modified.size() > 0:
+			cat = Catalog.STAT_CATEGORY.get(e.stats_modified[0], "A")
 			v = 10.0 * sign(e.value)
 		else:
 			var nt = native_trigger_of(e)
@@ -339,9 +370,11 @@ func _add_item_mechanics(src, mechs: Array, stat_value: float, pos_value: float)
 		each_down = max(3.0, (pos_value - budget) / downs)
 	for e in mechs:
 		var down = Catalog.is_downside_mechanic(e)
+		var scalar = e.get_script() == effect_script and e.storage_method == 0 and e.custom_key == "" \
+			and e.value != 0 and not e.key in Catalog.SCALAR_MECHANIC_EXCLUDED and not down
 		mechanics_by_tier[src.tier].push_back({
 			"effect": e, "value": -each_down if down else each_up, "down": down, "source": src.my_id,
-			"tags": _extra_tags(src),
+			"tags": _extra_tags(src), "scalar": scalar,
 		})
 
 
@@ -383,7 +416,7 @@ func _collect_character_mechanics(characters: Array, effect_keys: Dictionary) ->
 func _is_transferable_character_mechanic(e, effect_keys: Dictionary) -> bool:
 	if not is_mechanic(e) or Catalog.is_downside_mechanic(e):
 		return false
-	if e.key in Catalog.CHAR_MECHANIC_BANNED or e.custom_key in Catalog.CHAR_MECHANIC_BANNED:
+	if e.key in Catalog.CHAR_MECHANIC_BANNED or e.custom_key in Catalog.CHAR_MECHANIC_BANNED 			or e.key.to_lower() in Catalog.CHAR_MECHANIC_BANNED or e.custom_key.to_lower() in Catalog.CHAR_MECHANIC_BANNED:
 		return false
 	if e.key.begins_with("starting_") or e.custom_key.begins_with("starting_") or e.custom_key.begins_with("cursed_starting"):
 		return false
@@ -490,7 +523,7 @@ func generate_item(item) -> Dictionary:
 
 	var tier: int = item.tier
 	var perm_mult: float = Catalog.PERM_MULT[tier]
-	var budget: float = item_budget(item) * _avg_mult() * _variance_mult()
+	var budget: float = item_budget(item) * Catalog.HIDDEN_TIER_MULT[item.tier] * _avg_mult() * _variance_mult()
 	var budget_total = budget
 	var effects = []
 	var used_stats = []
@@ -500,6 +533,9 @@ func generate_item(item) -> Dictionary:
 	var cls = _pick_class(tier)
 	pos_cat = cls[0]
 	neg_cat = cls[1]
+	# 以运营为代价的道具在原版中很少且无明确规律：负面自由生成
+	if neg_cat == "E":
+		neg_cat = "*"
 	anchor_stat = ""
 	var primary = _pick_stat(false)
 	anchor_stat = primary
@@ -511,9 +547,20 @@ func generate_item(item) -> Dictionary:
 		var comp = budget_total * rng.randf_range(0.1, 0.35)
 		var got = 0.0
 		var r = rng.randf()
-		if r < 0.15:
+		if r >= 0.25 and r < 0.33:
+			var sc = gen_scaling(comp * divisor, true)
+			if not sc.empty():
+				downsides.push_back(sc.effect)
+				got = neg_value(abs(sc.value))
+		elif r >= 0.33 and r < 0.37:
+			var gm = gen_gain_mod(comp * divisor, true)
+			if not gm.empty():
+				downsides.push_back(gm.effect)
+				got = neg_value(abs(gm.value))
+		elif r < 0.15:
 			var c = gen_clause(-comp * divisor, perm_mult, true)
 			if not c.empty():
+				_note_clause(c)
 				downsides.push_back(TriggerEffect.make(c))
 				got = neg_value(abs(Valuation.clause_value(c, perm_mult)))
 		elif r < 0.25:
@@ -539,21 +586,41 @@ func generate_item(item) -> Dictionary:
 	for _slot in slots:
 		if budget <= 4.0:
 			break
+		var share = rng.randf_range(0.4, 0.8) if slots == 1 else rng.randf_range(0.3, 0.5)
+		var kind = _pick_weighted(Catalog.SPECIAL_KIND_WEIGHTS)
 		var done = false
-		if rng.randf() >= TRIGGER_SHARE_OF_SPECIAL and budget > 8.0:
+		if kind == "mechanic" and budget > 8.0:
 			var m = _pick_mechanic(tier, false, budget * 1.1)
 			if m != null:
-				effects.push_back(_mechanic_copy(m))
-				budget -= m.value
+				var me = _mechanic_copy(m, budget * share)
+				var mv = me.get_meta("aa_value")
+				effects.push_back(me)
+				budget -= mv
 				done = true
-				if m.value > main_line.value:
-					main_line = {"value": m.value, "adj": "AA_ADJ_ODD"}
+				if mv > main_line.value:
+					main_line = {"value": mv, "adj": "AA_ADJ_ODD"}
+		elif kind == "scaling":
+			var sc = gen_scaling(budget * share, false)
+			if not sc.empty():
+				effects.push_back(sc.effect)
+				budget -= sc.value
+				done = true
+				if sc.value > main_line.value:
+					main_line = {"value": sc.value, "adj": Catalog.ADJ_BY_STAT.get(sc.effect.key, "AA_ADJ_ODD")}
+		elif kind == "gain_mod":
+			var gm = gen_gain_mod(budget * share, false)
+			if not gm.empty():
+				effects.push_back(gm.effect)
+				budget -= gm.value
+				done = true
+				if gm.value > main_line.value:
+					main_line = {"value": gm.value, "adj": Catalog.ADJ_BY_STAT.get(gm.effect.stat_displayed, "AA_ADJ_ODD")}
 		if not done:
-			var share = rng.randf_range(0.4, 0.8) if slots == 1 else rng.randf_range(0.3, 0.5)
 			var c = gen_clause(budget * share, perm_mult, false)
 			if not c.empty():
 				var cv = Valuation.clause_value(c, perm_mult)
 				effects.push_back(TriggerEffect.make(c))
+				_note_clause(c)
 				budget -= cv
 				if cv > main_line.value:
 					main_line = {"value": cv, "adj": Catalog.ADJ_BY_TRIGGER[c.trigger]}
@@ -639,9 +706,18 @@ func _stat_effect(stat: String, value: int) -> Effect:
 
 
 # 机制行复制时记下其估值，便于审计
-func _mechanic_copy(m: Dictionary):
+# target > 0 时，可缩放机制按预算调整数值（1 单位 .. 原版 1.5 倍），价值按比例折算
+func _mechanic_copy(m: Dictionary, target: float = -1.0):
 	var e = m.effect.duplicate()
-	e.set_meta("aa_value", m.value)
+	var v = m.value
+	if target > 0.0 and m.get("scalar", false):
+		var native_v = m.effect.value
+		var sg = 1 if native_v > 0 else -1
+		var want = round(abs(native_v) * target / abs(m.value))
+		var nv = int(clamp(want, 1, max(1.0, ceil(abs(native_v) * 1.5)))) * sg
+		e.value = nv
+		v = m.value * float(nv) / float(native_v)
+	e.set_meta("aa_value", v)
 	e.set_meta("aa_tags", m.get("tags", []))
 	return e
 
@@ -652,7 +728,10 @@ func _pick_mechanic(tier: int, downside: bool, max_abs_value: float):
 		if t < 0 or t > 3:
 			continue
 		for m in mechanics_by_tier[t]:
-			if m.down == downside and abs(m.value) <= max_abs_value:
+			var min_value = abs(m.value)
+			if m.get("scalar", false):
+				min_value = abs(m.value) / max(1.0, abs(m.effect.value))
+			if m.down == downside and min_value <= max_abs_value:
 				pool.push_back(m)
 		if not pool.empty():
 			break
@@ -677,6 +756,9 @@ func _tags_for(effects: Array) -> Array:
 			if e.value > 0:
 				add.push_back(e.key)
 				add.push_back(Catalog.STAT_EXTRA_TAGS.get(e.key, ""))
+		elif is_scaling(e) or is_gain_mod(e):
+			if e.value > 0:
+				add.push_back(e.key if is_scaling(e) else e.stat_displayed)
 		elif e.has_meta("aa_tags") and e.get_meta("aa_value") > 0:
 			add += e.get_meta("aa_tags")
 		for t in add:
@@ -726,6 +808,10 @@ func main_stats(effects: Array) -> Array:
 				vals[e.stat] = vals.get(e.stat, 0.0) + 10.0
 		elif is_plain_stat(e):
 			vals[e.key] = vals.get(e.key, 0.0) + Catalog.stat_w(e.key) * e.value
+		elif is_scaling(e):
+			vals[e.key] = vals.get(e.key, 0.0) + Valuation.scaling_value(e.key, e.value, e.stat_scaled, e.nb_stat_scaled)
+		elif is_gain_mod(e) and e.stats_modified.size() > 0:
+			vals[e.stats_modified[0]] = vals.get(e.stats_modified[0], 0.0) + Valuation.gain_mod_value(e.stats_modified[0], e.value)
 		elif e.has_meta("aa_value"):
 			var k = e.custom_key if e.custom_key != "" else e.key
 			if k in Catalog.HEAL_KEYS:
@@ -750,6 +836,98 @@ func main_stats(effects: Array) -> Array:
 		if r != "" and not r in out:
 			out.push_back(r)
 	return out
+
+
+func _note_clause(c: Dictionary) -> void:
+	var k = c.trigger + "/" + c.payload
+	used_combo[k] = used_combo.get(k, 0) + 1
+	used_trigger[c.trigger] = used_trigger.get(c.trigger, 0) + 1
+	used_payload[c.payload] = used_payload.get(c.payload, 0) + 1
+
+
+const NICE_NB = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50, 60, 80, 100, 150, 200]
+
+
+static func _nice_nb(raw: float) -> int:
+	var best = 1
+	for n in NICE_NB:
+		if abs(log(max(0.01, raw)) - log(float(n))) < abs(log(max(0.01, raw)) - log(float(best))):
+			best = n
+	return best
+
+
+# ============================================================
+# 计数型："每有 [计数] 获得 [属性]"，计数与属性自由搭配。返回 {effect, value}（value 带符号）
+# ============================================================
+func gen_scaling(target: float, negative: bool) -> Dictionary:
+	for _attempt in 6:
+		var cw = {}
+		for c in Catalog.COUNTER_TEXT:
+			cw[c] = 0.6 + counter_prior.get(c, 0.0)
+		for st in Catalog.SCALING_STATS:
+			cw[st] = 0.15 * stat_pos_w.get(st, 0.5) / 5.0 + counter_prior.get(st, 0.0)
+		var counter = _pick_weighted(cw)
+		var allowed = []
+		for st in Catalog.SCALING_STATS:
+			if st != counter:
+				allowed.push_back(st)
+		var stat = _pick_stat(negative, [], allowed)
+		var unit = Catalog.stat_unit(stat)
+		var per_unit_full = Valuation.scaling_value(stat, unit, counter, 1)
+		var nb = _nice_nb(per_unit_full / max(0.1, abs(target)))
+		var v = unit
+		if per_unit_full < abs(target) * 0.7:
+			# 每 1 个计数的价值都不够：提高数值
+			nb = 1
+			v = int(clamp(round(abs(target) / per_unit_full), 1, 5)) * unit
+		var value = Valuation.scaling_value(stat, v, counter, nb)
+		if value < abs(target) * 0.4 or value > abs(target) * 1.35:
+			continue
+		var e = scaling_script.new()
+		e.key = stat
+		e.key_hash = Keys.generate_hash(stat)
+		e.custom_key_hash = Keys.generate_hash("")
+		e.value = -v if negative else v
+		e.stat_scaled = counter
+		e.stat_scaled_hash = Keys.generate_hash(counter)
+		e.nb_stat_scaled = nb
+		e.perm_stats_only = Catalog.STATS.has(counter) and rng.randf() < 0.5
+		if Catalog.COUNTER_TEXT.has(counter):
+			e.text_key = Catalog.COUNTER_TEXT[counter]
+		else:
+			e.text_key = "EFFECT_GAIN_STAT_FOR_EVERY_PERM_STAT" if e.perm_stats_only else "EFFECT_GAIN_STAT_FOR_EVERY_STAT"
+		e.effect_sign = Effect.Sign.FROM_VALUE
+		return {"effect": e, "value": -value if negative else value}
+	return {}
+
+
+# ============================================================
+# 属性修改 ±XX%（来自角色）。返回 {effect, value}
+# ============================================================
+func gen_gain_mod(target: float, negative: bool) -> Dictionary:
+	for _attempt in 4:
+		var stat = _pick_stat(negative, [], Catalog.GAIN_MOD_STATS)
+		var per_pct = Valuation.gain_mod_value(stat, 1)
+		var raw = abs(target) / max(0.01, per_pct)
+		var pct = 0
+		var best = 1e9
+		for step in Catalog.GAIN_MOD_STEPS:
+			if abs(step - raw) < best:
+				best = abs(step - raw)
+				pct = step
+		var value = Valuation.gain_mod_value(stat, pct)
+		if value < abs(target) * 0.4 or value > abs(target) * 1.35:
+			continue
+		var e = gain_mod_script.new()
+		e.key = "effect_reduce_stat_gains" if negative else "effect_increase_stat_gains"
+		e.key_hash = Keys.generate_hash(e.key)
+		e.custom_key_hash = Keys.generate_hash("")
+		e.value = -pct if negative else pct
+		e.stat_displayed = stat
+		e.stats_modified = [stat]
+		e.effect_sign = Effect.Sign.FROM_VALUE
+		return {"effect": e, "value": -value if negative else value}
+	return {}
 
 
 # ============================================================
@@ -792,7 +970,8 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 			var legal_t = _legal_payloads(t, negative)
 			if legal_t.empty() or (fixed_payload != "" and not fixed_payload in legal_t):
 				continue
-			tw[t] = Catalog.TRIGGERS[t].w + Catalog.NATIVE_PRIOR_STRENGTH * trigger_prior[t] / 3.0
+			tw[t] = (Catalog.TRIGGERS[t].w + Catalog.NATIVE_PRIOR_STRENGTH * log(1.0 + trigger_prior[t]) / 2.0) \
+				/ (1.0 + Catalog.REPEAT_PENALTY_TRIGGER * used_trigger.get(t, 0))
 		trigger = _pick_weighted(tw)
 	if trigger == null:
 		return {}
@@ -801,7 +980,8 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 		legal = [fixed_payload] if fixed_payload in legal else []
 	var pw = {}
 	for p in legal:
-		pw[p] = Catalog.PAYLOADS[p].w + Catalog.NATIVE_PRIOR_STRENGTH * payload_prior[p] / 3.0
+		pw[p] = (Catalog.PAYLOADS[p].w + Catalog.NATIVE_PRIOR_STRENGTH * log(1.0 + payload_prior[p]) / 2.0) \
+			/ (1.0 + Catalog.REPEAT_PENALTY_COMBO * used_combo.get(trigger + "/" + p, 0) + Catalog.REPEAT_PENALTY_PAYLOAD * used_payload.get(p, 0))
 		if not negative and pos_cat != "" and Catalog.PAYLOAD_CATEGORY.get(p, "") == pos_cat:
 			pw[p] *= 3.0
 	var payload = _pick_weighted(pw)
@@ -1031,3 +1211,40 @@ func _closest_tier(tiers: Dictionary, tier: int):
 			best_d = abs(t - tier)
 			best = tiers[t]
 	return best
+
+
+# ============================================================
+# 覆盖说明：原版每一条非纯属性效果在本 mod 中的处理方式（用于审计与 COVERAGE.md）
+#   plain     纯属性行：按权重重组
+#   trigger   原版触发行：拆解为 (扳机, 载荷) 先验，由通用触发条款重新表达
+#   scaling   计数型：计数 × 属性自由搭配重新生成
+#   gain_mod  属性修改 ±XX%：按属性期望总量估值后重新生成
+#   scalar    带数值的机制：搬运并按预算缩放数值
+#   mechanic  固定机制：原样搬运，按来源道具剩余价值估值
+#   downside  负面机制：作为代价搬运，价值 = 来源道具因它多得的正面预算
+#   text      纯描述行（行为写在道具 ID 上）：不搬运，所在道具保持原样
+#   identity  角色身份 / 结构性效果：保留在角色上，不进入道具池
+#   excluded  依赖其他行或道具 ID 语义：不搬运
+# ============================================================
+func handling_of(e, src) -> String:
+	if is_plain_stat(e):
+		return "plain"
+	if native_trigger_of(e) != null:
+		return "trigger"
+	if is_scaling(e):
+		return "scaling"
+	if is_gain_mod(e):
+		return "gain_mod"
+	if e.get_script() == effect_script and e.key == "":
+		return "text"
+	var k = e.custom_key if e.custom_key != "" else e.key
+	if src is CharacterData:
+		if not _is_transferable_character_mechanic(e, PlayerRunData.init_effects()):
+			return "identity"
+	if e.key in Catalog.MECHANIC_BANNED_KEYS or e.custom_key in Catalog.MECHANIC_BANNED_KEYS:
+		return "excluded"
+	if Catalog.is_downside_mechanic(e):
+		return "downside"
+	if e.get_script() == effect_script and e.storage_method == 0 and e.custom_key == "" and not e.key in Catalog.SCALAR_MECHANIC_EXCLUDED:
+		return "scalar"
+	return "mechanic"

@@ -159,6 +159,12 @@ func _value_of(gen, effects: Array, tier: int) -> float:
 			v += cv if cv >= 0 else cv / Catalog.DOWNSIDE_DIVISOR
 		elif gen.is_plain_stat(e):
 			v += gen.line_value(e.key, e.value)
+		elif gen.is_scaling(e):
+			var sv = Valuation.scaling_value(e.key, e.value, e.stat_scaled, e.nb_stat_scaled)
+			v += sv if sv >= 0 else sv / Catalog.DOWNSIDE_DIVISOR
+		elif gen.is_gain_mod(e):
+			var gv = Valuation.gain_mod_value(e.stats_modified[0], e.value)
+			v += gv if gv >= 0 else gv / Catalog.DOWNSIDE_DIVISOR
 		elif e.has_meta("aa_value"):
 			var mv = e.get_meta("aa_value")
 			v += mv
@@ -272,6 +278,27 @@ func test_12_value_audit() -> void:
 	print("AUDIT native special share by tier: ", g_sh.special_share_by_tier, " negative share: ", g_sh.neg_prob_by_tier)
 	print("AUDIT value/budget: p10=%.2f median=%.2f p90=%.2f (n=%d)" % [p10, median, p90, n])
 	print("AUDIT items with a trigger clause: %d / %d" % [with_trigger, total])
+	var kinds = {"scaling": 0, "gain_mod": 0, "mechanic": 0}
+	var samples = []
+	for sd in [SEEDS[0]]:
+		var gk = Generator.new(_cfg(), sd)
+		var pk = gk.generate(isvc.items, isvc.characters, [], [])
+		for id in pk.items:
+			for e in pk.items[id].effects:
+				var k = ""
+				if gk.is_scaling(e):
+					k = "scaling"
+				elif gk.is_gain_mod(e):
+					k = "gain_mod"
+				elif e.has_meta("aa_value"):
+					k = "mechanic"
+				if k != "":
+					kinds[k] += 1
+					if samples.size() < 10 and k != "mechanic":
+						samples.push_back(e.get_text(0, false))
+	print("AUDIT special kinds (1 seed): ", kinds)
+	for t in samples:
+		print("AUDIT special sample: ", t)
 	print("AUDIT triggers: ", trig_count)
 	print("AUDIT payloads: ", pay_count)
 	_check(median > 0.8 and median < 1.25, "median value/budget near 1 (%.2f)" % median)
@@ -865,7 +892,7 @@ func test_17_character_effects_on_items() -> void:
 # 参数实验：预算模型 × 负面除数。每档对比生成道具与原版纯属性道具的正面数值 / 净值中位数。
 # "真实"一列按实际频率（击杀 / 材料 110、受击 7、回血 12）重估触发条款，即玩家体感。
 # ============================================================
-const REAL_RATE = {"kill": 110.0 / 180.0, "gold": 110.0 / 180.0, "hit": 7.0 / 10.0, "heal": 12.0 / 20.0}
+const REAL_RATE = {"kill": 110.0 / 120.0, "gold": 110.0 / 120.0, "hit": 7.0 / 10.0, "heal": 12.0 / 20.0}
 
 
 func _med(a: Array) -> float:
@@ -889,6 +916,12 @@ func _item_metrics(gen, effects: Array, tier: int) -> Array:
 		elif gen.is_plain_stat(e):
 			v = Valuation.stat_line_value(e.key, e.value)
 			rv = v
+		elif gen.is_scaling(e):
+			v = Valuation.scaling_value(e.key, e.value, e.stat_scaled, e.nb_stat_scaled)
+			rv = v
+		elif gen.is_gain_mod(e):
+			v = Valuation.gain_mod_value(e.stats_modified[0], e.value)
+			rv = v
 		elif e.has_meta("aa_value"):
 			v = e.get_meta("aa_value")
 			rv = v
@@ -905,7 +938,7 @@ func _item_metrics(gen, effects: Array, tier: int) -> Array:
 func test_60_param_sweep() -> void:
 	var native_pos = [[], [], [], []]
 	var native_net = {}
-	for D in [1.5, 2.0, 3.0, 5.0]:
+	for D in [2.0, 2.5, 3.0]:
 		native_net[D] = [[], [], [], []]
 	var g0 = Generator.new(_cfg(), 1)
 	for item in isvc.items:
@@ -928,12 +961,12 @@ func test_60_param_sweep() -> void:
 		native_pos[item.tier].push_back(p)
 		for D in native_net:
 			native_net[D][item.tier].push_back(p + negs / D)
-	var line = "AUDIT native pos/net(D=3) by tier:"
+	var line = "AUDIT native pos/net(D=2.5) by tier:"
 	for t in 4:
-		line += "  T%d %.1f/%.1f" % [t + 1, _med(native_pos[t]), _med(native_net[3.0][t])]
+		line += "  T%d %.1f/%.1f" % [t + 1, _med(native_pos[t]), _med(native_net[2.5][t])]
 	print(line)
-	for model in ["intercept", "tier"]:
-		for D in [1.5, 2.0, 3.0, 5.0]:
+	for model in ["tier"]:
+		for D in [2.0, 2.5, 3.0]:
 			var cfg = _cfg()
 			cfg.budget_model = model
 			cfg.divisor = D
@@ -956,9 +989,17 @@ func test_60_param_sweep() -> void:
 			for t in 4:
 				out += " %.2f" % (_med(net[t]) / max(0.1, _med(native_net[D][t])))
 			out += "  real/native:"
+			var sugg = []
 			for t in 4:
-				out += " %.2f" % (_med(real[t]) / max(0.1, _med(native_net[D][t])))
+				var rr = _med(real[t]) / max(0.1, _med(native_net[D][t]))
+				out += " %.2f" % rr
+				sugg.push_back(stepify(Catalog.HIDDEN_TIER_MULT[t] / rr, 0.01) if rr < 1.0 else Catalog.HIDDEN_TIER_MULT[t])
 			print(out)
+			if D == Catalog.DOWNSIDE_DIVISOR:
+				print("AUDIT suggested HIDDEN_TIER_MULT: ", sugg)
+				for t in 4:
+					var rr = _med(real[t]) / max(0.1, _med(native_net[D][t]))
+					_check(rr > 0.95, "tier %d real strength vs native %.2f (after hidden multiplier)" % [t + 1, rr])
 
 
 # ============================================================
@@ -1060,3 +1101,40 @@ func test_72_groups_and_bans_are_semantic() -> void:
 	m.on_menu_reset()
 	_check(isvc.item_groups.get("lifesteal", []).has("item_bat"), "groups restored")
 	_check(golem.banned_items.has("item_goblet"), "bans restored")
+
+
+# 覆盖审计：原版每一种非纯属性效果都有明确的处理方式；输出 COVER 行供生成 COVERAGE.md
+func test_80_native_effect_coverage() -> void:
+	var gen = Generator.new(_cfg(), 1)
+	var kinds = {}
+	for group in [["item", isvc.items], ["char", isvc.characters], ["weapon", isvc.weapons]]:
+		for src in group[1]:
+			for e in src.effects:
+				var h = gen.handling_of(e, src)
+				if h == "plain":
+					continue
+				var k = e.custom_key if e.custom_key != "" else e.key
+				if gen.is_scaling(e):
+					k = "gain_stat_for_every:" + e.stat_scaled
+				elif k == "":
+					k = "(" + e.text_key + ")"
+				if group[0] == "weapon" and not h in ["trigger", "scaling"]:
+					h = "weapon"
+				if src is ItemData and src.my_id in Catalog.ANCHORED_ITEMS and h in ["mechanic", "scalar", "downside", "excluded"]:
+					h = "anchored"
+				var key = k + "|" + h
+				if not kinds.has(key):
+					kinds[key] = {"n": 0, "src": [], "ex": []}
+				kinds[key].n += 1
+				if not group[0] in kinds[key].src:
+					kinds[key].src.push_back(group[0])
+				if kinds[key].ex.size() < 2:
+					var t = e.get_text(0, false).replace("\n", " ")
+					kinds[key].ex.push_back(src.my_id.replace("item_", "").replace("character_", "c:").replace("weapon_", "w:") + " " + t.substr(0, 60))
+				_check(h != "", "handled: " + k)
+	var keys = kinds.keys()
+	keys.sort()
+	for key in keys:
+		var parts = key.split("|")
+		print("COVER|%s|%s|%d|%s|%s" % [parts[0], parts[1], kinds[key].n, PoolStringArray(kinds[key].src).join(","), PoolStringArray(kinds[key].ex).join(" / ")])
+	print("AUDIT coverage kinds: %d" % keys.size())

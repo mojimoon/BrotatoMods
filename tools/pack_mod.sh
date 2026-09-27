@@ -27,7 +27,7 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         rel = os.path.relpath(d, ".").replace(os.sep, "/")
         z.writestr(rel + "/", "")
         for f in sorted(files):
-            if f.lower() == "readme.md":
+            if f.lower().endswith(".md"):
                 continue
             p = os.path.join(d, f)
             z.write(p, os.path.relpath(p, ".").replace(os.sep, "/"))

@@ -5,7 +5,7 @@ extends Reference
 # 价值货币：1 点价值 ≈ 商店价格中的 1 材料。
 # 对原版纯属性道具做岭回归：价格 ≈ 稀有度截距 + Σ 正面属性权重 × 数值 + Σ 负面属性权重 × 数值 / D。
 # 负面除数 D 的网格搜索（平均相对误差）：D=1 13.0%，1.5 12.7%，2 12.6%，2.5–8 12.4–12.5%，不计负面 12.8%。
-# 数据只能说明"负面远不如正面值钱"（可以卖掉无关或次要的属性），取 D=3。
+# 数据只能说明"负面远不如正面值钱"（可以卖掉无关或次要的属性）；实验后取 D=2.5。
 #
 # 触发型效果的价值 = 单位价值 × 频率：
 #   临时属性（本波有效，逐次叠加）  w × v × 平均叠层
@@ -24,7 +24,10 @@ const TIER_INTERCEPT = [11.5, 30.0, 40.9, 39.0]
 const PERM_MULT = [7.5, 6.5, 5.5, 4.5]
 const PERM_MULT_CHARACTER = 10.5
 # 负面效果的价值除数：-3 远程伤害只按 -1 远程伤害计价
-const DOWNSIDE_DIVISOR = 3.0
+const DOWNSIDE_DIVISOR = 2.5
+# 隐藏价值乘数（按稀有度）：用"真实频率"审计生成道具与原版纯属性道具的强度比 real，
+# real < 1 的档位乘以 1 / real 补齐，real >= 1 的保持不变。由测试 test_60 的审计结果标定。
+const HIDDEN_TIER_MULT = [1.0, 1.08, 1.05, 1.0]
 # 档内价格弹性：原版同稀有度道具的 log(净价值) 对 log(价格) 的斜率（约 0.69）
 const PRICE_ELASTICITY = 0.69
 
@@ -80,11 +83,11 @@ const EXPLOSION_TARGETS = 2.5	# 爆炸平均命中数
 #   w: 基础出现权重（与原版先验相加）
 # ------------------------------------------------------------
 const TRIGGERS = {
-	"kill": {"kind": "event", "e": 180.0, "timing": 0.5, "gate": "every", "w": 1.0},
+	"kill": {"kind": "event", "e": 120.0, "timing": 0.5, "gate": "every", "w": 1.0},
 	"hit": {"kind": "event", "e": 10.0, "timing": 0.5, "gate": "chance", "w": 1.0},
 	"dodge": {"kind": "event", "e": 4.0, "timing": 0.5, "gate": "chance", "w": 0.7},
 	"consumable": {"kind": "event", "e": 7.0, "timing": 0.5, "gate": "chance", "w": 0.8},
-	"gold": {"kind": "event", "e": 180.0, "timing": 0.5, "gate": "every", "w": 0.6},
+	"gold": {"kind": "event", "e": 120.0, "timing": 0.5, "gate": "every", "w": 0.6},
 	"heal": {"kind": "event", "e": 20.0, "timing": 0.5, "gate": "chance", "w": 0.4},
 	"level_up": {"kind": "event", "e": 1.3, "timing": 0.5, "gate": "none", "w": 0.9},
 	"wave_start": {"kind": "event", "e": 1.0, "timing": 1.0, "gate": "none", "w": 0.8},
@@ -104,8 +107,8 @@ const INTERVAL_CHOICES = [3, 4, 5, 6, 8, 10, 12, 15]
 # 效果载荷
 # ------------------------------------------------------------
 const PAYLOADS = {
-	"temp_stat": {"w": 1.0},
-	"perm_stat": {"w": 0.8},
+	"temp_stat": {"w": 0.4},
+	"perm_stat": {"w": 0.3},
 	"timed_stat": {"w": 0.5},
 	"heal": {"w": 0.6},
 	"gold": {"w": 0.5},
@@ -171,6 +174,10 @@ const NATIVE_TRIGGER_MAP = {
 }
 # 原版先验在组合权重中的强度
 const NATIVE_PRIOR_STRENGTH = 0.6
+# 同一道具池中重复出现的 (扳机, 载荷) 组合 / 扳机 / 载荷的降权强度（提高触发多样性）
+const REPEAT_PENALTY_COMBO = 0.8
+const REPEAT_PENALTY_TRIGGER = 0.15
+const REPEAT_PENALTY_PAYLOAD = 0.08
 
 # 行为写死在道具 ID 上的道具：保持原样，也不作为机制组件的来源
 const ANCHORED_ITEMS = [
@@ -188,6 +195,7 @@ const DOWNSIDE_SIGN = {
 	"enemy_health": 1, "enemy_damage": 1, "enemy_speed": 1, "items_price": 1, "reroll_price": 1,
 	"speed_cap": 0, "hp_cap": 0, "lock_current_weapons": 0, "extra_enemies_next_wave": 0, "stat_curse": 1,
 	"gold_drops": -1, "enemy_gold_drops": -1, "dodge_cap": -1, "gain_pct_gold_start_wave": -1,
+	"accuracy": -1, "burning_cooldown_reduction": -1, "piercing_damage": -1,
 }
 # 角色效果中不能搬到道具上的身份 / 结构性 key
 const CHAR_MECHANIC_BANNED = [
@@ -200,7 +208,7 @@ const CHAR_MECHANIC_BANNED = [
 	"beast_master_effect", "next_level_xp_needed", "level_upgrades_modifications", "no_heal", "weapons_price",
 	"stronger_elites_on_kill", "charm_on_hit", "map_size", "weapon_scaling_stats", "convert_bonus_gold",
 	"additional_weapon_effects", "tier_iv_weapon_effects", "tier_i_weapon_effects", "unique_weapon_effects",
-	"poisoned_fruit", "upgraded_baits",
+	"poisoned_fruit", "upgraded_baits", "die_in_one_hit", "boosted_wanted_item_tag", "max_turret_count", "trees_start_wave",
 ]
 # 角色效果（整局持有）的总价值估计找不到时的默认值
 const CHARACTER_BUDGET_DEFAULT = 60.0
@@ -211,7 +219,7 @@ const STAT_TEXT_KEYS = {
 
 # 不适合搬运的机制 key（依赖其他行或道具 ID 语义）
 const MECHANIC_BANNED_KEYS = [
-	"stats_next_wave", "starting_item", "starting_weapon", "cursed_starting_item", "item_box_gold",
+	"stats_next_wave", "starting_item", "starting_weapon", "cursed_starting_item",
 	"curse_locked_items", "extra_item_in_crate", "duplicate_item", "increase_tier_on_reroll",
 	"item_hourglass", "remove_speed", "fog_visibility", "number_of_enemies",
 ]
@@ -302,3 +310,59 @@ const GROUP_STATS = {
 }
 # 原版中表示"回血"的机制 key（用于把角色禁用的原版道具翻译成语义）
 const HEAL_KEYS = ["heal_on_kill", "heal_on_crit_kill", "heal_when_pickup_gold", "heal_on_dodge", "consumable_heal_over_time", "hp_regen_bonus"]
+
+
+# ============================================================
+# 计数型效果：每有 [计数] 获得 [属性]（原版 GainStatForEveryStatEffect，计数与属性可自由搭配）
+# 价值 = 目标属性权重 × 数值 × 计数期望 / 每 N
+# 计数期望由原版道具校准：社区支持（每个存活敌人 +1 攻速）→ 存活敌人约 24；炒饭（每个燃烧敌人 +1 再生）→ 约 8；
+# 石皮（每点护甲 +1 生命）→ 护甲约 10；奇怪的书（每点元素 +1 工程）→ 元素约 15；发电机（每点速度 +1% 伤害）→ 速度约 16；
+# 幸运币（每点暴击 +2 幸运）→ 暴击约 25；复古卫衣（每点闪避 +2 攻速）→ 闪避约 25；护垫（每 80 材料 +1 生命）→ 材料约 160；
+# 仙女（每个普通 / 传说道具）→ 普通约 12、传说约 1.5。其余属性取 STATS.ref × 1.2。
+# ============================================================
+const COUNTER_REF = {
+	"stat_armor": 10.0, "stat_elemental_damage": 15.0, "stat_speed": 16.0, "stat_crit_chance": 25.0,
+	"stat_dodge": 25.0, "knockback": 12.0,
+	"materials": 160.0, "structure": 3.0, "living_enemy": 24.0, "burning_enemy": 8.0, "living_tree": 3.0,
+	"percent_player_missing_health": 30.0, "different_item": 18.0, "common_item": 12.0, "legendary_item": 1.5,
+}
+# 可用的非属性计数与原版描述 key
+const COUNTER_TEXT = {
+	"materials": "EFFECT_GAIN_STAT_FOR_EVERY_STAT", "structure": "EFFECT_GAIN_STAT_FOR_EVERY_STAT",
+	"living_enemy": "EFFECT_GAIN_STAT_FOR_EVERY_ENEMY", "burning_enemy": "EFFECT_GAIN_STAT_FOR_EVERY_BURNING_ENEMY",
+	"living_tree": "EFFECT_GAIN_STAT_FOR_EVERY_TREE",
+	"percent_player_missing_health": "EFFECT_GAIN_STAT_FOR_EVERY_PERCENT_PLAYER_MISSING_HEALTH",
+	"different_item": "EFFECT_GAIN_STAT_FOR_EVERY_DIFFERENT_STAT", "common_item": "EFFECT_GAIN_STAT_FOR_EVERY_DIFFERENT_STAT",
+	"legendary_item": "EFFECT_GAIN_STAT_FOR_EVERY_DIFFERENT_STAT",
+}
+# 可作为计数目标 / 计数来源的属性（需有 gain_ 以外的普通 stat key）
+const SCALING_STATS = [
+	"stat_max_hp", "stat_hp_regeneration", "stat_lifesteal", "stat_percent_damage", "stat_melee_damage",
+	"stat_ranged_damage", "stat_elemental_damage", "stat_attack_speed", "stat_crit_chance", "stat_engineering",
+	"stat_range", "stat_armor", "stat_dodge", "stat_speed", "stat_luck", "stat_harvesting", "knockback",
+]
+
+
+static func counter_ref(counter: String) -> float:
+	if COUNTER_REF.has(counter):
+		return COUNTER_REF[counter]
+	if STATS.has(counter) and STATS[counter].ref > 0:
+		return STATS[counter].ref * 1.2
+	return 10.0
+
+
+# ============================================================
+# 属性修改 ±XX%（原版 StatGainsModificationEffect，来自角色）：该属性的所有增减乘以 (1 + XX%)
+# 价值 = 属性权重 × 该属性期望总量（同计数期望）× XX%；负值按负面除数折算
+# ============================================================
+const GAIN_MOD_STATS = [
+	"stat_max_hp", "stat_hp_regeneration", "stat_lifesteal", "stat_percent_damage", "stat_melee_damage",
+	"stat_ranged_damage", "stat_elemental_damage", "stat_attack_speed", "stat_crit_chance", "stat_engineering",
+	"stat_range", "stat_armor", "stat_dodge", "stat_speed", "stat_luck", "stat_harvesting",
+]
+const GAIN_MOD_STEPS = [10, 15, 20, 25, 33, 40, 50]
+
+# 特殊行的类型比例：触发条款 / 计数型 / 属性修改 / 搬运机制
+const SPECIAL_KIND_WEIGHTS = {"trigger": 0.5, "scaling": 0.2, "gain_mod": 0.08, "mechanic": 0.22}
+# 可按预算缩放数值的机制（原版 Effect，数值线性含义）：缩放范围为原版数值的 1 单位 .. 1.5 倍
+const SCALAR_MECHANIC_EXCLUDED = ["hp_start_next_wave", "hp_start_wave", "speed_cap", "hp_cap", "lock_current_weapons", "dodge_cap", "one_shot_trees", "structures_can_crit"]
