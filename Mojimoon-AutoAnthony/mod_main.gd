@@ -285,6 +285,11 @@ func _activate(state: Dictionary) -> void:
 			if native != null and not native in chars:
 				chars.push_back(native)
 	var gen = Generator.new(state.cfg, int(state.seed))
+	# 本局所有玩家角色的偏好词条：重组后 T1–T3 每个稀有度都保证有带这些词条的道具
+	for ch in chars:
+		for t in ch.wanted_tags:
+			if not t in gen.player_wanted_tags:
+				gen.player_wanted_tags.push_back(t)
 	plan = gen.generate(native_only(isvc.items), native_only(isvc.characters), native_only(chars), native_only(isvc.weapons))
 	_gen = gen
 	var rename = bool(state.cfg.get("rename", true))

@@ -65,6 +65,8 @@ var anchor_stat := ""
 var cur_tier := -1
 # 当前道具不能生成的普通属性行（catalog.ITEM_STAT_BANS）
 var cur_stat_bans: Array = []
+# 本局玩家角色的偏好词条（开局时由 mod_main 填入）
+var player_wanted_tags: Array = []
 # 计数型 / 属性修改的原版先验
 var counter_prior: Dictionary = {}
 var gain_mod_prior := 0.0
@@ -108,7 +110,7 @@ func generate(items: Array, all_characters: Array, selected: Array, weapons: Arr
 			if not r.empty():
 				plan.items[item.my_id] = r
 		cur_stat_bans = []
-		_keep_wanted_tag_items(plan, items, all_characters, core)
+		_ensure_player_wanted_tags(plan, items, gen_items, core)
 	if cfg.get("characters", false):
 		for ch in selected:
 			plan.characters[ch.my_id] = generate_character(ch)
@@ -148,35 +150,133 @@ func pick_core_items(gen_items: Array) -> Dictionary:
 	return res
 
 
-# 角色"想要的词条"在原版里有 5% 几率只从带该词条的道具里抽；若某稀有度一件都没有，原版会退回到
-# 不检查角色禁用的备用池（可能抽到被禁道具）。重组后若某稀有度失去了原版有的某个想要词条，
-# 保留一件该稀有度带此词条的原版道具不重组（跳过核心属性道具）。
-func _keep_wanted_tag_items(plan: Dictionary, items: Array, characters: Array, core: Dictionary) -> void:
-	var wanted = []
-	for ch in characters:
-		for t in ch.wanted_tags:
-			if not t in wanted:
-				wanted.push_back(t)
-	var sorted_items = items.duplicate()
+# 本局玩家角色的偏好词条（去掉八种核心属性，核心属性道具已保证）：T1–T3 每个稀有度如果没有带该词条的道具，
+# 就把该稀有度的一件重组道具（优先选原版就带该词条的，图标一致）重新生成为带该词条的道具，只在本局有效。
+# 原版的偏好词条有 5% 几率只从带该词条的道具中抽，某稀有度一件都没有时会退回到不检查角色禁用的备用池。
+func _ensure_player_wanted_tags(plan: Dictionary, items: Array, gen_items: Array, core: Dictionary) -> void:
+	var tags = []
+	for t in player_wanted_tags:
+		if not t in tags and not t in Catalog.CORE_STATS:
+			tags.push_back(t)
+	if tags.empty():
+		return
+	var sorted_items = gen_items.duplicate()
 	sorted_items.sort_custom(self, "_sort_by_id")
-	for tier in 4:
-		for tag in wanted:
-			var native_cands = []
-			var present = false
-			for it in sorted_items:
-				if it.tier != tier or it is CharacterData or it is WeaponData or not it.can_be_looted:
-					continue
-				var tags = plan.items[it.my_id].tags if plan.items.has(it.my_id) else it.tags
-				if tag in tags:
-					present = true
-					break
-				if tag in it.tags and plan.items.has(it.my_id) and not core.has(it.my_id):
-					native_cands.push_back(it)
-			if present or native_cands.empty():
+	var used = {}
+	for tag in tags:
+		for tier in [0, 1, 2]:
+			if _tier_has_tag(plan, items, tier, tag):
 				continue
-			rng.seed = hash(str(seed_value) + "/keep/" + tag + "/" + str(tier))
-			var keep = native_cands[rng.randi() % native_cands.size()]
-			plan.items.erase(keep.my_id)
+			var with_tag = []
+			var others = []
+			for it in sorted_items:
+				if it.tier != tier or not plan.items.has(it.my_id) or core.has(it.my_id) or used.has(it.my_id):
+					continue
+				if tag in it.tags:
+					with_tag.push_back(it)
+				else:
+					others.push_back(it)
+			rng.seed = hash(str(seed_value) + "/wanted/" + tag + "/" + str(tier))
+			var cands = with_tag if not with_tag.empty() else others
+			if cands.empty():
+				continue
+			var item = cands[rng.randi() % cands.size()]
+			var r = _generate_tag_item(item, tag, items)
+			if r.empty():
+				# 生成不出来：该稀有度有原版带此词条的道具就保留原版
+				if not with_tag.empty():
+					plan.items.erase(item.my_id)
+					used[item.my_id] = true
+				continue
+			r["wanted_tag"] = tag
+			plan.items[item.my_id] = r
+			used[item.my_id] = true
+
+
+func _tier_has_tag(plan: Dictionary, items: Array, tier: int, tag: String) -> bool:
+	for it in items:
+		if it.tier != tier or it is CharacterData or it is WeaponData or not it.can_be_looted:
+			continue
+		var tags = plan.items[it.my_id].tags if plan.items.has(it.my_id) else it.tags
+		if tag in tags:
+			return true
+	return false
+
+
+# 为偏好词条生成道具：属性词条 = 单属性道具（同核心属性道具）；诅咒 = 普通道具 + 原版的"+1 诅咒"行；
+# 其余功能性词条（消耗品、建筑、宠物、爆炸、静止、经济、拾取……）= 反复重新生成直到带上该词条
+func _generate_tag_item(item, tag: String, items: Array) -> Dictionary:
+	cur_stat_bans = Catalog.ITEM_STAT_BANS.get(item.my_id, [])
+	var r = {}
+	if Catalog.STATS.has(tag) and not tag in cur_stat_bans:
+		rng.seed = hash(str(seed_value) + "/tagitem/" + item.my_id)
+		r = _generate_core_item(item, tag)
+		r.erase("core")
+	elif tag == "stat_curse":
+		var curse = null
+		for it in items:
+			for e in it.effects:
+				if e.key == "stat_curse" and e.custom_key == "" and e.value == 1:
+					curse = e
+		if curse != null:
+			rng.seed = hash(str(seed_value) + "/tagitem/" + item.my_id)
+			r = _generate_item_once(item, false)
+			var effects = r.effects + [curse.duplicate()]
+			r.effects = effects
+			r.tags = _tags_for(effects)
+	else:
+		for attempt in 20:
+			rng.seed = hash(str(seed_value) + "/tagitem/" + item.my_id + "/" + tag + "/" + str(attempt))
+			var c = _generate_item_once(item, true)
+			if tag in c.tags:
+				r = c
+				break
+		if r.empty():
+			r = _generate_mechanic_tag_item(item, tag)
+	cur_stat_bans = []
+	return r
+
+
+# 围绕一条带该词条的机制生成道具（敌人数量增减、更多树木……）：机制 + 一行属性补足预算；
+# 机制本身是代价时（敌人数量增加），换来的预算加到属性行上
+func _generate_mechanic_tag_item(item, tag: String) -> Dictionary:
+	var cands = []
+	for t in 4:
+		for m in mechanics_by_tier[t]:
+			if Catalog.MECHANIC_BANNED_KEYS.has(m.effect.key):
+				continue
+			var probe = _mechanic_copy(m, -1.0, item.my_id)
+			if tag in _tags_for([probe]):
+				cands.push_back(m)
+	if cands.empty():
+		return {}
+	rng.seed = hash(str(seed_value) + "/tagmech/" + item.my_id + "/" + tag)
+	cur_tier = item.tier
+	var budget: float = item_budget(item) * Catalog.HIDDEN_TIER_MULT[item.tier] * _avg_mult() * _variance_mult()
+	var budget_total = budget
+	var m = cands[rng.randi() % cands.size()]
+	var me = _mechanic_copy(m, budget * 0.5 if not m.down else -1.0, item.my_id)
+	var mv: float = me.get_meta("aa_value")
+	budget -= mv
+	var effects = []
+	var stat = _pick_stat(false)
+	if budget > 1.0:
+		var cap = _line_cap(stat, false)
+		var v = int(min(_round_to_unit(budget / Catalog.stat_w(stat), stat), cap))
+		effects.push_back(_stat_effect(stat, v))
+	if m.down:
+		effects.push_back(me)
+	else:
+		effects.push_front(me)
+	cur_tier = -1
+	return {
+		"effects": effects,
+		"adj": _adj(Catalog.ADJ_MECHANIC),
+		"tags": _tags_for(effects),
+		"main_stats": main_stats(effects),
+		"budget": budget_total,
+		"class": [Catalog.STAT_CATEGORY.get(stat, "A"), "*" if m.down else "-"],
+	}
 
 
 static func _sort_by_id(a, b) -> bool:
@@ -414,7 +514,8 @@ func _record_structure(src) -> void:
 static func _extra_tags(src) -> Array:
 	var out = []
 	for t in src.tags:
-		if not Catalog.STATS.has(t) and t != "stat_curse":
+		# 敌人数量词条只由敌人数量效果本身给出（见 _tags_for），不随来源道具继承到其他机制上
+		if not Catalog.STATS.has(t) and not t in ["stat_curse", "more_enemies", "less_enemies"]:
 			out.push_back(t)
 	return out
 

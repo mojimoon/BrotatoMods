@@ -1904,6 +1904,8 @@ func test_101_character_bans_and_wanted_tags_in_rolls() -> void:
 	var n_checked = 0
 	var boost_sum = [0.0, 0.0]
 	var boost_n = 0
+	var n_tag_slots = 0
+	var shown_tag_items = 0
 	for ch0 in isvc.characters:
 		if not m.is_native_resource(ch0):
 			continue
@@ -1974,6 +1976,28 @@ func test_101_character_bans_and_wanted_tags_in_rolls() -> void:
 						for e in it.effects:
 							txt.push_back(e.get_text(0, false))
 						print("AUDIT not-provided %s %s tags=%s: %s" % [cid, it.my_id, str(it.tags), " / ".join(txt)])
+			# 本局偏好词条（去掉核心属性）：T1–T3 每个稀有度的商店池里都有带该词条、且该角色未被禁的道具
+			if mode == "aa":
+				for id in m.plan.get("items", {}):
+					var pi = m.plan.items[id]
+					if pi.has("wanted_tag") and shown_tag_items < 12:
+						shown_tag_items += 1
+						var txt = []
+						for e in pi.effects:
+							txt.push_back(e.get_text(0, false))
+						print("AUDIT tag item [%s] T%d %s: %s" % [pi.wanted_tag, _item(id).tier + 1, id, " / ".join(txt)])
+				for tag in ch.wanted_tags:
+					if tag in Catalog.CORE_STATS:
+						continue
+					for tier in [0, 1, 2]:
+						var found = false
+						for it in isvc.get_pool(tier, isvc.TierData.ITEMS):
+							if tag in it.tags and not it.my_id in ch.banned_items:
+								found = true
+								break
+						_check(found, "%s: tier %d pool has a '%s' item" % [cid, tier + 1, tag])
+						if found:
+							n_tag_slots += 1
 			# 想要词条的加成：同一角色、同一道具池，清空 wanted_tags 后再抽一次作对照
 			if not ch.wanted_tags.empty():
 				seed(1234)
@@ -2035,6 +2059,7 @@ func test_101_character_bans_and_wanted_tags_in_rolls() -> void:
 	print("AUDIT wanted tags:")
 	for l in tag_rows:
 		print("AUDIT   " + l)
+	print("AUDIT wanted (non-core) tag x tier slots covered: %d" % n_tag_slots)
 	print("AUDIT wanted-tag boost, mean over %d characters: native +%.3f, reassembled +%.3f" % [boost_n, boost_sum[0] / max(1, boost_n), boost_sum[1] / max(1, boost_n)])
 	_check(boost_sum[1] / max(1, boost_n) >= 0.8 * boost_sum[0] / max(1, boost_n), "reassembled wanted-tag boost is comparable to native")
 	print("AUDIT test_101 took %d ms" % (OS.get_ticks_msec() - t0))
@@ -2047,6 +2072,12 @@ func test_101_character_bans_and_wanted_tags_in_rolls() -> void:
 func _wait_frames(n: int):
 	for i in n:
 		yield(tree, "idle_frame")
+
+
+# 原版的属性重载按物理帧排队处理（stats_manager），等待要按物理帧计
+func _wait_physics(n: int):
+	for i in n:
+		yield(tree, "physics_frame")
 
 
 func _enemies_hp(main) -> int:
@@ -2135,7 +2166,7 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 	hit_args.bypass_invincibility = true
 	hit_args.dodgeable = false
 	var _r = player.take_damage(3, hit_args)
-	yield(_wait_frames(3), "completed")
+	yield(_wait_physics(6), "completed")
 	# 闪避：闪避率 100%
 	player.current_stats.dodge = 1.0
 	var dodge_args = TakeDamageArgs.new(-1)
@@ -2196,15 +2227,15 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 	var weapon = player.current_weapons[0] if not player.current_weapons.empty() else null
 	var base_armor = player.max_stats.armor
 	rt.execute(TriggerEffect.make({"trigger": "kill", "payload": "temp_stat", "stat": "stat_armor", "value": 4}), 0, null, false)
-	yield(_wait_frames(4), "completed")
+	yield(_wait_physics(12), "completed")
 	_eq(player.max_stats.armor, base_armor + 4, "temp stat reaches the player's real armor")
 	var base_hp = player.max_stats.health
 	rt.execute(TriggerEffect.make({"trigger": "kill", "payload": "perm_stat", "stat": "stat_max_hp", "value": 5}), 0, null, false)
-	yield(_wait_frames(4), "completed")
+	yield(_wait_physics(12), "completed")
 	_eq(player.max_stats.health, base_hp + 5, "perm stat reaches the player's real max HP")
 	var base_speed = player.max_stats.speed
 	rt.execute(TriggerEffect.make({"trigger": "kill", "payload": "timed_stat", "stat": "stat_speed", "value": 20, "value2": 1}), 0, null, false)
-	yield(_wait_frames(4), "completed")
+	yield(_wait_physics(12), "completed")
 	_check(player.max_stats.speed > base_speed, "timed stat raises real speed")
 	yield(tree.create_timer(1.4), "timeout")
 	_check(abs(player.max_stats.speed - base_speed) < 0.01, "timed stat expires")
@@ -2230,19 +2261,19 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 	if en3 != null:
 		var e_hp = en3.current_stats.health
 		rt.execute(TriggerEffect.make({"trigger": "kill", "payload": "explode", "stat": "stat_max_hp", "value": 100}), 0, en3.global_position, false)
-		yield(_wait_frames(6), "completed")
+		yield(_wait_physics(12), "completed")
 		_check(not is_instance_valid(en3) or en3.dead or en3.current_stats.health < e_hp, "explode payload hurts the enemy at the position")
 	# 获得效果：机制（穿透 → 武器的真实穿透数）、属性修改（护甲 +50% → 真实护甲）
 	if weapon != null:
 		var p0 = weapon.current_stats.piercing
 		rt.execute(TriggerEffect.make({"trigger": "kill", "payload": "grant", "value": 2, "grant": _plain("piercing", 1), "grant_mode": "temp", "grant_unit": 10.0}), 0, null, false)
-		yield(_wait_frames(4), "completed")
+		yield(_wait_physics(12), "completed")
 		_eq(weapon.current_stats.piercing, p0 + 2, "granted piercing reaches the weapon")
 	rd.add_stat(Keys.stat_armor_hash, 10, 0)
-	yield(_wait_frames(4), "completed")
+	yield(_wait_physics(12), "completed")
 	var a0 = player.max_stats.armor
 	rt.execute(TriggerEffect.make({"trigger": "kill", "payload": "grant", "value": 1, "grant": gain_armor, "grant_mode": "temp", "grant_unit": 5.0}), 0, null, false)
-	yield(_wait_frames(4), "completed")
+	yield(_wait_physics(12), "completed")
 	_check(player.max_stats.armor > a0, "granted stat-gain modification raises real armor (%d -> %d)" % [a0, player.max_stats.armor])
 
 	# (C) 生成池中每种组合在战斗中都有效果。先移除 (A) 的测试条款（静止 / 移动等状态加成会同时切换，干扰前后比较）
@@ -2281,7 +2312,7 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 			var before = _battle_snapshot(main)
 			rt.execute(e, 0, tgt.global_position if tgt != null and is_instance_valid(tgt) else null, false)
 			# 爆炸由 WeaponService 延迟生成，命中需要几帧
-			yield(_wait_frames(8 if e.payload == "explode" else 3), "completed")
+			yield(_wait_physics(12 if e.payload == "explode" else 4), "completed")
 			if _battle_snapshot(main) != before:
 				changed = true
 				break
@@ -2403,14 +2434,14 @@ func test_103_scaling_grants_probe() -> void:
 		var _k = en.take_damage(999999, TakeDamageArgs.new(0))
 		kills += 1
 		yield(_wait_frames(2), "completed")
-	yield(_wait_frames(4), "completed")
+	yield(_wait_physics(12), "completed")
 	var n_common = int(_counter_now("common_item", false))
 	print("AUDIT user scenario: %d real kills, %d different tier-I items, real max HP %d -> %d" % [kills, n_common, hp_before, player.max_stats.health])
 	_check(kills == 2 and player.max_stats.health - hp_before == n_common, "user scenario: kill-triggered 'for every tier-I item' grant raises real max HP")
 	rd.remove_item(uholder, 0)
 	m.triggers_dirty = true
 	rt._check_dirty()
-	yield(_wait_frames(4), "completed")
+	yield(_wait_physics(12), "completed")
 	_check(abs(player.max_stats.health - hp_before) < 0.5, "grant removed with its item")
 
 	var counters = Catalog.COUNTER_TEXT.keys() + ["stat_luck", "stat_range", "stat_engineering", "stat_harvesting"]
@@ -2432,11 +2463,11 @@ func test_103_scaling_grants_probe() -> void:
 			var hp0 = player.max_stats.health
 			var cnt = _counter_now(counter, perm_only)
 			rt.execute(te, 0, null, false, en)
-			yield(_wait_frames(4), "completed")
+			yield(_wait_physics(12), "completed")
 			var d1 = Utils.get_stat(th, 0) - base
 			var exp1 = int(1 * (cnt / nb))
 			rt.execute(te, 0, null, false, en)
-			yield(_wait_frames(4), "completed")
+			yield(_wait_physics(12), "completed")
 			var cnt2 = _counter_now(counter, perm_only)
 			var d2 = Utils.get_stat(th, 0) - base
 			var exp2 = 2 * int(1 * (cnt2 / nb))
@@ -2444,7 +2475,7 @@ func test_103_scaling_grants_probe() -> void:
 			var txt = te.get_text(0, false)
 			rt._revert_grants(0, en)
 			rt._refresh(0)
-			yield(_wait_frames(4), "completed")
+			yield(_wait_physics(12), "completed")
 			var d3 = Utils.get_stat(th, 0) - base
 			rt.entries[0].erase(en)
 			var row = "%-32s perm=%-5s count=%.1f  +1 grant: %+d (exp %+d)  +2 grants: %+d (exp %+d)  real max HP %+d  reverted %+d" % [counter, str(perm_only), cnt, d1, exp1, d2, exp2, hp_seen, d3]
@@ -2459,12 +2490,12 @@ func test_103_scaling_grants_probe() -> void:
 	rt.entries[0].push_back(en2)
 	var b2 = Utils.get_stat(th, 0)
 	rt._set_state(0, en2, true)
-	yield(_wait_frames(3), "completed")
+	yield(_wait_physics(6), "completed")
 	var on_d = Utils.get_stat(th, 0) - b2
 	# 先移出总线，避免"静止"轮询立刻重新打开
 	rt.entries[0].erase(en2)
 	rt._set_state(0, en2, false)
-	yield(_wait_frames(3), "completed")
+	yield(_wait_physics(6), "completed")
 	var off_d = Utils.get_stat(th, 0) - b2
 	rows.push_back("state grant (still, common_item/1): on %+d, off %+d, count %d" % [on_d, off_d, _counter_now("common_item", false)])
 	_check(on_d == int(_counter_now("common_item", false)) and off_d == 0, "state scaling grant on / off")
@@ -2472,7 +2503,7 @@ func test_103_scaling_grants_probe() -> void:
 	var pe = TriggerEffect.make({"trigger": "level_up", "payload": "grant", "value": 1, "grant": g3, "grant_mode": "perm", "grant_unit": 5.0})
 	var b3 = Utils.get_stat(th, 0)
 	rt.execute(pe, 0, null, false, null)
-	yield(_wait_frames(3), "completed")
+	yield(_wait_physics(6), "completed")
 	LinkedStats.reset_player(0)
 	Utils.reset_stat_cache(0)
 	var perm_d = Utils.get_stat(th, 0) - b3
