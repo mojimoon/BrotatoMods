@@ -23,9 +23,12 @@ var enabled: bool = true
 var cfg_items: bool = true
 var cfg_characters: bool = false
 var cfg_weapons: bool = false
-var cfg_mode: int = 0			# 0 平衡 / 1 激进 / 2 混沌
-var cfg_trigger_rate: int = 1	# 0 少 / 1 标准 / 2 多
-var cfg_native_ratio: int = 0	# 保留原版道具的比例（%）
+var cfg_char_effects: bool = false	# 道具可含角色效果
+var cfg_rename: bool = true			# 重组名称
+var cfg_avg: int = 100				# 平均数值 50–200%
+var cfg_variance: int = 100			# 浮动范围 50–200%（100% = 原版离散度）
+var cfg_triggers: int = 100			# 触发效果 50–200%（100% = 原版特殊行比例）
+var cfg_native_ratio: int = 0		# 保留原版道具 0–100%
 var cfg_fixed_seed: bool = false
 var cfg_seed: int = 0
 
@@ -46,6 +49,7 @@ func _init() -> void:
 	var dir: String = ModLoaderMod.get_unpacked_dir() + MOD_ID + "/extensions/"
 	ModLoaderMod.install_script_extension(dir + "singletons/run_data.gd")
 	ModLoaderMod.install_script_extension(dir + "main.gd")
+	ModLoaderMod.install_script_extension(dir + "ui/menus/run/character_selection.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/run/weapon_selection.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/run/difficulty_selection/difficulty_selection.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/shop/shop.gd")
@@ -92,8 +96,11 @@ func get_cfg() -> Dictionary:
 		"items": cfg_items,
 		"characters": cfg_characters,
 		"weapons": cfg_weapons,
-		"mode": cfg_mode,
-		"trigger_rate": cfg_trigger_rate,
+		"char_effects": cfg_char_effects,
+		"rename": cfg_rename,
+		"avg": cfg_avg,
+		"variance": cfg_variance,
+		"triggers": cfg_triggers,
 		"native_ratio": cfg_native_ratio,
 	}
 
@@ -131,9 +138,12 @@ func _load_settings() -> void:
 	cfg_items = bool(d.get("items", true))
 	cfg_characters = bool(d.get("characters", false))
 	cfg_weapons = bool(d.get("weapons", false))
-	cfg_mode = int(clamp(int(d.get("mode", 0)), 0, 2))
-	cfg_trigger_rate = int(clamp(int(d.get("trigger_rate", 1)), 0, 2))
-	cfg_native_ratio = int(clamp(int(d.get("native_ratio", 0)), 0, 90))
+	cfg_char_effects = bool(d.get("char_effects", false))
+	cfg_rename = bool(d.get("rename", true))
+	cfg_avg = int(clamp(int(d.get("avg", 100)), 50, 200))
+	cfg_variance = int(clamp(int(d.get("variance", 100)), 50, 200))
+	cfg_triggers = int(clamp(int(d.get("triggers", 100)), 50, 200))
+	cfg_native_ratio = int(clamp(int(d.get("native_ratio", 0)), 0, 100))
 	cfg_fixed_seed = bool(d.get("fixed_seed", false))
 	cfg_seed = int(d.get("seed", 0))
 
@@ -240,7 +250,7 @@ func on_resume(state: Dictionary) -> void:
 func preview_plan(p_seed: int) -> Dictionary:
 	var gen = Generator.new(get_cfg(), p_seed)
 	var isvc = _autoload("ItemService")
-	return gen.generate(_native_items(isvc), [], [])
+	return gen.generate(isvc.items, isvc.characters, [], [])
 
 
 func _activate(state: Dictionary) -> void:
@@ -255,7 +265,8 @@ func _activate(state: Dictionary) -> void:
 			if native != null and not native in chars:
 				chars.push_back(native)
 	var gen = Generator.new(state.cfg, int(state.seed))
-	plan = gen.generate(isvc.items, chars, isvc.weapons)
+	plan = gen.generate(isvc.items, isvc.characters, chars, isvc.weapons)
+	var rename = bool(state.cfg.get("rename", true))
 	for id in plan.items:
 		var res = _find(isvc.items, id)
 		if res != null:
@@ -264,14 +275,16 @@ func _activate(state: Dictionary) -> void:
 			res.effects = p.effects
 			res.tags = p.tags
 			res.tracking_text = "[EMPTY]"
-			res.name = _compose_name(p.adj, _backups[res.get_instance_id()].name)
+			if rename:
+				res.name = _compose_name(p.adj, _backups[res.get_instance_id()].name)
 	for id in plan.characters:
 		var res = _find(isvc.characters, id)
 		if res != null:
 			var p = plan.characters[id]
 			_backup(res)
 			res.effects = p.effects
-			res.name = _compose_name(p.adj, _backups[res.get_instance_id()].name)
+			if rename:
+				res.name = _compose_name(p.adj, _backups[res.get_instance_id()].name)
 	for id in plan.weapons:
 		var res = _find(isvc.weapons, id)
 		if res != null:
@@ -283,10 +296,6 @@ func _activate(state: Dictionary) -> void:
 
 func _compose_name(adj_key: String, native_name_key: String) -> String:
 	return tr("AA_NAME_FMT").replace("{0}", tr(adj_key)).replace("{1}", tr(native_name_key))
-
-
-func _native_items(isvc) -> Array:
-	return isvc.items
 
 
 static func _find(arr: Array, id: String):
@@ -463,6 +472,41 @@ func fire_shop(event: String, player_index: int) -> void:
 					LinkedStats.reset_player(player_index)
 				"gold":
 					rd.add_gold(e.value, player_index)
+
+
+# ============================================================
+# 设置按钮：挂在角色 / 武器 / 难度选择界面的返回按钮旁
+# ============================================================
+const UI_SCENE = MOD_DIR + "ui/settings_ui.tscn"
+const FONT_26_PATH = "res://resources/fonts/actual/base/font_26.tres"
+
+
+static func add_config_button(screen: Node) -> void:
+	if screen == null or not screen.is_inside_tree():
+		return
+	var back_button = screen.get_node_or_null("%BackButton")
+	if back_button == null or back_button.has_node("AutoAnthonyBtn"):
+		return
+	var btn = Button.new()
+	btn.name = "AutoAnthonyBtn"
+	btn.text = TranslationServer.translate("AA_BTN_OPEN")
+	btn.rect_min_size = Vector2(200, 50)
+	btn.focus_mode = Control.FOCUS_ALL
+	btn.add_font_override("font", load(FONT_26_PATH))
+	place_config_button(back_button, btn)
+	btn.connect("pressed", get_mod(), "open_settings", [screen])
+
+
+func open_settings(screen: Node) -> void:
+	var scene = load(UI_SCENE)
+	if scene == null or screen == null:
+		return
+	var ui = scene.instance()
+	var layer = CanvasLayer.new()
+	layer.layer = 100
+	screen.get_tree().current_scene.add_child(layer)
+	layer.add_child(ui)
+	ui.connect("tree_exited", layer, "queue_free")
 
 
 # ============================================================

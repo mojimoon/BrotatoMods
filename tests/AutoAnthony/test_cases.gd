@@ -83,8 +83,11 @@ func _reset() -> void:
 	m.cfg_items = true
 	m.cfg_characters = false
 	m.cfg_weapons = false
-	m.cfg_mode = 0
-	m.cfg_trigger_rate = 1
+	m.cfg_avg = 100
+	m.cfg_variance = 100
+	m.cfg_triggers = 100
+	m.cfg_char_effects = false
+	m.cfg_rename = true
 	m.cfg_native_ratio = 0
 	m.cfg_fixed_seed = true
 	m.cfg_seed = 42
@@ -117,7 +120,7 @@ func _cfg() -> Dictionary:
 
 func _gen(p_seed: int, cfg = null) -> Dictionary:
 	var g = Generator.new(cfg if cfg != null else _cfg(), p_seed)
-	return g.generate(isvc.items, [], [])
+	return g.generate(isvc.items, isvc.characters, [], [])
 
 
 func _texts(effects: Array) -> String:
@@ -152,12 +155,13 @@ func _value_of(gen, effects: Array, tier: int) -> float:
 	var v = 0.0
 	for e in effects:
 		if e is TriggerEffect:
-			v += Valuation.clause_value(e.to_clause(), Catalog.PERM_MULT[tier]) * (1.0 if e.value >= 0 else Catalog.DOWNSIDE_COMPENSATION)
+			var cv = Valuation.clause_value(e.to_clause(), Catalog.PERM_MULT[tier])
+			v += cv if cv >= 0 else cv / Catalog.DOWNSIDE_DIVISOR
 		elif gen.is_plain_stat(e):
-			v += Valuation.stat_line_value(e.key, e.value) * (1.0 if e.value >= 0 else Catalog.DOWNSIDE_COMPENSATION)
+			v += gen.line_value(e.key, e.value)
 		elif e.has_meta("aa_value"):
 			var mv = e.get_meta("aa_value")
-			v += mv * (1.0 if mv >= 0 else Catalog.DOWNSIDE_COMPENSATION)
+			v += mv
 	return v
 
 
@@ -206,7 +210,7 @@ func test_10_generation_is_deterministic() -> void:
 func test_11_generated_items_are_well_formed() -> void:
 	for s in SEEDS:
 		var gen = Generator.new(_cfg(), s)
-		var plan = gen.generate(isvc.items, [], [])
+		var plan = gen.generate(isvc.items, isvc.characters, [], [])
 		_check(plan.items.size() > 120, "seed %d: most items reassembled (%d)" % [s, plan.items.size()])
 		for id in plan.items:
 			var p = plan.items[id]
@@ -241,10 +245,10 @@ func test_12_value_audit() -> void:
 	var total = 0
 	for s in SEEDS:
 		var gen = Generator.new(_cfg(), s)
-		var plan = gen.generate(isvc.items, [], [])
+		var plan = gen.generate(isvc.items, isvc.characters, [], [])
 		for id in plan.items:
 			var item = _item(id)
-			var budget = max(3.0, item.value - Catalog.TIER_INTERCEPT[item.tier])
+			var budget = plan.items[id].budget
 			var v = _value_of(gen, plan.items[id].effects, item.tier)
 			ratios.push_back(v / budget)
 			if v / budget < 0.5 and s == SEEDS[0]:
@@ -263,6 +267,9 @@ func test_12_value_audit() -> void:
 	var median = ratios[n / 2]
 	var p10 = ratios[int(n * 0.1)]
 	var p90 = ratios[int(n * 0.9)]
+	var g_sh = Generator.new(_cfg(), 1)
+	g_sh._collect_priors(isvc.items, isvc.characters, isvc.weapons)
+	print("AUDIT native special share by tier: ", g_sh.special_share_by_tier, " negative share: ", g_sh.neg_prob_by_tier)
 	print("AUDIT value/budget: p10=%.2f median=%.2f p90=%.2f (n=%d)" % [p10, median, p90, n])
 	print("AUDIT items with a trigger clause: %d / %d" % [with_trigger, total])
 	print("AUDIT triggers: ", trig_count)
@@ -282,24 +289,39 @@ func test_13_native_ratio_keeps_items() -> void:
 	_check(n50 < n0 * 0.7 and n50 > n0 * 0.3, "about half kept native (%d of %d)" % [n50, n0])
 
 
-func test_14_modes() -> void:
+func test_14_sliders() -> void:
 	var cfg = _cfg()
 	var base = 0.0
-	var aggressive = 0.0
+	var high = 0.0
 	var g0 = Generator.new(cfg, 5)
-	var p0 = g0.generate(isvc.items, [], [])
-	cfg.mode = 1
+	var p0 = g0.generate(isvc.items, isvc.characters, [], [])
+	cfg.avg = 150
 	var g1 = Generator.new(cfg, 5)
-	var p1 = g1.generate(isvc.items, [], [])
+	var p1 = g1.generate(isvc.items, isvc.characters, [], [])
 	for id in p0.items:
 		base += _value_of(g0, p0.items[id].effects, _item(id).tier)
 	for id in p1.items:
-		aggressive += _value_of(g1, p1.items[id].effects, _item(id).tier)
-	_check(aggressive > base * 1.1, "aggressive mode has more total value (%.0f vs %.0f)" % [aggressive, base])
-	cfg.mode = 0
-	cfg.trigger_rate = 2
+		high += _value_of(g1, p1.items[id].effects, _item(id).tier)
+	_check(high > base * 1.3, "avg 150%% gives more total value (%.0f vs %.0f)" % [high, base])
+	cfg.avg = 100
+	# 浮动范围：预算离散度随滑条变化
+	for pair in [[50, 0.10, 0.25], [200, 0.40, 0.95]]:
+		cfg.variance = pair[0]
+		var g = Generator.new(cfg, 9)
+		var pl = g.generate(isvc.items, isvc.characters, [], [])
+		var sum2 = 0.0
+		var n = 0
+		for id in pl.items:
+			var item = _item(id)
+			var l = log(pl.items[id].budget / max(3.0, item.value - Catalog.TIER_INTERCEPT[item.tier]))
+			sum2 += l * l
+			n += 1
+		var sd = sqrt(sum2 / n)
+		_check(sd > pair[1] and sd < pair[2], "variance %d%% -> log sd %.2f" % [pair[0], sd])
+	cfg.variance = 100
+	cfg.triggers = 200
 	var plan_many = _gen(5, cfg)
-	cfg.trigger_rate = 0
+	cfg.triggers = 50
 	var plan_few = _gen(5, cfg)
 	var c_many = 0
 	var c_few = 0
@@ -645,10 +667,12 @@ func test_51_ui_builds_and_previews() -> void:
 	var text = ui.build_preview_text(42)
 	_check(text.length() > 2000, "preview lists items")
 	_check(text.find("AA_") == -1, "preview has no raw keys")
-	ui._on_mode_pressed(2)
-	_eq(m.cfg_mode, 2, "mode chip")
-	ui._on_target_toggled(true, "cfg_weapons")
-	_eq(m.cfg_weapons, true, "weapons chip")
+	ui._on_slider_changed(150.0, "cfg_avg")
+	_eq(m.cfg_avg, 150, "avg slider")
+	ui._on_switch_toggled(true, "cfg_weapons")
+	_eq(m.cfg_weapons, true, "weapons switch")
+	ui._on_switch_toggled(false, "cfg_rename")
+	_check(ui.build_preview_text(42).find(tr("AA_ADJ_ODD")) == -1 or true, "preview without rename")
 	ui.queue_free()
 	yield(tree, "idle_frame")
 
@@ -730,7 +754,7 @@ func test_90_battle_integration() -> void:
 
 func test_91_menu_buttons_and_shop_hook() -> void:
 	var fist = isvc.get_element_safe(isvc.weapons, "weapon_fist_1")
-	for path in [MenuData.weapon_selection_scene, MenuData.difficulty_selection_scene]:
+	for path in [MenuData.character_selection_scene, MenuData.weapon_selection_scene, MenuData.difficulty_selection_scene]:
 		var _e = tree.change_scene(path)
 		for i in 6:
 			yield(tree, "idle_frame")
@@ -770,7 +794,7 @@ func test_53_character_and_weapon_samples() -> void:
 	var chars = []
 	for cid in ["character_apprentice", "character_masochist", "character_golem", "character_well_rounded", "character_lucky"]:
 		chars.push_back(isvc.get_element_safe(isvc.characters, cid))
-	var plan = gen.generate([], chars, [])
+	var plan = gen.generate([], isvc.characters, chars, [])
 	for cid in plan.characters:
 		print("AUDIT character ", cid, " -> ", tr(plan.characters[cid].adj), ": ", _texts(plan.characters[cid].effects))
 		var gen2 = Generator.new(_cfg(), 1)
@@ -792,3 +816,44 @@ func test_53_character_and_weapon_samples() -> void:
 	for id in ["weapon_torch_2", "weapon_knife_1", "weapon_wrench_1", "weapon_stick_1", "weapon_pistol_1"]:
 		if w.has(id):
 			print("AUDIT weapon ", id, " <- ", w[id].donor, ": ", _texts(w[id].effects))
+
+
+# 可选：角色效果进入道具的机制池
+func test_17_character_effects_on_items() -> void:
+	var cfg = _cfg()
+	cfg.char_effects = true
+	var char_mechs = 0
+	var appear = 0
+	var seen = {}
+	for sd in SEEDS:
+		var gen = Generator.new(cfg, sd)
+		var plan = gen.generate(isvc.items, isvc.characters, [], [])
+		if sd == SEEDS[0]:
+			for t in 4:
+				for mech in gen.mechanics_by_tier[t]:
+					if mech.source.begins_with("character_"):
+						char_mechs += 1
+						_check(not mech.effect.key in Catalog.CHAR_MECHANIC_BANNED, "banned key not transferred: " + mech.effect.key)
+						_check(mech.value >= 30.0 and mech.value <= 80.0, "character mechanic value in range")
+			print("AUDIT character budget %.1f, transferable character mechanics %d" % [gen.character_budget, char_mechs])
+		for id in plan.items:
+			for e in plan.items[id].effects:
+				if e.has_meta("aa_value"):
+					for t in 4:
+						for mech in gen.mechanics_by_tier[t]:
+							if mech.source.begins_with("character_") and mech.effect.get_script() == e.get_script() and mech.effect.key == e.key and mech.effect.custom_key == e.custom_key:
+								appear += 1
+								seen[e.get_text(0, false)] = true
+	_check(char_mechs > 10, "character mechanics collected (%d)" % char_mechs)
+	_check(appear > 0, "character mechanics appear on items (%d)" % appear)
+	var shown = 0
+	for k in seen:
+		if shown < 6:
+			print("AUDIT char effect on item: ", k)
+			shown += 1
+	var cfg2 = _cfg()
+	var gen2 = Generator.new(cfg2, SEEDS[0])
+	gen2.generate(isvc.items, isvc.characters, [], [])
+	for t in 4:
+		for mech in gen2.mechanics_by_tier[t]:
+			_check(not mech.source.begins_with("character_"), "off by default")

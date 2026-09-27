@@ -1,6 +1,6 @@
-extends "res://ui/menus/run/weapon_selection.gd"
+extends "res://ui/menus/run/character_selection.gd"
 
-# 在武器选择界面左上角（返回按钮旁）加"东尼算法"设置按钮。
+# 在角色选择界面左上角（返回按钮旁）加"东尼算法"设置按钮。
 
 const AAMain = preload("res://mods-unpacked/Mojimoon-AutoAnthony/mod_main.gd")
 

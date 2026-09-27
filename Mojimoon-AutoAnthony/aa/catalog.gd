@@ -2,53 +2,56 @@ extends Reference
 
 # 东尼算法（Brotato）静态目录：价值货币、触发扳机、效果载荷、合法组合与原版触发器的拆解映射。
 #
-# 价值货币：1 点价值 ≈ 商店价格中的 1 材料（对原版纯属性道具做岭回归得到，MAPE≈10%）。
-# 原版价格 ≈ 稀有度截距 + Σ 正面属性权重 × 数值；负面属性几乎不降价（由更大的正面收益"买单"）。
+# 价值货币：1 点价值 ≈ 商店价格中的 1 材料。
+# 对原版纯属性道具做岭回归：价格 ≈ 稀有度截距 + Σ 正面属性权重 × 数值 + Σ 负面属性权重 × 数值 / D。
+# 负面除数 D 的网格搜索（平均相对误差）：D=1 13.0%，1.5 12.7%，2 12.6%，2.5–8 12.4–12.5%，不计负面 12.8%。
+# 数据只能说明"负面远不如正面值钱"（可以卖掉无关或次要的属性），取 D=3。
 #
 # 触发型效果的价值 = 单位价值 × 频率：
 #   临时属性（本波有效，逐次叠加）  w × v × 平均叠层
 #   状态属性（静止 / 低血量时）     w × v × 在场率
-#   限时属性（N 秒）                w × v × min(1, 次数 × N / 波长)
+#   限时属性（N 秒）                w × v × 次数 × N / 波长
 #   永久属性（逐次累积）            w × v × 次数 × 累积倍率（与购买时剩余波数有关）
 #   回血 / 材料 / 经验 / 伤害       每波总量 × 对应单位价值
 # 频率统一用"每波期望次数"表示（波长按 60 秒估计，大部分波次为 60 秒），见 TRIGGERS。
+# 击杀 / 拾取材料 / 受击 / 回血的次数刻意高估，以压低这些高频扳机上的单次数值。
 
 const WAVE_SECONDS = 60.0
 
 # 稀有度截距（Tier 0..3）：原版价格中与效果无关的部分
-const TIER_INTERCEPT = [7.0, 20.0, 24.0, 15.0]
+const TIER_INTERCEPT = [11.5, 30.0, 40.9, 39.0]
 # 永久累积倍率：Tier 越高通常购买越晚、剩余波数越少。角色视为整局持有。
 const PERM_MULT = [7.5, 6.5, 5.5, 4.5]
 const PERM_MULT_CHARACTER = 10.5
-# 负面效果换取的额外正面预算比例
-const DOWNSIDE_COMPENSATION = 0.8
+# 负面效果的价值除数：-3 远程伤害只按 -1 远程伤害计价
+const DOWNSIDE_DIVISOR = 3.0
 
 # ------------------------------------------------------------
 # 属性：权重（材料 / 点）、每次触发的自然粒度、是否百分比显示、伤害参考值（用于"X% 某属性的伤害"）
 # ------------------------------------------------------------
 const STATS = {
-	"stat_max_hp": {"w": 4.2, "unit": 1, "pct": false, "ref": 40.0},
-	"stat_hp_regeneration": {"w": 4.7, "unit": 1, "pct": false, "ref": 8.0},
-	"stat_lifesteal": {"w": 4.3, "unit": 1, "pct": true, "ref": 10.0},
-	"stat_percent_damage": {"w": 2.1, "unit": 1, "pct": true, "ref": 25.0},
-	"stat_melee_damage": {"w": 2.8, "unit": 1, "pct": false, "ref": 15.0},
-	"stat_ranged_damage": {"w": 3.3, "unit": 1, "pct": false, "ref": 15.0},
-	"stat_elemental_damage": {"w": 3.6, "unit": 1, "pct": false, "ref": 12.0},
-	"stat_attack_speed": {"w": 1.9, "unit": 1, "pct": true, "ref": 25.0},
-	"stat_crit_chance": {"w": 3.0, "unit": 1, "pct": true, "ref": 15.0},
-	"stat_engineering": {"w": 2.6, "unit": 1, "pct": false, "ref": 15.0},
-	"stat_range": {"w": 0.5, "unit": 5, "pct": false, "ref": 60.0},
-	"stat_armor": {"w": 6.7, "unit": 1, "pct": false, "ref": 8.0},
-	"stat_dodge": {"w": 2.3, "unit": 1, "pct": true, "ref": 20.0},
-	"stat_speed": {"w": 2.9, "unit": 1, "pct": true, "ref": 15.0},
-	"stat_luck": {"w": 1.3, "unit": 1, "pct": false, "ref": 30.0},
-	"stat_harvesting": {"w": 1.1, "unit": 1, "pct": false, "ref": 40.0},
-	"xp_gain": {"w": 0.85, "unit": 1, "pct": true, "ref": 0.0},
-	"pickup_range": {"w": 0.65, "unit": 5, "pct": true, "ref": 0.0},
-	"knockback": {"w": 1.0, "unit": 1, "pct": false, "ref": 0.0},
-	"explosion_damage": {"w": 0.9, "unit": 5, "pct": true, "ref": 0.0},
-	"explosion_size": {"w": 1.4, "unit": 5, "pct": true, "ref": 0.0},
-	"consumable_heal": {"w": 6.6, "unit": 1, "pct": false, "ref": 0.0},
+	"stat_max_hp": {"w": 3.5, "unit": 1, "pct": false, "ref": 40.0},
+	"stat_hp_regeneration": {"w": 2.8, "unit": 1, "pct": false, "ref": 8.0},
+	"stat_lifesteal": {"w": 4.7, "unit": 1, "pct": true, "ref": 10.0},
+	"stat_percent_damage": {"w": 1.8, "unit": 1, "pct": true, "ref": 25.0},
+	"stat_melee_damage": {"w": 3.4, "unit": 1, "pct": false, "ref": 15.0},
+	"stat_ranged_damage": {"w": 5.0, "unit": 1, "pct": false, "ref": 15.0},
+	"stat_elemental_damage": {"w": 3.5, "unit": 1, "pct": false, "ref": 12.0},
+	"stat_attack_speed": {"w": 1.4, "unit": 1, "pct": true, "ref": 25.0},
+	"stat_crit_chance": {"w": 2.1, "unit": 1, "pct": true, "ref": 15.0},
+	"stat_engineering": {"w": 2.1, "unit": 1, "pct": false, "ref": 15.0},
+	"stat_range": {"w": 0.6, "unit": 5, "pct": false, "ref": 60.0},
+	"stat_armor": {"w": 6.5, "unit": 1, "pct": false, "ref": 8.0},
+	"stat_dodge": {"w": 2.6, "unit": 1, "pct": true, "ref": 20.0},
+	"stat_speed": {"w": 2.4, "unit": 1, "pct": true, "ref": 15.0},
+	"stat_luck": {"w": 1.1, "unit": 1, "pct": false, "ref": 30.0},
+	"stat_harvesting": {"w": 0.95, "unit": 1, "pct": false, "ref": 40.0},
+	"xp_gain": {"w": 0.66, "unit": 1, "pct": true, "ref": 0.0},
+	"pickup_range": {"w": 0.46, "unit": 5, "pct": true, "ref": 0.0},
+	"knockback": {"w": 0.8, "unit": 1, "pct": false, "ref": 0.0},
+	"explosion_damage": {"w": 0.95, "unit": 5, "pct": true, "ref": 0.0},
+	"explosion_size": {"w": 0.81, "unit": 5, "pct": true, "ref": 0.0},
+	"consumable_heal": {"w": 5.2, "unit": 1, "pct": false, "ref": 0.0},
 }
 
 # 可作为"对随机敌人造成 X% 属性伤害"缩放源的属性
@@ -75,12 +78,12 @@ const EXPLOSION_TARGETS = 2.5	# 爆炸平均命中数
 #   w: 基础出现权重（与原版先验相加）
 # ------------------------------------------------------------
 const TRIGGERS = {
-	"kill": {"kind": "event", "e": 120.0, "timing": 0.5, "gate": "every", "w": 1.0},
-	"hit": {"kind": "event", "e": 8.0, "timing": 0.5, "gate": "chance", "w": 1.0},
+	"kill": {"kind": "event", "e": 180.0, "timing": 0.5, "gate": "every", "w": 1.0},
+	"hit": {"kind": "event", "e": 10.0, "timing": 0.5, "gate": "chance", "w": 1.0},
 	"dodge": {"kind": "event", "e": 4.0, "timing": 0.5, "gate": "chance", "w": 0.7},
 	"consumable": {"kind": "event", "e": 7.0, "timing": 0.5, "gate": "chance", "w": 0.8},
-	"gold": {"kind": "event", "e": 120.0, "timing": 0.5, "gate": "every", "w": 0.6},
-	"heal": {"kind": "event", "e": 13.0, "timing": 0.5, "gate": "chance", "w": 0.4},
+	"gold": {"kind": "event", "e": 180.0, "timing": 0.5, "gate": "every", "w": 0.6},
+	"heal": {"kind": "event", "e": 20.0, "timing": 0.5, "gate": "chance", "w": 0.4},
 	"level_up": {"kind": "event", "e": 1.3, "timing": 0.5, "gate": "none", "w": 0.9},
 	"wave_start": {"kind": "event", "e": 1.0, "timing": 1.0, "gate": "none", "w": 0.8},
 	"wave_end": {"kind": "event", "e": 1.0, "timing": 0.0, "gate": "none", "w": 0.8},
@@ -182,7 +185,23 @@ const DOWNSIDE_SIGN = {
 	"hp_start_next_wave": -1, "hp_start_wave": -1, "lose_hp_per_second": 1, "extra_elite_next_wave_chance": 1,
 	"enemy_health": 1, "enemy_damage": 1, "enemy_speed": 1, "items_price": 1, "reroll_price": 1,
 	"speed_cap": 0, "hp_cap": 0, "lock_current_weapons": 0, "extra_enemies_next_wave": 0, "stat_curse": 1,
+	"gold_drops": -1, "enemy_gold_drops": -1, "dodge_cap": -1, "gain_pct_gold_start_wave": -1,
 }
+# 角色效果中不能搬到道具上的身份 / 结构性 key
+const CHAR_MECHANIC_BANNED = [
+	"weapon_slot", "weapon_slot_upgrades", "min_weapon_tier", "max_weapon_tier", "no_melee_weapons",
+	"no_ranged_weapons", "no_duplicate_weapons", "max_melee_weapons", "max_ranged_weapons", "destroy_weapons",
+	"minimum_weapons_in_shop", "lock_current_weapons", "remove_shop_items", "guaranteed_shop_items",
+	"specific_items_price", "hp_shop", "convert_stats_end_of_wave", "convert_stats_half_wave", "cryptid",
+	"pacifist", "item_steals", "item_steals_spawns_random_elite", "disable_item_locking",
+	"all_weapons_count_for_sets", "group_structures", "die_in_one_hit", "can_attack_while_moving",
+	"beast_master_effect", "next_level_xp_needed", "level_upgrades_modifications", "no_heal", "weapons_price",
+	"stronger_elites_on_kill", "charm_on_hit", "map_size", "weapon_scaling_stats", "convert_bonus_gold",
+	"additional_weapon_effects", "tier_iv_weapon_effects", "tier_i_weapon_effects", "unique_weapon_effects",
+	"poisoned_fruit", "upgraded_baits",
+]
+# 角色效果（整局持有）的总价值估计找不到时的默认值
+const CHARACTER_BUDGET_DEFAULT = 60.0
 # 非 stat_ 前缀属性的原版描述 key（否则数值不会显示）
 const STAT_TEXT_KEYS = {
 	"knockback": "effect_knockback", "pickup_range": "effect_pickup_range", "consumable_heal": "effect_consumable_heal",
