@@ -1798,8 +1798,7 @@ func test_100_core_stat_items() -> void:
 				_check(gen.is_plain_stat(p.effects[0]) and p.effects[0].key == p.core and p.effects[0].value > 0, id + " first line is the core stat")
 				for j in range(1, p.effects.size()):
 					_check(not _is_good(p.effects[j]) or Catalog.is_downside_mechanic(p.effects[j]) or (p.effects[j] is TriggerEffect and p.effects[j].is_downside()), id + " other lines are downsides: " + p.effects[j].get_text(0, false))
-				if tier == 2:
-					_check(p.effects.size() >= 2, id + " T3 core item carries a downside")
+				_check(p.effects.size() >= 2, id + " core item carries a downside")
 				ratios[0].push_back(p.effects[0].value * Catalog.stat_w(p.core) / p.budget)
 			else:
 				ratios[1].push_back(p.budget / gen.item_budget(_item(id)))
@@ -2080,6 +2079,23 @@ func _wait_physics(n: int):
 		yield(tree, "physics_frame")
 
 
+# 按敌人记录生命：新敌人同时生成会掩盖总生命的下降
+func _enemy_hp_map(main) -> Dictionary:
+	var d = {}
+	for en in main._entity_spawner.get_all_enemies(false):
+		if is_instance_valid(en) and not en.dead:
+			d[en.get_instance_id()] = [en, en.current_stats.health]
+	return d
+
+
+func _any_enemy_hurt(main, before: Dictionary) -> bool:
+	for id in before:
+		var en = before[id][0]
+		if not is_instance_valid(en) or en.dead or en.current_stats.health < before[id][1]:
+			return true
+	return false
+
+
 func _enemies_hp(main) -> int:
 	var s = 0
 	for en in main._entity_spawner.get_all_enemies(false):
@@ -2310,10 +2326,15 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 		for attempt in (3 if e.payload in ["damage", "explode"] else 1):
 			var tgt = yield(_wait_enemy(main), "completed")
 			var before = _battle_snapshot(main)
+			var hp_before = _enemy_hp_map(main)
 			rt.execute(e, 0, tgt.global_position if tgt != null and is_instance_valid(tgt) else null, false)
 			# 爆炸由 WeaponService 延迟生成，命中需要几帧
 			yield(_wait_physics(12 if e.payload == "explode" else 4), "completed")
-			if _battle_snapshot(main) != before:
+			if e.payload in ["damage", "explode"]:
+				if _any_enemy_hurt(main, hp_before):
+					changed = true
+					break
+			elif _battle_snapshot(main) != before:
 				changed = true
 				break
 		if not changed:
@@ -2576,3 +2597,28 @@ func test_104_scaling_counts_and_bonus_text() -> void:
 	LinkedStats.reset_player(0)
 	print("AUDIT scaling effects applied and compared with their [+x] text: %d" % n_checked)
 	m.on_menu_reset()
+
+
+# 下一波经验：数值分散，不集中在上限
+func test_105_next_wave_xp_spread() -> void:
+	var vals = {}
+	var n = 0
+	var at_top = 0
+	var top = 0
+	for sd in SEEDS:
+		var gen = Generator.new(_cfg(), sd)
+		var plan = gen.generate(isvc.items, isvc.characters, [], [])
+		top = gen._line_cap("xp_gain", false) * 2
+		for id in plan.items:
+			for e in plan.items[id].effects:
+				if gen.is_next_wave(e) and e.key == "xp_gain" and e.value > 0:
+					n += 1
+					vals[e.value] = vals.get(e.value, 0) + 1
+					_check(e.value <= top, "next-wave xp within the cap: %d" % e.value)
+					if e.value == top:
+						at_top += 1
+	var keys = vals.keys()
+	keys.sort()
+	print("AUDIT next-wave xp values (n=%d, cap %d, at cap %d): %s" % [n, top, at_top, str(keys)])
+	_check(n > 10 and keys.size() >= 8, "next-wave xp values vary")
+	_check(at_top <= n * 0.2, "few next-wave xp lines sit at the cap (%d / %d)" % [at_top, n])

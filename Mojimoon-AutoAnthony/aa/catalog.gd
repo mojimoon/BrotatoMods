@@ -559,7 +559,6 @@ const CORE_STATS = [
 ]
 const CORE_TIERS = [0, 1, 2]
 const CORE_VALUE_MULT = 1.08
-const CORE_DOWNSIDE_CHANCE = 0.75
 # 核心道具单行上限相对普通上限的倍数（数值更高的单属性道具）
 const CORE_LINE_CAP_MULT = 1.5
 

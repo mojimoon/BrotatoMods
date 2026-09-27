@@ -272,7 +272,8 @@ func _on_timed_stat_timeout(serial: int, h: int, value: int, player_index: int) 
 func _scaled_damage(e, player_index: int) -> int:
 	var stat_val = Utils.get_stat(Keys.generate_hash(e.stat), player_index)
 	var base = max(1.0, floor(e.value / 100.0 * stat_val))
-	return int(round(base * (1.0 + Utils.get_stat(Keys.stat_percent_damage_hash, player_index) / 100.0)))
+	# 与原版一致：%伤害再低，伤害也至少为 1
+	return int(max(1.0, round(base * (1.0 + Utils.get_stat(Keys.stat_percent_damage_hash, player_index) / 100.0))))
 
 
 func _deal_damage(e, player_index: int) -> void:

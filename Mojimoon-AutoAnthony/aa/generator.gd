@@ -897,7 +897,7 @@ func _generate_core_item(item, stat: String) -> Dictionary:
 	anchor_stat = stat
 	var used_stats = [stat]
 	var downsides = []
-	if item.tier == 2 or rng.randf() < Catalog.CORE_DOWNSIDE_CHANCE:
+	if item.tier in Catalog.CORE_TIERS:
 		var dres = _gen_downsides(item, budget_total * rng.randf_range(0.15, 0.4), perm_mult, used_stats)
 		downsides = dres.effects
 		budget += dres.got
@@ -1282,6 +1282,7 @@ func gen_next_wave(target: float, perm_mult: float, allow_pair: bool) -> Diction
 	var comp = target * rng.randf_range(0.3, 0.6) if pair else 0.0
 	var out = []
 	var value = 0.0
+	var capped = false
 	if kind == "loot_aliens":
 		var n = int(clamp(round((target + comp) / _loot_alien_value()), 1, 4))
 		var e = effect_script.new()
@@ -1298,8 +1299,16 @@ func gen_next_wave(target: float, perm_mult: float, allow_pair: bool) -> Diction
 		var stat = "xp_gain"
 		var unit = Catalog.stat_unit(stat)
 		var raw = (target + comp) * W / Catalog.stat_w(stat)
-		var v = int(clamp(round(raw / unit) * unit, unit, _line_cap(stat, false) * 2))
+		var top = _line_cap(stat, false) * 2
+		var v = int(max(unit, round(raw / unit) * unit))
+		if v > top:
+			# 下一波经验每 1% 很便宜，预算常远超上限：不再一律取上限，而是在上限的 40%–100% 间随机（取 5 的倍数），
+			# 剩余预算留给道具的其他行；成对的代价按比例缩小
+			v = int(max(5, round(top * rng.randf_range(0.4, 1.0) / 5.0) * 5))
+			capped = true
 		value = Valuation.next_wave_value(stat, v, perm_mult)
+		if capped and pair:
+			comp = min(comp, value * rng.randf_range(0.3, 0.6))
 		var e2 = _next_wave_effect(stat, v)
 		e2.set_meta("aa_value", value)
 		out.push_back(e2)
@@ -1308,7 +1317,7 @@ func gen_next_wave(target: float, perm_mult: float, allow_pair: bool) -> Diction
 		if not side.empty():
 			out.push_back(side.effect)
 			value -= side.value
-	if value < target * 0.4 or value > target * 1.6:
+	if (value < target * 0.4 and not capped) or value > target * 1.6 or value <= 0.0:
 		return {}
 	return {"effects": out, "value": value}
 
