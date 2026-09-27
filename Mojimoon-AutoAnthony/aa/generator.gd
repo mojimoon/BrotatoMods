@@ -1059,7 +1059,8 @@ func _note_clause(c: Dictionary) -> void:
 # 自由触发的"获得效果"：从可缩放机制 / 计数型 / 属性修改中选一条"单位"效果。
 # 返回 {effect, unit（单位价值）, max_units}；temp 模式只选战斗中实时生效的机制
 func _pick_grant(mode: String) -> Dictionary:
-	var kinds = {"mechanic": 0.5, "scaling": 0.3, "gain_mod": 0.2}
+	# "每有 [计数] 获得 [属性]"不作为触发结果（嵌套后难以理解）
+	var kinds = {"mechanic": 0.65, "gain_mod": 0.35}
 	for _attempt in 4:
 		var kind = _pick_weighted(kinds)
 		if kind == "mechanic":

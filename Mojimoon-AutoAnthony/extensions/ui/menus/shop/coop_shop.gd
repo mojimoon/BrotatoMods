@@ -25,6 +25,14 @@ func buy_item(item_data: ItemData, player_index: int) -> void:
 		m.fire_shop("buy", player_index)
 	# 重组道具可能带有沙漏的"倒流"效果：购买后刷新"下一波"按钮上的波数
 	update_go_next_button_text()
+	# 重组道具可能改变武器栏数量：原版只在武器列表变化时刷新"武器 (n/上限)"标签
+	_aa_refresh_weapon_label(player_index)
+
+
+func _aa_refresh_weapon_label(player_index: int) -> void:
+	var gear = _get_gear_container(player_index)
+	if gear != null and is_instance_valid(gear):
+		gear._on_weapons_changed()
 
 
 # 沙漏的"倒流"效果在原版里按沙漏的道具 ID 查找并移除持有者；出现在其他道具上时由这里处理：

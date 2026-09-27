@@ -817,6 +817,14 @@ func test_91_menu_buttons_and_shop_hook() -> void:
 	var g = rd.get_player_gold(0)
 	shop._on_RerollButton_pressed(0)
 	_check(rd.get_player_gold(0) > g + 40, "reroll trigger fired through the shop hook (%d -> %d)" % [g, rd.get_player_gold(0)])
+	# 购买改变武器栏的道具后，"武器 (n/上限)"标签立即刷新
+	var slot_item = _item("item_potato").duplicate()
+	slot_item.effects = [_plain("weapon_slot", 1)]
+	var slots0 = rd.get_player_effect(Keys.weapon_slot_hash, 0)
+	shop.buy_item(slot_item, 0)
+	var label = shop._get_gear_container(0).weapons_container._label.text
+	_eq(rd.get_player_effect(Keys.weapon_slot_hash, 0), slots0 + 1, "weapon slot item applied")
+	_check(label.ends_with("/" + str(slots0 + 1) + ")"), "weapon label refreshed right after buying: " + label)
 	m.on_menu_reset()
 
 
@@ -2024,3 +2032,249 @@ func test_101_character_bans_and_wanted_tags_in_rolls() -> void:
 	print("AUDIT wanted-tag boost, mean over %d characters: native +%.3f, reassembled +%.3f" % [boost_n, boost_sum[0] / max(1, boost_n), boost_sum[1] / max(1, boost_n)])
 	_check(boost_sum[1] / max(1, boost_n) >= 0.8 * boost_sum[0] / max(1, boost_n), "reassembled wanted-tag boost is comparable to native")
 	print("AUDIT test_101 took %d ms" % (OS.get_ticks_msec() - t0))
+
+
+# ============================================================
+# 真实战斗：(A) 每种扳机都能由原版事件触发；(B) 每种载荷在战斗里真正改变玩家 / 敌人 / 武器；
+# (C) 生成道具池里每种 (扳机, 载荷, 获得效果) 组合在战斗中执行后都有可观察的变化
+# ============================================================
+func _wait_frames(n: int):
+	for i in n:
+		yield(tree, "idle_frame")
+
+
+func _enemies_hp(main) -> int:
+	var s = 0
+	for en in main._entity_spawner.get_all_enemies(false):
+		if is_instance_valid(en) and not en.dead:
+			s += en.current_stats.health
+	return s
+
+
+func _battle_snapshot(main) -> String:
+	var p = main._players[0]
+	return JSON.print([rd.get_player_effects(0), TempStats.player_stats[0], rd.get_player_gold(0), rd.get_player_xp(0), rd.get_player_level(0),
+		p.current_stats.health, p.max_stats.health, _enemies_hp(main), main._entity_spawner.get_all_enemies(false).size()])
+
+
+func _wait_enemy(main):
+	yield(tree, "idle_frame")
+	for i in 24:
+		if not is_instance_valid(main):
+			return null
+		var enemies = main._entity_spawner.get_all_enemies(false)
+		for en in enemies:
+			if is_instance_valid(en) and not en.dead:
+				return en
+		yield(tree.create_timer(0.25), "timeout")
+	return null
+
+
+func test_102_triggers_and_payloads_in_battle() -> void:
+	m.start_new_run()
+	var pistol = isvc.get_element_safe(isvc.weapons, "weapon_pistol_1")
+	var _w = rd.add_weapon(pistol, 0)
+	var gain_armor = load("res://effects/items/stat_gains_modification_effect.gd").new()
+	gain_armor.key = "effect_increase_stat_gains"
+	gain_armor.key_hash = Keys.generate_hash(gain_armor.key)
+	gain_armor.custom_key_hash = Keys.generate_hash("")
+	gain_armor.value = 50
+	gain_armor.stat_displayed = "stat_armor"
+	gain_armor.stats_modified = ["stat_armor"]
+	# (A) 每种扳机一条（状态扳机挂临时属性，其余挂 +1 材料），只看是否触发
+	var trig_holder = _item("item_potato").duplicate()
+	var trig_effects = []
+	for t in Catalog.TRIGGERS:
+		if Catalog.TRIGGERS[t].kind == "shop":
+			continue
+		var payload = "temp_stat" if Catalog.TRIGGERS[t].kind == "state" else "gold"
+		var c = {"trigger": t, "payload": payload, "value": 1, "stat": "stat_luck"}
+		if t == "interval":
+			c.param = 1
+		trig_effects.push_back(TriggerEffect.make(c))
+	trig_holder.effects = trig_effects
+	rd.add_item(trig_holder, 0)
+	rd.current_wave = 1
+	TempStats.reset()
+	var _e = tree.change_scene("res://main.tscn")
+	yield(_wait_frames(10), "completed")
+	var main = tree.current_scene
+	var rt = main.get_node_or_null("AutoAnthonyRuntime") if main != null else null
+	_check(rt != null, "runtime in battle")
+	if rt == null:
+		return
+	var player = main._players[0]
+	# 测试期间玩家不被敌人打到（直接调用 take_damage 不受影响）
+	player.disable_hurtbox()
+	# 延长本波，保证整个测试期间都有敌人
+	main._wave_timer.start(600)
+	var seen_state = {}
+
+	# 满血、静止在开局即成立；等待间隔
+	yield(tree.create_timer(1.3), "timeout")
+	for en in rt.entries[0]:
+		if en.active:
+			seen_state[en.effect.trigger] = true
+	# 移动与计步：锁定移动方向，让原版移动逻辑走起来
+	player._move_locked = true
+	player._current_movement = Vector2(1, 0)
+	yield(tree.create_timer(2.0), "timeout")
+	for en in rt.entries[0]:
+		if en.active:
+			seen_state[en.effect.trigger] = true
+	player._current_movement = Vector2.ZERO
+	player._move_locked = false
+	# 受击
+	var hit_args = TakeDamageArgs.new(-1)
+	hit_args.bypass_invincibility = true
+	hit_args.dodgeable = false
+	var _r = player.take_damage(3, hit_args)
+	yield(_wait_frames(3), "completed")
+	# 闪避：闪避率 100%
+	player.current_stats.dodge = 1.0
+	var dodge_args = TakeDamageArgs.new(-1)
+	dodge_args.bypass_invincibility = true
+	var _d = player.take_damage(3, dodge_args)
+	yield(_wait_frames(2), "completed")
+	player.disable_hurtbox()
+	# 低血
+	player.current_stats.health = 1
+	yield(tree.create_timer(0.5), "timeout")
+	for en in rt.entries[0]:
+		if en.active:
+			seen_state[en.effect.trigger] = true
+	# 回血（原版的回血信号）
+	RunData.emit_signal("healing_effect", 3, 0, Keys.empty_hash)
+	yield(_wait_frames(2), "completed")
+	# 升级
+	rd.add_xp(int(rd.get_next_level_xp_needed(0)) + 1, 0)
+	yield(_wait_frames(2), "completed")
+	# 击杀 / 燃烧击杀 / 暴击击杀（原版受伤信号带暴击标记）
+	var en1 = yield(_wait_enemy(main), "completed")
+	_check(en1 != null, "enemy spawned for kill triggers")
+	if en1 != null:
+		en1._is_burning = true
+		var _k = en1.take_damage(999999, TakeDamageArgs.new(0))
+		yield(_wait_frames(2), "completed")
+		if is_instance_valid(en1):
+			main._on_enemy_took_damage(en1, 999999, Vector2.ZERO, true, false, false, false, TakeDamageArgs.new(0), 0, false)
+	# 拾取材料（原版生成的材料节点）
+	main.spawn_gold(1.0, player.global_position, 0)
+	yield(_wait_frames(2), "completed")
+	if not main._active_golds.empty():
+		main.on_gold_picked_up(main._active_golds.back(), 0)
+	# 拾取消耗品
+	# 与原版 spawn_consumables 相同：先从对象池取（同时建立对象池），没有再实例化
+	var cons = main.get_node_from_pool(main._consumable_pool_id, main._consumables_container)
+	if cons == null:
+		cons = main.consumable_scene.instance()
+		main._consumables_container.add_child(cons)
+	cons.consumable_data = isvc.consumables[0]
+	cons.global_position = player.global_position
+	main._consumables.push_back(cons)
+	main.on_consumable_picked_up(cons, 0)
+	# 半波
+	main._on_HalfWaveTimer_timeout()
+	yield(_wait_frames(2), "completed")
+	var fired = {}
+	for en in rt.entries[0]:
+		if en.effect in trig_effects:
+			fired[en.effect.trigger] = en.fired > 0 or en.active or seen_state.has(en.effect.trigger)
+	for t in Catalog.TRIGGERS:
+		if Catalog.TRIGGERS[t].kind == "shop" or t == "wave_end":
+			continue
+		_check(fired.get(t, false), "trigger fires from real game events: " + t)
+
+	# (B) 载荷：直接执行，检查真实的玩家 / 敌人 / 武器状态
+	player.current_stats.health = player.max_stats.health
+	var weapon = player.current_weapons[0] if not player.current_weapons.empty() else null
+	var base_armor = player.max_stats.armor
+	rt.execute(TriggerEffect.make({"trigger": "kill", "payload": "temp_stat", "stat": "stat_armor", "value": 4}), 0, null, false)
+	yield(_wait_frames(4), "completed")
+	_eq(player.max_stats.armor, base_armor + 4, "temp stat reaches the player's real armor")
+	var base_hp = player.max_stats.health
+	rt.execute(TriggerEffect.make({"trigger": "kill", "payload": "perm_stat", "stat": "stat_max_hp", "value": 5}), 0, null, false)
+	yield(_wait_frames(4), "completed")
+	_eq(player.max_stats.health, base_hp + 5, "perm stat reaches the player's real max HP")
+	var base_speed = player.max_stats.speed
+	rt.execute(TriggerEffect.make({"trigger": "kill", "payload": "timed_stat", "stat": "stat_speed", "value": 20, "value2": 1}), 0, null, false)
+	yield(_wait_frames(4), "completed")
+	_check(player.max_stats.speed > base_speed, "timed stat raises real speed")
+	yield(tree.create_timer(1.4), "timeout")
+	_check(abs(player.max_stats.speed - base_speed) < 0.01, "timed stat expires")
+	player.current_stats.health = max(1, player.max_stats.health - 10)
+	var h0 = player.current_stats.health
+	rt.execute(TriggerEffect.make({"trigger": "kill", "payload": "heal", "value": 3}), 0, null, false)
+	yield(_wait_frames(2), "completed")
+	_check(player.current_stats.health > h0, "heal payload heals the player (%d -> %d)" % [h0, player.current_stats.health])
+	var g0 = rd.get_player_gold(0)
+	rt.execute(TriggerEffect.make({"trigger": "kill", "payload": "gold", "value": 7}), 0, null, false)
+	_eq(rd.get_player_gold(0), g0 + 7, "gold payload")
+	var x0 = rd.get_player_xp(0)
+	var l0 = rd.get_player_level(0)
+	rt.execute(TriggerEffect.make({"trigger": "kill", "payload": "xp", "value": 3}), 0, null, false)
+	_check(rd.get_player_xp(0) > x0 or rd.get_player_level(0) > l0, "xp payload")
+	var en2 = yield(_wait_enemy(main), "completed")
+	if en2 != null:
+		var hp0 = _enemies_hp(main)
+		rt.execute(TriggerEffect.make({"trigger": "kill", "payload": "damage", "stat": "stat_max_hp", "value": 100}), 0, null, false)
+		yield(_wait_frames(2), "completed")
+		_check(_enemies_hp(main) < hp0, "damage payload hurts an enemy")
+	var en3 = yield(_wait_enemy(main), "completed")
+	if en3 != null:
+		var e_hp = en3.current_stats.health
+		rt.execute(TriggerEffect.make({"trigger": "kill", "payload": "explode", "stat": "stat_max_hp", "value": 100}), 0, en3.global_position, false)
+		yield(_wait_frames(6), "completed")
+		_check(not is_instance_valid(en3) or en3.dead or en3.current_stats.health < e_hp, "explode payload hurts the enemy at the position")
+	# 获得效果：机制（穿透 → 武器的真实穿透数）、属性修改（护甲 +50% → 真实护甲）
+	if weapon != null:
+		var p0 = weapon.current_stats.piercing
+		rt.execute(TriggerEffect.make({"trigger": "kill", "payload": "grant", "value": 2, "grant": _plain("piercing", 1), "grant_mode": "temp", "grant_unit": 10.0}), 0, null, false)
+		yield(_wait_frames(4), "completed")
+		_eq(weapon.current_stats.piercing, p0 + 2, "granted piercing reaches the weapon")
+	rd.add_stat(Keys.stat_armor_hash, 10, 0)
+	yield(_wait_frames(4), "completed")
+	var a0 = player.max_stats.armor
+	rt.execute(TriggerEffect.make({"trigger": "kill", "payload": "grant", "value": 1, "grant": gain_armor, "grant_mode": "temp", "grant_unit": 5.0}), 0, null, false)
+	yield(_wait_frames(4), "completed")
+	_check(player.max_stats.armor > a0, "granted stat-gain modification raises real armor (%d -> %d)" % [a0, player.max_stats.armor])
+
+	# (C) 生成池中每种组合在战斗中都有效果
+	var shapes = {}
+	for sd in SEEDS:
+		var gen = Generator.new(_cfg(), sd)
+		var plan = gen.generate(isvc.items, isvc.characters, [], [])
+		for id in plan.items:
+			for e in plan.items[id].effects:
+				if not e is TriggerEffect:
+					continue
+				_check(e.grant == null or not gen.is_scaling(e.grant), "no 'for every X' effect as a trigger result: " + e.get_text(0, false))
+				var gk = ""
+				if e.grant != null:
+					gk = e.grant.custom_key if e.grant.custom_key != "" else e.grant.key
+				var k = "%s/%s/%s/%s/%s" % [e.trigger, e.payload, e.grant_mode if e.payload == "grant" else "", gk, e.stat]
+				if not shapes.has(k):
+					shapes[k] = e
+	var bad = []
+	for k in shapes:
+		var e = shapes[k]
+		if player.dead or not is_instance_valid(main):
+			_check(false, "player alive during shape checks")
+			break
+		player.disable_hurtbox()
+		player.current_stats.health = max(1, player.max_stats.health / 2)
+		var tgt = yield(_wait_enemy(main), "completed")
+		var before = _battle_snapshot(main)
+		rt.execute(e, 0, tgt.global_position if tgt != null and is_instance_valid(tgt) else null, false)
+		# 爆炸由 WeaponService 延迟生成，命中需要几帧
+		yield(_wait_frames(8 if e.payload == "explode" else 3), "completed")
+		if _battle_snapshot(main) == before:
+			bad.push_back(k + " : " + e.get_text(0, false))
+		player.current_stats.health = player.max_stats.health
+	print("AUDIT battle-executed %d distinct (trigger, payload, grant, stat) shapes, %d without effect" % [shapes.size(), bad.size()])
+	for b in bad:
+		print("AUDIT   no effect: " + b)
+	_check(bad.empty(), "every generated trigger shape changes the battle state")
+	main._cleaning_up = true
+	rt.revert_all_grants()
+	m.on_menu_reset()
