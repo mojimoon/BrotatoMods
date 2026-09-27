@@ -130,7 +130,7 @@ const PAYLOADS = {
 	"xp": {"w": 0.3},
 	"damage": {"w": 0.6},
 	"explode": {"w": 0.5},
-	"grant": {"w": 2.0},
+	"grant": {"w": 2.5},
 }
 
 # 合法组合：触发扳机 -> 允许的载荷

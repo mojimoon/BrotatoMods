@@ -62,6 +62,7 @@ func rebuild(player_index: int) -> void:
 					var show = Valuation.raw_rate(e.trigger, e.param, e.chance) <= FEEDBACK_MAX_RATE and not e.trigger in ["still", "moving"] and Catalog.STATS.has(e.stat)
 					list.push_back({"effect": e, "count": 0, "fired": 0, "active": false, "show": show, "stack": 0, "granted": []})
 	# 被移除的状态加成要撤销
+	var reverted = false
 	for id in old:
 		var still_there = false
 		for en in list:
@@ -73,7 +74,11 @@ func rebuild(player_index: int) -> void:
 				_set_state(player_index, old[id], false)
 			if not old[id].granted.empty():
 				_revert_grants(player_index, old[id])
+				reverted = true
 	entries[player_index] = list
+	# 撤销的"获得效果"可能是计数型（LinkedStats）：立即重算，不等下一次刷新
+	if reverted:
+		_refresh(player_index)
 
 
 func _check_dirty() -> void:

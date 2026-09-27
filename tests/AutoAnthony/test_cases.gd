@@ -1383,7 +1383,8 @@ func test_16b_permanent_caps() -> void:
 		var c = gen.gen_clause(rng_budget(i), 4.0, false)
 		if c.empty():
 			continue
-		var perm = c.payload == "perm_stat" or (c.payload == "grant" and c.get("grant_mode", "") == "perm")
+		# 永久属性条款（永久获得效果的单位价值差异很大，上限按预算另算）
+		var perm = c.payload == "perm_stat"
 		if perm and Valuation.raw_rate(c.trigger, 1, 100) > 1.5:
 			caps.push_back(c.cap)
 			if shown < 5:
@@ -2239,7 +2240,13 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 	yield(_wait_frames(4), "completed")
 	_check(player.max_stats.armor > a0, "granted stat-gain modification raises real armor (%d -> %d)" % [a0, player.max_stats.armor])
 
-	# (C) 生成池中每种组合在战斗中都有效果
+	# (C) 生成池中每种组合在战斗中都有效果。先移除 (A) 的测试条款（静止 / 移动等状态加成会同时切换，干扰前后比较）
+	for en in rt.entries[0].duplicate():
+		if en.effect in trig_effects:
+			if en.active:
+				rt._set_state(0, en, false)
+			rt.entries[0].erase(en)
+	rd.remove_item(trig_holder, 0)
 	var shapes = {}
 	for sd in SEEDS:
 		var gen = Generator.new(_cfg(), sd)
@@ -2248,7 +2255,6 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 			for e in plan.items[id].effects:
 				if not e is TriggerEffect:
 					continue
-				_check(e.grant == null or not gen.is_scaling(e.grant), "no 'for every X' effect as a trigger result: " + e.get_text(0, false))
 				var gk = ""
 				if e.grant != null:
 					gk = e.grant.custom_key if e.grant.custom_key != "" else e.grant.key
@@ -2263,18 +2269,221 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 			break
 		player.disable_hurtbox()
 		player.current_stats.health = max(1, player.max_stats.health / 2)
-		var tgt = yield(_wait_enemy(main), "completed")
-		var before = _battle_snapshot(main)
-		rt.execute(e, 0, tgt.global_position if tgt != null and is_instance_valid(tgt) else null, false)
-		# 爆炸由 WeaponService 延迟生成，命中需要几帧
-		yield(_wait_frames(8 if e.payload == "explode" else 3), "completed")
-		if _battle_snapshot(main) == before:
+		# 伤害 / 爆炸看敌人总生命，敌人同时生成 / 死亡会干扰比较：最多重试 3 次
+		var changed = false
+		for attempt in (3 if e.payload in ["damage", "explode"] else 1):
+			var tgt = yield(_wait_enemy(main), "completed")
+			var before = _battle_snapshot(main)
+			rt.execute(e, 0, tgt.global_position if tgt != null and is_instance_valid(tgt) else null, false)
+			# 爆炸由 WeaponService 延迟生成，命中需要几帧
+			yield(_wait_frames(8 if e.payload == "explode" else 3), "completed")
+			if _battle_snapshot(main) != before:
+				changed = true
+				break
+		if not changed:
 			bad.push_back(k + " : " + e.get_text(0, false))
 		player.current_stats.health = player.max_stats.health
 	print("AUDIT battle-executed %d distinct (trigger, payload, grant, stat) shapes, %d without effect" % [shapes.size(), bad.size()])
 	for b in bad:
 		print("AUDIT   no effect: " + b)
 	_check(bad.empty(), "every generated trigger shape changes the battle state")
+	main._cleaning_up = true
+	rt.revert_all_grants()
+	m.on_menu_reset()
+
+
+# ============================================================
+# 探查："每有 [计数] 获得 [属性]"作为触发结果（已从生成中移除）在真实战斗中是否正确
+# 对每种计数：本波获得 / 叠加 / 波末撤销 / 状态开关 / 永久获得 / 序列化往返，与原版 LinkedStats 口径的期望值比较
+# ============================================================
+func _scaling_grant(target: String, counter: String, nb: int, perm_only: bool):
+	var e = load("res://effects/items/gain_stat_for_every_stat_effect.gd").new()
+	e.key = target
+	e.key_hash = Keys.generate_hash(target)
+	e.custom_key_hash = Keys.generate_hash("")
+	e.value = 1
+	e.stat_scaled = counter
+	e.stat_scaled_hash = Keys.generate_hash(counter)
+	e.nb_stat_scaled = nb
+	e.perm_stats_only = perm_only
+	e.text_key = Catalog.COUNTER_TEXT.get(counter, "EFFECT_GAIN_STAT_FOR_EVERY_PERM_STAT" if perm_only else "EFFECT_GAIN_STAT_FOR_EVERY_STAT")
+	return e
+
+
+# 与原版 LinkedStats.reset_player 相同的计数口径
+func _counter_now(counter: String, perm_only: bool) -> float:
+	match counter:
+		"materials": return float(rd.get_player_gold(0))
+		"structure": return float(rd.get_nb_structures(0))
+		"living_enemy": return float(rd.current_living_enemies)
+		"burning_enemy": return float(rd.current_burning_enemies)
+		"living_tree": return float(rd.current_living_trees)
+		"percent_player_missing_health":
+			return float(WeaponService.apply_inverted_health_bonus(1, 1, rd.get_player_current_health(0), rd.get_player_max_health(0)))
+		"different_item": return float(rd.get_nb_different_items_of_tier(-1, 0))
+		"common_item": return float(rd.get_nb_different_items_of_tier(Tier.COMMON, 0))
+		"legendary_item": return float(rd.get_nb_different_items_of_tier(Tier.LEGENDARY, 0))
+		"free_weapon_slots": return float(rd.get_free_weapon_slots(0))
+	var h = Keys.generate_hash(counter)
+	return rd.get_stat(h, 0) + (0.0 if perm_only else TempStats.get_stat(h, 0))
+
+
+func test_103_scaling_grants_probe() -> void:
+	m.start_new_run()
+	var pistol = isvc.get_element_safe(isvc.weapons, "weapon_pistol_1")
+	var _w = rd.add_weapon(pistol, 0)
+	# 让各种计数都不为 0：几件不同的普通 / 传说道具、材料、属性
+	var added = 0
+	for it in isvc.items:
+		if added >= 4:
+			break
+		if it.tier == 0 and not it.is_cursed and it.effects.size() > 0:
+			# 只用纯属性道具，避免原版的计数型效果随战斗变化干扰基线
+			var plain = true
+			for e in it.effects:
+				if e.get_script() != load("res://items/global/effect.gd") or e.custom_key != "" or e.key == "stat_max_hp":
+					plain = false
+			if not plain:
+				continue
+			rd.add_item(it, 0)
+			added += 1
+	for it in isvc.items:
+		if it.tier == 3 and not it.is_cursed and it.effects.size() == 1 and it.effects[0].get_script() == load("res://items/global/effect.gd") and it.effects[0].key != "stat_max_hp":
+			rd.add_item(it, 0)
+			break
+	rd.add_gold(80, 0)
+	for st in ["stat_luck", "stat_range", "stat_engineering", "stat_harvesting", "stat_armor"]:
+		rd.add_stat(Keys.generate_hash(st), 12, 0)
+	rd.current_wave = 3
+	TempStats.reset()
+	var _e = tree.change_scene("res://main.tscn")
+	yield(_wait_frames(10), "completed")
+	var main = tree.current_scene
+	var rt = main.get_node_or_null("AutoAnthonyRuntime") if main != null else null
+	_check(rt != null, "runtime in battle")
+	if rt == null:
+		return
+	var player = main._players[0]
+	player.disable_hurtbox()
+	main._wave_timer.start(600)
+	# 等场上有几个敌人（"每个存活敌人"计数），并让玩家损失部分生命（"每 1% 已损失生命"计数）
+	for i in 40:
+		if rd.current_living_enemies >= 4:
+			break
+		yield(tree.create_timer(0.25), "timeout")
+	var hurt = TakeDamageArgs.new(-1)
+	hurt.bypass_invincibility = true
+	hurt.dodgeable = false
+	hurt.armor_applied = false
+	player.enable_hurtbox()
+	var _h = player.take_damage(int(player.max_stats.health * 0.4), hurt)
+	yield(_wait_frames(2), "completed")
+	player.disable_hurtbox()
+
+	# 用户报告的原样场景：每击杀 N 个敌人 → 本波获得「每持有一件不同的 I 级道具 +1 最大生命值」，用真实击杀触发
+	var ug = _scaling_grant("stat_max_hp", "common_item", 1, false)
+	var ute = TriggerEffect.make({"trigger": "kill", "param": 2, "payload": "grant", "value": 1, "grant": ug, "grant_mode": "temp", "grant_unit": 5.0})
+	var uholder = _item("item_potato").duplicate()
+	uholder.effects = [ute]
+	rd.add_item(uholder, 0)
+	m.triggers_dirty = true
+	var hp_before = player.max_stats.health
+	var kills = 0
+	for i in 60:
+		if kills >= 2:
+			break
+		var en = yield(_wait_enemy(main), "completed")
+		if en == null:
+			break
+		var _k = en.take_damage(999999, TakeDamageArgs.new(0))
+		kills += 1
+		yield(_wait_frames(2), "completed")
+	yield(_wait_frames(4), "completed")
+	var n_common = int(_counter_now("common_item", false))
+	print("AUDIT user scenario: %d real kills, %d different tier-I items, real max HP %d -> %d" % [kills, n_common, hp_before, player.max_stats.health])
+	_check(kills == 2 and player.max_stats.health - hp_before == n_common, "user scenario: kill-triggered 'for every tier-I item' grant raises real max HP")
+	rd.remove_item(uholder, 0)
+	m.triggers_dirty = true
+	rt._check_dirty()
+	yield(_wait_frames(4), "completed")
+	_check(abs(player.max_stats.health - hp_before) < 0.5, "grant removed with its item")
+
+	var counters = Catalog.COUNTER_TEXT.keys() + ["stat_luck", "stat_range", "stat_engineering", "stat_harvesting"]
+	var target = "stat_max_hp"
+	var th = Keys.stat_max_hp_hash
+	var rows = []
+	var problems = []
+	for counter in counters:
+		for perm_only in ([true, false] if Catalog.STATS.has(counter) else [false]):
+			player.disable_hurtbox()
+			var nb = 2
+			var g = _scaling_grant(target, counter, nb, perm_only)
+			# 用战斗中不会自然发生的扳机（商店刷新），避免武器自动击杀额外触发
+			var te = TriggerEffect.make({"trigger": "reroll", "payload": "grant", "value": 1, "grant": g, "grant_mode": "temp", "grant_unit": 5.0})
+			var en = {"effect": te, "count": 0, "fired": 0, "active": false, "show": false, "stack": 0, "granted": []}
+			rt.entries[0].push_back(en)
+			yield(_wait_frames(2), "completed")
+			var base = Utils.get_stat(th, 0)
+			var hp0 = player.max_stats.health
+			var cnt = _counter_now(counter, perm_only)
+			rt.execute(te, 0, null, false, en)
+			yield(_wait_frames(4), "completed")
+			var d1 = Utils.get_stat(th, 0) - base
+			var exp1 = int(1 * (cnt / nb))
+			rt.execute(te, 0, null, false, en)
+			yield(_wait_frames(4), "completed")
+			var cnt2 = _counter_now(counter, perm_only)
+			var d2 = Utils.get_stat(th, 0) - base
+			var exp2 = 2 * int(1 * (cnt2 / nb))
+			var hp_seen = player.max_stats.health - hp0
+			var txt = te.get_text(0, false)
+			rt._revert_grants(0, en)
+			rt._refresh(0)
+			yield(_wait_frames(4), "completed")
+			var d3 = Utils.get_stat(th, 0) - base
+			rt.entries[0].erase(en)
+			var row = "%-32s perm=%-5s count=%.1f  +1 grant: %+d (exp %+d)  +2 grants: %+d (exp %+d)  real max HP %+d  reverted %+d" % [counter, str(perm_only), cnt, d1, exp1, d2, exp2, hp_seen, d3]
+			rows.push_back(row)
+			var live = counter in ["living_enemy", "burning_enemy", "living_tree", "percent_player_missing_health", "materials"]
+			if d3 != 0 or (not live and (d1 != exp1 or d2 != exp2)) or (exp2 != 0 and hp_seen == 0 and not live):
+				problems.push_back(row + "  | " + txt)
+	# 状态扳机（静止时获得）开关、永久获得、序列化往返
+	var g2 = _scaling_grant(target, "common_item", 1, false)
+	var st = TriggerEffect.make({"trigger": "still", "payload": "grant", "value": 1, "grant": g2, "grant_mode": "temp", "grant_unit": 5.0})
+	var en2 = {"effect": st, "count": 0, "fired": 0, "active": false, "show": false, "stack": 0, "granted": []}
+	rt.entries[0].push_back(en2)
+	var b2 = Utils.get_stat(th, 0)
+	rt._set_state(0, en2, true)
+	yield(_wait_frames(3), "completed")
+	var on_d = Utils.get_stat(th, 0) - b2
+	# 先移出总线，避免"静止"轮询立刻重新打开
+	rt.entries[0].erase(en2)
+	rt._set_state(0, en2, false)
+	yield(_wait_frames(3), "completed")
+	var off_d = Utils.get_stat(th, 0) - b2
+	rows.push_back("state grant (still, common_item/1): on %+d, off %+d, count %d" % [on_d, off_d, _counter_now("common_item", false)])
+	_check(on_d == int(_counter_now("common_item", false)) and off_d == 0, "state scaling grant on / off")
+	var g3 = _scaling_grant(target, "different_item", 1, false)
+	var pe = TriggerEffect.make({"trigger": "level_up", "payload": "grant", "value": 1, "grant": g3, "grant_mode": "perm", "grant_unit": 5.0})
+	var b3 = Utils.get_stat(th, 0)
+	rt.execute(pe, 0, null, false, null)
+	yield(_wait_frames(3), "completed")
+	LinkedStats.reset_player(0)
+	Utils.reset_stat_cache(0)
+	var perm_d = Utils.get_stat(th, 0) - b3
+	rows.push_back("perm grant (level up, different_item/1): %+d after a LinkedStats reset, count %d" % [perm_d, _counter_now("different_item", false)])
+	_check(perm_d == int(_counter_now("different_item", false)), "perm scaling grant survives LinkedStats reset")
+	rd.get_player_effects(0)[Keys.stat_links_hash].erase([g3.key_hash, 1, g3.stat_scaled_hash, 1, false])
+	var ser = pe.serialize()
+	var back = TriggerEffect.new()
+	back.deserialize_and_merge(ser)
+	_check(back.grant != null and back.grant.stat_scaled == "different_item" and back.grant.stat_scaled_hash == g3.stat_scaled_hash, "scaling grant serialization roundtrip")
+	print("AUDIT scaling-grant probe (target %s):" % target)
+	for r in rows:
+		print("AUDIT   " + r)
+	for p in problems:
+		print("AUDIT   PROBLEM " + p)
+	_check(problems.empty(), "scaling grants behave like native linked stats (%d problems)" % problems.size())
 	main._cleaning_up = true
 	rt.revert_all_grants()
 	m.on_menu_reset()
