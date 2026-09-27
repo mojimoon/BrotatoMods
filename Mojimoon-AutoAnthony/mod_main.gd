@@ -58,6 +58,7 @@ func _init() -> void:
 	ModLoaderMod.install_script_extension(dir + "ui/menus/run/difficulty_selection/difficulty_selection.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/shop/shop.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/shop/coop_shop.gd")
+	ModLoaderMod.install_script_extension(dir + "dlcs/dlc_1/dlc_1_data.gd")
 
 
 func _ready() -> void:
@@ -270,7 +271,7 @@ func on_resume(state: Dictionary) -> void:
 func preview_plan(p_seed: int) -> Dictionary:
 	var gen = Generator.new(get_cfg(), p_seed)
 	var isvc = _autoload("ItemService")
-	return gen.generate(isvc.items, isvc.characters, [], [])
+	return gen.generate(native_only(isvc.items), native_only(isvc.characters), [], [])
 
 
 func _activate(state: Dictionary) -> void:
@@ -285,7 +286,7 @@ func _activate(state: Dictionary) -> void:
 			if native != null and not native in chars:
 				chars.push_back(native)
 	var gen = Generator.new(state.cfg, int(state.seed))
-	plan = gen.generate(isvc.items, isvc.characters, chars, isvc.weapons)
+	plan = gen.generate(native_only(isvc.items), native_only(isvc.characters), native_only(chars), native_only(isvc.weapons))
 	_gen = gen
 	var rename = bool(state.cfg.get("rename", true))
 	for id in plan.items:
@@ -378,6 +379,29 @@ func _rebuild_groups_and_bans(isvc) -> void:
 		if not _backups[ch.get_instance_id()].has("banned_items"):
 			_backups[ch.get_instance_id()]["banned_items"] = orig_banned
 		ch.banned_items = kept
+
+
+# 只重组原版（含 DLC）的道具 / 角色 / 武器：其他 mod 加入的内容不重组、不参与先验统计、也不作为机制来源，
+# 照常留在道具池里。判断依据是资源来源目录（mod 的资源来自 mods-unpacked 或由脚本创建，没有原版路径）。
+const NATIVE_RESOURCE_DIRS = ["res://items/", "res://dlcs/", "res://weapons/"]
+
+
+static func is_native_resource(res) -> bool:
+	if res == null:
+		return false
+	var path: String = res.resource_path
+	for d in NATIVE_RESOURCE_DIRS:
+		if path.begins_with(d):
+			return true
+	return false
+
+
+static func native_only(arr: Array) -> Array:
+	var out = []
+	for r in arr:
+		if is_native_resource(r):
+			out.push_back(r)
+	return out
 
 
 func _compose_name(adj_key: String, native_name_key: String) -> String:

@@ -1537,3 +1537,120 @@ func test_93_new_triggers_tags_and_char_components() -> void:
 		if "weapon_slot" in m.plan.items[id].main_stats:
 			_check(id in one_arm.banned_items, "one-arm bans weapon-slot item " + id)
 	m.on_menu_reset()
+
+
+# ============================================================
+# 与其他 mod 的道具共处：只重组原版（含 DLC）资源
+# ============================================================
+func test_94_other_mod_items_untouched() -> void:
+	var fake = _item("item_potato").duplicate()
+	fake.my_id = "item_testmod_widget"
+	fake.my_id_hash = Keys.generate_hash(fake.my_id)
+	fake.name = "TESTMOD_WIDGET"
+	fake.unlocked_by_default = true
+	var fake_effects = fake.effects
+	isvc.add_mod_item(fake)
+	_check(not m.is_native_resource(fake), "script-created item is not native")
+	_check(m.is_native_resource(_item("item_potato")), "base item is native")
+	var dlc_item = null
+	for it in isvc.items:
+		if it.resource_path.begins_with("res://dlcs/"):
+			dlc_item = it
+			break
+	if dlc_item != null:
+		_check(m.is_native_resource(dlc_item), "DLC item is native: " + dlc_item.my_id)
+	m.start_new_run()
+	_check(not m.plan.items.has("item_testmod_widget"), "mod item not reassembled")
+	_check(fake.effects == fake_effects and fake.name == "TESTMOD_WIDGET", "mod item unchanged")
+	_check(fake in isvc.items, "mod item still registered")
+	isvc.init_unlocked_pool()
+	var in_pool = false
+	for it in isvc.get_pool(fake.tier, 0):
+		if it == fake:
+			in_pool = true
+	_check(in_pool, "mod item still in the shop pool")
+	var pl = m.preview_plan(42)
+	_check(not pl.items.has("item_testmod_widget"), "preview ignores mod item")
+	m.on_menu_reset()
+	isvc.remove_mod_item(fake)
+	isvc.init_unlocked_pool()
+
+
+# ============================================================
+# 诅咒：把整个生成道具池逐件诅咒（原版 DLC 代码），检查方向与可用性
+# ============================================================
+func _is_good(e) -> bool:
+	var s = e.get_sign(e.effect_sign, e.value)
+	return s == Effect.Sign.POSITIVE or s == Effect.Sign.OVERRIDE
+
+
+func test_95_curse_whole_pool() -> void:
+	var pd = tree.root.get_node("ProgressData")
+	var dlc = pd.get_dlc_data("abyssal_terrors")
+	if dlc == null:
+		print("  (DLC data unavailable, skipped)")
+		return
+	rd.current_wave = 12
+	# 原版诅咒对这些 key 有特殊处理（固定值 / 随机值 / 数值越小越好）
+	var special_keys = ["dodge_cap", "hp_start_next_wave", "extra_elite_next_wave_chance", "hit_protection", "stat_curse", "knockback_aura", "modify_every_x_projectile"]
+	var n_items = 0
+	var n_trig = 0
+	var n_side = 0
+	for sd in [11, 222]:
+		var gen = Generator.new(_cfg(), sd)
+		var plan = gen.generate(isvc.items, isvc.characters, [], [])
+		for id in plan.items:
+			var holder = _item(id).duplicate()
+			holder.effects = plan.items[id].effects
+			holder.is_cursed = false
+			var cursed = dlc.curse_item(holder, 0)
+			n_items += 1
+			_check(cursed.is_cursed and cursed.curse_factor > 0.0, id + " cursed")
+			# 原版诅咒可能插入额外行（藏宝图 +幸运、铁砧 +护甲……）：按类型与 key 匹配对应行
+			var used = {}
+			for i in holder.effects.size():
+				var a = holder.effects[i]
+				var b = null
+				for j in cursed.effects.size():
+					var c = cursed.effects[j]
+					if not used.has(j) and c.get_script() == a.get_script() and c.key == a.key and c.custom_key == a.custom_key:
+						b = c
+						used[j] = true
+						break
+				_check(b != null, "%s effect %d (%s) survives the curse" % [id, i, a.key])
+				if b == null:
+					continue
+				var txt = b.get_text(0, false)
+				_check(txt.find("AA_") == -1, "%s cursed text: %s" % [id, txt])
+				if (a.custom_key if a.custom_key != "" else a.key) in special_keys:
+					continue
+				if a.value != 0 and "value" in b:
+					if _is_good(a):
+						_check(abs(b.value) >= abs(a.value), "%s: good line not weakened (%s: %d -> %d)" % [id, a.key, a.value, b.value])
+					else:
+						_check(abs(b.value) <= abs(a.value), "%s: bad line not strengthened (%s: %d -> %d)" % [id, a.key, a.value, b.value])
+				if a is TriggerEffect:
+					n_trig += 1
+					if a.side_value != 0:
+						n_side += 1
+						_check(abs(b.side_value) <= abs(a.side_value), "%s: paired downside reduced (%d -> %d)" % [id, a.side_value, b.side_value])
+					if a.grant != null:
+						_check(b.grant != null, id + " grant kept")
+	print("AUDIT cursed %d items, %d trigger clauses (%d paired)" % [n_items, n_trig, n_side])
+	_check(n_side > 3, "paired clauses covered")
+	# 诅咒后的触发条款在运行时照常生效（并且更强）
+	TempStats.reset()
+	var base = _item("item_potato").duplicate()
+	base.effects = [TriggerEffect.make({"trigger": "kill", "payload": "temp_stat", "stat": "stat_armor", "value": 2, "side_stat": "enemy_damage", "side_value": 4})]
+	var cursed2 = dlc.curse_item(base, 0, true)
+	rd.players_data[0].items.push_back(cursed2)
+	var rt = Runtime.new()
+	tree.root.add_child(rt)
+	rt.mod = m
+	rt.rebuild_all()
+	rt.fire("kill", 0)
+	_check(int(TempStats.get_stat(Keys.stat_armor_hash, 0) / rd.get_stat_gain(Keys.stat_armor_hash, 0)) >= 3, "cursed trigger stronger at runtime")
+	_check(int(TempStats.get_stat(Keys.generate_hash("enemy_damage"), 0)) <= 3, "cursed paired downside weaker at runtime")
+	rt.queue_free()
+	TempStats.reset()
+	rd.players_data[0].items.erase(cursed2)
