@@ -14,7 +14,7 @@ extends Reference
 #   永久属性（逐次累积）            w × v × 次数 × 累积倍率（与购买时剩余波数有关）
 #   回血 / 材料 / 经验 / 伤害       每波总量 × 对应单位价值
 # 频率统一用"每波期望次数"表示（波长按 60 秒估计，大部分波次为 60 秒），见 TRIGGERS。
-# 击杀 / 拾取材料 / 受击 / 回血的次数刻意高估，以压低这些高频扳机上的单次数值。
+# 击杀 / 拾取材料 / 受击 / 回血的次数现已不再高估。
 
 const WAVE_SECONDS = 60.0
 
@@ -86,12 +86,12 @@ const EXPLOSION_TARGETS = 2.5	# 爆炸平均命中数
 #   w: 基础出现权重（与原版先验相加）
 # ------------------------------------------------------------
 const TRIGGERS = {
-	"kill": {"kind": "event", "e": 120.0, "timing": 0.5, "gate": "every", "w": 1.0},
-	"hit": {"kind": "event", "e": 10.0, "timing": 0.5, "gate": "chance", "w": 1.0},
+	"kill": {"kind": "event", "e": 90.0, "timing": 0.5, "gate": "every", "w": 1.0},
+	"hit": {"kind": "event", "e": 7.0, "timing": 0.5, "gate": "chance", "w": 1.0},
 	"dodge": {"kind": "event", "e": 4.0, "timing": 0.5, "gate": "chance", "w": 1.0},
 	"consumable": {"kind": "event", "e": 7.0, "timing": 0.5, "gate": "chance", "w": 1.0},
-	"gold": {"kind": "event", "e": 120.0, "timing": 0.5, "gate": "every", "w": 0.6},
-	"heal": {"kind": "event", "e": 20.0, "timing": 0.5, "gate": "chance", "w": 0.4},
+	"gold": {"kind": "event", "e": 90.0, "timing": 0.5, "gate": "every", "w": 0.6},
+	"heal": {"kind": "event", "e": 14.0, "timing": 0.5, "gate": "chance", "w": 0.4},
 	"level_up": {"kind": "event", "e": 1.3, "timing": 0.5, "gate": "none", "w": 0.9},
 	"wave_start": {"kind": "event", "e": 1.0, "timing": 1.0, "gate": "none", "w": 0.8},
 	"wave_end": {"kind": "event", "e": 1.0, "timing": 0.0, "gate": "none", "w": 0.8},
@@ -105,7 +105,7 @@ const TRIGGERS = {
 	"crit_kill": {"kind": "event", "e": 30.0, "timing": 0.5, "gate": "every", "w": 0.7},
 	"burning_kill": {"kind": "event", "e": 25.0, "timing": 0.5, "gate": "every", "w": 0.3},
 	# 每走 N 步（徒步旅行者）：移动时约每秒 3.33 步，每波约 200 步，实际强度不足，需要低估
-	"steps": {"kind": "event", "e": 120.0, "timing": 0.5, "gate": "every", "w": 0.3},
+	"steps": {"kind": "event", "e": 90.0, "timing": 0.5, "gate": "every", "w": 0.3},
 	# 波次进行到一半时（赛博格）
 	"half_wave": {"kind": "event", "e": 1.0, "timing": 0.5, "gate": "none", "w": 0.3},
 	"buy": {"kind": "shop", "e": 3.0, "timing": 0.0, "gate": "chance", "w": 0.3},
