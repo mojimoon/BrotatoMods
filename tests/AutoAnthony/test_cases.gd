@@ -1702,3 +1702,63 @@ func test_98_enemy_stat_clauses() -> void:
 	var e = TriggerEffect.make(c)
 	_eq(e.effect_sign, Effect.Sign.NEGATIVE, "enemy stat clause uses the native negative sign")
 	_check(e.is_downside(), "enemy stat clause is a downside")
+
+
+# ============================================================
+# 建筑 / 宠物 / 沙漏 / 金鱼 / 镜子现在也会被重组；角色初始道具保留原版；T4 无 +收获；T3 单效果非纯数值
+# ============================================================
+func test_99_structures_and_special_items_reassembled() -> void:
+	var plan = _gen(42)
+	for id in ["item_turret", "item_landmines", "item_garden", "item_bonk_dog", "item_lootworm", "item_hourglass", "item_goldfish", "item_mirror"]:
+		_check(plan.items.has(id), id + " is reassembled")
+	for id in ["item_builder_turret_0", "item_goldfish_used", "item_broken_mirror", "item_broken_hourglass"]:
+		_check(not plan.items.has(id), id + " kept")
+	m.start_new_run()
+	for id in ["item_hourglass", "item_goldfish", "item_mirror"]:
+		_eq(_item(id).replaced_by, null, id + " no longer turns into another item")
+	m.on_menu_reset()
+	_check(_item("item_mirror").replaced_by != null, "mirror replaced_by restored")
+	# 技术法师：开局两个炮台保留原版效果，商店里的炮台是重组版本
+	_setup_player("character_technomage")
+	rd.add_starting_items_and_weapons()
+	var native_turret_effects = _item("item_turret").effects
+	m.start_new_run()
+	var owned_turrets = 0
+	for it in rd.players_data[0].items:
+		if it.my_id == "item_turret":
+			owned_turrets += 1
+			_check(it.effects == native_turret_effects, "starting turret keeps its native effect")
+			_check(it.is_structure_item(), "starting turret still spawns a structure")
+	_eq(owned_turrets, 2, "technomage owns two starting turrets")
+	_check(_item("item_turret").effects != native_turret_effects, "shop turret is reassembled")
+	_check(m.active_state.kept_native.has("item_turret"), "kept list saved in run state")
+	m.on_menu_reset()
+
+
+func test_99b_tier_rules() -> void:
+	var t3_single = 0
+	for sd in SEEDS:
+		var gen = Generator.new(_cfg(), sd)
+		var plan = gen.generate(isvc.items, isvc.characters, [], [])
+		for id in plan.items:
+			var tier = _item(id).tier
+			var p = plan.items[id]
+			if tier == 3:
+				for e in p.effects:
+					if e.value > 0 and (e.key == "stat_harvesting" or (e is TriggerEffect and e.stat == "stat_harvesting") or (gen.is_scaling(e) and e.key == "stat_harvesting")):
+						_check(false, id + " T4 item has +harvesting: " + e.get_text(0, false))
+			if tier == 2 and p.effects.size() == 1:
+				t3_single += 1
+				_check(not gen.is_plain_stat(p.effects[0]), id + " T3 single-line item is not a plain stat")
+	print("AUDIT T3 single-line items: %d (5 seeds)" % t3_single)
+	# 敌人属性作为独立代价 / 触发结果
+	var gen2 = Generator.new(_cfg(), 9)
+	gen2._collect_priors(isvc.items, isvc.characters, isvc.weapons)
+	gen2.rng.seed = 9
+	var enemy_neg = 0
+	for i in 300:
+		var c = gen2.gen_clause(-8.0, 4.0, true)
+		if not c.empty() and Catalog.ENEMY_STATS.has(c.stat):
+			enemy_neg += 1
+			_check(c.value > 0 and Valuation.clause_value(c, 4.0) < 0, "enemy downside clause increases enemy stat")
+	_check(enemy_neg > 20, "negative trigger clauses can raise enemy stats (%d)" % enemy_neg)

@@ -298,6 +298,8 @@ func _activate(state: Dictionary) -> void:
 			res.tracking_text = "[EMPTY]"
 			# 原版的"限制 (N)"/"独特"属于原道具，不继承到重组后的道具上
 			res.max_nb = -1
+			# 金鱼 / 沙漏 / 镜子在原版"用后 / 移除时变成另一件道具"：重组后不再继承
+			res.replaced_by = null
 			if rename:
 				res.name = _compose_name(p.adj, _backups[res.get_instance_id()].name)
 	for id in plan.characters:
@@ -425,6 +427,7 @@ func _backup(res) -> void:
 		b.tags = res.tags
 		b.tracking_text = res.tracking_text
 		b.max_nb = res.max_nb
+		b.replaced_by = res.replaced_by
 	_backups[id] = b
 
 
@@ -442,6 +445,7 @@ func restore() -> void:
 			res.tags = b.tags
 			res.tracking_text = b.tracking_text
 			res.max_nb = b.max_nb
+			res.replaced_by = b.replaced_by
 	_backups.clear()
 	if _groups_backup != null:
 		var isvc = _autoload("ItemService")
@@ -488,6 +492,17 @@ func _template_for(res):
 func _materialize_owned(owned: Array) -> void:
 	var rd = _autoload("RunData")
 	var touched = {}
+	# 角色自带的初始道具（技术法师的炮台、野兽大师的战利品虫、法师的蛇……）是角色特征的一部分：保留原版效果
+	var starting = []
+	for p in rd.get_player_count():
+		var counts = {}
+		var ch = rd.players_data[p].current_character
+		if ch != null:
+			for e in ch.effects:
+				if e.custom_key in ["starting_item", "cursed_starting_item"]:
+					counts[e.key] = counts.get(e.key, 0) + max(1, e.value)
+		starting.push_back(counts)
+	var kept = []
 	for o in owned:
 		var p: int = o[0]
 		var res = o[1]
@@ -497,6 +512,21 @@ func _materialize_owned(owned: Array) -> void:
 		var tmpl = _template_for(res)
 		if tmpl == null:
 			continue
+		if res == tmpl and not res is CharacterData and not res is WeaponData and starting[p].get(res.my_id, 0) > 0:
+			starting[p][res.my_id] -= 1
+			var copy = res.duplicate()
+			var b = _backups[res.get_instance_id()]
+			copy.effects = old
+			copy.name = b.name
+			copy.tags = b.tags
+			copy.tracking_text = b.tracking_text
+			copy.max_nb = b.max_nb
+			copy.replaced_by = b.replaced_by
+			var items = rd.players_data[p].items
+			items[items.find(res)] = copy
+			if not res.my_id in kept:
+				kept.push_back(res.my_id)
+			continue
 		rd.unapply_effects_array(old, p)
 		if res != tmpl:
 			res.effects = tmpl.effects if res is WeaponData else _dup_effects(tmpl.effects)
@@ -505,8 +535,11 @@ func _materialize_owned(owned: Array) -> void:
 				res.tags = tmpl.tags
 				res.tracking_text = tmpl.tracking_text
 				res.max_nb = tmpl.max_nb
+				res.replaced_by = tmpl.replaced_by
 		rd.apply_item_effects(res, p)
 		touched[p] = true
+	if active_state != null:
+		active_state["kept_native"] = kept
 	for p in touched:
 		rd.update_sets(p)
 		rd.update_item_related_effects(p)
@@ -544,11 +577,17 @@ func _repair_item(it) -> void:
 	var tmpl = _template_for(it)
 	if tmpl == null or tmpl == it:
 		return
+	# 开局保留原版效果的角色初始道具：名字仍为原版名字，不做修复
+	if active_state != null and it.my_id in active_state.get("kept_native", []):
+		var b = _backups.get(tmpl.get_instance_id())
+		if b != null and it.name == b.name:
+			return
 	it.name = tmpl.name
 	if not it is CharacterData:
 		it.tags = tmpl.tags
 		it.tracking_text = tmpl.tracking_text
 		it.max_nb = tmpl.max_nb
+		it.replaced_by = tmpl.replaced_by
 	var has_trigger = false
 	for e in it.effects:
 		if e is TriggerEffect:

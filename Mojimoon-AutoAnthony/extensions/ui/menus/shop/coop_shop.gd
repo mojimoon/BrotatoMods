@@ -35,7 +35,7 @@ func _on_GoButton_pressed(player_index: int) -> void:
 		var holders = []
 		var count = 0
 		for it in RunData.get_player_items(p):
-			if it.my_id_hash == Keys.item_hourglass_hash:
+			if it.my_id_hash == Keys.item_hourglass_hash and not _aa_generated(it):
 				continue
 			for e in it.effects:
 				if e.key_hash == Keys.item_hourglass_hash:
@@ -63,6 +63,12 @@ func _on_GoButton_pressed(player_index: int) -> void:
 const AA_NATIVE_HOLDERS = ["item_mirror", "item_goldfish", "item_hourglass"]
 
 
+# 原版的镜子 / 金鱼 / 沙漏交给原版处理；重组后同 ID 的道具按本 mod 规则处理
+func _aa_generated(it) -> bool:
+	var m = AAMain.get_mod()
+	return m != null and m.is_generated(it)
+
+
 static func _aa_effect_key(e) -> String:
 	return e.custom_key if e.custom_key != "" else e.key
 
@@ -73,7 +79,7 @@ func _aa_snapshot(keys: Array) -> Array:
 	for p in RunData.get_player_count():
 		var seen = {}
 		for it in RunData.get_player_items_ref(p):
-			if it.my_id in AA_NATIVE_HOLDERS or seen.has(it.my_id):
+			if (it.my_id in AA_NATIVE_HOLDERS and not _aa_generated(it)) or seen.has(it.my_id):
 				continue
 			for e in it.effects:
 				if _aa_effect_key(e) in keys:

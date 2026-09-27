@@ -61,6 +61,8 @@ var posneg: Dictionary = {}
 var pos_cat := ""
 var neg_cat := ""
 var anchor_stat := ""
+# 当前生成道具的稀有度（T4 不出现 +收获）
+var cur_tier := -1
 # 计数型 / 属性修改的原版先验
 var counter_prior: Dictionary = {}
 var gain_mod_prior := 0.0
@@ -117,9 +119,6 @@ func _is_reassemblable_item(item) -> bool:
 	if item.my_id in Catalog.ANCHORED_ITEMS:
 		return false
 	if item.tier < 0 or item.tier > 3:
-		return false
-	if item.is_pet_item() or item.is_structure_item():
-		# 宠物 / 建筑道具的外观、计数与其效果绑定：保留原样，但其机制行可以被其他道具借用
 		return false
 	return true
 
@@ -474,6 +473,8 @@ func _pick_stat(neg: bool, exclude: Array = [], allowed = null) -> String:
 	var weights = {}
 	var src = stat_neg_w if neg else stat_pos_w
 	for s in src:
+		if not neg and cur_tier == 3 and s in Catalog.T4_BANNED_POSITIVE_STATS:
+			continue
 		if s in exclude:
 			continue
 		if allowed != null and not s in allowed:
@@ -534,7 +535,18 @@ func generate_item(item) -> Dictionary:
 	_seed_for(item.my_id)
 	if rng.randf() < float(cfg.get("native_ratio", 0)) / 100.0:
 		return {}
+	# T3 道具如果只有一条效果，不能是单纯的数值效果：重掷（强制带特殊行）
+	var r = {}
+	for attempt in 4:
+		r = _generate_item_once(item, attempt > 0)
+		if item.tier == 2 and not r.empty() and r.effects.size() == 1 and is_plain_stat(r.effects[0]):
+			continue
+		break
+	return r
 
+
+func _generate_item_once(item, force_special: bool) -> Dictionary:
+	cur_tier = item.tier
 	var tier: int = item.tier
 	var perm_mult: float = Catalog.PERM_MULT[tier]
 	var budget: float = item_budget(item) * Catalog.HIDDEN_TIER_MULT[item.tier] * _avg_mult() * _variance_mult()
@@ -571,7 +583,7 @@ func generate_item(item) -> Dictionary:
 			if not cd.empty():
 				downsides += cd.effects
 				got = cd.value
-		elif r >= 0.37 and r < 0.45:
+		elif r >= 0.37 and r < 0.41:
 			var nd = gen_next_wave_downside(comp, perm_mult)
 			if not nd.empty():
 				downsides += nd.effects
@@ -603,7 +615,7 @@ func generate_item(item) -> Dictionary:
 	# 2) 特殊行：数量按原版同稀有度"带特殊行的比例" × 触发效果滑条；约 70% 为触发条款，其余为搬运机制
 	var p_special = special_share_by_tier[tier] * _trigger_rate()
 	var slots = 0
-	if rng.randf() < min(0.95, p_special):
+	if rng.randf() < min(0.95, p_special) or force_special:
 		slots += 1
 	if rng.randf() < p_special - 1.0:
 		slots += 1
@@ -717,6 +729,7 @@ func generate_item(item) -> Dictionary:
 	pos_cat = ""
 	neg_cat = ""
 	anchor_stat = ""
+	cur_tier = -1
 
 	return {
 		"effects": ordered,
@@ -1205,7 +1218,7 @@ func _next_wave_side(comp: float, perm_mult: float, exclude: Array) -> Dictionar
 	var W = Catalog.remaining_waves(perm_mult)
 	var stat = ""
 	var sign_v = 1
-	if rng.randf() < 0.6:
+	if rng.randf() < 0.5:
 		var keys = Catalog.ENEMY_STATS.keys()
 		stat = keys[rng.randi() % keys.size()]
 	else:
@@ -1405,8 +1418,13 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 
 	match payload:
 		"temp_stat", "timed_stat":
-			c.stat = _pick_stat(negative, Catalog.TEMP_STAT_BANNED + ([anchor_stat] if negative else []))
-			c.value = Catalog.stat_unit(c.stat)
+			if negative and rng.randf() < Catalog.NEGATIVE_CLAUSE_ENEMY_CHANCE:
+				var ek = Catalog.ENEMY_STATS.keys()
+				c.stat = ek[rng.randi() % ek.size()]
+				c.value = 1
+			else:
+				c.stat = _pick_stat(negative, Catalog.TEMP_STAT_BANNED + ([anchor_stat] if negative else []))
+				c.value = Catalog.stat_unit(c.stat)
 			if payload == "timed_stat":
 				c.value2 = [3, 4, 5, 6, 8][rng.randi() % 5]
 			if payload == "temp_stat" and t.kind == "event" and Valuation.raw_rate(trigger, 1, 100) > 6.0 and rng.randf() < 0.5:
@@ -1507,7 +1525,8 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 	if c.payload in ["temp_stat", "perm_stat", "timed_stat"]:
 		c.value = int(min(c.value, _line_cap(c.stat, negative)))
 	if negative:
-		c.value = -abs(c.value)
+		# 敌人属性的"代价"方向是提高（正值），自身属性是降低（负值）
+		c.value = abs(c.value) if Catalog.ENEMY_STATS.has(c.stat) else -abs(c.value)
 	return c
 
 

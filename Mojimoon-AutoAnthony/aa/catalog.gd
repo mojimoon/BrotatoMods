@@ -22,7 +22,8 @@ const WAVE_SECONDS = 60.0
 const TIER_INTERCEPT = [11.5, 30.0, 40.9, 39.0]
 # 永久累积倍率：Tier 越高通常购买越晚、剩余波数越少。角色视为整局持有。
 # 由原版"每波永久成长"道具反推（警戒戒指 6.4、机械臂 3.5、魔法叶 3.3、鬼火 2.5、宝宝乌贼 6.1），中位约 3.5
-const PERM_MULT = [5.0, 4.5, 4.0, 3.5]
+# 期望剩余波数 T1–T4 = 11 / 9 / 7 / 5（累积倍率 = (波数 + 1) / 2）
+const PERM_MULT = [6.0, 5.0, 4.0, 3.0]
 # 高频扳机上永久效果的每波上限最大值
 const PERM_CAP_MAX = 10
 const PERM_MULT_CHARACTER = 7.0
@@ -244,10 +245,10 @@ const REPEAT_PENALTY_PAYLOAD = 0.08
 # 行为写死在道具 ID 上的道具：保持原样，也不作为机制组件的来源
 # 道具 ID 本身还有额外含义的道具（望远镜的升级预览、诱饵的渔夫计数、口袋工厂计入建筑数、美西螈的商店刷新规则、
 # 金鱼 / 沙漏 / 镜子的"用后变成另一件道具"）：道具本身保持原样，但它们的效果可以出现在其他重组道具上
+# 金鱼 / 沙漏 / 镜子本身会被重组（并去掉"用后变成另一件道具"），只保留它们不可获得的"用后形态"
 const ANCHORED_ITEMS = [
 	"item_spyglass", "item_bait", "item_pocket_factory", "item_axolotl",
-	"item_goldfish", "item_goldfish_used", "item_hourglass", "item_broken_hourglass",
-	"item_mirror", "item_broken_mirror",
+	"item_goldfish_used", "item_broken_hourglass", "item_broken_mirror",
 	"item_builder_turret_0", "item_builder_turret_1", "item_builder_turret_2", "item_builder_turret_3",
 ]
 # 不作为组件来源的道具（建造者的角色专属炮台）
@@ -477,7 +478,8 @@ const SCALAR_MECHANIC_EXCLUDED = ["hp_start_next_wave", "hp_start_wave", "speed_
 const ENEMY_STATS = {
 	"enemy_health": {"w": 0.6, "unit": 1},
 	"enemy_damage": {"w": 0.8, "unit": 1},
-	"enemy_speed": {"w": 1.0, "unit": 1},
+	# 孔雀：+25% 敌人速度 ≈ +50% 敌人伤害 → 每 1% 速度按伤害的 2 倍估值
+	"enemy_speed": {"w": 1.6, "unit": 1},
 }
 
 # ============================================================
@@ -495,7 +497,7 @@ const NEXT_WAVE_POS_KINDS = {"xp_gain": 0.7, "loot_aliens": 0.3}
 # 每个额外战利品外星人（一次性）的价值：原版诱饵 34 材料（+2 再生、下一波 +2 个）反推约 4.6
 const LOOT_ALIEN_VALUE = 4.6
 # "下一波"正面行附带同一行为下负面行的概率（原版芹菜茶、孔雀都是成对的）
-const NEXT_WAVE_PAIR_CHANCE = 0.5
+const NEXT_WAVE_PAIR_CHANCE = 0.35
 # 属性类触发条款附带同一扳机负面部分的概率
 const PAIRED_CLAUSE_CHANCE = 0.4
 
@@ -543,3 +545,9 @@ const PACIFIST_W = 0.4			# 每 0.01 材料+经验 / 存活敌人（波末约 30 
 const WEAPON_SLOT_W = 25.0
 const GROUP_STRUCTURES_VALUE = 6.0
 const CHAR_COMPONENT_WEIGHTS = {"class_bonus": 0.45, "burn_bonus": 0.15, "pacifist": 0.15, "weapon_slot": 0.15, "group_structures": 0.1}
+
+
+# T4 道具不出现 +收获（与原版一致）
+const T4_BANNED_POSITIVE_STATS = ["stat_harvesting"]
+# 负面触发条款使用敌人属性（生命 / 伤害 / 速度提高）的概率
+const NEGATIVE_CLAUSE_ENEMY_CHANCE = 0.3
