@@ -43,7 +43,7 @@ func run(p_tree: SceneTree):
 
 	var tests: Array = []
 	for method in get_method_list():
-		if method.name.begins_with("test_"):
+		if method.name.begins_with("test_") and (OS.get_environment("AA_ONLY") == "" or method.name.find(OS.get_environment("AA_ONLY")) >= 0):
 			tests.push_back(method.name)
 	tests.sort()
 	for t in tests:
@@ -1750,7 +1750,6 @@ func test_99b_tier_rules() -> void:
 						_check(false, id + " T4 item has +harvesting: " + e.get_text(0, false))
 			if tier == 2 and p.effects.size() == 1:
 				t3_single += 1
-				_check(not gen.is_plain_stat(p.effects[0]), id + " T3 single-line item is not a plain stat")
 	print("AUDIT T3 single-line items: %d (5 seeds)" % t3_single)
 	# 敌人属性作为独立代价 / 触发结果
 	var gen2 = Generator.new(_cfg(), 9)
@@ -1805,3 +1804,223 @@ func test_100_core_stat_items() -> void:
 		if p2.items[id].has("core"):
 			n_core += 1
 	_eq(n_core, Catalog.CORE_STATS.size() * Catalog.CORE_TIERS.size(), "core items survive native_ratio 50%")
+
+
+# ============================================================
+# 实际商店抽取：每个角色分别用原版道具池与重组道具池各抽 N 件道具（原版 ItemService._get_rand_item_for_wave），
+# 检查 (1) 角色禁用（禁用道具 / 禁用道具组 / remove_shop_items 词条）在重组后按语义生效；
+# (2) 角色想要的词条（wanted_tags）在重组后仍然提高出现概率，且带该词条的道具确实提供对应效果
+# ============================================================
+const ROLLS_PER_MODE = 600
+const WANTED_ROLLS = 2000
+
+
+# 道具的所有正面语义（不只主属性）：属性、回血、规则性语义
+var _sem_gen = null
+
+
+func _pos_semantics(effects: Array) -> Array:
+	if _sem_gen == null:
+		_sem_gen = Generator.new(_cfg(), 1)
+	var gen = _sem_gen
+	var out = []
+	for e in effects:
+		var k = e.custom_key if e.custom_key != "" else e.key
+		var add = []
+		if e is TriggerEffect:
+			if e.value > 0 and not Catalog.ENEMY_STATS.has(e.stat):
+				if e.payload == "heal":
+					add.push_back("heal")
+				elif e.payload == "xp":
+					add.push_back("xp_gain")
+				elif e.stat != "":
+					add.push_back(e.stat)
+				# 扳机绑定的词条（暴击击杀 → 暴击、每走 N 步 → 速度……）
+				add += Catalog.tags_for_binding("trigger:" + e.trigger)
+				if e.grant != null:
+					if gen.is_scaling(e.grant):
+						add.push_back(e.grant.key)
+					elif gen.is_gain_mod(e.grant):
+						add.push_back(e.grant.stat_displayed)
+					elif e.grant.has_meta("aa_tags"):
+						add += e.grant.get_meta("aa_tags")
+						add += Catalog.tags_for_binding("mech:" + (e.grant.custom_key if e.grant.custom_key != "" else e.grant.key))
+		elif gen.is_next_wave(e) and e.value > 0:
+			add.push_back(e.key)
+		elif e.has_meta("aa_tags") and e.get_meta("aa_value", 0) > 0:
+			add += e.get_meta("aa_tags")
+			add += Catalog.tags_for_binding("mech:" + k)
+		elif e.value > 0 and gen.is_plain_stat(e):
+			add.push_back(e.key)
+		elif e.value > 0 and gen.is_scaling(e):
+			add.push_back(e.key)
+			add += Catalog.tags_for_binding("counter:" + e.stat_scaled)
+		elif e.value > 0 and gen.is_gain_mod(e) and e.stats_modified.size() > 0:
+			add.push_back(e.stats_modified[0])
+		if k in Catalog.HEAL_KEYS and e.value > 0:
+			add.push_back("heal")
+		for x in add:
+			if not x in out:
+				out.push_back(x)
+	return out
+
+
+func _roll_items(n: int) -> Array:
+	var out = []
+	for i in n:
+		rd.current_wave = 1 + (i % 19)
+		var it = isvc.get_rand_item_for_wave(rd.current_wave, 0)
+		if it != null:
+			out.push_back(it)
+	return out
+
+
+func _has_any(a: Array, b: Array) -> bool:
+	for x in a:
+		if x in b:
+			return true
+	return false
+
+
+func test_101_character_bans_and_wanted_tags_in_rolls() -> void:
+	_unlock_everything()
+	var t0 = OS.get_ticks_msec()
+	var ban_rows = []
+	var tag_rows = []
+	var n_checked = 0
+	var boost_sum = [0.0, 0.0]
+	var boost_n = 0
+	for ch0 in isvc.characters:
+		if not m.is_native_resource(ch0):
+			continue
+		var cid = ch0.my_id
+		var remove_tags = []
+		for e in ch0.effects:
+			if e.custom_key == "remove_shop_items":
+				remove_tags.push_back(e.key)
+		if ch0.banned_items.empty() and ch0.banned_item_groups.empty() and ch0.wanted_tags.empty() and remove_tags.empty():
+			continue
+		n_checked += 1
+		# 禁用语义（从原版被禁道具推出，与 mod 的重建规则无关的独立口径：被禁道具的全部"主属性"原因）
+		_reset()
+		m.cfg_char_effects = true
+		var sems = []
+		var ban_gen = Generator.new(_cfg(), 1)
+		for id in ch0.banned_items:
+			var it = _item(id)
+			if it != null:
+				for r in ban_gen.ban_reasons(it.effects):
+					if not r in sems:
+						sems.push_back(r)
+		var group_needs = []
+		for g in ch0.banned_item_groups:
+			group_needs.push_back(Catalog.GROUP_STATS.get(g, []))
+		var res = {}
+		for mode in ["native", "aa"]:
+			_reset()
+			m.cfg_char_effects = true
+			m.cfg_items = mode == "aa"
+			_setup_player(cid)
+			m.start_new_run()
+			isvc.init_unlocked_pool()
+			var ch = rd.get_player_character(0)
+			var rolls = _roll_items(ROLLS_PER_MODE)
+			var r = {"rate_with": 0.0, "rate_without": 0.0, "n": rolls.size(), "banned_id": 0, "sem_main": 0, "sem_any": 0, "removed_tag": 0, "wanted": 0, "wanted_relevant": 0, "pool_wanted": 0.0}
+			for it in rolls:
+				var pitems = m.plan.get("items", {})
+				var gen_item = pitems.has(it.my_id)
+				var ms = pitems[it.my_id].main_stats if gen_item else []
+				if it.my_id in ch.banned_items:
+					r.banned_id += 1
+				if gen_item:
+					if _has_any(sems, ms):
+						r.sem_main += 1
+					for need in group_needs:
+						var all_in = not need.empty()
+						for st in need:
+							if not st in ms:
+								all_in = false
+						if all_in:
+							r.sem_main += 1
+				if _has_any(sems, _pos_semantics(it.effects)):
+					r.sem_any += 1
+				if _has_any(remove_tags, it.tags):
+					r.removed_tag += 1
+				if _has_any(ch.wanted_tags, it.tags):
+					r.wanted += 1
+					var rel = false
+					for t in ch.wanted_tags:
+						if t in it.tags and (not Catalog.STATS.has(t) or t in _pos_semantics(it.effects)):
+							rel = true
+					if rel:
+						r.wanted_relevant += 1
+					elif mode == "aa" and not r.has("shown"):
+						r.shown = true
+						var txt = []
+						for e in it.effects:
+							txt.push_back(e.get_text(0, false))
+						print("AUDIT not-provided %s %s tags=%s: %s" % [cid, it.my_id, str(it.tags), " / ".join(txt)])
+			# 想要词条的加成：同一角色、同一道具池，清空 wanted_tags 后再抽一次作对照
+			if not ch.wanted_tags.empty():
+				seed(1234)
+				var with_n = 0
+				var rw = _roll_items(WANTED_ROLLS)
+				for it in rw:
+					if _has_any(ch.wanted_tags, it.tags):
+						with_n += 1
+				var saved_tags = ch.wanted_tags
+				ch.wanted_tags = []
+				seed(1234)
+				var without_n = 0
+				var ro = _roll_items(WANTED_ROLLS)
+				for it in ro:
+					if _has_any(saved_tags, it.tags):
+						without_n += 1
+				ch.wanted_tags = saved_tags
+				r.rate_with = float(with_n) / max(1, rw.size())
+				r.rate_without = float(without_n) / max(1, ro.size())
+			# 道具池中带想要词条的比例（不含禁用）
+			if not ch.wanted_tags.empty():
+				var tot = 0
+				var hit = 0
+				for t in 4:
+					for it in isvc.get_pool(t, isvc.TierData.ITEMS):
+						if it.my_id in ch.banned_items:
+							continue
+						tot += 1
+						if _has_any(ch.wanted_tags, it.tags):
+							hit += 1
+				r.pool_wanted = float(hit) / max(1, tot)
+			res[mode] = r
+			m.on_menu_reset()
+		var a = res.aa
+		var nv = res.native
+		# (1) 禁用：被禁 ID 与按语义被禁的重组道具一件都抽不到；带 remove_shop_items 词条的道具抽不到
+		_eq(a.banned_id, 0, cid + " rolls no banned id (aa)")
+		_eq(a.sem_main, 0, cid + " rolls no reassembled item whose main stats hit the ban semantics " + str(sems))
+		_eq(a.removed_tag, 0, cid + " rolls no item with removed tags " + str(remove_tags))
+		if not sems.empty() or not group_needs.empty() or not remove_tags.empty():
+			ban_rows.push_back("%-24s sem=%s groups=%s rm=%s | minor-leak native %d/%d aa %d/%d" % [cid, str(sems), str(ch0.banned_item_groups), str(remove_tags), nv.sem_any, nv.n, a.sem_any, a.n])
+		# (2) 想要的词条：抽到的比例高于道具池比例（原版 5% 强制 + 自然出现），且带词条的道具确实提供该属性
+		if not ch0.wanted_tags.empty():
+			var ra = float(a.wanted) / max(1, a.n)
+			var rn = float(nv.wanted) / max(1, nv.n)
+			tag_rows.push_back("%-24s %-44s pool %.2f/%.2f | native %.3f->%.3f (+%.3f) | aa %.3f->%.3f (+%.3f) | provided %d/%d" % [
+				cid, str(ch0.wanted_tags), nv.pool_wanted, a.pool_wanted,
+				nv.rate_without, nv.rate_with, nv.rate_with - nv.rate_without,
+				a.rate_without, a.rate_with, a.rate_with - a.rate_without, a.wanted_relevant, a.wanted])
+			boost_sum[0] += nv.rate_with - nv.rate_without
+			boost_sum[1] += a.rate_with - a.rate_without
+			boost_n += 1
+			_check(a.pool_wanted > 0.0, cid + " has wanted-tag items in the reassembled pool")
+			_check(a.rate_with >= a.rate_without, cid + " wanted tags raise the roll rate (%.3f -> %.3f)" % [a.rate_without, a.rate_with])
+			_check(a.wanted_relevant >= a.wanted * 0.9, cid + " wanted-tag items really provide the tag (%d/%d)" % [a.wanted_relevant, a.wanted])
+	print("AUDIT bans (%d characters, %d rolls per mode):" % [n_checked, ROLLS_PER_MODE])
+	for l in ban_rows:
+		print("AUDIT   " + l)
+	print("AUDIT wanted tags:")
+	for l in tag_rows:
+		print("AUDIT   " + l)
+	print("AUDIT wanted-tag boost, mean over %d characters: native +%.3f, reassembled +%.3f" % [boost_n, boost_sum[0] / max(1, boost_n), boost_sum[1] / max(1, boost_n)])
+	_check(boost_sum[1] / max(1, boost_n) >= 0.8 * boost_sum[0] / max(1, boost_n), "reassembled wanted-tag boost is comparable to native")
+	print("AUDIT test_101 took %d ms" % (OS.get_ticks_msec() - t0))

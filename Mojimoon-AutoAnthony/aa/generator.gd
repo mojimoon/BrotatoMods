@@ -129,7 +129,7 @@ func pick_core_items(gen_items: Array) -> Dictionary:
 	for t in Catalog.CORE_TIERS:
 		var pool = []
 		for it in gen_items:
-			if it.tier == t and not Catalog.ITEM_STAT_BANS.has(it.my_id):
+			if it.tier == t and not Catalog.ITEM_STAT_BANS.has(it.my_id) and _preserved_lines(it).empty():
 				pool.push_back(it)
 		pool.sort_custom(self, "_sort_by_id")
 		rng.seed = hash(str(seed_value) + "/core/" + str(t))
@@ -582,14 +582,7 @@ func generate_item(item, core_stat: String = "") -> Dictionary:
 	cur_stat_bans = Catalog.ITEM_STAT_BANS.get(item.my_id, [])
 	if core_stat != "":
 		return _generate_core_item(item, core_stat)
-	# T3 道具如果只有一条效果，不能是单纯的数值效果：重掷（强制带特殊行）
-	var r = {}
-	for attempt in 4:
-		r = _generate_item_once(item, attempt > 0)
-		if item.tier == 2 and not r.empty() and r.effects.size() == 1 and is_plain_stat(r.effects[0]):
-			continue
-		break
-	return r
+	return _generate_item_once(item, false)
 
 
 func _generate_item_once(item, force_special: bool) -> Dictionary:
@@ -734,7 +727,7 @@ func _generate_item_once(item, force_special: bool) -> Dictionary:
 		i += 1
 
 	# 原版的书写顺序：正面属性在前，触发 / 机制随后，负面在最后
-	var ordered = stat_lines + effects + downsides
+	var ordered = stat_lines + effects + _preserved_lines(item) + downsides
 	pos_cat = ""
 	neg_cat = ""
 	anchor_stat = ""
@@ -748,6 +741,15 @@ func _generate_item_once(item, force_special: bool) -> Dictionary:
 		"budget": budget_total,
 		"class": cls,
 	}
+
+
+# 原道具上保留的原版行（catalog.PRESERVED_NATIVE_KEYS），复制一份
+func _preserved_lines(item) -> Array:
+	var out = []
+	for e in item.effects:
+		if e.key in Catalog.PRESERVED_NATIVE_KEYS and e.custom_key == "":
+			out.push_back(e.duplicate())
+	return out
 
 
 # 核心属性道具：唯一的正面效果是 stat 的一行数值（隐含价值 × CORE_VALUE_MULT），多数附带代价以提高数值；
@@ -961,6 +963,11 @@ func _tags_for(effects: Array) -> Array:
 		elif e.has_meta("aa_tags") and e.get_meta("aa_value") > 0:
 			add += e.get_meta("aa_tags")
 			add += Catalog.tags_for_binding("mech:" + (e.custom_key if e.custom_key != "" else e.key))
+		# 功能性词条（与正负无关，原版角色按它们筛选）：+诅咒、敌人数量增减
+		if e.key in Catalog.PRESERVED_NATIVE_KEYS and e.value > 0:
+			add.push_back(e.key)
+		if e.key == "number_of_enemies" and e.value != 0:
+			add.push_back("more_enemies" if e.value > 0 else "less_enemies")
 		for t in add:
 			if t != "" and not t in tags:
 				tags.push_back(t)

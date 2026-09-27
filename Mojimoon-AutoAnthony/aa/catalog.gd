@@ -566,3 +566,7 @@ const CORE_LINE_CAP_MULT = 1.5
 # 原版 DLC 诅咒按道具 ID 特判的属性行（鬼火的元素伤害行会写入 value3，普通效果没有该字段）：
 # 这些道具上不生成对应的普通属性行
 const ITEM_STAT_BANS = {"item_will_o_the_wisp": ["stat_elemental_damage"]}
+
+# 原道具上保留的原版行：+诅咒（深海 DLC 的诅咒道具）。价值约为 0，但水手 / 生物等角色想要带"诅咒"词条的道具，
+# 保留后这些道具仍带 stat_curse 词条
+const PRESERVED_NATIVE_KEYS = ["stat_curse"]
