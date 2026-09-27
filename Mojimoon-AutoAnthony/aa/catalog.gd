@@ -248,10 +248,12 @@ const REPEAT_PENALTY_PAYLOAD = 0.08
 const ANCHORED_ITEMS = [
 	"item_spyglass", "item_bait", "item_pocket_factory", "item_axolotl",
 	"item_goldfish_used", "item_broken_hourglass", "item_broken_mirror",
+	# 鱼钩（生物的诅咒初始道具、原版诅咒按 ID 特判）：本体保持原样，效果仍参与组合
+	"item_fish_hook",
 	"item_builder_turret_0", "item_builder_turret_1", "item_builder_turret_2", "item_builder_turret_3",
 ]
-# 不作为组件来源的道具（建造者的角色专属炮台）
-const MECHANIC_SOURCE_EXCLUDED = ["item_builder_turret_0", "item_builder_turret_1", "item_builder_turret_2", "item_builder_turret_3"]
+# 不作为机制来源：建造者炮台（角色专属）、蝾螈（属性互换按道具 ID 在商店中重置）
+const MECHANIC_SOURCE_EXCLUDED = ["item_builder_turret_0", "item_builder_turret_1", "item_builder_turret_2", "item_builder_turret_3", "item_axolotl"]
 # 效果里存"持有者道具 ID"的机制：搬运时改为新持有者的 ID
 const HOLDER_KEYED = ["duplicate_item", "increase_tier_on_reroll"]
 # 生效后持有者道具会被移除的机制：在同一行里注明

@@ -1196,7 +1196,7 @@ func test_85_id_bound_effects_are_adapted() -> void:
 		_eq(e2.value2, e2.value * 4, "remove_speed cap stays 4x")
 	# 这些道具现在也参与重组
 	var plan = _gen(42)
-	for id in ["item_coupon", "item_crown", "item_pearl", "item_whistle", "item_crystal", "item_fish_hook"]:
+	for id in ["item_coupon", "item_crown", "item_pearl", "item_whistle", "item_crystal"]:
 		_check(plan.items.has(id), id + " is reassembled")
 
 
@@ -1603,6 +1603,12 @@ func _is_good(e) -> bool:
 	return s == Effect.Sign.POSITIVE or s == Effect.Sign.OVERRIDE
 
 
+const CURSE_ID_ASSERTED = {
+	"hit_protection": "item_tardigrade", "hp_regen_bonus": "item_potion", "upgrade_random_weapon": "item_anvil",
+	"wandering_bot": "item_wandering_bot", "instant_gold_attracting": "item_sifds_relic",
+}
+
+
 func test_95_curse_whole_pool() -> void:
 	var pd = tree.root.get_node("ProgressData")
 	var dlc = pd.get_dlc_data("abyssal_terrors")
@@ -1615,10 +1621,20 @@ func test_95_curse_whole_pool() -> void:
 	var n_items = 0
 	var n_trig = 0
 	var n_side = 0
+	var n_skipped_assert = 0
 	for sd in [11, 222]:
 		var gen = Generator.new(_cfg(), sd)
 		var plan = gen.generate(isvc.items, isvc.characters, [], [])
 		for id in plan.items:
+			# 原版诅咒对少数效果按道具 ID 断言（仅调试版生效，正式版断言被移除、后续逻辑对任何持有者都成立）
+			var id_asserted = false
+			for e in plan.items[id].effects:
+				var ek = e.custom_key if e.custom_key != "" else e.key
+				if ek in CURSE_ID_ASSERTED and CURSE_ID_ASSERTED[ek] != id:
+					id_asserted = true
+			if id_asserted:
+				n_skipped_assert += 1
+				continue
 			var holder = _item(id).duplicate()
 			holder.effects = plan.items[id].effects
 			holder.is_cursed = false
@@ -1654,7 +1670,7 @@ func test_95_curse_whole_pool() -> void:
 						n_side += 1
 					if a.grant != null:
 						_check(b.grant != null, id + " grant kept")
-	print("AUDIT cursed %d items, %d trigger clauses (%d downside clauses)" % [n_items, n_trig, n_side])
+	print("AUDIT cursed %d items, %d trigger clauses (%d downside clauses); skipped %d items carrying an ID-asserted effect on another holder (debug-build assert only)" % [n_items, n_trig, n_side, n_skipped_assert])
 	_check(n_side > 3, "downside clauses covered")
 	# 诅咒后的触发条款在运行时照常生效（并且更强）
 	TempStats.reset()
@@ -1733,11 +1749,12 @@ func test_99_structures_and_special_items_reassembled() -> void:
 		_eq(_item(id).replaced_by, null, id + " no longer turns into another item")
 	m.on_menu_reset()
 	_check(_item("item_mirror").replaced_by != null, "mirror replaced_by restored")
-	# 技术法师：开局两个炮台保留原版效果，商店里的炮台是重组版本
+	# 技术法师：本局初始道具（炮台）不重组，开局的与商店里的同 ID 道具都是原版
 	_setup_player("character_technomage")
 	rd.add_starting_items_and_weapons()
 	var native_turret_effects = _item("item_turret").effects
 	m.start_new_run()
+	_check(not m.plan.items.has("item_turret"), "technomage run: turret not reassembled")
 	var owned_turrets = 0
 	for it in rd.players_data[0].items:
 		if it.my_id == "item_turret":
@@ -1745,8 +1762,7 @@ func test_99_structures_and_special_items_reassembled() -> void:
 			_check(it.effects == native_turret_effects, "starting turret keeps its native effect")
 			_check(it.is_structure_item(), "starting turret still spawns a structure")
 	_eq(owned_turrets, 2, "technomage owns two starting turrets")
-	_check(_item("item_turret").effects != native_turret_effects, "shop turret is reassembled")
-	_check(m.active_state.kept_native.has("item_turret"), "kept list saved in run state")
+	_check(_item("item_turret").effects == native_turret_effects, "shop turret is native too")
 	m.on_menu_reset()
 
 
@@ -1925,7 +1941,8 @@ func test_101_character_bans_and_wanted_tags_in_rolls() -> void:
 			var it = _item(id)
 			if it != null:
 				for r in ban_gen.ban_reasons(it.effects):
-					if not r in sems:
+					# 想要的词条优先（与 mod 规则一致）
+					if not r in sems and not r in ch0.wanted_tags:
 						sems.push_back(r)
 		var group_needs = []
 		for g in ch0.banned_item_groups:
@@ -1965,7 +1982,8 @@ func test_101_character_bans_and_wanted_tags_in_rolls() -> void:
 					r.wanted += 1
 					var rel = false
 					for t in ch.wanted_tags:
-						if t in it.tags and (not Catalog.STATS.has(t) or t in _pos_semantics(it.effects)):
+						# 只评判重组道具；保留原版的道具（本局初始道具、锚定道具）按原版词条
+						if t in it.tags and (not m.plan.get("items", {}).has(it.my_id) or not Catalog.STATS.has(t) or t in _pos_semantics(it.effects)):
 							rel = true
 					if rel:
 						r.wanted_relevant += 1
@@ -2622,3 +2640,53 @@ func test_105_next_wave_xp_spread() -> void:
 	print("AUDIT next-wave xp values (n=%d, cap %d, at cap %d): %s" % [n, top, at_top, str(keys)])
 	_check(n > 10 and keys.size() >= 8, "next-wave xp values vary")
 	_check(at_top <= n * 0.2, "few next-wave xp lines sit at the cap (%d / %d)" % [at_top, n])
+
+
+# ============================================================
+# 本局玩家角色的初始道具不重组（驯兽师：战利品虫 + 开局可选的四只宠物）；鱼钩、水熊虫锚定；蝾螈效果不参与组合
+# ============================================================
+func test_106_starting_items_stay_native() -> void:
+	var bm = isvc.get_element_safe(isvc.characters, "character_beast_master")
+	var ids = m.starting_item_ids([bm])
+	_check("item_lootworm" in ids, "beast master: lootworm is a starting item")
+	_eq(ids.size(), 1 + bm.starting_items.size(), "beast master: lootworm + selectable pets")
+	_setup_player("character_beast_master")
+	m.start_new_run()
+	for id in ids:
+		_check(not m.plan.items.has(id), "beast master run: %s not reassembled" % id)
+	m.on_menu_reset()
+	# 其他角色的局里照常重组
+	var plan = _gen(42)
+	_check(plan.items.has("item_lootworm"), "lootworm reassembled in other runs")
+	# 法师：蛇、香肠；军火商：危险的兔子；负伤者：水熊虫（锚定）
+	for pair in [["character_mage", ["item_snake"]], ["character_arms_dealer", ["item_dangerous_bunny"]]]:
+		var ch = isvc.get_element_safe(isvc.characters, pair[0])
+		var sids = m.starting_item_ids([ch])
+		for id in pair[1]:
+			_check(id in sids, "%s starts with %s" % [pair[0], id])
+	# 存档往返：法师开局的蛇 + 商店买的蛇，读档后两件效果一致（原版按 ID 缓存序列化）
+	_setup_player("character_mage")
+	rd.add_starting_items_and_weapons()
+	m.start_new_run()
+	var snake = _item("item_snake")
+	rd.add_item(snake, 0)
+	var ser = rd.players_data[0].serialize()
+	var pd2 = PlayerRunData.new().deserialize(JSON.parse(JSON.print(ser)).result)
+	var snakes = []
+	for it in pd2.items:
+		if it.my_id == "item_snake":
+			snakes.push_back(_texts(it.effects))
+	_check(snakes.size() >= 2 and snakes[0] == snakes[1], "both snakes identical after a save roundtrip (%d)" % snakes.size())
+	_eq(snakes[0] if snakes.size() > 0 else "", _texts(snake.effects), "saved snake matches the shop snake")
+	m.on_menu_reset()
+	# 锚定与机制来源
+	var gen = Generator.new(_cfg(), 1)
+	gen._collect_priors(isvc.items, isvc.characters, isvc.weapons)
+	var sources = {}
+	for t in 4:
+		for mech in gen.mechanics_by_tier[t]:
+			sources[mech.source] = true
+	for id in ["item_fish_hook", "item_tardigrade"]:
+		_check(not plan.items.has(id), id + " anchored")
+		_check(sources.has(id), id + " effects still combine")
+	_check(not sources.has("item_axolotl"), "axolotl effect no longer combines")

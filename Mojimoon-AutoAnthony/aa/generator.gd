@@ -67,6 +67,8 @@ var cur_tier := -1
 var cur_stat_bans: Array = []
 # 本局玩家角色的偏好词条（开局时由 mod_main 填入）
 var player_wanted_tags: Array = []
+# 本局玩家角色的初始道具 ID（开局时由 mod_main 填入）：本局不重组，商店里的同 ID 道具也保持原版
+var run_excluded_ids: Array = []
 # 计数型 / 属性修改的原版先验
 var counter_prior: Dictionary = {}
 var gain_mod_prior := 0.0
@@ -290,7 +292,7 @@ func _seed_for(id: String) -> void:
 func _is_reassemblable_item(item) -> bool:
 	if item is CharacterData or item is WeaponData:
 		return false
-	if item.my_id in Catalog.ANCHORED_ITEMS:
+	if item.my_id in Catalog.ANCHORED_ITEMS or item.my_id in run_excluded_ids:
 		return false
 	if item.tier < 0 or item.tier > 3:
 		return false
