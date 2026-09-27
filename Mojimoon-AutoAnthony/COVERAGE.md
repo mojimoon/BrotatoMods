@@ -6,8 +6,9 @@
 
 | 处理 | 含义 | 估值 |
 | --- | --- | --- |
-| `trigger`（29 种） | 拆解为 (扳机, 载荷) 先验，由通用触发条款重新表达 | 单位价值 × 每波频率（见 README 第 4 节） |
+| `trigger`（28 种） | 拆解为 (扳机, 载荷) 先验，由通用触发条款重新表达 | 单位价值 × 每波频率（见 README 第 4 节） |
 | `scaling`（27 种） | 计数 × 属性自由搭配重新生成（原版 GainStatForEveryStatEffect） | 目标属性权重 × 数值 × 计数期望 / 每 N；计数期望由原版道具校准 |
+| `next_wave`（1 种） | 下一波（芹菜茶 / 孔雀）：一次性，下一波开始时生效；约一半附带同一行为下的负面行（敌人属性或自身属性降低） | 一波的价值 = 整局价值 / 剩余波数（≈ 2 × 永久累积倍率 − 1）；孔雀校准吻合 |
 | `gain_mod`（3 种） | 属性修改 ±XX% 重新生成（原版 StatGainsModificationEffect） | 属性权重 × 属性期望总量 × XX% |
 | `scalar`（39 种） | 原样搬运，并按预算缩放数值（1 单位 .. 原版 1.5 倍） | 来源道具剩余价值按数值比例折算 |
 | `mechanic`（54 种） | 原样搬运（炮台、宠物、爆炸、武器类加成……） | 道具：来源道具 (预算 − 属性行价值) / 机制数；角色：(角色总价值 − 可估值部分) / 机制数，限制 30–80 |
@@ -44,7 +45,6 @@
 | `heal_when_pickup_gold` | 1 | item | cute_monkey +8% chance to heal 1 HP when picking up a material |
 | `stats_below_half_health` | 2 | char | c:golem +40 % Attack Speed when you have less than 50% health / c:golem +20 % Speed when you have less than 50% health |
 | `stats_end_of_wave` | 15 | item,char | robot_arm +3 Melee Damage at the end of a wave / robot_arm +3 Engineering at the end of a wave |
-| `stats_next_wave` | 5 | item | peacock +100 % XP Gain during the next wave / peacock +50 % Enemy damage during the next wave |
 | `stats_on_fruit` | 1 | char | c:druid 33% chance to get +1 Luck when you pick up a fruit |
 | `stats_on_level_up` | 10 | item,char | decomposing_flesh +1 % Life Steal when you level up / decomposing_flesh -1 Max HP when you level up |
 | `temp_consumable_stats_while_max` | 1 | item | penguin +1 HP Regeneration until the end of the wave when picking up |
@@ -85,6 +85,12 @@
 | `gain_stat_for_every:stat_ranged_damage` | 1 | char | c:generalist +2 Melee Damage for every 1 Ranged Damage you have [+0] |
 | `gain_stat_for_every:stat_speed` | 3 | item,char | power_generator +1 % Damage for every permanent 1 % Speed you have [+5] / estys_couch +2 HP Regeneration for every permanent -1 % Speed you have [ |
 | `gain_stat_for_every:structure` | 3 | item,char | lighthouse -1 Engineering for every 1 Structure you have [+0] / c:streamer +2 Armor for every 1 Structure you have [+0] |
+
+### `next_wave`
+
+| 效果 key | 次数 | 来源 | 示例 |
+| --- | --- | --- | --- |
+| `stats_next_wave` | 5 | item | peacock +100 % XP Gain during the next wave / peacock +50 % Enemy damage during the next wave |
 
 ### `gain_mod`
 

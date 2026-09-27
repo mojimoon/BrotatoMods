@@ -1387,3 +1387,69 @@ func test_16b_permanent_caps() -> void:
 
 func rng_budget(i: int) -> float:
 	return [10.0, 20.0, 35.0, 60.0][i % 4]
+
+
+# ============================================================
+# 下一波（芹菜茶 / 孔雀）与同扳机正负成对
+# ============================================================
+func test_92_next_wave_and_pairs() -> void:
+	var nw = 0
+	var nw_pairs = 0
+	var paired = 0
+	var shown = 0
+	for sd in SEEDS:
+		var gen = Generator.new(_cfg(), sd)
+		var plan = gen.generate(isvc.items, isvc.characters, [], [])
+		for id in plan.items:
+			var effs = plan.items[id].effects
+			var n_here = 0
+			for e in effs:
+				if gen.is_next_wave(e):
+					n_here += 1
+					_eq(e.storage_method, Effect.StorageMethod.KEY_VALUE, "next wave uses native storage")
+					var txt = e.get_text(0, false)
+					_check(txt != "" and txt.find("AA_") == -1, "next wave text: " + txt)
+				elif e is TriggerEffect and e.side_stat != "":
+					paired += 1
+					var t2 = e.get_text(0, false)
+					_check(t2.find(tr("AA_AND").strip_edges()) != -1, "paired clause rendered in one line: " + t2)
+					if shown < 6:
+						print("AUDIT paired clause: ", t2)
+						shown += 1
+			if n_here > 0:
+				nw += 1
+				if n_here > 1:
+					nw_pairs += 1
+					if shown < 10:
+						print("AUDIT next wave: ", _texts(effs))
+						shown += 1
+	print("AUDIT next-wave items %d (paired %d), paired trigger clauses %d (5 seeds)" % [nw, nw_pairs, paired])
+	_check(nw > 20 and nw_pairs > 5 and paired > 30, "next-wave and paired effects appear (%d / %d / %d)" % [nw, nw_pairs, paired])
+	# 运行时：成对条款同时施加正负两部分
+	TempStats.reset()
+	var rt = _make_runtime([{"trigger": "kill", "payload": "temp_stat", "stat": "stat_armor", "value": 3, "side_stat": "enemy_damage", "side_value": 2}])
+	rt.fire("kill", 0)
+	_eq(int(TempStats.get_stat(Keys.stat_armor_hash, 0) / rd.get_stat_gain(Keys.stat_armor_hash, 0)), 3, "positive part")
+	_eq(int(TempStats.get_stat(Keys.generate_hash("enemy_damage"), 0)), 2, "negative part (enemy damage up)")
+	rt.queue_free()
+	TempStats.reset()
+	# 下一波：购买后写入 stats_next_wave
+	var gen2 = Generator.new(_cfg(), 3)
+	var e = gen2._next_wave_effect("xp_gain", 50)
+	var holder = _item("item_potato").duplicate()
+	holder.effects = [e]
+	rd.add_item(holder, 0)
+	var list = rd.get_player_effects(0)[Keys.stats_next_wave_hash]
+	var found = false
+	for x in list:
+		if x[0] == Keys.xp_gain_hash and x[1] == 50:
+			found = true
+	_check(found, "next wave entry queued for the next wave")
+	rd.remove_item(holder, 0)
+	# 估值：孔雀校准
+	var pv = 0.66 * 25 + Valuation.next_wave_value("xp_gain", 100, Catalog.PERM_MULT[2]) - Valuation.next_wave_value("enemy_damage", 50, Catalog.PERM_MULT[2]) / Catalog.DOWNSIDE_DIVISOR
+	var g3 = Generator.new(_cfg(), 1)
+	g3._collect_priors(isvc.items, isvc.characters, isvc.weapons)
+	var peacock_budget = g3.item_budget(_item("item_peacock"))
+	print("AUDIT peacock model value %.1f vs budget %.1f" % [pv, peacock_budget])
+	_check(abs(pv / peacock_budget - 1.0) < 0.35, "next-wave valuation matches peacock")

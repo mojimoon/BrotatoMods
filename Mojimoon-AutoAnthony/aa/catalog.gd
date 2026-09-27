@@ -202,7 +202,6 @@ const NATIVE_TRIGGER_MAP = {
 	"decaying_stats_on_consumable": ["consumable", "timed_stat"],
 	"gain_stats_on_reroll": ["reroll", "perm_stat"],
 	"stats_on_fruit": ["consumable", "perm_stat"],
-	"stats_next_wave": ["wave_start", "temp_stat"],
 	"dmg_on_dodge": ["dodge", "damage"],
 	"dmg_when_death": ["kill", "damage"],
 	"dmg_when_pickup_gold": ["gold", "damage"],
@@ -332,6 +331,8 @@ static func is_downside_mechanic(e) -> bool:
 static func stat_w(stat: String) -> float:
 	if STATS.has(stat):
 		return STATS[stat].w
+	if ENEMY_STATS.has(stat):
+		return ENEMY_STATS[stat].w
 	return 1.0
 
 
@@ -443,6 +444,37 @@ const GAIN_MOD_STATS = [
 const GAIN_MOD_STEPS = [10, 15, 20, 25, 33, 40, 50]
 
 # 特殊行的类型比例：触发条款 / 计数型 / 属性修改 / 搬运机制
-const SPECIAL_KIND_WEIGHTS = {"trigger": 0.5, "scaling": 0.2, "gain_mod": 0.08, "mechanic": 0.22}
+const SPECIAL_KIND_WEIGHTS = {"trigger": 0.46, "scaling": 0.18, "gain_mod": 0.07, "mechanic": 0.2, "next_wave": 0.09}
 # 可按预算缩放数值的机制（原版 Effect，数值线性含义）：缩放范围为原版数值的 1 单位 .. 1.5 倍
 const SCALAR_MECHANIC_EXCLUDED = ["hp_start_next_wave", "hp_start_wave", "speed_cap", "hp_cap", "lock_current_weapons", "dodge_cap", "one_shot_trees", "structures_can_crit"]
+
+
+# ============================================================
+# 敌人属性（作为代价）：每 1% 的"整局持有"价值。孔雀（+25% 经验，下一波 +100% 经验、+50% 敌人伤害，50 材料）
+# 与芹菜茶校准后大致吻合；负面价值同样按负面除数折算
+# ============================================================
+const ENEMY_STATS = {
+	"enemy_health": {"w": 0.6, "unit": 1},
+	"enemy_damage": {"w": 0.8, "unit": 1},
+	"enemy_speed": {"w": 1.0, "unit": 1},
+}
+
+# ============================================================
+# 下一波（原版芹菜茶 / 孔雀 / 围巾）：一次性，写入 stats_next_wave，下一波开始时生效一次后清空。
+# 一波的价值 = 整局持有价值 / 剩余波数，剩余波数 ≈ 2 × 永久累积倍率 − 1
+# ============================================================
+const NEXT_WAVE_STATS = [
+	"stat_max_hp", "stat_hp_regeneration", "stat_lifesteal", "stat_percent_damage", "stat_melee_damage",
+	"stat_ranged_damage", "stat_elemental_damage", "stat_attack_speed", "stat_crit_chance", "stat_engineering",
+	"stat_armor", "stat_dodge", "stat_speed", "stat_luck", "stat_harvesting", "xp_gain",
+]
+# "下一波"正面行的属性权重：原版只用于经验，这里偏向运营属性（经验、收获、幸运），其余属性权重较低
+const NEXT_WAVE_POS_WEIGHTS = {"xp_gain": 6.0, "stat_harvesting": 3.0, "stat_luck": 3.0}
+# "下一波"正面行附带同一行为下负面行的概率（原版芹菜茶、孔雀都是成对的）
+const NEXT_WAVE_PAIR_CHANCE = 0.5
+# 属性类触发条款附带同一扳机负面部分的概率
+const PAIRED_CLAUSE_CHANCE = 0.4
+
+
+static func remaining_waves(perm_mult: float) -> float:
+	return max(2.0, 2.0 * perm_mult - 1.0)

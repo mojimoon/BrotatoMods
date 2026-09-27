@@ -50,8 +50,29 @@ static func damage_per_proc(stat: String, pct: int) -> float:
 	return max(1.0, pct / 100.0 * ref)
 
 
-# 条款价值（带符号）。perm_mult：永久累积倍率（由道具稀有度或角色决定）
+# 条款价值（带符号）：正面部分 + 同扳机负面部分（按负面除数折算）
 static func clause_value(c: Dictionary, perm_mult: float) -> float:
+	var v = main_value(c, perm_mult)
+	if c.get("side_stat", "") != "" and int(c.get("side_value", 0)) != 0:
+		v += side_raw_value(c, perm_mult) / Catalog.DOWNSIDE_DIVISOR
+	return v
+
+
+# 负面部分的原始价值（负数，未折算）：与正面部分同样的载荷方式，只换成负面属性
+static func side_raw_value(c: Dictionary, perm_mult: float) -> float:
+	var sc = c.duplicate()
+	sc.stat = c.side_stat
+	sc.value = -abs(int(c.side_value))
+	sc.erase("side_stat")
+	return main_value(sc, perm_mult)
+
+
+# 下一波：一波的价值
+static func next_wave_value(stat: String, value: int, perm_mult: float) -> float:
+	return Catalog.stat_w(stat) * value / Catalog.remaining_waves(perm_mult)
+
+
+static func main_value(c: Dictionary, perm_mult: float) -> float:
 	var trigger: String = c.trigger
 	var payload: String = c.payload
 	var param: int = int(c.get("param", 1))

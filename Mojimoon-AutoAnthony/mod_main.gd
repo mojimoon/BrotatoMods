@@ -545,6 +545,8 @@ func fire_shop(event: String, player_index: int) -> void:
 			match e.payload:
 				"perm_stat":
 					rd.add_stat(Keys.generate_hash(e.stat), e.value, player_index)
+					if e.side_stat != "":
+						rd.add_stat(Keys.generate_hash(e.side_stat), e.side_signed(), player_index)
 					LinkedStats.reset_player(player_index)
 				"grant":
 					if e.grant != null:

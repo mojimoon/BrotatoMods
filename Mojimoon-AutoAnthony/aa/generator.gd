@@ -150,8 +150,12 @@ func is_gain_mod(e) -> bool:
 	return e.get_script() == gain_mod_script
 
 
+func is_next_wave(e) -> bool:
+	return e.custom_key == "stats_next_wave"
+
+
 func is_mechanic(e) -> bool:
-	if is_plain_stat(e) or native_trigger_of(e) != null or is_scaling(e) or is_gain_mod(e):
+	if is_plain_stat(e) or native_trigger_of(e) != null or is_scaling(e) or is_gain_mod(e) or is_next_wave(e):
 		return false
 	if e.get_script() == effect_script and e.key == "":
 		return false	# 纯描述行（由道具 ID 实现）
@@ -197,12 +201,14 @@ func _collect_priors(items: Array, characters: Array, weapons: Array) -> void:
 			if is_plain_stat(e):
 				if e.value > 0:
 					stat_pos_w[e.key] += 1.0
-					stat_max_pos[e.key] = max(stat_max_pos.get(e.key, 0), e.value)
+					if src is ItemData and not src is CharacterData:
+						stat_max_pos[e.key] = max(stat_max_pos.get(e.key, 0), e.value)
 					pos_lines += 1
 					pos_value += line_value(e.key, e.value)
 				elif e.value < 0:
 					stat_neg_w[e.key] += 1.0
-					stat_max_neg[e.key] = max(stat_max_neg.get(e.key, 0), -e.value)
+					if src is ItemData and not src is CharacterData:
+						stat_max_neg[e.key] = max(stat_max_neg.get(e.key, 0), -e.value)
 					has_neg = true
 				stat_value += line_value(e.key, e.value)
 				continue
@@ -212,6 +218,8 @@ func _collect_priors(items: Array, characters: Array, weapons: Array) -> void:
 				continue
 			if is_gain_mod(e):
 				gain_mod_prior += 1.0
+				continue
+			if is_next_wave(e):
 				continue
 			var nt = native_trigger_of(e)
 			if nt != null:
@@ -557,6 +565,11 @@ func generate_item(item) -> Dictionary:
 			if not sc.empty():
 				downsides.push_back(sc.effect)
 				got = neg_value(abs(sc.value))
+		elif r >= 0.37 and r < 0.45:
+			var nd = gen_next_wave_downside(comp, perm_mult)
+			if not nd.empty():
+				downsides += nd.effects
+				got = nd.value
 		elif r >= 0.33 and r < 0.37:
 			var gm = gen_gain_mod(comp * divisor, true)
 			if not gm.empty():
@@ -612,6 +625,14 @@ func generate_item(item) -> Dictionary:
 				done = true
 				if sc.value > main_line.value:
 					main_line = {"value": sc.value, "adj": _adj(Catalog.ADJ_SCALING)}
+		elif kind == "next_wave":
+			var nw = gen_next_wave(budget * share, perm_mult, true)
+			if not nw.empty():
+				effects += nw.effects
+				budget -= nw.value
+				done = true
+				if nw.value > main_line.value:
+					main_line = {"value": nw.value, "adj": _adj(Catalog.ADJ_BY_TRIGGER["wave_start"])}
 		elif kind == "gain_mod":
 			var gm = gen_gain_mod(budget * share, false)
 			if not gm.empty():
@@ -623,6 +644,9 @@ func generate_item(item) -> Dictionary:
 		if not done:
 			var c = gen_clause(budget * share, perm_mult, false)
 			if not c.empty():
+				if c.payload in ["temp_stat", "perm_stat", "timed_stat"] and not c.get("reset", false) \
+						and rng.randf() < Catalog.PAIRED_CLAUSE_CHANCE:
+					_add_side(c, perm_mult)
 				var cv = Valuation.clause_value(c, perm_mult)
 				effects.push_back(TriggerEffect.make(c))
 				_note_clause(c)
@@ -803,6 +827,9 @@ func _tags_for(effects: Array) -> Array:
 		elif is_scaling(e) or is_gain_mod(e):
 			if e.value > 0:
 				add.push_back(e.key if is_scaling(e) else e.stat_displayed)
+		elif is_next_wave(e):
+			if e.value > 0 and Catalog.STATS.has(e.key):
+				add.push_back(e.key)
 		elif e.has_meta("aa_tags") and e.get_meta("aa_value") > 0:
 			add += e.get_meta("aa_tags")
 		for t in add:
@@ -856,6 +883,8 @@ func main_stats(effects: Array) -> Array:
 			vals[e.key] = vals.get(e.key, 0.0) + Valuation.scaling_value(e.key, e.value, e.stat_scaled, e.nb_stat_scaled)
 		elif is_gain_mod(e) and e.stats_modified.size() > 0:
 			vals[e.stats_modified[0]] = vals.get(e.stats_modified[0], 0.0) + Valuation.gain_mod_value(e.stats_modified[0], e.value)
+		elif is_next_wave(e) and Catalog.STATS.has(e.key):
+			vals[e.key] = vals.get(e.key, 0.0) + e.get_meta("aa_value", 5.0)
 		elif e.has_meta("aa_value"):
 			var k = e.custom_key if e.custom_key != "" else e.key
 			if k in Catalog.HEAL_KEYS:
@@ -958,6 +987,105 @@ func _pick_grant(mode: String) -> Dictionary:
 			e.effect_sign = Effect.Sign.FROM_VALUE
 			return {"effect": e, "unit": Valuation.gain_mod_value(stat, 5), "max_units": 10}
 	return {}
+
+
+# ============================================================
+# 下一波（原版芹菜茶 / 孔雀）：一次性，下一波开始时生效一次。约一半附带同一行为下的负面行。
+# 返回 {effects, value}（value 已扣除负面折算）
+# ============================================================
+func _next_wave_effect(stat: String, value: int) -> Effect:
+	var e = effect_script.new()
+	e.key = stat
+	e.key_hash = Keys.generate_hash(stat)
+	e.custom_key = "stats_next_wave"
+	e.custom_key_hash = Keys.generate_hash("stats_next_wave")
+	e.storage_method = Effect.StorageMethod.KEY_VALUE
+	e.text_key = "effect_stat_next_wave"
+	e.value = value
+	# 敌人属性提高是坏事：按原版固定显示为负面颜色
+	e.effect_sign = Effect.Sign.NEGATIVE if Catalog.ENEMY_STATS.has(stat) else Effect.Sign.FROM_VALUE
+	return e
+
+
+func gen_next_wave(target: float, perm_mult: float, allow_pair: bool) -> Dictionary:
+	var W = Catalog.remaining_waves(perm_mult)
+	var nw_w = {}
+	for st in Catalog.NEXT_WAVE_STATS:
+		nw_w[st] = Catalog.NEXT_WAVE_POS_WEIGHTS.get(st, 0.4)
+	var stat = _pick_weighted(nw_w)
+	var unit = Catalog.stat_unit(stat)
+	var pair = allow_pair and rng.randf() < Catalog.NEXT_WAVE_PAIR_CHANCE
+	var comp = target * rng.randf_range(0.3, 0.6) if pair else 0.0
+	var raw = (target + comp) * W / Catalog.stat_w(stat)
+	var v = int(clamp(round(raw / unit) * unit, unit, _line_cap(stat, false) * 2))
+	var value = Valuation.next_wave_value(stat, v, perm_mult)
+	var out = [_next_wave_effect(stat, v)]
+	out[0].set_meta("aa_value", value)
+	if pair:
+		var side = _next_wave_side(comp, perm_mult, [stat])
+		if not side.empty():
+			out.push_back(side.effect)
+			value -= side.value
+	if value < target * 0.4 or value > target * 1.6:
+		return {}
+	return {"effects": out, "value": value}
+
+
+func gen_next_wave_downside(comp: float, perm_mult: float) -> Dictionary:
+	var side = _next_wave_side(comp, perm_mult, [])
+	if side.empty():
+		return {}
+	return {"effects": [side.effect], "value": side.value}
+
+
+# 负面行：60% 敌人属性（生命 / 伤害 / 速度），40% 自身属性降低。返回 {effect, value（折算后的补偿，正数）}
+func _next_wave_side(comp: float, perm_mult: float, exclude: Array) -> Dictionary:
+	var W = Catalog.remaining_waves(perm_mult)
+	var stat = ""
+	var sign_v = 1
+	if rng.randf() < 0.6:
+		var keys = Catalog.ENEMY_STATS.keys()
+		stat = keys[rng.randi() % keys.size()]
+	else:
+		stat = _pick_stat(true, exclude + Catalog.TEMP_STAT_BANNED, Catalog.NEXT_WAVE_STATS)
+		sign_v = -1
+	var w = Catalog.stat_w(stat)
+	var unit = 5 if Catalog.ENEMY_STATS.has(stat) else Catalog.stat_unit(stat)
+	var raw = comp * divisor * W / w
+	var cap = 100 if Catalog.ENEMY_STATS.has(stat) else _line_cap(stat, true) * 2
+	var v = int(clamp(round(raw / unit) * unit, unit, cap))
+	var got = neg_value(w * v / W)
+	var e = _next_wave_effect(stat, v * sign_v)
+	e.set_meta("aa_value", -got)
+	return {"effect": e, "value": got}
+
+
+# 属性类触发条款的同扳机负面部分：敌人属性（50%）或自身其他属性降低；负面折算后的补偿约为正面价值的 30–60%
+func _add_side(c: Dictionary, perm_mult: float) -> void:
+	var cv = Valuation.main_value(c, perm_mult)
+	if cv <= 0.0:
+		return
+	var stat = ""
+	if rng.randf() < 0.5:
+		var keys = Catalog.ENEMY_STATS.keys()
+		stat = keys[rng.randi() % keys.size()]
+	else:
+		var banned = [c.stat, anchor_stat]
+		if c.payload != "perm_stat":
+			banned += Catalog.TEMP_STAT_BANNED
+		stat = _pick_stat(true, banned)
+	var probe = c.duplicate()
+	probe.side_stat = stat
+	probe.side_value = 1
+	var per_unit = abs(Valuation.side_raw_value(probe, perm_mult))
+	if per_unit <= 0.0:
+		return
+	var comp = cv * rng.randf_range(0.3, 0.6)
+	var cap = 10 if Catalog.ENEMY_STATS.has(stat) else _line_cap(stat, true)
+	if Valuation.raw_rate(c.trigger, c.param, c.chance) <= 1.5 or Catalog.TRIGGERS[c.trigger].kind == "state":
+		cap *= 4
+	c.side_stat = stat
+	c.side_value = int(clamp(round(comp * divisor / per_unit), 1, cap))
 
 
 const NICE_NB = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50, 60, 80, 100, 150, 200]
@@ -1398,6 +1526,8 @@ func handling_of(e, src) -> String:
 		return "scaling"
 	if is_gain_mod(e):
 		return "gain_mod"
+	if is_next_wave(e):
+		return "next_wave"
 	if e.get_script() == effect_script and e.key == "":
 		return "text"
 	var k = e.custom_key if e.custom_key != "" else e.key
