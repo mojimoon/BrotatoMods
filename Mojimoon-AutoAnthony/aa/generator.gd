@@ -108,6 +108,7 @@ func generate(items: Array, all_characters: Array, selected: Array, weapons: Arr
 			if not r.empty():
 				plan.items[item.my_id] = r
 		cur_stat_bans = []
+		_keep_wanted_tag_items(plan, items, all_characters, core)
 	if cfg.get("characters", false):
 		for ch in selected:
 			plan.characters[ch.my_id] = generate_character(ch)
@@ -145,6 +146,37 @@ func pick_core_items(gen_items: Array) -> Dictionary:
 			res[pool[k].my_id] = st
 			pool.remove(k)
 	return res
+
+
+# 角色"想要的词条"在原版里有 5% 几率只从带该词条的道具里抽；若某稀有度一件都没有，原版会退回到
+# 不检查角色禁用的备用池（可能抽到被禁道具）。重组后若某稀有度失去了原版有的某个想要词条，
+# 保留一件该稀有度带此词条的原版道具不重组（跳过核心属性道具）。
+func _keep_wanted_tag_items(plan: Dictionary, items: Array, characters: Array, core: Dictionary) -> void:
+	var wanted = []
+	for ch in characters:
+		for t in ch.wanted_tags:
+			if not t in wanted:
+				wanted.push_back(t)
+	var sorted_items = items.duplicate()
+	sorted_items.sort_custom(self, "_sort_by_id")
+	for tier in 4:
+		for tag in wanted:
+			var native_cands = []
+			var present = false
+			for it in sorted_items:
+				if it.tier != tier or it is CharacterData or it is WeaponData or not it.can_be_looted:
+					continue
+				var tags = plan.items[it.my_id].tags if plan.items.has(it.my_id) else it.tags
+				if tag in tags:
+					present = true
+					break
+				if tag in it.tags and plan.items.has(it.my_id) and not core.has(it.my_id):
+					native_cands.push_back(it)
+			if present or native_cands.empty():
+				continue
+			rng.seed = hash(str(seed_value) + "/keep/" + tag + "/" + str(tier))
+			var keep = native_cands[rng.randi() % native_cands.size()]
+			plan.items.erase(keep.my_id)
 
 
 static func _sort_by_id(a, b) -> bool:
@@ -1097,7 +1129,7 @@ func _pick_grant(mode: String) -> Dictionary:
 					allowed.push_back(st)
 			var stat = _pick_stat(false, [], allowed)
 			var unit = Catalog.stat_unit(stat)
-			var nb = _nice_nb(Valuation.scaling_value(stat, unit, counter, 1) / 4.0)
+			var nb = 1 if counter in Catalog.COUNTER_NB_FIXED else _nice_nb(Valuation.scaling_value(stat, unit, counter, 1) / 4.0)
 			var e = scaling_script.new()
 			e.key = stat
 			e.key_hash = Keys.generate_hash(stat)
@@ -1107,10 +1139,7 @@ func _pick_grant(mode: String) -> Dictionary:
 			e.stat_scaled_hash = Keys.generate_hash(counter)
 			e.nb_stat_scaled = nb
 			e.perm_stats_only = Catalog.STATS.has(counter) and rng.randf() < 0.5
-			if Catalog.COUNTER_TEXT.has(counter):
-				e.text_key = Catalog.COUNTER_TEXT[counter]
-			else:
-				e.text_key = "EFFECT_GAIN_STAT_FOR_EVERY_PERM_STAT" if e.perm_stats_only else "EFFECT_GAIN_STAT_FOR_EVERY_STAT"
+			e.text_key = Catalog.counter_text(counter, e.perm_stats_only)
 			e.effect_sign = Effect.Sign.FROM_VALUE
 			return {"effect": e, "unit": Valuation.scaling_value(stat, unit, counter, nb), "max_units": 5}
 		else:
@@ -1394,6 +1423,9 @@ func gen_scaling(target: float, negative: bool) -> Dictionary:
 		var per_unit_full = Valuation.scaling_value(stat, unit, counter, 1)
 		var nb = _nice_nb(per_unit_full / max(0.1, abs(target)))
 		var v = unit
+		# 文本不显示 N 的计数：N 固定为 1；最小价值明显超过预算时（下面的区间检查）换别的计数 / 属性，全部失败则改用别的词条
+		if counter in Catalog.COUNTER_NB_FIXED:
+			nb = 1
 		if per_unit_full < abs(target) * 0.7:
 			# 每 1 个计数的价值都不够：提高数值
 			nb = 1
@@ -1410,10 +1442,7 @@ func gen_scaling(target: float, negative: bool) -> Dictionary:
 		e.stat_scaled_hash = Keys.generate_hash(counter)
 		e.nb_stat_scaled = nb
 		e.perm_stats_only = Catalog.STATS.has(counter) and rng.randf() < 0.5
-		if Catalog.COUNTER_TEXT.has(counter):
-			e.text_key = Catalog.COUNTER_TEXT[counter]
-		else:
-			e.text_key = "EFFECT_GAIN_STAT_FOR_EVERY_PERM_STAT" if e.perm_stats_only else "EFFECT_GAIN_STAT_FOR_EVERY_STAT"
+		e.text_key = Catalog.counter_text(counter, e.perm_stats_only)
 		e.effect_sign = Effect.Sign.FROM_VALUE
 		return {"effect": e, "value": -value if negative else value}
 	return {}

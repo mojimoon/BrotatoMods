@@ -42,12 +42,12 @@ const STATS = {
 	"stat_hp_regeneration": {"w": 2.8, "unit": 1, "pct": false, "ref": 8.0},
 	"stat_lifesteal": {"w": 4.7, "unit": 1, "pct": true, "ref": 10.0},
 	"stat_percent_damage": {"w": 1.8, "unit": 1, "pct": true, "ref": 25.0},
-	"stat_melee_damage": {"w": 3.4, "unit": 1, "pct": false, "ref": 15.0},
+	"stat_melee_damage": {"w": 2.8, "unit": 1, "pct": false, "ref": 15.0},
 	"stat_ranged_damage": {"w": 5.0, "unit": 1, "pct": false, "ref": 15.0},
-	"stat_elemental_damage": {"w": 3.5, "unit": 1, "pct": false, "ref": 12.0},
+	"stat_elemental_damage": {"w": 4.4, "unit": 1, "pct": false, "ref": 12.0},
 	"stat_attack_speed": {"w": 1.4, "unit": 1, "pct": true, "ref": 25.0},
 	"stat_crit_chance": {"w": 2.1, "unit": 1, "pct": true, "ref": 15.0},
-	"stat_engineering": {"w": 2.1, "unit": 1, "pct": false, "ref": 15.0},
+	"stat_engineering": {"w": 3.3, "unit": 1, "pct": false, "ref": 15.0},
 	"stat_range": {"w": 0.6, "unit": 5, "pct": false, "ref": 60.0},
 	"stat_armor": {"w": 6.5, "unit": 1, "pct": false, "ref": 8.0},
 	"stat_dodge": {"w": 2.6, "unit": 1, "pct": true, "ref": 20.0},
@@ -570,3 +570,14 @@ const ITEM_STAT_BANS = {"item_will_o_the_wisp": ["stat_elemental_damage"]}
 # 原道具上保留的原版行：+诅咒（深海 DLC 的诅咒道具）。价值约为 0，但水手 / 生物等角色想要带"诅咒"词条的道具，
 # 保留后这些道具仍带 stat_curse 词条
 const PRESERVED_NATIVE_KEYS = ["stat_curse"]
+
+# 原版这些计数的文本不显示"每 N 个"（原版只用 N = 1）：生成时 N 固定为 1，单个计数的价值即最小价值
+const COUNTER_NB_FIXED = [
+	"different_item", "common_item", "legendary_item", "living_enemy", "burning_enemy", "living_tree", "free_weapon_slots",
+]
+
+
+static func counter_text(counter: String, perm_only: bool) -> String:
+	if COUNTER_TEXT.has(counter):
+		return COUNTER_TEXT[counter]
+	return "EFFECT_GAIN_STAT_FOR_EVERY_PERM_STAT" if perm_only else "EFFECT_GAIN_STAT_FOR_EVERY_STAT"

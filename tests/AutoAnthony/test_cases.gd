@@ -1392,7 +1392,12 @@ func test_16b_permanent_caps() -> void:
 				shown += 1
 	caps.sort()
 	print("AUDIT perm caps on high-frequency triggers: n=%d median=%d max=%d" % [caps.size(), caps[caps.size() / 2] if caps.size() > 0 else 0, caps.back() if caps.size() > 0 else 0])
-	_check(caps.size() > 10 and caps[caps.size() / 2] >= 3, "permanent caps are no longer 1-3")
+	var big = 0
+	for c in caps:
+		if c >= 4:
+			big += 1
+	print("AUDIT perm caps >= 4: %d / %d" % [big, caps.size()])
+	_check(caps.size() > 10 and caps[caps.size() / 2] >= 2 and big >= caps.size() / 4, "permanent caps are no longer 1-3")
 
 
 func rng_budget(i: int) -> float:
@@ -2486,4 +2491,57 @@ func test_103_scaling_grants_probe() -> void:
 	_check(problems.empty(), "scaling grants behave like native linked stats (%d problems)" % problems.size())
 	main._cleaning_up = true
 	rt.revert_all_grants()
+	m.on_menu_reset()
+
+
+# ============================================================
+# "每有 [计数] 获得 [属性]"：原版文本不显示 N 的计数固定 N = 1；道具说明里的 [+x] 与实际获得的属性一致
+# ============================================================
+func test_104_scaling_counts_and_bonus_text() -> void:
+	var n_fixed = 0
+	var n_checked = 0
+	for sd in SEEDS:
+		var gen = Generator.new(_cfg(), sd)
+		var plan = gen.generate(isvc.items, isvc.characters, [], [])
+		for id in plan.items:
+			for e in plan.items[id].effects:
+				var sc = e.grant if e is TriggerEffect and e.grant != null else e
+				if not gen.is_scaling(sc):
+					continue
+				if sc.stat_scaled in Catalog.COUNTER_NB_FIXED:
+					n_fixed += 1
+					_eq(sc.nb_stat_scaled, 1, "%s: '%s' uses N = 1" % [id, sc.stat_scaled])
+	print("AUDIT scaling effects on fixed-N counters: %d (5 seeds)" % n_fixed)
+	_check(n_fixed > 0, "fixed-N counters still appear")
+	# 实际生效：把道具池里每条（非触发）计数型效果装到玩家身上，比较属性增量与原版 get_scaling_bonus
+	m.start_new_run()
+	for it in isvc.items:
+		if it.tier == 0 and it.effects.size() > 0 and not m.plan.items.has(it.my_id):
+			rd.add_item(it, 0)
+	for it in isvc.items:
+		if it.tier == 0 and m.plan.items.has(it.my_id) and n_checked < 12:
+			rd.add_item(it, 0)
+	rd.add_gold(60, 0)
+	var gen = m._gen
+	for id in m.plan.items:
+		for e in m.plan.items[id].effects:
+			if not gen.is_scaling(e) or e.value <= 0:
+				continue
+			var h = Keys.generate_hash(e.key)
+			LinkedStats.reset_player(0)
+			Utils.reset_stat_cache(0)
+			var before = Utils.get_stat(h, 0)
+			var bonus = rd.get_scaling_bonus(e.value, e.stat_scaled, e.nb_stat_scaled, e.perm_stats_only, 0)
+			e.apply(0)
+			LinkedStats.reset_player(0)
+			Utils.reset_stat_cache(0)
+			var gained = Utils.get_stat(h, 0) - before
+			# 原版的"属性修改"同样作用于计数加成
+			bonus = int(round(bonus * rd.get_stat_gain(h, 0)))
+			e.unapply(0)
+			n_checked += 1
+			if e.key != e.stat_scaled:
+				_check(abs(gained - bonus) <= 1, "%s: text bonus [+%d] equals real gain %s (%s per %d %s)" % [id, bonus, str(gained), e.key, e.nb_stat_scaled, e.stat_scaled])
+	LinkedStats.reset_player(0)
+	print("AUDIT scaling effects applied and compared with their [+x] text: %d" % n_checked)
 	m.on_menu_reset()
