@@ -77,6 +77,12 @@ static func clause_value(c: Dictionary, perm_mult: float) -> float:
 			return Catalog.XP_W * v * fires_per_wave(trigger, param, chance, cap)
 		"damage":
 			return Catalog.DMG_W * damage_per_proc(stat, int(v)) * fires_per_wave(trigger, param, chance, cap)
+		"grant":
+			# 被获得效果的价值（作为整局持有的道具行）× 数量 × 叠层 / 在场率 或 永久累积
+			var unit = float(c.get("grant_unit", 0.0)) * v
+			if c.get("grant_mode", "temp") == "perm":
+				return unit * fires_per_wave(trigger, param, chance, cap) * perm_mult
+			return unit * avg_stack(trigger, param, chance, cap, bool(c.get("reset", false)))
 		"explode":
 			return Catalog.DMG_W * Catalog.EXPLOSION_TARGETS * damage_per_proc(stat, int(v)) * fires_per_wave(trigger, param, chance, cap)
 	return 0.0

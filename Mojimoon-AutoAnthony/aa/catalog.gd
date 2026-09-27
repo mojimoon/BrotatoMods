@@ -104,7 +104,7 @@ const TRIGGERS = {
 # 实际受击次数（用于"受伤时清空"条款的估值）
 const REAL_HITS_PER_WAVE = 7.0
 # 本波属性条款带"受伤时清空"的概率
-const RESET_ON_HIT_CHANCE = 0.25
+const RESET_ON_HIT_CHANCE = 0.20
 
 const INTERVAL_CHOICES = [3, 4, 5, 6, 8, 10, 12, 15]
 
@@ -120,6 +120,7 @@ const PAYLOADS = {
 	"xp": {"w": 0.3},
 	"damage": {"w": 0.6},
 	"explode": {"w": 0.5},
+	"grant": {"w": 1.2},
 }
 
 # 合法组合：触发扳机 -> 允许的载荷
@@ -143,6 +144,43 @@ const LEGAL = {
 	"reroll": ["perm_stat", "gold"],
 	"buy": ["perm_stat", "gold"],
 }
+
+# ============================================================
+# 自由触发（选项）：任何扳机都能以"获得效果"为结果，合法表放宽为只排除自激循环与无意义组合
+#   grant 载荷：触发时获得一条效果（可缩放机制 / 计数型 / 属性修改）
+#     本波获得：可叠加，波末撤销；只允许战斗中实时生效的效果（GRANT_TEMP_KEYS）
+#     永久获得：只允许求和型数值效果（存档安全）；商店扳机、波末只能永久获得
+# ============================================================
+const FREE_LEGAL = {
+	"kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant"],
+	"hit": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant"],
+	"dodge": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant"],
+	"consumable": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant"],
+	"gold": ["temp_stat", "perm_stat", "timed_stat", "heal", "xp", "damage", "explode", "grant"],
+	"heal": ["temp_stat", "perm_stat", "timed_stat", "gold", "xp", "damage", "explode", "grant"],
+	"level_up": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "damage", "explode", "grant"],
+	"wave_start": ["temp_stat", "perm_stat", "timed_stat", "gold", "xp", "grant"],
+	"wave_end": ["perm_stat", "gold", "xp", "grant"],
+	"interval": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant"],
+	"still": ["temp_stat", "grant"],
+	"moving": ["temp_stat", "grant"],
+	"low_hp": ["temp_stat", "grant"],
+	"full_hp": ["temp_stat", "grant"],
+	"reroll": ["perm_stat", "gold", "grant"],
+	"buy": ["perm_stat", "gold", "grant"],
+}
+# 战斗中实时读取、可"本波获得"的机制 key（其余求和型机制只能永久获得）
+const GRANT_TEMP_KEYS = [
+	"bounce", "piercing", "piercing_damage", "pierce_on_crit", "burning_cooldown_reduction", "burning_spread",
+	"chance_double_gold", "damage_against_bosses", "enemy_gold_drops", "gold_drops", "gold_on_cursed_enemy_kill",
+	"instant_gold_attracting", "structure_attack_speed", "enemy_fruit_drops", "tree_turrets",
+	"heal_when_pickup_gold", "heal_on_kill", "heal_on_crit_kill",
+]
+# 不能作为触发结果的机制：绑定 / 消耗持有者（镜子、金鱼、沙漏、珍珠），以及生效时机特殊的机制
+const GRANT_BANNED_KEYS = [
+	"duplicate_item", "increase_tier_on_reroll", "item_hourglass", "extra_item_in_crate", "hit_protection",
+	"hp_start_next_wave", "hp_start_wave", "lose_hp_per_second", "jellyshield_count", "torture", "number_of_enemies",
+]
 
 # 原版触发型效果 -> [扳机, 载荷]（custom_key 或 key）。这些原版行在重组时被"拆解"为先验，
 # 由通用触发器重新表达；不会原样搬到别的道具上。

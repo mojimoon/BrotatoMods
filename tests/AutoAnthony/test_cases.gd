@@ -88,6 +88,7 @@ func _reset() -> void:
 	m.cfg_triggers = 100
 	m.cfg_char_effects = false
 	m.cfg_rename = true
+	m.cfg_free_triggers = true
 	m.cfg_native_ratio = 0
 	m.cfg_fixed_seed = true
 	m.cfg_seed = 42
@@ -229,7 +230,7 @@ func test_11_generated_items_are_well_formed() -> void:
 				var text = e.get_text(0, false)
 				_check(text != "" and text.find("AA_") == -1, "%s line renders (%s) %s/%s/%s" % [id, text, e.key, e.custom_key, e.get_script().resource_path])
 				if e is TriggerEffect:
-					_check(e.payload in Catalog.LEGAL[e.trigger], "%s legal combo %s/%s" % [id, e.trigger, e.payload])
+					_check(e.payload in Catalog.FREE_LEGAL[e.trigger], "%s legal combo %s/%s" % [id, e.trigger, e.payload])
 					_check(e.value != 0, "%s trigger value non-zero" % id)
 					_check(e.chance >= 5 and e.chance <= 100, "%s chance in range" % id)
 					_check(e.param >= 1, "%s param >= 1" % id)
@@ -378,8 +379,8 @@ func test_15_every_native_combo_is_reachable() -> void:
 		var pair = Catalog.NATIVE_TRIGGER_MAP[k]
 		_check(seen.has(pair[0] + "/" + pair[1]), "native combo reachable: %s -> %s/%s" % [k, pair[0], pair[1]])
 	var legal_total = 0
-	for t in Catalog.LEGAL:
-		legal_total += Catalog.LEGAL[t].size()
+	for t in Catalog.FREE_LEGAL:
+		legal_total += Catalog.FREE_LEGAL[t].size()
 	print("AUDIT distinct trigger/payload combos generated: %d of %d legal" % [seen.size(), legal_total])
 	_check(seen.size() > legal_total * 0.8, "most legal combos reachable")
 
@@ -1241,4 +1242,105 @@ func test_87_hourglass_and_goldfish_in_shop() -> void:
 	_eq(int(rd.get_player_effects(0)[Keys.item_hourglass_hash]), 0, "hourglass counter back to 0")
 	for i in 6:
 		yield(tree, "idle_frame")
+	m.on_menu_reset()
+
+
+# ============================================================
+# 自由触发：任何扳机 -> "获得效果"
+# ============================================================
+func _plain(key: String, value: int) -> Effect:
+	var e = load("res://items/global/effect.gd").new()
+	e.key = key
+	e.key_hash = Keys.generate_hash(key)
+	e.custom_key_hash = Keys.generate_hash("")
+	e.value = value
+	return e
+
+
+func test_88_grant_runtime() -> void:
+	var pierce = Keys.generate_hash("piercing")
+	var base = rd.get_player_effects(0)[pierce]
+	var rt = _make_runtime([
+		{"trigger": "kill", "payload": "grant", "value": 2, "grant": _plain("piercing", 1), "grant_mode": "temp", "grant_unit": 10.0},
+		{"trigger": "level_up", "payload": "grant", "value": 1, "grant": _plain("chance_double_gold", 5), "grant_mode": "perm", "grant_unit": 5.0},
+		{"trigger": "still", "payload": "grant", "value": 1, "grant": _plain("bounce", 1), "grant_mode": "temp", "grant_unit": 10.0},
+	])
+	rt.fire("kill", 0)
+	rt.fire("kill", 0)
+	_eq(rd.get_player_effects(0)[pierce], base + 4, "temp grant stacks (2 x 2 piercing)")
+	var dg = Keys.generate_hash("chance_double_gold")
+	var dg0 = rd.get_player_effects(0)[dg]
+	rt.fire("level_up", 0)
+	_eq(rd.get_player_effects(0)[dg], dg0 + 5, "perm grant applied")
+	var bounce = Keys.generate_hash("bounce")
+	var b0 = rd.get_player_effects(0)[bounce]
+	rt._set_state(0, rt.entries[0][2], true)
+	_eq(rd.get_player_effects(0)[bounce], b0 + 1, "state grant on")
+	rt._set_state(0, rt.entries[0][2], false)
+	_eq(rd.get_player_effects(0)[bounce], b0, "state grant off")
+	rt.on_wave_end()
+	_eq(rd.get_player_effects(0)[pierce], base, "temp grant reverted at wave end")
+	_eq(rd.get_player_effects(0)[dg], dg0 + 5, "perm grant kept")
+	rt.fire("kill", 0)
+	_eq(rd.get_player_effects(0)[pierce], base + 2, "granted again next wave")
+	rt.queue_free()
+	yield(tree, "idle_frame")
+	_eq(rd.get_player_effects(0)[pierce], base, "temp grant reverted when the scene exits")
+	rd.get_player_effects(0)[dg] = dg0
+
+
+func test_89_grant_texts_serialization_and_modes() -> void:
+	var gen = Generator.new(_cfg(), 7)
+	var plan = gen.generate(isvc.items, isvc.characters, [], [])
+	var grants = 0
+	var shown = 0
+	for id in plan.items:
+		for e in plan.items[id].effects:
+			if e is TriggerEffect and e.payload == "grant":
+				grants += 1
+				var k = e.grant.custom_key if e.grant.custom_key != "" else e.grant.key
+				_check(not k in Catalog.GRANT_BANNED_KEYS, "grant not banned: " + k)
+				if Catalog.TRIGGERS[e.trigger].kind == "shop" or e.trigger == "wave_end":
+					_eq(e.grant_mode, "perm", "shop / wave-end grants are permanent")
+				if e.grant_mode == "temp" and gen.is_scaling(e.grant) == false and gen.is_gain_mod(e.grant) == false:
+					_check(e.grant.key in Catalog.GRANT_TEMP_KEYS, "temp grant is combat-dynamic: " + e.grant.key)
+				var txt = e.get_text(0, false)
+				_check(txt.find("AA_") == -1 and txt.length() > 10, "grant text: " + txt)
+				if shown < 6:
+					print("AUDIT grant sample: ", txt)
+					shown += 1
+				# 存档往返
+				var holder = _item("item_potato").duplicate()
+				holder.effects = [e]
+				var back = _item("item_potato").duplicate()
+				back.deserialize_and_merge(JSON.parse(JSON.print(holder.serialize())).result)
+				_check(back.effects.size() == 1 and back.effects[0].grant != null and back.effects[0].get_text(0, false) == txt, "grant survives save: " + txt)
+	print("AUDIT grant clauses (1 seed): %d" % grants)
+	_check(grants > 10, "free triggers produce grants (%d)" % grants)
+	var cfg = _cfg()
+	cfg.free_triggers = false
+	var plan2 = Generator.new(cfg, 7).generate(isvc.items, isvc.characters, [], [])
+	for id in plan2.items:
+		for e in plan2.items[id].effects:
+			if e is TriggerEffect:
+				_check(e.payload in Catalog.LEGAL[e.trigger], "free triggers off -> classic legal table")
+	for t in Catalog.FREE_LEGAL:
+		_check(not ("heal" in Catalog.FREE_LEGAL[t] and t == "heal"), "no heal loop")
+		_check(not ("gold" in Catalog.FREE_LEGAL[t] and t == "gold"), "no gold loop")
+		_check(not ("xp" in Catalog.FREE_LEGAL[t] and t == "level_up"), "no xp/level loop")
+		if Catalog.TRIGGERS[t].kind == "shop":
+			for p in Catalog.FREE_LEGAL[t]:
+				_check(p in ["perm_stat", "gold", "grant"], "shop trigger payload is shop-safe")
+
+
+func test_89b_shop_grant() -> void:
+	m.start_new_run()
+	var holder = _item("item_potato").duplicate()
+	holder.effects = [TriggerEffect.make({"trigger": "buy", "payload": "grant", "value": 3, "grant": _plain("items_price", -1), "grant_mode": "perm", "grant_unit": 3.0})]
+	rd.players_data[0].items.push_back(holder)
+	var ip = Keys.generate_hash("items_price")
+	var before = rd.get_player_effects(0)[ip]
+	m.fire_shop("buy", 0)
+	_eq(rd.get_player_effects(0)[ip], before - 3, "buy -> permanently -3% items price")
+	rd.get_player_effects(0)[ip] = before
 	m.on_menu_reset()

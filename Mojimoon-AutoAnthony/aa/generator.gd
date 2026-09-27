@@ -785,6 +785,13 @@ func _tags_for(effects: Array) -> Array:
 				add.push_back(Catalog.TRIGGER_TAGS.get(e.trigger, ""))
 				add.push_back(Catalog.PAYLOAD_TAGS.get(e.payload, ""))
 				add.push_back(Catalog.STAT_EXTRA_TAGS.get(e.stat, ""))
+				if e.grant != null:
+					if is_scaling(e.grant):
+						add.push_back(e.grant.key)
+					elif is_gain_mod(e.grant):
+						add.push_back(e.grant.stat_displayed)
+					elif e.grant.has_meta("aa_tags"):
+						add += e.grant.get_meta("aa_tags")
 		elif e.get_script() == effect_script and Catalog.STATS.has(e.key):
 			if e.value > 0:
 				add.push_back(e.key)
@@ -876,6 +883,77 @@ func _note_clause(c: Dictionary) -> void:
 	used_combo[k] = used_combo.get(k, 0) + 1
 	used_trigger[c.trigger] = used_trigger.get(c.trigger, 0) + 1
 	used_payload[c.payload] = used_payload.get(c.payload, 0) + 1
+
+
+# 自由触发的"获得效果"：从可缩放机制 / 计数型 / 属性修改中选一条"单位"效果。
+# 返回 {effect, unit（单位价值）, max_units}；temp 模式只选战斗中实时生效的机制
+func _pick_grant(mode: String) -> Dictionary:
+	var kinds = {"mechanic": 0.5, "scaling": 0.3, "gain_mod": 0.2}
+	for _attempt in 4:
+		var kind = _pick_weighted(kinds)
+		if kind == "mechanic":
+			var pool = []
+			for t in 4:
+				for m in mechanics_by_tier[t]:
+					var e = m.effect
+					if m.down or not m.get("scalar", false) or e.get_script() != effect_script or e.storage_method != 0 or e.custom_key != "":
+						continue
+					if e.key in Catalog.GRANT_BANNED_KEYS:
+						continue
+					if mode == "temp" and not e.key in Catalog.GRANT_TEMP_KEYS:
+						continue
+					pool.push_back(m)
+			if pool.empty():
+				continue
+			var m = pool[rng.randi() % pool.size()]
+			var tmpl = m.effect.duplicate()
+			var native_v = m.effect.value
+			tmpl.value = 1 if native_v > 0 else -1
+			var tags = m.get("tags", [])
+			tmpl.set_meta("aa_tags", tags)
+			return {"effect": tmpl, "unit": abs(m.value) / max(1.0, abs(native_v)), "max_units": int(max(1.0, ceil(abs(native_v) * 1.5)))}
+		elif kind == "scaling":
+			var cw = {}
+			for c in Catalog.COUNTER_TEXT:
+				if mode == "temp" or not c in ["living_enemy", "burning_enemy", "living_tree"]:
+					cw[c] = 0.6 + counter_prior.get(c, 0.0)
+			for st in Catalog.SCALING_STATS:
+				cw[st] = 0.15 * stat_pos_w.get(st, 0.5) / 5.0 + counter_prior.get(st, 0.0)
+			var counter = _pick_weighted(cw)
+			var allowed = []
+			for st in Catalog.SCALING_STATS:
+				if st != counter:
+					allowed.push_back(st)
+			var stat = _pick_stat(false, [], allowed)
+			var unit = Catalog.stat_unit(stat)
+			var nb = _nice_nb(Valuation.scaling_value(stat, unit, counter, 1) / 4.0)
+			var e = scaling_script.new()
+			e.key = stat
+			e.key_hash = Keys.generate_hash(stat)
+			e.custom_key_hash = Keys.generate_hash("")
+			e.value = unit
+			e.stat_scaled = counter
+			e.stat_scaled_hash = Keys.generate_hash(counter)
+			e.nb_stat_scaled = nb
+			e.perm_stats_only = Catalog.STATS.has(counter) and rng.randf() < 0.5
+			if Catalog.COUNTER_TEXT.has(counter):
+				e.text_key = Catalog.COUNTER_TEXT[counter]
+			else:
+				e.text_key = "EFFECT_GAIN_STAT_FOR_EVERY_PERM_STAT" if e.perm_stats_only else "EFFECT_GAIN_STAT_FOR_EVERY_STAT"
+			e.effect_sign = Effect.Sign.FROM_VALUE
+			return {"effect": e, "unit": Valuation.scaling_value(stat, unit, counter, nb), "max_units": 5}
+		else:
+			var stat = _pick_stat(false, [], Catalog.GAIN_MOD_STATS)
+			var e = gain_mod_script.new()
+			e.key = "effect_increase_stat_gains"
+			e.key_hash = Keys.generate_hash(e.key)
+			e.custom_key_hash = Keys.generate_hash("")
+			e.value = 5
+			e.stat_displayed = stat
+			e.stats_modified = [stat]
+			e.effect_sign = Effect.Sign.FROM_VALUE
+			return {"effect": e, "unit": Valuation.gain_mod_value(stat, 5), "max_units": 10}
+	return {}
 
 
 const NICE_NB = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50, 60, 80, 100, 150, 200]
@@ -987,7 +1065,8 @@ func _legal_payloads(trigger: String, negative: bool) -> Array:
 	if negative:
 		return ["temp_stat"] if trigger in NEGATIVE_TRIGGERS else []
 	var out = []
-	for p in Catalog.LEGAL[trigger]:
+	var table = Catalog.FREE_LEGAL if cfg.get("free_triggers", true) else Catalog.LEGAL
+	for p in table[trigger]:
 		if not p in banned_payloads:
 			out.push_back(p)
 	return out
@@ -1046,6 +1125,22 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 			c.value = 1
 		"xp":
 			c.value = 3
+		"grant":
+			var mode = "temp"
+			if t.kind == "shop" or trigger == "wave_end":
+				mode = "perm"
+			elif t.kind == "event" and rng.randf() < 0.3:
+				mode = "perm"
+			var gr = _pick_grant(mode)
+			if gr.empty():
+				return {}
+			c.grant = gr.effect
+			c.grant_unit = gr.unit
+			c.grant_max = gr.max_units
+			c.grant_mode = mode
+			c.value = 1
+			if mode == "perm" and Valuation.raw_rate(trigger, 1, 100) > 1.5:
+				c.cap = 1 + rng.randi() % 3
 		"damage":
 			c.stat = _pick_stat(false, [], Catalog.DAMAGE_SCALING_STATS)
 			c.value = [50, 75, 100, 150, 200][rng.randi() % 5]
@@ -1084,8 +1179,8 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 			c.param = fitted
 		else:
 			return {}
-		# 永久属性在高频扳机上再用每波上限收口
-		if payload == "perm_stat" and c.cap > 1:
+		# 永久属性 / 永久获得在高频扳机上再用每波上限收口
+		if (payload == "perm_stat" or (payload == "grant" and c.grant_mode == "perm")) and c.cap > 1:
 			var per_fire = abs(Valuation.clause_value(c, perm_mult)) / max(0.01, Valuation.fires_per_wave(trigger, c.param, c.chance, c.cap))
 			c.cap = int(clamp(floor(budget / max(0.01, per_fire)), 1, c.cap))
 
@@ -1117,6 +1212,13 @@ func _amount_cap(c: Dictionary, trigger: String) -> int:
 			return 20
 		"damage", "explode":
 			return 8
+		"grant":
+			var mx = int(c.get("grant_max", 5))
+			if c.get("grant_mode", "temp") == "perm":
+				return int(min(mx, 3 if rate <= 1.5 else 1))
+			if kind == "state" or rate <= 1.5:
+				return mx
+			return int(min(mx, 3 if rate <= 10 else 1))
 	return 5
 
 

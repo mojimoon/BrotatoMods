@@ -58,7 +58,7 @@ func rebuild(player_index: int) -> void:
 					list.push_back(old[id])
 				else:
 					var show = Valuation.raw_rate(e.trigger, e.param, e.chance) <= FEEDBACK_MAX_RATE and not e.trigger in ["still", "moving"]
-					list.push_back({"effect": e, "count": 0, "fired": 0, "active": false, "show": show, "stack": 0})
+					list.push_back({"effect": e, "count": 0, "fired": 0, "active": false, "show": show, "stack": 0, "granted": []})
 	# 被移除的状态加成要撤销
 	for id in old:
 		var still_there = false
@@ -66,8 +66,11 @@ func rebuild(player_index: int) -> void:
 			if en.effect.get_instance_id() == id:
 				still_there = true
 				break
-		if not still_there and old[id].active:
-			_set_state(player_index, old[id], false)
+		if not still_there:
+			if old[id].active:
+				_set_state(player_index, old[id], false)
+			if not old[id].granted.empty():
+				_revert_grants(player_index, old[id])
 	entries[player_index] = list
 
 
@@ -100,7 +103,7 @@ func fire(event: String, player_index: int, pos = null) -> void:
 		if e.chance < 100 and randf() * 100.0 >= e.chance:
 			continue
 		en.fired += 1
-		execute(e, player_index, pos, en.show)
+		execute(e, player_index, pos, en.show, en)
 		if e.reset and e.payload == "temp_stat":
 			en.stack = en.get("stack", 0) + e.value
 	if event == "hit":
@@ -148,7 +151,7 @@ func _physics_process(delta: float) -> void:
 					en.count = 0
 					if (e.cap <= 0 or en.fired < e.cap) and (e.chance >= 100 or randf() * 100.0 < e.chance):
 						en.fired += 1
-						execute(e, p, null, en.show)
+						execute(e, p, null, en.show, en)
 						if e.reset and e.payload == "temp_stat":
 							en.stack = en.get("stack", 0) + e.value
 			elif Catalog.TRIGGERS[e.trigger].kind == "state":
@@ -174,6 +177,15 @@ func _state_holds(trigger: String, player) -> bool:
 func _set_state(player_index: int, en: Dictionary, on: bool) -> void:
 	en.active = on
 	var e = en.effect
+	if e.payload == "grant":
+		if on and e.grant != null:
+			var g = e.scaled_grant()
+			g.apply(player_index)
+			en.granted.push_back(g)
+		elif not on:
+			_revert_grants(player_index, en)
+		_refresh(player_index)
+		return
 	var h = Keys.generate_hash(e.stat)
 	if on:
 		TempStats.add_stat(h, e.value, player_index)
@@ -188,9 +200,17 @@ func _set_state(player_index: int, en: Dictionary, on: bool) -> void:
 # ============================================================
 # 载荷
 # ============================================================
-func execute(e, player_index: int, pos, show: bool = true) -> void:
+func execute(e, player_index: int, pos, show: bool = true, en = null) -> void:
 	var h = Keys.generate_hash(e.stat) if e.stat != "" else Keys.empty_hash
 	match e.payload:
+		"grant":
+			if e.grant == null:
+				return
+			var g = e.scaled_grant()
+			g.apply(player_index)
+			if e.grant_mode != "perm" and en != null:
+				en.granted.push_back(g)
+			_refresh(player_index)
 		"temp_stat":
 			TempStats.add_stat(h, e.value, player_index)
 			if show:
@@ -283,9 +303,39 @@ func _get_player(player_index: int):
 	return p
 
 
-# 波次结束：清空状态（TempStats 由原版在波末整体重置）
+# "本波获得"的效果：撤销
+func _revert_grants(player_index: int, en: Dictionary) -> void:
+	for g in en.granted:
+		g.unapply(player_index)
+	en.granted = []
+
+
+func _refresh(player_index: int) -> void:
+	Utils.reset_stat_cache(player_index)
+	RunData._are_player_stats_dirty[player_index] = true
+	LinkedStats.reset_player(player_index)
+
+
+func revert_all_grants() -> void:
+	for p in entries.size():
+		var any = false
+		for en in entries[p]:
+			if not en.granted.empty():
+				_revert_grants(p, en)
+				any = true
+		if any and p < RunData.get_player_count():
+			_refresh(p)
+
+
+# 场景提前结束（死亡 / 退出 / 重开）时也要撤销，避免"本波获得"的效果残留到之后
+func _exit_tree() -> void:
+	revert_all_grants()
+
+
+# 波次结束：清空状态（TempStats 由原版在波末整体重置）；撤销"本波获得"的效果
 func on_wave_end() -> void:
 	_wave_serial += 1
+	revert_all_grants()
 	for p in entries.size():
 		for en in entries[p]:
 			en.active = false

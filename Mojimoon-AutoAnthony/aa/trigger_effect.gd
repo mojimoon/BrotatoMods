@@ -25,6 +25,10 @@ export(int) var value2 := 0
 export(int) var cap := 0
 # 受到伤害时清空本条款累积的本波属性（原版水晶）
 export(bool) var reset := false
+# grant 载荷：触发时获得的效果（单位数值）、模式（temp 本波 / perm 永久）、单位价值（估值用）
+export(Resource) var grant = null
+export(String) var grant_mode := "temp"
+export(float) var grant_unit := 0.0
 
 
 static func get_id() -> String:
@@ -46,6 +50,11 @@ static func make(c: Dictionary) -> Effect:
 	e.value2 = int(c.get("value2", 0))
 	e.cap = int(c.get("cap", 0))
 	e.reset = bool(c.get("reset", false))
+	if c.get("grant") != null:
+		e.grant = c.grant.duplicate()
+		e.grant_mode = c.get("grant_mode", "temp")
+		e.grant_unit = float(c.get("grant_unit", 0.0))
+		e.value = int(c.value)
 	e.effect_sign = Effect.Sign.FROM_VALUE
 	return e
 
@@ -54,6 +63,7 @@ func to_clause() -> Dictionary:
 	return {
 		"trigger": trigger, "param": param, "chance": chance, "payload": payload,
 		"stat": stat, "value": value, "value2": value2, "cap": cap, "reset": reset,
+		"grant_mode": grant_mode, "grant_unit": grant_unit,
 	}
 
 
@@ -137,9 +147,20 @@ func _payload_text(colored: bool) -> String:
 			return tr("AA_P_XP").replace("{0}", _col(str(value), good, colored))
 		"damage":
 			return tr("AA_P_DAMAGE").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", stat_name)
+		"grant":
+			var inner = scaled_grant().get_text(0, colored) if grant != null else ""
+			var k = "AA_P_GRANT_PERM" if grant_mode == "perm" else ("AA_P_GRANT_STATE" if Catalog.TRIGGERS[trigger].kind == "state" else "AA_P_GRANT_TEMP")
+			return tr(k).replace("{0}", inner)
 		"explode":
 			return tr("AA_P_EXPLODE").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", stat_name)
 	return ""
+
+
+# grant 保存"单位"效果；实际获得的效果 = 单位 × 条款数量（诅咒会提高条款数量）
+func scaled_grant():
+	var d = grant.duplicate()
+	d.value = grant.value * value
+	return d
 
 
 func _cap_text() -> String:
@@ -161,6 +182,9 @@ func serialize() -> Dictionary:
 	s.value2 = value2
 	s.cap = cap
 	s.reset = reset
+	s.grant_mode = grant_mode
+	s.grant_unit = grant_unit
+	s.grant = grant.serialize() if grant != null else null
 	return s
 
 
@@ -174,3 +198,13 @@ func deserialize_and_merge(s: Dictionary) -> void:
 	value2 = int(s.get("value2", 0))
 	cap = int(s.get("cap", 0))
 	reset = bool(s.get("reset", false))
+	grant_mode = str(s.get("grant_mode", "temp"))
+	grant_unit = float(s.get("grant_unit", 0.0))
+	grant = null
+	var gs = s.get("grant", null)
+	if gs is Dictionary:
+		for script in ItemService.effects:
+			if script.get_id() == gs.get("effect_id", ""):
+				grant = script.new()
+				grant.deserialize_and_merge(gs)
+				break

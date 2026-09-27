@@ -25,6 +25,7 @@ var cfg_items: bool = true
 var cfg_characters: bool = false
 var cfg_weapons: bool = false
 var cfg_char_effects: bool = false	# 道具可含角色效果
+var cfg_free_triggers: bool = true	# 自由触发：任何扳机都能以任何效果为结果
 var cfg_rename: bool = true			# 重组名称
 var cfg_avg: int = 100				# 平均数值 50–200%
 var cfg_variance: int = 100			# 浮动范围 50–200%（100% = 原版离散度）
@@ -117,6 +118,7 @@ func get_cfg() -> Dictionary:
 		"characters": cfg_characters,
 		"weapons": cfg_weapons,
 		"char_effects": cfg_char_effects,
+		"free_triggers": cfg_free_triggers,
 		"rename": cfg_rename,
 		"avg": cfg_avg,
 		"variance": cfg_variance,
@@ -159,6 +161,7 @@ func _load_settings() -> void:
 	cfg_characters = bool(d.get("characters", false))
 	cfg_weapons = bool(d.get("weapons", false))
 	cfg_char_effects = bool(d.get("char_effects", false))
+	cfg_free_triggers = bool(d.get("free_triggers", true))
 	cfg_rename = bool(d.get("rename", true))
 	cfg_avg = int(clamp(int(d.get("avg", 100)), 50, 200))
 	cfg_variance = int(clamp(int(d.get("variance", 100)), 50, 200))
@@ -549,6 +552,12 @@ func fire_shop(event: String, player_index: int) -> void:
 				"perm_stat":
 					rd.add_stat(Keys.generate_hash(e.stat), e.value, player_index)
 					LinkedStats.reset_player(player_index)
+				"grant":
+					if e.grant != null:
+						e.scaled_grant().apply(player_index)
+						Utils.reset_stat_cache(player_index)
+						rd._are_player_stats_dirty[player_index] = true
+						LinkedStats.reset_player(player_index)
 				"gold":
 					rd.add_gold(e.value, player_index)
 
