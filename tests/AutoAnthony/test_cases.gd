@@ -88,7 +88,6 @@ func _reset() -> void:
 	m.cfg_triggers = 100
 	m.cfg_char_effects = false
 	m.cfg_rename = true
-	m.cfg_free_triggers = true
 	m.cfg_native_ratio = 0
 	m.cfg_fixed_seed = true
 	m.cfg_seed = 42
@@ -670,10 +669,14 @@ func test_50_all_translation_keys_exist() -> void:
 	for t in Catalog.TRIGGERS:
 		if not t in ["kill", "gold", "interval"]:
 			_check(keys.has("AA_T_" + t.to_upper()), "trigger text for " + t)
+	var adjs = Catalog.ADJ_MECHANIC + Catalog.ADJ_SCALING + Catalog.ADJ_GAIN_MOD + Catalog.ADJ_GRANT
 	for s in Catalog.ADJ_BY_STAT:
-		_check(keys.has(Catalog.ADJ_BY_STAT[s]), "adjective " + Catalog.ADJ_BY_STAT[s])
+		adjs += Catalog.ADJ_BY_STAT[s]
 	for t in Catalog.ADJ_BY_TRIGGER:
-		_check(keys.has(Catalog.ADJ_BY_TRIGGER[t]), "adjective " + Catalog.ADJ_BY_TRIGGER[t])
+		adjs += Catalog.ADJ_BY_TRIGGER[t]
+	for a in adjs:
+		_check(keys.has(a), "adjective " + a)
+	print("AUDIT distinct name adjectives: %d" % adjs.size())
 	# 扫描源码中引用的 AA_ key
 	var re = RegEx.new()
 	re.compile("\"(AA_[A-Z0-9_]+)\"")
@@ -1235,10 +1238,24 @@ func test_87_hourglass_and_goldfish_in_shop() -> void:
 		yield(tree, "idle_frame")
 	var shop = tree.current_scene
 	shop._on_RerollButton_pressed(0)
-	_check(rd.get_nb_item(Keys.generate_hash("item_cake"), 0, false) == 0, "goldfish-like holder consumed by reroll")
+	_eq(rd.get_nb_item(Keys.generate_hash("item_cake"), 0, false), 1, "goldfish-like holder kept after reroll")
+	var cake = rd.get_player_item(Keys.generate_hash("item_cake"), 0)
+	_check(cake != null and cake.effects.empty(), "only the consumed effect disappeared")
+	# 镜子：购买时复制，持有者只失去这条效果
+	var mirror_holder = _item("item_helmet").duplicate()
+	mirror_holder.effects = [gen._mechanic_copy(_find_mech(gen, "duplicate_item"), -1.0, "item_helmet")]
+	rd.add_item(mirror_holder, 0)
+	var bought = _item("item_bat")
+	shop.buy_item(bought, 0)
+	_eq(rd.get_nb_item(Keys.generate_hash("item_bat"), 0, false), 2, "mirror-like holder duplicated the bought item")
+	_eq(rd.get_nb_item(Keys.generate_hash("item_helmet"), 0, false), 1, "mirror-like holder kept")
+	var helmet = rd.get_player_item(Keys.generate_hash("item_helmet"), 0)
+	_check(helmet != null and helmet.effects.empty(), "mirror effect removed from the holder")
 	shop._on_GoButton_pressed(0)
 	_eq(rd.current_wave, 5, "hourglass-like holder rewinds the wave (5 -> 6 -> 5)")
-	_check(rd.get_nb_item(Keys.generate_hash("item_potato"), 0, false) == 0, "hourglass-like holder removed")
+	_eq(rd.get_nb_item(Keys.generate_hash("item_potato"), 0, false), 1, "hourglass-like holder kept")
+	var pot = rd.get_player_item(Keys.generate_hash("item_potato"), 0)
+	_check(pot != null and pot.effects.empty(), "hourglass effect removed from the holder")
 	_eq(int(rd.get_player_effects(0)[Keys.item_hourglass_hash]), 0, "hourglass counter back to 0")
 	for i in 6:
 		yield(tree, "idle_frame")
@@ -1344,3 +1361,29 @@ func test_89b_shop_grant() -> void:
 	_eq(rd.get_player_effects(0)[ip], before - 3, "buy -> permanently -3% items price")
 	rd.get_player_effects(0)[ip] = before
 	m.on_menu_reset()
+
+
+
+func test_16b_permanent_caps() -> void:
+	var gen = Generator.new(_cfg(), 4)
+	gen._collect_priors(isvc.items, isvc.characters, isvc.weapons)
+	gen.rng.seed = 4
+	var caps = []
+	var shown = 0
+	for i in 400:
+		var c = gen.gen_clause(rng_budget(i), 4.0, false)
+		if c.empty():
+			continue
+		var perm = c.payload == "perm_stat" or (c.payload == "grant" and c.get("grant_mode", "") == "perm")
+		if perm and Valuation.raw_rate(c.trigger, 1, 100) > 1.5:
+			caps.push_back(c.cap)
+			if shown < 5:
+				print("AUDIT perm clause: ", TriggerEffect.make(c).get_text(0, false))
+				shown += 1
+	caps.sort()
+	print("AUDIT perm caps on high-frequency triggers: n=%d median=%d max=%d" % [caps.size(), caps[caps.size() / 2] if caps.size() > 0 else 0, caps.back() if caps.size() > 0 else 0])
+	_check(caps.size() > 10 and caps[caps.size() / 2] >= 3, "permanent caps are no longer 1-3")
+
+
+func rng_budget(i: int) -> float:
+	return [10.0, 20.0, 35.0, 60.0][i % 4]

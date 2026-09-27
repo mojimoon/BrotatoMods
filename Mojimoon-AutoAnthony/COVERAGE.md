@@ -15,7 +15,7 @@
 | `identity`（59 种） | 保留在角色上，不进入道具池（武器限制、初始装备、商店规则、负向机制……） | — |
 | `anchored`（3 种） | 建造者炮台的角色专属效果：不作为组件来源 | — |
 | `text`（6 种） | 纯描述行：需要的说明已合并进对应效果的同一行（“生效后此道具消失”“受到伤害时清空”），其余为音效 / 已用状态的提示 | — |
-| `excluded`（1 种） | 迷雾视野：只在迷雾事件中有意义，不搬运 | — |
+| `excluded`（2 种） | 迷雾视野：只在迷雾事件中有意义，不搬运 | — |
 | `weapon`（36 种） | 武器专属效果：仅在“重组武器”时于同类型武器家族间整套交换 | 按等级对齐，不单独估值 |
 
 ## 明细
@@ -125,7 +125,7 @@
 | `level_upgrades_modifications` | 1 | item | barnacle +35% stats gained from level upgrades |
 | `loot_alien_chance` | 1 | item | whistle +50% chance for loot aliens to appear |
 | `loot_alien_speed` | 1 | item | whistle +20% movement speed for loot aliens |
-| `number_of_enemies` | 7 | item,char | candle -10% Enemies / gentle_alien +5% Enemies |
+| `number_of_enemies` | 5 | item,char | gentle_alien +5% Enemies / mouse +10% Enemies |
 | `pierce_on_crit` | 1 | item | eyepatch Projectiles get +1 piercing on critical hit |
 | `piercing` | 3 | item,char | bandana Projectiles pierce through 1 additional target / sharp_bullet Projectiles pierce through 1 additional target |
 | `piercing_damage` | 1 | item | pumpkin +15% Piercing Damage. Can't go above base damage |
@@ -212,9 +212,9 @@
 | `hp_start_wave` | 1 | item | sad_tomato Start waves with -50% HP |
 | `lock_current_weapons` | 1 | item | knot Weapons can no longer be upgraded or recycled |
 | `lose_hp_per_second` | 2 | item | blood_donation You take 1 damage per second (does not give invulnerability  / bloody_hand You take 1 damage per second (does not give invulnerability  |
+| `number_of_enemies` | 2 | item | candle -10% Enemies / white_flag -5% Enemies |
 | `piercing_damage` | 1 | item | sharp_bullet -20% Piercing Damage |
 | `speed_cap` | 1 | item | shackles Your Speed is capped at its current value [5] |
-| `stat_curse` | 4 | item | black_flag +5 Curse / fish_hook +1 Curse |
 
 ### `identity`
 
@@ -304,6 +304,7 @@
 | 效果 key | 次数 | 来源 | 示例 |
 | --- | --- | --- | --- |
 | `fog_visibility` | 5 | item | campfire  / candle  |
+| `stat_curse` | 4 | item | black_flag +5 Curse / fish_hook +1 Curse |
 
 ### `weapon`
 

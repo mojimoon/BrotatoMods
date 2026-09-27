@@ -25,7 +25,6 @@ var cfg_items: bool = true
 var cfg_characters: bool = false
 var cfg_weapons: bool = false
 var cfg_char_effects: bool = false	# 道具可含角色效果
-var cfg_free_triggers: bool = true	# 自由触发：任何扳机都能以任何效果为结果
 var cfg_rename: bool = true			# 重组名称
 var cfg_avg: int = 100				# 平均数值 50–200%
 var cfg_variance: int = 100			# 浮动范围 50–200%（100% = 原版离散度）
@@ -118,7 +117,6 @@ func get_cfg() -> Dictionary:
 		"characters": cfg_characters,
 		"weapons": cfg_weapons,
 		"char_effects": cfg_char_effects,
-		"free_triggers": cfg_free_triggers,
 		"rename": cfg_rename,
 		"avg": cfg_avg,
 		"variance": cfg_variance,
@@ -161,7 +159,6 @@ func _load_settings() -> void:
 	cfg_characters = bool(d.get("characters", false))
 	cfg_weapons = bool(d.get("weapons", false))
 	cfg_char_effects = bool(d.get("char_effects", false))
-	cfg_free_triggers = bool(d.get("free_triggers", true))
 	cfg_rename = bool(d.get("rename", true))
 	cfg_avg = int(clamp(int(d.get("avg", 100)), 50, 200))
 	cfg_variance = int(clamp(int(d.get("variance", 100)), 50, 200))
@@ -482,7 +479,7 @@ static func _dup_effects(effects: Array) -> Array:
 
 
 # 读档后的修复：启动时存档可能在本 mod 注册效果脚本之前就被反序列化，触发条款会丢失。
-# 未诅咒的物品直接换回模板（数值与存档一致）；诅咒物品只补回缺失的触发条款并按诅咒系数增强。
+# 只补回缺失的触发条款（诅咒物品按诅咒系数增强），其余效果保持存档原样（例如已消失的一次性效果不会被补回）。
 func _repair_loaded(state: Dictionary) -> void:
 	var rd = _autoload("RunData")
 	for pd in rd.players_data:
@@ -504,13 +501,10 @@ func _repair_item(it) -> void:
 	var tmpl = _template_for(it)
 	if tmpl == null or tmpl == it:
 		return
-	if not it.is_cursed:
-		it.effects = _dup_effects(tmpl.effects)
-		it.name = tmpl.name
-		if not it is CharacterData:
-			it.tags = tmpl.tags
-			it.tracking_text = tmpl.tracking_text
-		return
+	it.name = tmpl.name
+	if not it is CharacterData:
+		it.tags = tmpl.tags
+		it.tracking_text = tmpl.tracking_text
 	var has_trigger = false
 	for e in it.effects:
 		if e is TriggerEffect:
@@ -525,7 +519,7 @@ func _repair_item(it) -> void:
 	for e in tmpl.effects:
 		if e is TriggerEffect:
 			var ne = e.duplicate()
-			if dlc != null and dlc.has_method("_boost_effect_value_positively"):
+			if it.is_cursed and dlc != null and dlc.has_method("_boost_effect_value_positively"):
 				ne.value = dlc._boost_effect_value_positively(ne, it.curse_factor)
 			new_effects.push_back(ne)
 	it.effects = new_effects

@@ -21,8 +21,11 @@ const WAVE_SECONDS = 60.0
 # 稀有度截距（Tier 0..3）：原版价格中与效果无关的部分
 const TIER_INTERCEPT = [11.5, 30.0, 40.9, 39.0]
 # 永久累积倍率：Tier 越高通常购买越晚、剩余波数越少。角色视为整局持有。
-const PERM_MULT = [7.5, 6.5, 5.5, 4.5]
-const PERM_MULT_CHARACTER = 10.5
+# 由原版"每波永久成长"道具反推（警戒戒指 6.4、机械臂 3.5、魔法叶 3.3、鬼火 2.5、宝宝乌贼 6.1），中位约 3.5
+const PERM_MULT = [5.0, 4.5, 4.0, 3.5]
+# 高频扳机上永久效果的每波上限最大值
+const PERM_CAP_MAX = 10
+const PERM_MULT_CHARACTER = 7.0
 # 负面效果的价值除数：-3 远程伤害只按 -1 远程伤害计价
 const DOWNSIDE_DIVISOR = 2.5
 # 隐藏价值乘数（按稀有度）：用"真实频率"审计生成道具与原版纯属性道具的强度比 real，
@@ -247,7 +250,7 @@ const SCALAR_EXTRA_KEYS = [
 const DOWNSIDE_SIGN = {
 	"hp_start_next_wave": -1, "hp_start_wave": -1, "lose_hp_per_second": 1, "extra_elite_next_wave_chance": 1,
 	"enemy_health": 1, "enemy_damage": 1, "enemy_speed": 1, "items_price": 1, "reroll_price": 1,
-	"speed_cap": 0, "hp_cap": 0, "lock_current_weapons": 0, "extra_enemies_next_wave": 0, "stat_curse": 1,
+	"speed_cap": 0, "hp_cap": 0, "lock_current_weapons": 0, "extra_enemies_next_wave": 0, "number_of_enemies": -1,
 	"gold_drops": -1, "enemy_gold_drops": -1, "dodge_cap": -1, "gain_pct_gold_start_wave": -1,
 	"accuracy": -1, "burning_cooldown_reduction": -1, "piercing_damage": -1,
 }
@@ -274,24 +277,48 @@ const STAT_TEXT_KEYS = {
 # 不适合搬运的机制 key（依赖其他行或道具 ID 语义）
 const MECHANIC_BANNED_KEYS = [
 	"stats_next_wave", "starting_item", "starting_weapon", "cursed_starting_item",
-	"fog_visibility",
+	"fog_visibility", "stat_curse",
 ]
 
-# 名称形容词：按主要效果选择
+# 名称形容词：按主要效果选择（每项多个候选，按道具随机）
 const ADJ_BY_STAT = {
-	"stat_max_hp": "AA_ADJ_STURDY", "stat_hp_regeneration": "AA_ADJ_VITAL", "stat_lifesteal": "AA_ADJ_THIRSTY",
-	"stat_percent_damage": "AA_ADJ_SHARP", "stat_melee_damage": "AA_ADJ_BRUTAL", "stat_ranged_damage": "AA_ADJ_AIMED",
-	"stat_elemental_damage": "AA_ADJ_ARCANE", "stat_attack_speed": "AA_ADJ_HASTY", "stat_crit_chance": "AA_ADJ_DEADLY",
-	"stat_engineering": "AA_ADJ_CLEVER", "stat_range": "AA_ADJ_FARSIGHTED", "stat_armor": "AA_ADJ_ARMORED",
-	"stat_dodge": "AA_ADJ_ELUSIVE", "stat_speed": "AA_ADJ_SWIFT", "stat_luck": "AA_ADJ_LUCKY",
-	"stat_harvesting": "AA_ADJ_FERTILE",
+	"stat_max_hp": ["AA_ADJ_STURDY", "AA_ADJ_HEARTY", "AA_ADJ_BULKY"],
+	"stat_hp_regeneration": ["AA_ADJ_VITAL", "AA_ADJ_VERDANT", "AA_ADJ_MENDING"],
+	"stat_lifesteal": ["AA_ADJ_THIRSTY", "AA_ADJ_VAMPIRIC", "AA_ADJ_LEECHING"],
+	"stat_percent_damage": ["AA_ADJ_SHARP", "AA_ADJ_KEEN", "AA_ADJ_FIERCE"],
+	"stat_melee_damage": ["AA_ADJ_BRUTAL", "AA_ADJ_HEAVY", "AA_ADJ_SAVAGE"],
+	"stat_ranged_damage": ["AA_ADJ_AIMED", "AA_ADJ_PRECISE", "AA_ADJ_HAWKEYED"],
+	"stat_elemental_damage": ["AA_ADJ_ARCANE", "AA_ADJ_BLAZING", "AA_ADJ_STORMY"],
+	"stat_attack_speed": ["AA_ADJ_HASTY", "AA_ADJ_FRANTIC", "AA_ADJ_RAPID"],
+	"stat_crit_chance": ["AA_ADJ_DEADLY", "AA_ADJ_LETHAL", "AA_ADJ_VICIOUS"],
+	"stat_engineering": ["AA_ADJ_CLEVER", "AA_ADJ_MECHANICAL", "AA_ADJ_TINKERING"],
+	"stat_range": ["AA_ADJ_FARSIGHTED", "AA_ADJ_LONG", "AA_ADJ_TELESCOPIC"],
+	"stat_armor": ["AA_ADJ_ARMORED", "AA_ADJ_PLATED", "AA_ADJ_STALWART"],
+	"stat_dodge": ["AA_ADJ_ELUSIVE", "AA_ADJ_SLIPPERY", "AA_ADJ_PHANTOM"],
+	"stat_speed": ["AA_ADJ_SWIFT", "AA_ADJ_FLEET", "AA_ADJ_BREEZY"],
+	"stat_luck": ["AA_ADJ_LUCKY", "AA_ADJ_FORTUNATE", "AA_ADJ_CHARMED"],
+	"stat_harvesting": ["AA_ADJ_FERTILE", "AA_ADJ_BOUNTIFUL", "AA_ADJ_HARVEST"],
+	"xp_gain": ["AA_ADJ_WISE", "AA_ADJ_STUDIOUS"],
+	"pickup_range": ["AA_ADJ_MAGNETIC", "AA_ADJ_GRABBY"],
+	"knockback": ["AA_ADJ_BOUNCY", "AA_ADJ_FORCEFUL"],
+	"explosion_damage": ["AA_ADJ_VOLATILE", "AA_ADJ_EXPLOSIVE"],
+	"explosion_size": ["AA_ADJ_VOLATILE", "AA_ADJ_EXPLOSIVE"],
+	"consumable_heal": ["AA_ADJ_TASTY", "AA_ADJ_NOURISHING"],
 }
 const ADJ_BY_TRIGGER = {
-	"kill": "AA_ADJ_HUNTING", "hit": "AA_ADJ_VENGEFUL", "dodge": "AA_ADJ_NIMBLE", "consumable": "AA_ADJ_HUNGRY",
-	"gold": "AA_ADJ_GREEDY", "heal": "AA_ADJ_BLESSED", "level_up": "AA_ADJ_GROWING", "wave_start": "AA_ADJ_EAGER",
-	"wave_end": "AA_ADJ_PATIENT", "interval": "AA_ADJ_TICKING", "still": "AA_ADJ_ROOTED", "moving": "AA_ADJ_RESTLESS",
-	"low_hp": "AA_ADJ_DESPERATE", "full_hp": "AA_ADJ_PROUD", "reroll": "AA_ADJ_FICKLE", "buy": "AA_ADJ_THRIFTY",
+	"kill": ["AA_ADJ_HUNTING", "AA_ADJ_PREDATORY"], "hit": ["AA_ADJ_VENGEFUL", "AA_ADJ_SPITEFUL"],
+	"dodge": ["AA_ADJ_NIMBLE", "AA_ADJ_EVASIVE"], "consumable": ["AA_ADJ_HUNGRY", "AA_ADJ_GLUTTONOUS"],
+	"gold": ["AA_ADJ_GREEDY", "AA_ADJ_HOARDING"], "heal": ["AA_ADJ_BLESSED", "AA_ADJ_HOLY"],
+	"level_up": ["AA_ADJ_GROWING", "AA_ADJ_AMBITIOUS"], "wave_start": ["AA_ADJ_EAGER", "AA_ADJ_DAWNING"],
+	"wave_end": ["AA_ADJ_PATIENT", "AA_ADJ_DUSK"], "interval": ["AA_ADJ_TICKING", "AA_ADJ_RHYTHMIC"],
+	"still": ["AA_ADJ_ROOTED", "AA_ADJ_CALM"], "moving": ["AA_ADJ_RESTLESS", "AA_ADJ_WANDERING"],
+	"low_hp": ["AA_ADJ_DESPERATE", "AA_ADJ_CORNERED"], "full_hp": ["AA_ADJ_PROUD", "AA_ADJ_PRISTINE"],
+	"reroll": ["AA_ADJ_FICKLE", "AA_ADJ_GAMBLING"], "buy": ["AA_ADJ_THRIFTY", "AA_ADJ_SHOPAHOLIC"],
 }
+const ADJ_MECHANIC = ["AA_ADJ_ODD", "AA_ADJ_STRANGE", "AA_ADJ_CURIOUS", "AA_ADJ_ANCIENT"]
+const ADJ_SCALING = ["AA_ADJ_RESONANT", "AA_ADJ_SYNERGIC"]
+const ADJ_GAIN_MOD = ["AA_ADJ_AMPLIFIED", "AA_ADJ_REFINED"]
+const ADJ_GRANT = ["AA_ADJ_AWAKENED", "AA_ADJ_CHARGED"]
 
 
 static func is_downside_mechanic(e) -> bool:
@@ -376,7 +403,7 @@ const HEAL_KEYS = ["heal_on_kill", "heal_on_crit_kill", "heal_when_pickup_gold",
 const COUNTER_REF = {
 	"stat_armor": 10.0, "stat_elemental_damage": 15.0, "stat_speed": 16.0, "stat_crit_chance": 25.0,
 	"stat_dodge": 25.0, "knockback": 12.0,
-	"materials": 160.0, "structure": 3.0, "living_enemy": 24.0, "burning_enemy": 8.0, "living_tree": 3.0,
+	"materials": 320.0, "structure": 3.0, "living_enemy": 24.0, "burning_enemy": 8.0, "living_tree": 3.0,
 	"percent_player_missing_health": 30.0, "different_item": 18.0, "common_item": 12.0, "legendary_item": 1.5,
 }
 # 可用的非属性计数与原版描述 key

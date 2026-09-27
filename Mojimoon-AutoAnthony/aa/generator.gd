@@ -491,6 +491,10 @@ static func _max_value(d: Dictionary) -> float:
 	return m
 
 
+func _adj(options: Array) -> String:
+	return options[rng.randi() % options.size()]
+
+
 func _pick_class(tier: int) -> String:
 	var w = {}
 	for c in Catalog.CATEGORY_CLASSES:
@@ -599,7 +603,7 @@ func generate_item(item) -> Dictionary:
 				budget -= mv
 				done = true
 				if mv > main_line.value:
-					main_line = {"value": mv, "adj": "AA_ADJ_ODD"}
+					main_line = {"value": mv, "adj": _adj(Catalog.ADJ_MECHANIC)}
 		elif kind == "scaling":
 			var sc = gen_scaling(budget * share, false)
 			if not sc.empty():
@@ -607,7 +611,7 @@ func generate_item(item) -> Dictionary:
 				budget -= sc.value
 				done = true
 				if sc.value > main_line.value:
-					main_line = {"value": sc.value, "adj": Catalog.ADJ_BY_STAT.get(sc.effect.key, "AA_ADJ_ODD")}
+					main_line = {"value": sc.value, "adj": _adj(Catalog.ADJ_SCALING)}
 		elif kind == "gain_mod":
 			var gm = gen_gain_mod(budget * share, false)
 			if not gm.empty():
@@ -615,7 +619,7 @@ func generate_item(item) -> Dictionary:
 				budget -= gm.value
 				done = true
 				if gm.value > main_line.value:
-					main_line = {"value": gm.value, "adj": Catalog.ADJ_BY_STAT.get(gm.effect.stat_displayed, "AA_ADJ_ODD")}
+					main_line = {"value": gm.value, "adj": _adj(Catalog.ADJ_GAIN_MOD)}
 		if not done:
 			var c = gen_clause(budget * share, perm_mult, false)
 			if not c.empty():
@@ -624,7 +628,7 @@ func generate_item(item) -> Dictionary:
 				_note_clause(c)
 				budget -= cv
 				if cv > main_line.value:
-					main_line = {"value": cv, "adj": Catalog.ADJ_BY_TRIGGER[c.trigger]}
+					main_line = {"value": cv, "adj": _adj(Catalog.ADJ_GRANT) if c.payload == "grant" and rng.randf() < 0.5 else _adj(Catalog.ADJ_BY_TRIGGER[c.trigger])}
 				if c.get("stat", "") != "":
 					used_stats.push_back(c.stat)
 
@@ -663,7 +667,7 @@ func generate_item(item) -> Dictionary:
 		carry = max(0.0, b - v * Catalog.stat_w(s))
 		stat_lines.push_back(_stat_effect(s, v))
 		if v * Catalog.stat_w(s) > main_line.value:
-			main_line = {"value": v * Catalog.stat_w(s), "adj": Catalog.ADJ_BY_STAT.get(s, "AA_ADJ_ODD")}
+			main_line = {"value": v * Catalog.stat_w(s), "adj": _adj(Catalog.ADJ_BY_STAT.get(s, Catalog.ADJ_MECHANIC))}
 		i += 1
 
 	# 原版的书写顺序：正面属性在前，触发 / 机制随后，负面在最后
@@ -674,7 +678,7 @@ func generate_item(item) -> Dictionary:
 
 	return {
 		"effects": ordered,
-		"adj": main_line.adj if main_line.adj != "" else "AA_ADJ_ODD",
+		"adj": main_line.adj if main_line.adj != "" else _adj(Catalog.ADJ_MECHANIC),
 		"tags": _tags_for(ordered),
 		"main_stats": main_stats(ordered),
 		"budget": budget_total,
@@ -1148,6 +1152,27 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 			c.stat = _pick_stat(false, [], Catalog.DAMAGE_SCALING_STATS)
 			c.value = [50, 75, 100, 150][rng.randi() % 4]
 
+	# 高频扳机上的永久效果：先按预算定每波上限（2..10），再把频率调到上限的约两倍（多数波次能触发满）
+	var is_perm = payload == "perm_stat" or (payload == "grant" and c.get("grant_mode", "") == "perm")
+	if is_perm and not negative and Valuation.raw_rate(trigger, 1, 100) > 1.5:
+		c.cap = 1
+		var per_fire = abs(Valuation.clause_value(c, perm_mult))
+		if per_fire > 0.0 and per_fire * 2.0 <= budget:
+			var cap = int(clamp(floor(budget / per_fire), 2, Catalog.PERM_CAP_MAX))
+			c.cap = cap
+			var rate = Valuation.raw_rate(trigger, 1, 100)
+			var want = cap * 2.0
+			if rate > want:
+				if t.gate == "every":
+					c.param = int(max(1, round(rate / want)))
+				elif t.gate == "chance" or t.kind == "shop":
+					c.chance = int(clamp(round(want / rate * 20.0) * 5, 5, 100))
+				elif trigger == "interval":
+					c.param = int(clamp(ceil(Catalog.WAVE_SECONDS / want), c.param, 30))
+			if c.payload == "perm_stat":
+				c.value = int(min(c.value, _line_cap(c.stat, false)))
+			return c
+
 	var unit_v = abs(Valuation.clause_value(c, perm_mult))
 	if unit_v <= 0.0:
 		return {}
@@ -1266,7 +1291,7 @@ func generate_character(ch) -> Dictionary:
 				out.push_back(TriggerEffect.make(c))
 				if abs(nv) > main_v and nv > 0:
 					main_v = abs(nv)
-					main_adj = Catalog.ADJ_BY_TRIGGER[c.trigger]
+					main_adj = _adj(Catalog.ADJ_BY_TRIGGER[c.trigger])
 				continue
 		out.push_back(e)
 	# 额外把一条正面属性行换成等价触发条款
@@ -1277,9 +1302,9 @@ func generate_character(ch) -> Dictionary:
 		if not c.empty():
 			out[out.find(victim)] = TriggerEffect.make(c)
 			if main_adj == "":
-				main_adj = Catalog.ADJ_BY_TRIGGER[c.trigger]
+				main_adj = _adj(Catalog.ADJ_BY_TRIGGER[c.trigger])
 	if main_adj == "":
-		main_adj = "AA_ADJ_ODD"
+		main_adj = _adj(Catalog.ADJ_MECHANIC)
 	banned_triggers = []
 	banned_payloads = []
 	return {"effects": out, "adj": main_adj}

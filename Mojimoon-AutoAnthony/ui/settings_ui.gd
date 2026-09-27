@@ -31,7 +31,6 @@ const SWITCHES = [
 	["cfg_characters", "AA_UI_CHARACTERS"],
 	["cfg_weapons", "AA_UI_WEAPONS"],
 	["cfg_char_effects", "AA_UI_CHAR_EFFECTS"],
-	["cfg_free_triggers", "AA_UI_FREE_TRIGGERS"],
 	["cfg_rename", "AA_UI_RENAME"],
 ]
 # [配置字段, 翻译 key, 最小, 最大, 步长]
