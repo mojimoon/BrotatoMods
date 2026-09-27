@@ -313,7 +313,7 @@ func test_14_sliders() -> void:
 		var n = 0
 		for id in pl.items:
 			var item = _item(id)
-			var l = log(pl.items[id].budget / max(3.0, item.value - Catalog.TIER_INTERCEPT[item.tier]))
+			var l = log(pl.items[id].budget / g.item_budget(item))
 			sum2 += l * l
 			n += 1
 		var sd = sqrt(sum2 / n)
@@ -755,6 +755,7 @@ func test_90_battle_integration() -> void:
 func test_91_menu_buttons_and_shop_hook() -> void:
 	var fist = isvc.get_element_safe(isvc.weapons, "weapon_fist_1")
 	for path in [MenuData.character_selection_scene, MenuData.weapon_selection_scene, MenuData.difficulty_selection_scene]:
+		_setup_player("character_well_rounded")
 		var _e = tree.change_scene(path)
 		for i in 6:
 			yield(tree, "idle_frame")
@@ -770,6 +771,7 @@ func test_91_menu_buttons_and_shop_hook() -> void:
 					opened = true
 					c.get_child(0)._on_close_pressed()
 			_check(opened, "settings popup opens on " + path)
+	_setup_player("character_well_rounded")
 	var _w = rd.add_weapon(fist, 0)
 	m.start_new_run()
 	var holder = _item("item_potato").duplicate()
@@ -857,3 +859,204 @@ func test_17_character_effects_on_items() -> void:
 	for t in 4:
 		for mech in gen2.mechanics_by_tier[t]:
 			_check(not mech.source.begins_with("character_"), "off by default")
+
+
+# ============================================================
+# 参数实验：预算模型 × 负面除数。每档对比生成道具与原版纯属性道具的正面数值 / 净值中位数。
+# "真实"一列按实际频率（击杀 / 材料 110、受击 7、回血 12）重估触发条款，即玩家体感。
+# ============================================================
+const REAL_RATE = {"kill": 110.0 / 180.0, "gold": 110.0 / 180.0, "hit": 7.0 / 10.0, "heal": 12.0 / 20.0}
+
+
+func _med(a: Array) -> float:
+	if a.empty():
+		return 0.0
+	var b = a.duplicate()
+	b.sort()
+	return b[b.size() / 2]
+
+
+func _item_metrics(gen, effects: Array, tier: int) -> Array:
+	var pos = 0.0
+	var net = 0.0
+	var real = 0.0
+	for e in effects:
+		var v = 0.0
+		var rv = 0.0
+		if e is TriggerEffect:
+			v = Valuation.clause_value(e.to_clause(), Catalog.PERM_MULT[tier])
+			rv = v * REAL_RATE.get(e.trigger, 1.0)
+		elif gen.is_plain_stat(e):
+			v = Valuation.stat_line_value(e.key, e.value)
+			rv = v
+		elif e.has_meta("aa_value"):
+			v = e.get_meta("aa_value")
+			rv = v
+		if v > 0:
+			pos += v
+			net += v
+			real += rv
+		else:
+			net += v / gen.divisor if not e.has_meta("aa_value") else v
+			real += rv / gen.divisor if not e.has_meta("aa_value") else rv
+	return [pos, net, real]
+
+
+func test_60_param_sweep() -> void:
+	var native_pos = [[], [], [], []]
+	var native_net = {}
+	for D in [1.5, 2.0, 3.0, 5.0]:
+		native_net[D] = [[], [], [], []]
+	var g0 = Generator.new(_cfg(), 1)
+	for item in isvc.items:
+		if not g0._is_reassemblable_item(item) or not item.can_be_looted:
+			continue
+		var plain = true
+		for e in item.effects:
+			if not g0.is_plain_stat(e):
+				plain = false
+		if not plain:
+			continue
+		var p = 0.0
+		var negs = 0.0
+		for e in item.effects:
+			var v = Valuation.stat_line_value(e.key, e.value)
+			if v > 0:
+				p += v
+			else:
+				negs += v
+		native_pos[item.tier].push_back(p)
+		for D in native_net:
+			native_net[D][item.tier].push_back(p + negs / D)
+	var line = "AUDIT native pos/net(D=3) by tier:"
+	for t in 4:
+		line += "  T%d %.1f/%.1f" % [t + 1, _med(native_pos[t]), _med(native_net[3.0][t])]
+	print(line)
+	for model in ["intercept", "tier"]:
+		for D in [1.5, 2.0, 3.0, 5.0]:
+			var cfg = _cfg()
+			cfg.budget_model = model
+			cfg.divisor = D
+			var pos = [[], [], [], []]
+			var net = [[], [], [], []]
+			var real = [[], [], [], []]
+			for sd in [1, 42, 777]:
+				var gen = Generator.new(cfg, sd)
+				var plan = gen.generate(isvc.items, isvc.characters, [], [])
+				for id in plan.items:
+					var t = _item(id).tier
+					var mt = _item_metrics(gen, plan.items[id].effects, t)
+					pos[t].push_back(mt[0])
+					net[t].push_back(mt[1])
+					real[t].push_back(mt[2])
+			var out = "AUDIT sweep %-9s D=%.1f  pos/native:" % [model, D]
+			for t in 4:
+				out += " %.2f" % (_med(pos[t]) / max(0.1, _med(native_pos[t])))
+			out += "  net/native:"
+			for t in 4:
+				out += " %.2f" % (_med(net[t]) / max(0.1, _med(native_net[D][t])))
+			out += "  real/native:"
+			for t in 4:
+				out += " %.2f" % (_med(real[t]) / max(0.1, _med(native_net[D][t])))
+			print(out)
+
+
+# ============================================================
+# 道具池结构：类型分布、想要词条覆盖、道具组与角色禁用
+# ============================================================
+func test_70_class_distribution_matches_native() -> void:
+	var gen0 = Generator.new(_cfg(), 1)
+	gen0._collect_priors(isvc.items, isvc.characters, isvc.weapons)
+	var native = {}
+	var n_native = 0.0
+	for t in 4:
+		for c in gen0.class_counts[t]:
+			native[c] = native.get(c, 0.0) + gen0.class_counts[t][c]
+			n_native += gen0.class_counts[t][c]
+	var generated = {}
+	var n_gen = 0.0
+	for sd in SEEDS:
+		var gen = Generator.new(_cfg(), sd)
+		var plan = gen.generate(isvc.items, isvc.characters, [], [])
+		for id in plan.items:
+			var c = gen.classify(plan.items[id].effects)
+			if c != "":
+				generated[c] = generated.get(c, 0.0) + 1.0
+				n_gen += 1.0
+	var line = "AUDIT class share native/generated:"
+	var l1 = 0.0
+	for c in Catalog.CATEGORY_CLASSES:
+		var a = native.get(c, 0.0) / max(1.0, n_native)
+		var b = generated.get(c, 0.0) / max(1.0, n_gen)
+		l1 += abs(a - b)
+		line += " %s %.0f/%.0f" % [c, a * 100, b * 100]
+	print(line)
+	print("AUDIT class distribution L1 distance: %.2f" % l1)
+	_check(l1 < 0.5, "generated class mix close to native (L1 %.2f)" % l1)
+
+
+func test_71_wanted_tag_coverage() -> void:
+	var plan = _gen(42)
+	var coverage_native = {}
+	var coverage_gen = {}
+	for item in isvc.items:
+		if not item.can_be_looted:
+			continue
+		for t in item.tags:
+			coverage_native[t] = coverage_native.get(t, 0) + 1
+	for item in isvc.items:
+		if not item.can_be_looted:
+			continue
+		var tags = plan.items[item.my_id].tags if plan.items.has(item.my_id) else item.tags
+		for t in tags:
+			coverage_gen[t] = coverage_gen.get(t, 0) + 1
+	var missing = []
+	for ch in isvc.characters:
+		for t in ch.wanted_tags:
+			if coverage_native.get(t, 0) > 0 and coverage_gen.get(t, 0) == 0 and not t in missing:
+				missing.push_back(t)
+	var line = "AUDIT wanted-tag coverage (native -> generated):"
+	for t in ["stat_melee_damage", "stat_max_hp", "xp_gain", "consumable", "structure", "explosive", "stand_still", "pet", "economy", "pickup", "exploration"]:
+		line += " %s %d->%d" % [t, coverage_native.get(t, 0), coverage_gen.get(t, 0)]
+	print(line)
+	_check(missing.size() <= 2, "wanted tags keep items in the pool (missing: %s)" % str(missing))
+
+
+func test_72_groups_and_bans_are_semantic() -> void:
+	_setup_player("character_golem")
+	m.start_new_run()
+	var groups = isvc.item_groups
+	for id in groups.get("lifesteal", []):
+		if m.plan.items.has(id):
+			_check("stat_lifesteal" in m.plan.items[id].main_stats, id + " in lifesteal group gives lifesteal")
+	var golem = isvc.get_element_safe(isvc.characters, "character_golem")
+	for id in m._backups[golem.get_instance_id()].banned_items:
+		var orig = _item(id)
+		if orig != null and m._backups.has(orig.get_instance_id()):
+			print("AUDIT golem native ban ", id, " -> ", m._gen.ban_reasons(m._backups[orig.get_instance_id()].effects))
+		else:
+			print("AUDIT golem native ban ", id, " kept")
+	var heal_banned = 0
+	for id in golem.banned_items:
+		if m.plan.items.has(id):
+			var ms = m.plan.items[id].main_stats
+			_check("heal" in ms or "hp_start" in ms or "full_hp" in ms, id + " banned for golem for a healing-related reason " + str(ms))
+			heal_banned += 1
+	for id in m.plan.items:
+		if "heal" in m.plan.items[id].main_stats:
+			_check(id in golem.banned_items, "healing item %s banned for golem" % id)
+	print("AUDIT golem bans %d generated healing items; lifesteal group %d items" % [heal_banned, groups.get("lifesteal", []).size()])
+	var wounded = isvc.get_element_safe(isvc.characters, "character_wounded")
+	var hp_items = 0
+	for id in wounded.banned_items:
+		if m.plan.items.has(id):
+			hp_items += 1
+			var ok = false
+			for r in ["stat_max_hp", "stat_hp_regeneration", "stat_lifesteal", "stat_armor", "consumable_heal", "heal", "hp_start", "full_hp", "lose_hp"]:
+				if r in m.plan.items[id].main_stats:
+					ok = true
+			_check(ok, id + " banned for wounded is survival-related " + str(m.plan.items[id].main_stats))
+	_check(hp_items > 0, "wounded bans generated max hp items")
+	m.on_menu_reset()
+	_check(isvc.item_groups.get("lifesteal", []).has("item_bat"), "groups restored")
+	_check(golem.banned_items.has("item_goblet"), "bans restored")

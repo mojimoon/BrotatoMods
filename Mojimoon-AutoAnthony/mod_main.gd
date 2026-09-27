@@ -15,6 +15,7 @@ const CSV_PATH = MOD_DIR + "translations/autoanthony.csv"
 
 const Generator = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/generator.gd")
 const TriggerEffect = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/trigger_effect.gd")
+const Catalog = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/catalog.gd")
 
 # ------------------------------------------------------------
 # 设置（弹窗配置，持久化到 JSON）
@@ -42,6 +43,9 @@ var plan: Dictionary = {}
 var _backups: Dictionary = {}
 # 运行时触发索引需要重建
 var triggers_dirty: bool = true
+# 原版"道具组"备份（按道具 ID 写死，重组后按语义重建）
+var _groups_backup = null
+var _gen = null
 var _effect_registered := false
 
 
@@ -266,6 +270,7 @@ func _activate(state: Dictionary) -> void:
 				chars.push_back(native)
 	var gen = Generator.new(state.cfg, int(state.seed))
 	plan = gen.generate(isvc.items, isvc.characters, chars, isvc.weapons)
+	_gen = gen
 	var rename = bool(state.cfg.get("rename", true))
 	for id in plan.items:
 		var res = _find(isvc.items, id)
@@ -290,8 +295,58 @@ func _activate(state: Dictionary) -> void:
 		if res != null:
 			_backup(res)
 			res.effects = plan.weapons[id].effects
+	_rebuild_groups_and_bans(isvc)
 	triggers_dirty = true
 	ModLoaderLog.info("Activated seed %d: %d items, %d characters, %d weapons" % [int(state.seed), plan.items.size(), plan.characters.size(), plan.weapons.size()], MOD_ID)
+
+
+# 原版的"道具组"（角色整组禁用）与角色的禁用道具都按道具 ID 写死。重组后：
+#   道具组 = 未重组的原成员 + 主属性满足该组属性的生成道具
+#   角色禁用 = 未重组的原禁用道具 + 与"被禁用原版道具的语义主属性"相同的生成道具
+#   （例如魔像禁用了触手、圣杯等回血道具 -> 禁用主效果为回血的生成道具）
+func _rebuild_groups_and_bans(isvc) -> void:
+	if plan.items.empty() or _gen == null:
+		return
+	_groups_backup = isvc.item_groups
+	var groups = {}
+	for g in _groups_backup:
+		var members = []
+		for id in _groups_backup[g]:
+			if not plan.items.has(id):
+				members.push_back(id)
+		var need = Catalog.GROUP_STATS.get(g, [])
+		if not need.empty():
+			for id in plan.items:
+				var ok = true
+				for st in need:
+					if not st in plan.items[id].main_stats:
+						ok = false
+				if ok:
+					members.push_back(id)
+		groups[g] = members
+	isvc.item_groups = groups
+	for ch in isvc.characters:
+		if ch.banned_items.empty():
+			continue
+		var semantics = []
+		var kept = []
+		for id in ch.banned_items:
+			if plan.items.has(id):
+				var orig = _find(isvc.items, id)
+				var b = _backups.get(orig.get_instance_id()) if orig != null else null
+				if b != null:
+					for sem in _gen.ban_reasons(b.effects):
+						if not sem in semantics:
+							semantics.push_back(sem)
+			else:
+				kept.push_back(id)
+		for id in plan.items:
+			for sem in semantics:
+				if sem in plan.items[id].main_stats and not id in kept:
+					kept.push_back(id)
+		_backup(ch)
+		_backups[ch.get_instance_id()]["banned_items"] = ch.banned_items
+		ch.banned_items = kept
 
 
 func _compose_name(adj_key: String, native_name_key: String) -> String:
@@ -324,10 +379,18 @@ func restore() -> void:
 			continue
 		res.effects = b.effects
 		res.name = b.name
+		if b.has("banned_items"):
+			res.banned_items = b.banned_items
 		if b.has("tags"):
 			res.tags = b.tags
 			res.tracking_text = b.tracking_text
 	_backups.clear()
+	if _groups_backup != null:
+		var isvc = _autoload("ItemService")
+		if isvc != null:
+			isvc.item_groups = _groups_backup
+		_groups_backup = null
+	_gen = null
 	plan = {}
 	triggers_dirty = true
 

@@ -49,6 +49,18 @@ var payload_prior: Dictionary = {}
 var trigger_stat_prior: Dictionary = {}
 var mechanics_by_tier: Array = [[], [], [], []]	# {effect, value, down, source}
 var character_budget: float = Catalog.CHARACTER_BUDGET_DEFAULT
+# 预算模型：原版纯属性道具每档的净价值中位数与价格中位数（档内价格弹性见 catalog.PRICE_ELASTICITY）
+var tier_value_median: Array = [8.0, 18.0, 29.0, 55.0]
+var tier_price_median: Array = [20.0, 48.0, 72.0, 100.0]
+var divisor: float = Catalog.DOWNSIDE_DIVISOR
+# 道具池结构先验：每档 (正面类, 负面类) 计数；正面属性共现；正面属性 -> 负面属性
+var class_counts: Array = [{}, {}, {}, {}]
+var cooc: Dictionary = {}
+var posneg: Dictionary = {}
+# 当前正在生成的道具的类型与主属性（影响属性、载荷选择）
+var pos_cat := ""
+var neg_cat := ""
+var anchor_stat := ""
 var effect_script: Script
 # 条款约束（角色重组时使用）：禁用的扳机 / 载荷（反协同，如"无法回血"的角色不出现回血相关条款）
 var banned_triggers: Array = []
@@ -58,6 +70,7 @@ var banned_payloads: Array = []
 func _init(p_cfg: Dictionary, p_seed: int) -> void:
 	cfg = p_cfg
 	seed_value = p_seed
+	divisor = float(cfg.get("divisor", Catalog.DOWNSIDE_DIVISOR))
 	rng = RandomNumberGenerator.new()
 	effect_script = load("res://items/global/effect.gd")
 
@@ -128,12 +141,12 @@ func is_mechanic(e) -> bool:
 	return true
 
 
-static func neg_value(v: float) -> float:
-	return v / Catalog.DOWNSIDE_DIVISOR
+func neg_value(v: float) -> float:
+	return v / divisor
 
 
 # 属性行价值：负面行按除数折算
-static func line_value(stat: String, value: int) -> float:
+func line_value(stat: String, value: int) -> float:
 	var v = Valuation.stat_line_value(stat, value)
 	return v if value >= 0 else neg_value(v)
 
@@ -150,6 +163,9 @@ func _collect_priors(items: Array, characters: Array, weapons: Array) -> void:
 
 	# 机制行必须能写入玩家 effects 字典（例如未启用 DLC 时没有诅咒等 DLC 属性）
 	var effect_keys = PlayerRunData.init_effects()
+	var plain_values = [[], [], [], []]
+	var plain_prices = [[], [], [], []]
+	var pending_mechs = []
 	var sources = items + characters + weapons
 	for src in sources:
 		var pos_lines = 0
@@ -187,6 +203,7 @@ func _collect_priors(items: Array, characters: Array, weapons: Array) -> void:
 					and e.get_text(0, false) != "" and _mechanic_keys_exist(e, effect_keys):
 				mechs.push_back(e)
 		if src is ItemData and not src is CharacterData and not src is WeaponData and src.tier >= 0 and src.tier <= 3:
+			_record_structure(src)
 			if not src.my_id in Catalog.ANCHORED_ITEMS and src.can_be_looted:
 				lines_by_tier[src.tier].push_back(pos_lines)
 				tier_count[src.tier] += 1
@@ -194,8 +211,17 @@ func _collect_priors(items: Array, characters: Array, weapons: Array) -> void:
 					neg_prob_by_tier[src.tier] += 1.0
 				if has_special:
 					special_share_by_tier[src.tier] += 1.0
+				elif pos_lines > 0:
+					plain_values[src.tier].push_back(max(1.0, stat_value))
+					plain_prices[src.tier].push_back(float(src.value))
 			if not mechs.empty():
-				_add_item_mechanics(src, mechs, stat_value, pos_value)
+				pending_mechs.push_back([src, mechs, stat_value, pos_value])
+	for t in 4:
+		if plain_values[t].size() >= 5:
+			tier_value_median[t] = _median(plain_values[t])
+			tier_price_median[t] = _median(plain_prices[t])
+	for pm in pending_mechs:
+		_add_item_mechanics(pm[0], pm[1], pm[2], pm[3])
 	for t in 4:
 		var n = max(1, tier_count[t])
 		neg_prob_by_tier[t] = neg_prob_by_tier[t] / n
@@ -204,6 +230,96 @@ func _collect_priors(items: Array, characters: Array, weapons: Array) -> void:
 			lines_by_tier[t] = [1, 2]
 	if cfg.get("char_effects", false):
 		_collect_character_mechanics(characters, effect_keys)
+
+
+# 道具类型：正面主类 + 负面主类（"-" 表示无负面），例如 "AS" = 攻击为主、以生存为代价
+func classify(effects: Array) -> String:
+	var pos = {"A": 0.0, "S": 0.0, "E": 0.0}
+	var neg = {"A": 0.0, "S": 0.0, "E": 0.0}
+	for e in effects:
+		var cat = ""
+		var v = 0.0
+		if is_plain_stat(e):
+			cat = Catalog.STAT_CATEGORY.get(e.key, "")
+			v = Catalog.stat_w(e.key) * e.value
+		elif e is TriggerEffect:
+			cat = Catalog.PAYLOAD_CATEGORY.get(e.payload, Catalog.STAT_CATEGORY.get(e.stat, ""))
+			v = 10.0 * sign(e.value)
+		else:
+			var nt = native_trigger_of(e)
+			if nt != null:
+				cat = Catalog.PAYLOAD_CATEGORY.get(nt[1], Catalog.STAT_CATEGORY.get(e.key, ""))
+				v = 10.0 * sign(e.value)
+		if cat == "":
+			continue
+		if v > 0:
+			pos[cat] += v
+		elif v < 0:
+			neg[cat] -= v
+	var pc = ""
+	var best = 0.0
+	for k in pos:
+		if pos[k] > best:
+			best = pos[k]
+			pc = k
+	if pc == "":
+		return ""
+	var nc = "-"
+	best = 0.0
+	for k in neg:
+		if neg[k] > best:
+			best = neg[k]
+			nc = k
+	return pc + nc
+
+
+func _record_structure(src) -> void:
+	var cls = classify(src.effects)
+	if cls != "":
+		class_counts[src.tier][cls] = class_counts[src.tier].get(cls, 0.0) + 1.0
+	var P = []
+	var N = []
+	for e in src.effects:
+		if is_plain_stat(e):
+			if e.value > 0:
+				P.push_back(e.key)
+			elif e.value < 0:
+				N.push_back(e.key)
+	for a in P:
+		if not cooc.has(a):
+			cooc[a] = {}
+		for b in P:
+			if a != b:
+				cooc[a][b] = cooc[a].get(b, 0.0) + 1.0
+		if not posneg.has(a):
+			posneg[a] = {}
+		for n in N:
+			posneg[a][n] = posneg[a].get(n, 0.0) + 1.0
+
+
+# 原版道具的非属性词条（structure / pet / explosive ……），随机制行一起搬运
+static func _extra_tags(src) -> Array:
+	var out = []
+	for t in src.tags:
+		if not Catalog.STATS.has(t) and t != "stat_curse":
+			out.push_back(t)
+	return out
+
+
+static func _median(arr: Array) -> float:
+	var a = arr.duplicate()
+	a.sort()
+	return a[a.size() / 2]
+
+
+# 原版道具的效果预算（不含平均数值与浮动）
+#   tier（默认）：同稀有度原版纯属性道具的净价值中位数 × (价格 / 该档价格中位数) ^ 弹性
+#   intercept：价格 − 稀有度截距（线性价格模型）
+func item_budget(item) -> float:
+	if cfg.get("budget_model", "tier") == "intercept":
+		return max(3.0, item.value - Catalog.TIER_INTERCEPT[item.tier])
+	var t = item.tier
+	return max(2.0, tier_value_median[t] * pow(max(1.0, item.value) / tier_price_median[t], Catalog.PRICE_ELASTICITY))
 
 
 # 道具机制估值：正面机制平分"价格 − 截距 − 属性行价值"；
@@ -216,7 +332,7 @@ func _add_item_mechanics(src, mechs: Array, stat_value: float, pos_value: float)
 			downs += 1
 		else:
 			ups += 1
-	var budget = src.value - Catalog.TIER_INTERCEPT[src.tier]
+	var budget = item_budget(src)
 	var each_up = max(5.0, (budget - stat_value) / max(1, ups))
 	var each_down = max(3.0, 0.15 * max(budget, 0.0))
 	if ups == 0 and downs > 0:
@@ -225,6 +341,7 @@ func _add_item_mechanics(src, mechs: Array, stat_value: float, pos_value: float)
 		var down = Catalog.is_downside_mechanic(e)
 		mechanics_by_tier[src.tier].push_back({
 			"effect": e, "value": -each_down if down else each_up, "down": down, "source": src.my_id,
+			"tags": _extra_tags(src),
 		})
 
 
@@ -260,7 +377,7 @@ func _collect_character_mechanics(characters: Array, effect_keys: Dictionary) ->
 		var each = clamp((character_budget - entry[1]) / entry[2].size(), 30.0, 80.0)
 		var tier = 0 if each < 15.0 else (1 if each < 35.0 else (2 if each < 60.0 else 3))
 		for e in entry[2]:
-			mechanics_by_tier[tier].push_back({"effect": e, "value": each, "down": false, "source": entry[0].my_id})
+			mechanics_by_tier[tier].push_back({"effect": e, "value": each, "down": false, "source": entry[0].my_id, "tags": []})
 
 
 func _is_transferable_character_mechanic(e, effect_keys: Dictionary) -> bool:
@@ -318,9 +435,33 @@ func _pick_stat(neg: bool, exclude: Array = [], allowed = null) -> String:
 			continue
 		if allowed != null and not s in allowed:
 			continue
-		weights[s] = src[s] + trigger_stat_prior.get(s, 0.0) * 0.5
+		var w = src[s] + trigger_stat_prior.get(s, 0.0) * 0.5
+		# 类型偏好：正面属性偏向本道具的正面类，负面属性偏向负面类
+		var cat = neg_cat if neg else pos_cat
+		if cat != "" and cat != "-" and Catalog.STAT_CATEGORY.get(s, "") == cat:
+			w *= 4.0
+		# 共现偏好：原版中与主属性一起出现（或被它拿来交换）的属性
+		if anchor_stat != "" and s != anchor_stat:
+			var table = posneg if neg else cooc
+			if table.has(anchor_stat):
+				w *= 1.0 + 3.0 * table[anchor_stat].get(s, 0.0) / max(1.0, _max_value(table[anchor_stat]))
+		weights[s] = w
 	var s = _pick_weighted(weights)
 	return s if s != null else "stat_max_hp"
+
+
+static func _max_value(d: Dictionary) -> float:
+	var m = 0.0
+	for k in d:
+		m = max(m, d[k])
+	return m
+
+
+func _pick_class(tier: int) -> String:
+	var w = {}
+	for c in Catalog.CATEGORY_CLASSES:
+		w[c] = class_counts[tier].get(c, 0.0) + 0.5
+	return _pick_weighted(w)
 
 
 func _avg_mult() -> float:
@@ -349,20 +490,29 @@ func generate_item(item) -> Dictionary:
 
 	var tier: int = item.tier
 	var perm_mult: float = Catalog.PERM_MULT[tier]
-	var budget: float = max(3.0, item.value - Catalog.TIER_INTERCEPT[tier]) * _avg_mult() * _variance_mult()
+	var budget: float = item_budget(item) * _avg_mult() * _variance_mult()
 	var budget_total = budget
 	var effects = []
 	var used_stats = []
 	var main_line = {"value": 0.0, "adj": ""}
 
+	# 0) 道具类型：按原版同稀有度的 (正面类, 负面类) 分布抽取，先定主属性
+	var cls = _pick_class(tier)
+	pos_cat = cls[0]
+	neg_cat = cls[1]
+	anchor_stat = ""
+	var primary = _pick_stat(false)
+	anchor_stat = primary
+	used_stats.push_back(primary)
+
 	# 1) 代价：负面效果的实际强度 = 换来的预算 × 负面除数
 	var downsides = []
-	if rng.randf() < neg_prob_by_tier[tier]:
+	if neg_cat != "-":
 		var comp = budget_total * rng.randf_range(0.1, 0.35)
 		var got = 0.0
 		var r = rng.randf()
 		if r < 0.15:
-			var c = gen_clause(-comp * Catalog.DOWNSIDE_DIVISOR, perm_mult, true)
+			var c = gen_clause(-comp * divisor, perm_mult, true)
 			if not c.empty():
 				downsides.push_back(TriggerEffect.make(c))
 				got = neg_value(abs(Valuation.clause_value(c, perm_mult)))
@@ -372,8 +522,8 @@ func generate_item(item) -> Dictionary:
 				downsides.push_back(_mechanic_copy(m))
 				got = abs(m.value)
 		if got == 0.0:
-			var s = _pick_stat(true)
-			var v = int(min(_round_to_unit(comp * Catalog.DOWNSIDE_DIVISOR / Catalog.stat_w(s), s), _line_cap(s, true)))
+			var s = _pick_stat(true, used_stats)
+			var v = int(min(_round_to_unit(comp * divisor / Catalog.stat_w(s), s), _line_cap(s, true)))
 			downsides.push_back(_stat_effect(s, -v))
 			used_stats.push_back(s)
 			got = neg_value(v * Catalog.stat_w(s))
@@ -427,9 +577,14 @@ func generate_item(item) -> Dictionary:
 	var stat_lines = []
 	var carry = 0.0
 	var i = 0
+	var primary_used = false
+	for e in effects:
+		if e is TriggerEffect and e.stat == primary:
+			primary_used = true
 	while i < n or (carry > 2.0 and i < n + 2):
-		var s = _pick_stat(false, used_stats)
-		used_stats.push_back(s)
+		var s = primary if (i == 0 and not primary_used) else _pick_stat(false, used_stats)
+		if s != primary:
+			used_stats.push_back(s)
 		var b = carry
 		if i < n:
 			b += max(budget, 2.0) * shares[i] / total_share
@@ -445,12 +600,17 @@ func generate_item(item) -> Dictionary:
 
 	# 原版的书写顺序：正面属性在前，触发 / 机制随后，负面在最后
 	var ordered = stat_lines + effects + downsides
+	pos_cat = ""
+	neg_cat = ""
+	anchor_stat = ""
 
 	return {
 		"effects": ordered,
 		"adj": main_line.adj if main_line.adj != "" else "AA_ADJ_ODD",
 		"tags": _tags_for(ordered),
+		"main_stats": main_stats(ordered),
 		"budget": budget_total,
+		"class": cls,
 	}
 
 
@@ -482,6 +642,7 @@ func _stat_effect(stat: String, value: int) -> Effect:
 func _mechanic_copy(m: Dictionary):
 	var e = m.effect.duplicate()
 	e.set_meta("aa_value", m.value)
+	e.set_meta("aa_tags", m.get("tags", []))
 	return e
 
 
@@ -500,17 +661,95 @@ func _pick_mechanic(tier: int, downside: bool, max_abs_value: float):
 	return pool[rng.randi() % pool.size()]
 
 
+# 词条：正面属性 key + 原版风格的非属性词条（consumable / explosive / stand_still / structure ……）
 func _tags_for(effects: Array) -> Array:
 	var tags = []
 	for e in effects:
-		var s = ""
-		if e.get_script() == effect_script and Catalog.STATS.has(e.key):
-			s = e.key
-		elif e.has_method("to_clause"):
-			s = e.stat
-		if s != "" and e.value > 0 and not s in tags:
-			tags.push_back(s)
+		var add = []
+		if e is TriggerEffect:
+			if e.value > 0:
+				if Catalog.STATS.has(e.stat) and e.payload in ["temp_stat", "perm_stat", "timed_stat"]:
+					add.push_back(e.stat)
+				add.push_back(Catalog.TRIGGER_TAGS.get(e.trigger, ""))
+				add.push_back(Catalog.PAYLOAD_TAGS.get(e.payload, ""))
+				add.push_back(Catalog.STAT_EXTRA_TAGS.get(e.stat, ""))
+		elif e.get_script() == effect_script and Catalog.STATS.has(e.key):
+			if e.value > 0:
+				add.push_back(e.key)
+				add.push_back(Catalog.STAT_EXTRA_TAGS.get(e.key, ""))
+		elif e.has_meta("aa_tags") and e.get_meta("aa_value") > 0:
+			add += e.get_meta("aa_tags")
+		for t in add:
+			if t != "" and not t in tags:
+				tags.push_back(t)
 	return tags
+
+
+# 原版道具被角色禁用的"原因"：规则性原因优先（回血、下波低血开局、满血条件），否则取正面价值最大的属性。
+# 例如魔像禁用肾上腺素、额外的胃、怪异幽灵，原因都是"无法回血"，而不是闪避或最大生命值。
+func ban_reasons(effects: Array) -> Array:
+	var rules = []
+	var vals = {}
+	for e in effects:
+		var k = e.custom_key if e.custom_key != "" else e.key
+		if k in Catalog.HEAL_KEYS or (e is TriggerEffect and e.payload == "heal"):
+			rules.push_back("heal")
+		elif k in ["hp_start_next_wave", "hp_start_wave"] and e.value < 0:
+			rules.push_back("hp_start")
+		elif k == "lose_hp_per_second" and e.value > 0:
+			rules.push_back("lose_hp")
+		elif k in ["consumable_stats_while_max", "temp_consumable_stats_while_max"] or (e is TriggerEffect and e.trigger == "full_hp"):
+			rules.push_back("full_hp")
+		elif e.value > 0 and is_plain_stat(e):
+			vals[e.key] = vals.get(e.key, 0.0) + Catalog.stat_w(e.key) * e.value
+	if not rules.empty():
+		return rules
+	var best = ""
+	var top = 0.0
+	for k in vals:
+		if vals[k] > top:
+			top = vals[k]
+			best = k
+	return [best] if best != "" else []
+
+
+# 主属性：正面价值不低于最大者一半的属性（用于重建原版"道具组"与角色禁用）；回血载荷记为 "heal"
+func main_stats(effects: Array) -> Array:
+	var vals = {}
+	for e in effects:
+		if e.value <= 0:
+			continue
+		if e is TriggerEffect:
+			if e.payload == "heal":
+				vals["heal"] = vals.get("heal", 0.0) + 10.0
+			elif Catalog.STATS.has(e.stat) and e.payload in ["temp_stat", "perm_stat", "timed_stat"]:
+				vals[e.stat] = vals.get(e.stat, 0.0) + 10.0
+		elif is_plain_stat(e):
+			vals[e.key] = vals.get(e.key, 0.0) + Catalog.stat_w(e.key) * e.value
+		elif e.has_meta("aa_value"):
+			var k = e.custom_key if e.custom_key != "" else e.key
+			if k in Catalog.HEAL_KEYS:
+				vals["heal"] = vals.get("heal", 0.0) + e.get_meta("aa_value")
+	var top = _max_value(vals)
+	var out = []
+	for k in vals:
+		if vals[k] >= top * 0.5:
+			out.push_back(k)
+	# 规则性语义：任何回血 / 低血开局 / 满血条件都记录（不要求是主效果）
+	for e in effects:
+		var k = e.custom_key if e.custom_key != "" else e.key
+		var r = ""
+		if (e is TriggerEffect and e.payload == "heal" and e.value > 0) or (k in Catalog.HEAL_KEYS and e.value > 0):
+			r = "heal"
+		elif k in ["hp_start_next_wave", "hp_start_wave"] and e.value < 0:
+			r = "hp_start"
+		elif k == "lose_hp_per_second" and e.value > 0:
+			r = "lose_hp"
+		elif e is TriggerEffect and e.trigger == "full_hp":
+			r = "full_hp"
+		if r != "" and not r in out:
+			out.push_back(r)
+	return out
 
 
 # ============================================================
@@ -563,6 +802,8 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 	var pw = {}
 	for p in legal:
 		pw[p] = Catalog.PAYLOADS[p].w + Catalog.NATIVE_PRIOR_STRENGTH * payload_prior[p] / 3.0
+		if not negative and pos_cat != "" and Catalog.PAYLOAD_CATEGORY.get(p, "") == pos_cat:
+			pw[p] *= 3.0
 	var payload = _pick_weighted(pw)
 	if payload == null:
 		return {}
@@ -574,7 +815,7 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 
 	match payload:
 		"temp_stat", "timed_stat":
-			c.stat = _pick_stat(negative, Catalog.TEMP_STAT_BANNED)
+			c.stat = _pick_stat(negative, Catalog.TEMP_STAT_BANNED + ([anchor_stat] if negative else []))
 			c.value = Catalog.stat_unit(c.stat)
 			if payload == "timed_stat":
 				c.value2 = [3, 4, 5, 6, 8][rng.randi() % 5]

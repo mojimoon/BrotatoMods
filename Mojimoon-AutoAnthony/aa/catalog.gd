@@ -25,6 +25,8 @@ const PERM_MULT = [7.5, 6.5, 5.5, 4.5]
 const PERM_MULT_CHARACTER = 10.5
 # 负面效果的价值除数：-3 远程伤害只按 -1 远程伤害计价
 const DOWNSIDE_DIVISOR = 3.0
+# 档内价格弹性：原版同稀有度道具的 log(净价值) 对 log(价格) 的斜率（约 0.69）
+const PRICE_ELASTICITY = 0.69
 
 # ------------------------------------------------------------
 # 属性：权重（材料 / 点）、每次触发的自然粒度、是否百分比显示、伤害参考值（用于"X% 某属性的伤害"）
@@ -263,3 +265,40 @@ static func events_per_wave(trigger: String, param: int) -> float:
 	if trigger == "interval":
 		return WAVE_SECONDS / max(1, param)
 	return TRIGGERS[trigger].e
+
+
+# ============================================================
+# 道具池结构：攻击 A / 生存 S / 运营 E
+# 原版约 49% 攻击、37% 生存、15% 运营为主；最常见的是同类内交换（+近战 −远程、+生命 −再生），
+# 运营几乎从不作为代价。生成时按原版同稀有度的 (正面类, 负面类) 分布抽取道具类型。
+# ============================================================
+const STAT_CATEGORY = {
+	"stat_melee_damage": "A", "stat_ranged_damage": "A", "stat_elemental_damage": "A", "stat_percent_damage": "A",
+	"stat_attack_speed": "A", "stat_crit_chance": "A", "stat_engineering": "A", "stat_range": "A",
+	"explosion_damage": "A", "explosion_size": "A", "knockback": "A",
+	"stat_max_hp": "S", "stat_hp_regeneration": "S", "stat_lifesteal": "S", "stat_dodge": "S", "stat_armor": "S",
+	"consumable_heal": "S", "stat_speed": "S",
+	"stat_luck": "E", "stat_harvesting": "E", "xp_gain": "E", "pickup_range": "E",
+}
+const PAYLOAD_CATEGORY = {"heal": "S", "gold": "E", "xp": "E", "damage": "A", "explode": "A"}
+const CATEGORY_CLASSES = ["AA", "AS", "AE", "A-", "SA", "SS", "SE", "S-", "EA", "ES", "EE", "E-"]
+
+# 原版的非属性词条（角色的"想要词条"会用到）
+const STAT_EXTRA_TAGS = {
+	"consumable_heal": "consumable", "explosion_damage": "explosive", "explosion_size": "explosive",
+	"knockback": "knockback", "pickup_range": "pickup",
+}
+const TRIGGER_TAGS = {"still": "stand_still", "consumable": "consumable"}
+const PAYLOAD_TAGS = {"explode": "explosive", "gold": "economy"}
+
+# 原版"道具组"（角色可整组禁用）对应的属性
+const GROUP_STATS = {
+	"harvesting": ["stat_harvesting"], "melee_damage": ["stat_melee_damage"], "ranged_damage": ["stat_ranged_damage"],
+	"melee_and_ranged_damage": ["stat_melee_damage", "stat_ranged_damage"], "lifesteal": ["stat_lifesteal"],
+	"lifesteal_and_hp_regeneration": ["stat_lifesteal", "stat_hp_regeneration"],
+	"hp_regeneration": ["stat_hp_regeneration"], "consumable_heal": ["consumable_heal"], "speed": ["stat_speed"],
+	"engineering": ["stat_engineering"], "elemental_damage": ["stat_elemental_damage"], "armor": ["stat_armor"],
+	"dodge": ["stat_dodge"],
+}
+# 原版中表示"回血"的机制 key（用于把角色禁用的原版道具翻译成语义）
+const HEAL_KEYS = ["heal_on_kill", "heal_on_crit_kill", "heal_when_pickup_gold", "heal_on_dodge", "consumable_heal_over_time", "hp_regen_bonus"]
