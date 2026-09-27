@@ -658,13 +658,17 @@ func generate_item(item) -> Dictionary:
 		if not done:
 			var c = gen_clause(budget * share, perm_mult, false)
 			if not c.empty():
-				if c.payload in ["temp_stat", "perm_stat", "timed_stat"] and not c.get("reset", false) \
-						and rng.randf() < Catalog.PAIRED_CLAUSE_CHANCE:
-					_add_side(c, perm_mult)
 				var cv = Valuation.clause_value(c, perm_mult)
 				effects.push_back(TriggerEffect.make(c))
 				_note_clause(c)
 				budget -= cv
+				# 同扳机正负成对：另写一条同扳机、同门控的负面条款（两条独立效果，诅咒由原版逐条处理）
+				if c.payload in ["temp_stat", "perm_stat", "timed_stat"] and not c.get("reset", false) \
+						and rng.randf() < Catalog.PAIRED_CLAUSE_CHANCE:
+					var c2 = _make_pair(c, perm_mult)
+					if not c2.empty():
+						effects.push_back(TriggerEffect.make(c2))
+						budget += neg_value(abs(Valuation.clause_value(c2, perm_mult)))
 				if cv > main_line.value:
 					main_line = {"value": cv, "adj": _adj(Catalog.ADJ_GRANT) if c.payload == "grant" and rng.randf() < 0.5 else _adj(Catalog.ADJ_BY_TRIGGER[c.trigger])}
 				if c.get("stat", "") != "":
@@ -1218,11 +1222,12 @@ func _next_wave_side(comp: float, perm_mult: float, exclude: Array) -> Dictionar
 	return {"effect": e, "value": got}
 
 
-# 属性类触发条款的同扳机负面部分：敌人属性（50%）或自身其他属性降低；负面折算后的补偿约为正面价值的 30–60%
-func _add_side(c: Dictionary, perm_mult: float) -> void:
-	var cv = Valuation.main_value(c, perm_mult)
+# 属性类触发条款的同扳机负面条款：同扳机、同门控、同载荷方式，属性换成敌人属性（50%，数值为正）
+# 或自身其他属性（数值为负）；负面折算后的补偿约为正面价值的 30–60%
+func _make_pair(c: Dictionary, perm_mult: float) -> Dictionary:
+	var cv = Valuation.clause_value(c, perm_mult)
 	if cv <= 0.0:
-		return
+		return {}
 	var stat = ""
 	if rng.randf() < 0.5:
 		var keys = Catalog.ENEMY_STATS.keys()
@@ -1232,18 +1237,21 @@ func _add_side(c: Dictionary, perm_mult: float) -> void:
 		if c.payload != "perm_stat":
 			banned += Catalog.TEMP_STAT_BANNED
 		stat = _pick_stat(true, banned)
-	var probe = c.duplicate()
-	probe.side_stat = stat
-	probe.side_value = 1
-	var per_unit = abs(Valuation.side_raw_value(probe, perm_mult))
+	var enemy = Catalog.ENEMY_STATS.has(stat)
+	var c2 = c.duplicate()
+	c2.stat = stat
+	c2.value = 1 if enemy else -1
+	c2.erase("grant")
+	var per_unit = abs(Valuation.clause_value(c2, perm_mult))
 	if per_unit <= 0.0:
-		return
+		return {}
 	var comp = cv * rng.randf_range(0.3, 0.6)
-	var cap = 10 if Catalog.ENEMY_STATS.has(stat) else _line_cap(stat, true)
+	var cap = 10 if enemy else _line_cap(stat, true)
 	if Valuation.raw_rate(c.trigger, c.param, c.chance) <= 1.5 or Catalog.TRIGGERS[c.trigger].kind == "state":
 		cap *= 4
-	c.side_stat = stat
-	c.side_value = int(clamp(round(comp * divisor / per_unit), 1, cap))
+	var mag = int(clamp(round(comp * divisor / per_unit), 1, cap))
+	c2.value = mag if enemy else -mag
+	return c2
 
 
 const NICE_NB = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50, 60, 80, 100, 150, 200]

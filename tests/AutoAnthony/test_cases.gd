@@ -1409,13 +1409,14 @@ func test_92_next_wave_and_pairs() -> void:
 					_eq(e.storage_method, Effect.StorageMethod.KEY_VALUE, "next wave uses native storage")
 					var txt = e.get_text(0, false)
 					_check(txt != "" and txt.find("AA_") == -1, "next wave text: " + txt)
-				elif e is TriggerEffect and e.side_stat != "":
-					paired += 1
-					var t2 = e.get_text(0, false)
-					_check(t2.find(tr("AA_AND").strip_edges()) != -1, "paired clause rendered in one line: " + t2)
-					if shown < 6:
-						print("AUDIT paired clause: ", t2)
-						shown += 1
+				elif e is TriggerEffect and e.is_downside():
+					var idx = effs.find(e)
+					var prev = effs[idx - 1] if idx > 0 else null
+					if prev is TriggerEffect and not prev.is_downside() and prev.trigger == e.trigger and prev.param == e.param and prev.chance == e.chance and prev.cap == e.cap and prev.payload == e.payload:
+						paired += 1
+						if shown < 6:
+							print("AUDIT paired clauses: ", prev.get_text(0, false), " | ", e.get_text(0, false))
+							shown += 1
 			if n_here > 0:
 				nw += 1
 				if n_here > 1:
@@ -1427,7 +1428,10 @@ func test_92_next_wave_and_pairs() -> void:
 	_check(nw > 20 and nw_pairs > 5 and paired >= 25, "next-wave and paired effects appear (%d / %d / %d)" % [nw, nw_pairs, paired])
 	# 运行时：成对条款同时施加正负两部分
 	TempStats.reset()
-	var rt = _make_runtime([{"trigger": "kill", "payload": "temp_stat", "stat": "stat_armor", "value": 3, "side_stat": "enemy_damage", "side_value": 2}])
+	var rt = _make_runtime([
+		{"trigger": "kill", "payload": "temp_stat", "stat": "stat_armor", "value": 3},
+		{"trigger": "kill", "payload": "temp_stat", "stat": "enemy_damage", "value": 2},
+	])
 	rt.fire("kill", 0)
 	_eq(int(TempStats.get_stat(Keys.stat_armor_hash, 0) / rd.get_stat_gain(Keys.stat_armor_hash, 0)), 3, "positive part")
 	_eq(int(TempStats.get_stat(Keys.generate_hash("enemy_damage"), 0)), 2, "negative part (enemy damage up)")
@@ -1631,19 +1635,22 @@ func test_95_curse_whole_pool() -> void:
 						_check(abs(b.value) <= abs(a.value), "%s: bad line not strengthened (%s: %d -> %d)" % [id, a.key, a.value, b.value])
 				if a is TriggerEffect:
 					n_trig += 1
-					if a.side_value != 0:
+					if a.is_downside():
 						n_side += 1
-						_check(abs(b.side_value) <= abs(a.side_value), "%s: paired downside reduced (%d -> %d)" % [id, a.side_value, b.side_value])
 					if a.grant != null:
 						_check(b.grant != null, id + " grant kept")
-	print("AUDIT cursed %d items, %d trigger clauses (%d paired)" % [n_items, n_trig, n_side])
-	_check(n_side > 3, "paired clauses covered")
+	print("AUDIT cursed %d items, %d trigger clauses (%d downside clauses)" % [n_items, n_trig, n_side])
+	_check(n_side > 3, "downside clauses covered")
 	# 诅咒后的触发条款在运行时照常生效（并且更强）
 	TempStats.reset()
 	var base = _item("item_potato").duplicate()
-	base.effects = [TriggerEffect.make({"trigger": "kill", "payload": "temp_stat", "stat": "stat_armor", "value": 2, "side_stat": "enemy_damage", "side_value": 4})]
+	base.effects = [
+		TriggerEffect.make({"trigger": "kill", "payload": "temp_stat", "stat": "stat_armor", "value": 2}),
+		TriggerEffect.make({"trigger": "kill", "payload": "temp_stat", "stat": "enemy_damage", "value": 4}),
+	]
 	var cursed2 = dlc.curse_item(base, 0, true)
-	rd.players_data[0].items.push_back(cursed2)
+	_check(cursed2.effects[1].value < 4, "native curse weakens the enemy-stat clause (%d)" % cursed2.effects[1].value)
+	rd.add_item(cursed2, 0)
 	var rt = Runtime.new()
 	tree.root.add_child(rt)
 	rt.mod = m
@@ -1653,4 +1660,45 @@ func test_95_curse_whole_pool() -> void:
 	_check(int(TempStats.get_stat(Keys.generate_hash("enemy_damage"), 0)) <= 3, "cursed paired downside weaker at runtime")
 	rt.queue_free()
 	TempStats.reset()
-	rd.players_data[0].items.erase(cursed2)
+	rd.remove_item(cursed2, 0)
+
+
+# 原版的"限制 (N)"/"独特"不继承到重组道具
+func test_96_no_item_limits() -> void:
+	var limited = []
+	for it in isvc.items:
+		if it.max_nb > 0 and m.is_native_resource(it) and not it.my_id in Catalog.ANCHORED_ITEMS:
+			limited.push_back([it, it.max_nb])
+	_check(limited.size() > 5, "native pool has limited items (%d)" % limited.size())
+	m.start_new_run()
+	var lifted = 0
+	for pair in limited:
+		if m.plan.items.has(pair[0].my_id):
+			_eq(pair[0].max_nb, -1, pair[0].my_id + " limit lifted")
+			lifted += 1
+	_check(lifted > 5, "limits lifted on reassembled items (%d)" % lifted)
+	m.on_menu_reset()
+	for pair in limited:
+		_eq(pair[0].max_nb, pair[1], pair[0].my_id + " limit restored")
+
+
+
+# 真实游戏里 DLC 脚本位于独立 pck、mod 加载时尚不存在：不能扩展 res://dlcs/ 下的脚本
+func test_97_no_dlc_script_extensions() -> void:
+	var f = File.new()
+	f.open(MOD_DIR + "mod_main.gd", File.READ)
+	var src = f.get_as_text()
+	f.close()
+	_check(src.find('install_script_extension(dir + "dlcs') == -1, "no script extension targets res://dlcs/")
+	var d = Directory.new()
+	_check(not d.dir_exists(MOD_DIR + "extensions/dlcs"), "no extensions/dlcs folder")
+
+
+
+# 敌人属性条款：估值为负、显示为负面、被视为代价
+func test_98_enemy_stat_clauses() -> void:
+	var c = {"trigger": "wave_start", "payload": "temp_stat", "stat": "enemy_health", "value": 10}
+	_check(Valuation.clause_value(c, 4.0) < 0.0, "enemy stat clause has negative value")
+	var e = TriggerEffect.make(c)
+	_eq(e.effect_sign, Effect.Sign.NEGATIVE, "enemy stat clause uses the native negative sign")
+	_check(e.is_downside(), "enemy stat clause is a downside")

@@ -25,9 +25,6 @@ export(int) var value2 := 0
 export(int) var cap := 0
 # 受到伤害时清空本条款累积的本波属性（原版水晶）
 export(bool) var reset := false
-# 同扳机的负面部分（属性类载荷）：side_stat 可为玩家属性或敌人属性，side_value 为有害方向的数值
-export(String) var side_stat := ""
-export(int) var side_value := 0
 # grant 载荷：触发时获得的效果（单位数值）、模式（temp 本波 / perm 永久）、单位价值（估值用）
 export(Resource) var grant = null
 export(String) var grant_mode := "temp"
@@ -53,14 +50,13 @@ static func make(c: Dictionary) -> Effect:
 	e.value2 = int(c.get("value2", 0))
 	e.cap = int(c.get("cap", 0))
 	e.reset = bool(c.get("reset", false))
-	e.side_stat = str(c.get("side_stat", ""))
-	e.side_value = int(c.get("side_value", 0))
 	if c.get("grant") != null:
 		e.grant = c.grant.duplicate()
 		e.grant_mode = c.get("grant_mode", "temp")
 		e.grant_unit = float(c.get("grant_unit", 0.0))
 		e.value = int(c.value)
-	e.effect_sign = Effect.Sign.FROM_VALUE
+	# 敌人属性提高是坏事：显式标为负面，原版诅咒系统会减弱它、文本按负面着色
+	e.effect_sign = Effect.Sign.NEGATIVE if Catalog.ENEMY_STATS.has(e.stat) else Effect.Sign.FROM_VALUE
 	return e
 
 
@@ -68,13 +64,12 @@ func to_clause() -> Dictionary:
 	return {
 		"trigger": trigger, "param": param, "chance": chance, "payload": payload,
 		"stat": stat, "value": value, "value2": value2, "cap": cap, "reset": reset,
-		"side_stat": side_stat, "side_value": side_value,
 		"grant_mode": grant_mode, "grant_unit": grant_unit,
 	}
 
 
 func is_downside() -> bool:
-	return value < 0
+	return value < 0 or Catalog.ENEMY_STATS.has(stat)
 
 
 # 不写入 effects 字典；只通知运行时重建触发索引
@@ -115,29 +110,7 @@ func _signed(v: int) -> String:
 
 
 func get_text(_player_index: int, colored: bool = true) -> String:
-	var t = tr(_trigger_text(colored)) + tr("AA_SEP") + _payload_text(colored)
-	if side_stat != "" and side_value != 0:
-		t += tr("AA_AND") + _side_text(colored)
-	return t + _cap_text()
-
-
-# 负面部分：与正面同一载荷模板，数值按"有害方向"着色（敌人属性为 +，玩家属性为 −）
-func _side_text(colored: bool) -> String:
-	var v = side_signed()
-	var k = "AA_P_TEMP_STAT"
-	match payload:
-		"perm_stat":
-			k = "AA_P_PERM_STAT"
-		"timed_stat":
-			k = "AA_P_TIMED_STAT"
-		"temp_stat":
-			k = "AA_P_STATE_STAT" if Catalog.TRIGGERS[trigger].kind == "state" else "AA_P_TEMP_STAT"
-	return tr(k).replace("{0}", _col(_signed(v), false, colored)).replace("{1}", tr(side_stat.to_upper())).replace("{2}", str(value2))
-
-
-# 负面部分实际施加的数值：敌人属性为正（更强），玩家属性为负
-func side_signed() -> int:
-	return int(abs(side_value)) if Catalog.ENEMY_STATS.has(side_stat) else -int(abs(side_value))
+	return tr(_trigger_text(colored)) + tr("AA_SEP") + _payload_text(colored) + _cap_text()
 
 
 func _trigger_text(colored: bool) -> String:
@@ -163,7 +136,7 @@ func _trigger_text(colored: bool) -> String:
 
 
 func _payload_text(colored: bool) -> String:
-	var good = value >= 0
+	var good = (value >= 0) != Catalog.ENEMY_STATS.has(stat)
 	var stat_name = tr(stat.to_upper()) if stat != "" else ""
 	match payload:
 		"temp_stat":
@@ -216,8 +189,6 @@ func serialize() -> Dictionary:
 	s.value2 = value2
 	s.cap = cap
 	s.reset = reset
-	s.side_stat = side_stat
-	s.side_value = side_value
 	s.grant_mode = grant_mode
 	s.grant_unit = grant_unit
 	s.grant = grant.serialize() if grant != null else null
@@ -234,8 +205,6 @@ func deserialize_and_merge(s: Dictionary) -> void:
 	value2 = int(s.get("value2", 0))
 	cap = int(s.get("cap", 0))
 	reset = bool(s.get("reset", false))
-	side_stat = str(s.get("side_stat", ""))
-	side_value = int(s.get("side_value", 0))
 	grant_mode = str(s.get("grant_mode", "temp"))
 	grant_unit = float(s.get("grant_unit", 0.0))
 	grant = null

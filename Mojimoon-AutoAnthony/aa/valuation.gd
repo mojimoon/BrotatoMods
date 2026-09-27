@@ -50,21 +50,9 @@ static func damage_per_proc(stat: String, pct: int) -> float:
 	return max(1.0, pct / 100.0 * ref)
 
 
-# 条款价值（带符号）：正面部分 + 同扳机负面部分（按负面除数折算）
+# 条款价值（带符号，负面未折算）。敌人属性提高为负价值
 static func clause_value(c: Dictionary, perm_mult: float) -> float:
-	var v = main_value(c, perm_mult)
-	if c.get("side_stat", "") != "" and int(c.get("side_value", 0)) != 0:
-		v += side_raw_value(c, perm_mult) / Catalog.DOWNSIDE_DIVISOR
-	return v
-
-
-# 负面部分的原始价值（负数，未折算）：与正面部分同样的载荷方式，只换成负面属性
-static func side_raw_value(c: Dictionary, perm_mult: float) -> float:
-	var sc = c.duplicate()
-	sc.stat = c.side_stat
-	sc.value = -abs(int(c.side_value))
-	sc.erase("side_stat")
-	return main_value(sc, perm_mult)
+	return main_value(c, perm_mult)
 
 
 # 下一波：一波的价值
@@ -84,12 +72,12 @@ static func main_value(c: Dictionary, perm_mult: float) -> float:
 
 	match payload:
 		"temp_stat":
-			return Catalog.stat_w(stat) * v * avg_stack(trigger, param, chance, cap, bool(c.get("reset", false)))
+			return _stat_sign(stat) * Catalog.stat_w(stat) * v * avg_stack(trigger, param, chance, cap, bool(c.get("reset", false)))
 		"perm_stat":
-			return Catalog.stat_w(stat) * v * fires_per_wave(trigger, param, chance, cap) * perm_mult
+			return _stat_sign(stat) * Catalog.stat_w(stat) * v * fires_per_wave(trigger, param, chance, cap) * perm_mult
 		"timed_stat":
 			var f = fires_per_wave(trigger, param, chance, cap)
-			return Catalog.stat_w(stat) * v * f * v2 / Catalog.WAVE_SECONDS
+			return _stat_sign(stat) * Catalog.stat_w(stat) * v * f * v2 / Catalog.WAVE_SECONDS
 		"heal":
 			return Catalog.HEAL_W * v * fires_per_wave(trigger, param, chance, cap)
 		"gold":
@@ -122,3 +110,8 @@ static func scaling_value(stat: String, value: int, counter: String, nb: int) ->
 # 属性修改 ±pct%
 static func gain_mod_value(stat: String, pct: int) -> float:
 	return Catalog.stat_w(stat) * Catalog.counter_ref(stat) * pct / 100.0
+
+
+# 敌人属性（生命 / 伤害 / 速度）提高对玩家不利
+static func _stat_sign(stat: String) -> float:
+	return -1.0 if Catalog.ENEMY_STATS.has(stat) else 1.0

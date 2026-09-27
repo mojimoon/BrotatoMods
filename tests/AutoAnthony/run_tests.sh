@@ -34,6 +34,16 @@ APPDATA=$(cygpath -w "$SANDBOX") AA_TEST=1 timeout 600 "$GODOT" --no-window --au
 STATUS=$?
 
 # 只关心 mod / 测试自身的脚本错误（游戏在无头模式下有一些与 mod 无关的报错）
+# 与游戏的崩溃检测一致：任何 "ERROR:" 行（或其下一行）提到本 mod 都算失败——游戏会因此在下次启动时禁用所有 mod
+CRASH=$(awk -v mod="$MOD" '
+	/ERROR:/ { cur = $0; if ((getline nxt) > 0) { if (index(cur, "mods-unpacked/" mod) || index(nxt, "mods-unpacked/" mod)) { print cur; print nxt } } }
+' "$LOG")
+if [ -n "$CRASH" ]; then
+	echo
+	echo "Errors mentioning the mod (the game's crash detector would disable mods):"
+	echo "$CRASH"
+	STATUS=1
+fi
 ERRORS=$(awk '
 	/SCRIPT ERROR|Parse Error|Script error/ { pending = $0; next }
 	pending != "" {

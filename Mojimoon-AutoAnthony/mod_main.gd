@@ -58,7 +58,6 @@ func _init() -> void:
 	ModLoaderMod.install_script_extension(dir + "ui/menus/run/difficulty_selection/difficulty_selection.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/shop/shop.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/shop/coop_shop.gd")
-	ModLoaderMod.install_script_extension(dir + "dlcs/dlc_1/dlc_1_data.gd")
 
 
 func _ready() -> void:
@@ -297,6 +296,8 @@ func _activate(state: Dictionary) -> void:
 			res.effects = p.effects
 			res.tags = p.tags
 			res.tracking_text = "[EMPTY]"
+			# 原版的"限制 (N)"/"独特"属于原道具，不继承到重组后的道具上
+			res.max_nb = -1
 			if rename:
 				res.name = _compose_name(p.adj, _backups[res.get_instance_id()].name)
 	for id in plan.characters:
@@ -423,6 +424,7 @@ func _backup(res) -> void:
 	if res is ItemData:
 		b.tags = res.tags
 		b.tracking_text = res.tracking_text
+		b.max_nb = res.max_nb
 	_backups[id] = b
 
 
@@ -439,6 +441,7 @@ func restore() -> void:
 		if b.has("tags"):
 			res.tags = b.tags
 			res.tracking_text = b.tracking_text
+			res.max_nb = b.max_nb
 	_backups.clear()
 	if _groups_backup != null:
 		var isvc = _autoload("ItemService")
@@ -501,6 +504,7 @@ func _materialize_owned(owned: Array) -> void:
 			if res is ItemData and not res is CharacterData:
 				res.tags = tmpl.tags
 				res.tracking_text = tmpl.tracking_text
+				res.max_nb = tmpl.max_nb
 		rd.apply_item_effects(res, p)
 		touched[p] = true
 	for p in touched:
@@ -544,6 +548,7 @@ func _repair_item(it) -> void:
 	if not it is CharacterData:
 		it.tags = tmpl.tags
 		it.tracking_text = tmpl.tracking_text
+		it.max_nb = tmpl.max_nb
 	var has_trigger = false
 	for e in it.effects:
 		if e is TriggerEffect:
@@ -584,8 +589,6 @@ func fire_shop(event: String, player_index: int) -> void:
 			match e.payload:
 				"perm_stat":
 					rd.add_stat(Keys.generate_hash(e.stat), e.value, player_index)
-					if e.side_stat != "":
-						rd.add_stat(Keys.generate_hash(e.side_stat), e.side_signed(), player_index)
 					LinkedStats.reset_player(player_index)
 				"grant":
 					if e.grant != null:

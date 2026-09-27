@@ -59,7 +59,7 @@ func rebuild(player_index: int) -> void:
 				if old.has(id):
 					list.push_back(old[id])
 				else:
-					var show = Valuation.raw_rate(e.trigger, e.param, e.chance) <= FEEDBACK_MAX_RATE and not e.trigger in ["still", "moving"]
+					var show = Valuation.raw_rate(e.trigger, e.param, e.chance) <= FEEDBACK_MAX_RATE and not e.trigger in ["still", "moving"] and Catalog.STATS.has(e.stat)
 					list.push_back({"effect": e, "count": 0, "fired": 0, "active": false, "show": show, "stack": 0, "granted": []})
 	# 被移除的状态加成要撤销
 	for id in old:
@@ -204,8 +204,6 @@ func _set_state(player_index: int, en: Dictionary, on: bool) -> void:
 		_refresh(player_index)
 		return
 	var h = Keys.generate_hash(e.stat)
-	if e.side_stat != "":
-		TempStats.add_stat(Keys.generate_hash(e.side_stat), e.side_signed() * (1 if on else -1), player_index)
 	if on:
 		TempStats.add_stat(h, e.value, player_index)
 		if en.get("show", false):
@@ -234,12 +232,10 @@ func execute(e, player_index: int, pos, show: bool = true, en = null) -> void:
 			TempStats.add_stat(h, e.value, player_index)
 			if show:
 				RunData.emit_signal("stat_added", h, e.value, 0.0, player_index)
-			if e.side_stat != "":
-				TempStats.add_stat(Keys.generate_hash(e.side_stat), e.side_signed(), player_index)
+
 		"perm_stat":
 			RunData.add_stat(h, e.value, player_index)
-			if e.side_stat != "":
-				RunData.add_stat(Keys.generate_hash(e.side_stat), e.side_signed(), player_index)
+
 			LinkedStats.reset_player(player_index)
 		"timed_stat":
 			TempStats.add_stat(h, e.value, player_index)
@@ -248,11 +244,7 @@ func execute(e, player_index: int, pos, show: bool = true, en = null) -> void:
 			var serial = _wave_serial
 			var timer = get_tree().create_timer(max(0.1, e.value2), false)
 			timer.connect("timeout", self, "_on_timed_stat_timeout", [serial, h, e.value, player_index])
-			if e.side_stat != "":
-				var sh = Keys.generate_hash(e.side_stat)
-				TempStats.add_stat(sh, e.side_signed(), player_index)
-				var t2 = get_tree().create_timer(max(0.1, e.value2), false)
-				t2.connect("timeout", self, "_on_timed_stat_timeout", [serial, sh, e.side_signed(), player_index])
+
 		"heal":
 			RunData.emit_signal("healing_effect", e.value, player_index, Keys.empty_hash)
 		"gold":
