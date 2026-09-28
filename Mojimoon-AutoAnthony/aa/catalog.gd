@@ -108,37 +108,38 @@ const TRIGGERS = {
 	"steps": {"kind": "event", "e": 90.0, "timing": 0.5, "gate": "every", "w": 0.3},
 	# 波次进行到一半时（赛博格）
 	"half_wave": {"kind": "event", "e": 1.0, "timing": 0.5, "gate": "none", "w": 0.3},
-	"buy": {"kind": "shop", "e": 3.0, "timing": 0.0, "gate": "chance", "w": 0.3},
+	"buy": {"kind": "shop", "e": 3.0, "timing": 0.0, "gate": "chance", "w": 0.2},
 	# ---- 实验性扳机（低权重）----
 	# 拾取箱子（原版袋子）
 	"crate": {"kind": "event", "e": 0.8, "timing": 0.5, "gate": "chance", "w": 0.2},
 	# 引发爆炸（任何来源：原版爆炸道具 / 武器）
 	"explode": {"kind": "event", "e": 12.0, "timing": 0.5, "gate": "every", "w": 0.2},
 	# 暴击命中（不必击杀）
-	"crit": {"kind": "event", "e": 80.0, "timing": 0.5, "gate": "every", "w": 0.2},
+	"crit": {"kind": "event", "e": 80.0, "timing": 0.5, "gate": "every", "w": 0.3},
 	# 点燃敌人（敌人开始燃烧；原版以燃烧结算为准）
 	"ignite": {"kind": "event", "e": 25.0, "timing": 0.5, "gate": "every", "w": 0.15},
 	# 首次命中某个敌人（冰块、潜水员的"首次命中时"）；可限定伤害类型（按命中的伤害缩放属性）
-	"first_hit": {"kind": "event", "e": 120.0, "timing": 0.5, "gate": "every", "w": 0.1},
-	"first_hit_melee": {"kind": "event", "e": 80.0, "timing": 0.5, "gate": "every", "w": 0.04},
-	"first_hit_ranged": {"kind": "event", "e": 80.0, "timing": 0.5, "gate": "every", "w": 0.04},
-	"first_hit_elemental": {"kind": "event", "e": 80.0, "timing": 0.5, "gate": "every", "w": 0.04},
-	"first_hit_engineering": {"kind": "event", "e": 80.0, "timing": 0.5, "gate": "every", "w": 0.04},
+	"first_hit": {"kind": "event", "e": 110.0, "timing": 0.5, "gate": "every", "w": 0.1},
+	"first_hit_melee": {"kind": "event", "e": 70.0, "timing": 0.5, "gate": "every", "w": 0.04},
+	"first_hit_ranged": {"kind": "event", "e": 70.0, "timing": 0.5, "gate": "every", "w": 0.04},
+	"first_hit_elemental": {"kind": "event", "e": 70.0, "timing": 0.5, "gate": "every", "w": 0.04},
+	"first_hit_engineering": {"kind": "event", "e": 70.0, "timing": 0.5, "gate": "every", "w": 0.04},
 	# 命中生命值高于 / 低于 X% 的敌人（小鱼、原版"对高 / 低血敌人增伤"）：每次命中都计，按命中次数高估
-	"hit_above_50": {"kind": "event", "e": 150.0, "timing": 0.5, "gate": "every", "w": 0.04},
-	"hit_above_75": {"kind": "event", "e": 120.0, "timing": 0.5, "gate": "every", "w": 0.05},
-	"hit_below_50": {"kind": "event", "e": 90.0, "timing": 0.5, "gate": "every", "w": 0.05},
+	"hit_above_50": {"kind": "event", "e": 150.0, "timing": 0.5, "gate": "every", "w": 0.06},
+	"hit_above_75": {"kind": "event", "e": 120.0, "timing": 0.5, "gate": "every", "w": 0.06},
+	"hit_above_90": {"kind": "event", "e": 90.0, "timing": 0.5, "gate": "every", "w": 0.04},
+	"hit_below_50": {"kind": "event", "e": 70.0, "timing": 0.5, "gate": "every", "w": 0.06},
 }
 
 # 实验性扳机（低权重）
 const EXPERIMENTAL_TRIGGERS = [
 	"crate", "explode", "crit", "ignite", "first_hit", "first_hit_melee", "first_hit_ranged", "first_hit_elemental",
-	"first_hit_engineering", "hit_above_50", "hit_above_75", "hit_below_50"
+	"first_hit_engineering", "hit_above_50", "hit_above_75", "hit_above_90", "hit_below_50"
 ]
 # 有目标敌人的扳机：可以挂"使该敌人受到的伤害提高"载荷
 const ENEMY_TARGET_TRIGGERS = [
 	"crit", "ignite", "first_hit", "first_hit_melee", "first_hit_ranged", "first_hit_elemental", "first_hit_engineering",
-	"hit_above_50", "hit_above_75", "hit_below_50"
+	"hit_above_50", "hit_above_75", "hit_above_90", "hit_below_50"
 ]
 # 限定伤害类型的首次命中 -> 伤害缩放属性
 const FIRST_HIT_STATS = {
