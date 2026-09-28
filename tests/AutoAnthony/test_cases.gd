@@ -407,7 +407,8 @@ func test_16_clause_fits_budget() -> void:
 			ok += 1
 		_check(ok >= 40, "clauses found for target %.0f (%d/50)" % [target, ok])
 	var neg = gen.gen_clause(-10.0, 5.5, true)
-	_check(not neg.empty() and neg.value < 0 and neg.payload == "temp_stat", "negative clause is a temp-stat downside")
+	# 代价：自身属性降低（负值）或敌人属性提高（正值）
+	_check(not neg.empty() and neg.payload == "temp_stat" and Valuation.clause_value(neg, 5.5) < 0, "negative clause is a temp-stat downside")
 
 
 # ============================================================
@@ -1340,8 +1341,8 @@ func test_89_grant_texts_serialization_and_modes() -> void:
 				grants += 1
 				var k = e.grant.custom_key if e.grant.custom_key != "" else e.grant.key
 				_check(not k in Catalog.GRANT_BANNED_KEYS, "grant not banned: " + k)
-				if Catalog.TRIGGERS[e.trigger].kind == "shop" or e.trigger == "wave_end":
-					_eq(e.grant_mode, "perm", "shop / wave-end grants are permanent")
+				if Catalog.TRIGGERS[e.trigger].kind == "shop" or e.trigger in ["wave_end", "wave_start"]:
+					_eq(e.grant_mode, "perm", "shop / wave-start / wave-end grants are permanent")
 				if e.grant_mode == "temp" and gen.is_scaling(e.grant) == false and gen.is_gain_mod(e.grant) == false:
 					_check(e.grant.key in Catalog.GRANT_TEMP_KEYS, "temp grant is combat-dynamic: " + e.grant.key)
 				var txt = e.get_text(0, false)
@@ -2842,3 +2843,35 @@ func test_108_percent_caps() -> void:
 		_check(abs(e.get_meta("aa_value") - relic.value) < 0.01, "value follows the capped number (%.1f vs %.1f)" % [e.get_meta("aa_value"), relic.value])
 	# 战利品外星人出现几率是相对值，不受上限
 	_check(not Catalog.PCT_CAPS.has("loot_alien_chance"), "loot alien chance is relative, not capped")
+
+
+# 每隔 N 秒获得持续 M 秒的效果：M < N；每波开始时只能"永久获得"
+func test_109_interval_duration_and_wave_start_grants() -> void:
+	var n_int = 0
+	var n_ws = 0
+	for sd in SEEDS:
+		var plan = Generator.new(_cfg(), sd).generate(isvc.items, isvc.characters, [], [])
+		for id in plan.items:
+			for e in plan.items[id].effects:
+				if not e is TriggerEffect:
+					continue
+				if e.trigger == "interval" and e.payload == "timed_stat":
+					n_int += 1
+					_check(e.value2 < e.param, "duration < interval: " + e.get_text(0, false))
+				if e.trigger == "wave_start" and e.payload == "grant":
+					n_ws += 1
+					_eq(e.grant_mode, "perm", "wave-start grant is permanent: " + e.get_text(0, false))
+	var gen = Generator.new(_cfg(), 5)
+	gen._collect_priors(isvc.items, isvc.characters, isvc.weapons)
+	gen.rng.seed = 5
+	for i in 200:
+		var c = gen.gen_clause([8.0, 20.0, 45.0][i % 3], 4.0, false, "interval", "timed_stat")
+		if not c.empty():
+			n_int += 1
+			_check(c.value2 < c.param, "generated duration %d < interval %d" % [c.value2, c.param])
+		var w = gen.gen_clause(20.0, 4.0, false, "wave_start", "grant")
+		if not w.empty():
+			n_ws += 1
+			_eq(w.grant_mode, "perm", "wave-start grant clause is permanent")
+	print("AUDIT interval timed clauses %d, wave-start grants %d" % [n_int, n_ws])
+	_check(n_int > 20 and n_ws > 20, "both shapes still generated")

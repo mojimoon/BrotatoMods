@@ -1736,7 +1736,8 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 			c.value = 3
 		"grant":
 			var mode = "temp"
-			if t.kind == "shop" or trigger == "wave_end":
+			# 每波开始时"本波获得"= 整局一直持有该效果，与直接写在道具上无异：波初只允许"永久获得"（逐波累积）
+			if t.kind == "shop" or trigger == "wave_end" or trigger == "wave_start":
 				mode = "perm"
 			elif t.kind == "event" and rng.randf() < 0.3:
 				mode = "perm"
@@ -1819,6 +1820,9 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 			var per_fire = abs(Valuation.clause_value(c, perm_mult)) / max(0.01, Valuation.fires_per_wave(trigger, c.param, c.chance, c.cap))
 			c.cap = int(clamp(floor(budget / max(0.01, per_fire)), 1, c.cap))
 
+	# 每隔 N 秒获得持续 M 秒的效果：M < N（否则等同于一直生效）
+	if trigger == "interval" and payload == "timed_stat":
+		c.value2 = int(clamp(c.value2, 1, max(1, c.param - 1)))
 	# 单次触发的属性数值同样受原版单行上限约束
 	if c.payload in ["temp_stat", "perm_stat", "timed_stat"]:
 		c.value = int(min(c.value, _line_cap(c.stat, negative)))
