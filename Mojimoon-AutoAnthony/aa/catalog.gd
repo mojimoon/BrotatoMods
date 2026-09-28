@@ -86,12 +86,12 @@ const EXPLOSION_TARGETS = 2.5	# 爆炸平均命中数
 #   w: 基础出现权重（与原版先验相加）
 # ------------------------------------------------------------
 const TRIGGERS = {
-	"kill": {"kind": "event", "e": 90.0, "timing": 0.5, "gate": "every", "w": 1.0},
-	"hit": {"kind": "event", "e": 7.0, "timing": 0.5, "gate": "chance", "w": 1.0},
+	"kill": {"kind": "event", "e": 100.0, "timing": 0.5, "gate": "every", "w": 1.0},
+	"hit": {"kind": "event", "e": 8.0, "timing": 0.5, "gate": "chance", "w": 1.0},
 	"dodge": {"kind": "event", "e": 4.0, "timing": 0.5, "gate": "chance", "w": 1.0},
 	"consumable": {"kind": "event", "e": 7.0, "timing": 0.5, "gate": "chance", "w": 1.0},
-	"gold": {"kind": "event", "e": 90.0, "timing": 0.5, "gate": "every", "w": 0.6},
-	"heal": {"kind": "event", "e": 14.0, "timing": 0.5, "gate": "chance", "w": 0.4},
+	"gold": {"kind": "event", "e": 100.0, "timing": 0.5, "gate": "every", "w": 0.6},
+	"heal": {"kind": "event", "e": 16.0, "timing": 0.5, "gate": "chance", "w": 0.4},
 	"level_up": {"kind": "event", "e": 1.3, "timing": 0.5, "gate": "none", "w": 0.9},
 	"wave_start": {"kind": "event", "e": 1.0, "timing": 1.0, "gate": "none", "w": 0.8},
 	"wave_end": {"kind": "event", "e": 1.0, "timing": 0.0, "gate": "none", "w": 0.8},
@@ -119,7 +119,7 @@ const TRIGGERS = {
 	# 点燃敌人（敌人开始燃烧；原版以燃烧结算为准）
 	"ignite": {"kind": "event", "e": 25.0, "timing": 0.5, "gate": "every", "w": 0.15},
 	# 首次命中某个敌人（冰块、潜水员的"首次命中时"）；可限定伤害类型（按命中的伤害缩放属性）
-	"first_hit": {"kind": "event", "e": 110.0, "timing": 0.5, "gate": "every", "w": 0.1},
+	"first_hit": {"kind": "event", "e": 120.0, "timing": 0.5, "gate": "every", "w": 0.1},
 	"first_hit_melee": {"kind": "event", "e": 70.0, "timing": 0.5, "gate": "every", "w": 0.04},
 	"first_hit_ranged": {"kind": "event", "e": 70.0, "timing": 0.5, "gate": "every", "w": 0.04},
 	"first_hit_elemental": {"kind": "event", "e": 70.0, "timing": 0.5, "gate": "every", "w": 0.04},
@@ -127,7 +127,7 @@ const TRIGGERS = {
 	# 命中生命值高于 / 低于 X% 的敌人（小鱼、原版"对高 / 低血敌人增伤"）：每次命中都计，按命中次数高估
 	"hit_above_50": {"kind": "event", "e": 150.0, "timing": 0.5, "gate": "every", "w": 0.06},
 	"hit_above_75": {"kind": "event", "e": 120.0, "timing": 0.5, "gate": "every", "w": 0.06},
-	"hit_above_90": {"kind": "event", "e": 90.0, "timing": 0.5, "gate": "every", "w": 0.04},
+	"hit_above_90": {"kind": "event", "e": 100.0, "timing": 0.5, "gate": "every", "w": 0.04},
 	"hit_below_50": {"kind": "event", "e": 70.0, "timing": 0.5, "gate": "every", "w": 0.06},
 }
 
