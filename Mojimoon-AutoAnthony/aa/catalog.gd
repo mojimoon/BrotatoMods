@@ -109,7 +109,51 @@ const TRIGGERS = {
 	# 波次进行到一半时（赛博格）
 	"half_wave": {"kind": "event", "e": 1.0, "timing": 0.5, "gate": "none", "w": 0.3},
 	"buy": {"kind": "shop", "e": 3.0, "timing": 0.0, "gate": "chance", "w": 0.3},
+	# ---- 实验性扳机（低权重，便于形成"A 触发 B、B 触发 C"的连锁）----
+	# 拾取箱子（原版袋子）：每波约 1.2 个
+	"crate": {"kind": "event", "e": 1.2, "timing": 0.5, "gate": "chance", "w": 0.2},
+	# 引发爆炸（任何来源：原版爆炸道具 / 武器、本 mod 的爆炸载荷）：依赖构筑，按每波 8 次保守估计
+	"explode": {"kind": "event", "e": 8.0, "timing": 0.5, "gate": "every", "w": 0.2},
+	# 暴击命中（不必击杀）
+	"crit": {"kind": "event", "e": 80.0, "timing": 0.5, "gate": "every", "w": 0.2},
+	# 点燃敌人（敌人开始燃烧；原版以燃烧结算为准）
+	"ignite": {"kind": "event", "e": 25.0, "timing": 0.5, "gate": "every", "w": 0.15},
+	# 首次命中某个敌人（冰块、潜水员的"首次命中时"）；可限定伤害类型（按命中的伤害缩放属性）
+	"first_hit": {"kind": "event", "e": 110.0, "timing": 0.5, "gate": "every", "w": 0.1},
+	"first_hit_melee": {"kind": "event", "e": 70.0, "timing": 0.5, "gate": "every", "w": 0.04},
+	"first_hit_ranged": {"kind": "event", "e": 70.0, "timing": 0.5, "gate": "every", "w": 0.04},
+	"first_hit_elemental": {"kind": "event", "e": 70.0, "timing": 0.5, "gate": "every", "w": 0.04},
+	"first_hit_engineering": {"kind": "event", "e": 70.0, "timing": 0.5, "gate": "every", "w": 0.04},
+	# 命中生命值高于 / 低于 X% 的敌人（小鱼、原版"对高 / 低血敌人增伤"）：每次命中都计，按命中次数高估
+	"hit_above_50": {"kind": "event", "e": 200.0, "timing": 0.5, "gate": "every", "w": 0.04},
+	"hit_above_75": {"kind": "event", "e": 150.0, "timing": 0.5, "gate": "every", "w": 0.05},
+	"hit_above_90": {"kind": "event", "e": 110.0, "timing": 0.5, "gate": "every", "w": 0.04},
+	"hit_below_50": {"kind": "event", "e": 120.0, "timing": 0.5, "gate": "every", "w": 0.05},
+	"hit_below_25": {"kind": "event", "e": 60.0, "timing": 0.5, "gate": "every", "w": 0.04},
 }
+
+# 实验性扳机（低权重）
+const EXPERIMENTAL_TRIGGERS = [
+	"crate", "explode", "crit", "ignite", "first_hit", "first_hit_melee", "first_hit_ranged", "first_hit_elemental",
+	"first_hit_engineering", "hit_above_50", "hit_above_75", "hit_above_90", "hit_below_50", "hit_below_25",
+]
+# 有目标敌人的扳机：可以挂"使该敌人受到的伤害提高"载荷
+const ENEMY_TARGET_TRIGGERS = [
+	"crit", "ignite", "first_hit", "first_hit_melee", "first_hit_ranged", "first_hit_elemental", "first_hit_engineering",
+	"hit_above_50", "hit_above_75", "hit_above_90", "hit_below_50", "hit_below_25",
+]
+# 限定伤害类型的首次命中 -> 伤害缩放属性
+const FIRST_HIT_STATS = {
+	"first_hit_melee": "stat_melee_damage", "first_hit_ranged": "stat_ranged_damage",
+	"first_hit_elemental": "stat_elemental_damage", "first_hit_engineering": "stat_engineering",
+}
+# 连锁深度上限（"A 触发 B、B 触发 C、C 触发 D"）；延迟生成的爆炸也携带深度
+const MAX_CHAIN_DEPTH = 3
+# 单条条款每秒最多触发次数（防止连锁在同一时刻刷屏）
+const MAX_FIRES_PER_SECOND = 20
+# 受伤加成载荷的估值：同时被伤害的敌人约 8 个，持续时间超过约 4 秒不再增值
+const VULN_CONCURRENT_TARGETS = 8.0
+const VULN_MAX_USEFUL_SECONDS = 4.0
 
 # 实际受击次数（用于"受伤时清空"条款的估值）
 const REAL_HITS_PER_WAVE = 7.0
@@ -123,7 +167,7 @@ const INTERVAL_CHOICES = [3, 4, 5, 6, 8, 10, 12, 15]
 # ------------------------------------------------------------
 const PAYLOADS = {
 	"temp_stat": {"w": 0.4},
-	"perm_stat": {"w": 1.0},
+	"perm_stat": {"w": 0.8},
 	"timed_stat": {"w": 0.3},
 	"heal": {"w": 0.3},
 	"gold": {"w": 0.3},
@@ -131,6 +175,8 @@ const PAYLOADS = {
 	"damage": {"w": 0.4},
 	"explode": {"w": 0.4},
 	"grant": {"w": 2.0},
+	# 使该敌人受到的伤害提高 X%，持续 N 秒（原版冰块 / 潜水员的效果；只用于有目标敌人的扳机）
+	"vuln": {"w": 0.6},
 }
 
 # 合法组合：触发扳机 -> 允许的载荷
@@ -157,6 +203,20 @@ const LEGAL = {
 	"burning_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode"],
 	"steps": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp"],
 	"half_wave": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold"],
+	"crate": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp"],
+	"explode": ["temp_stat", "timed_stat", "heal", "gold", "damage"],
+	"crit": ["temp_stat", "timed_stat", "heal", "gold", "damage", "vuln"],
+	"ignite": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
+	"first_hit": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
+	"first_hit_melee": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
+	"first_hit_ranged": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
+	"first_hit_elemental": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
+	"first_hit_engineering": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
+	"hit_above_50": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
+	"hit_above_75": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
+	"hit_above_90": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
+	"hit_below_50": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
+	"hit_below_25": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
 }
 
 # ============================================================
@@ -186,6 +246,21 @@ const FREE_LEGAL = {
 	"burning_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant"],
 	"steps": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant"],
 	"half_wave": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant"],
+	"crate": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant"],
+	# 爆炸不挂爆炸（自激循环）；暴击不挂爆炸（爆炸可以暴击，形成循环）
+	"explode": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "grant"],
+	"crit": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "grant", "vuln"],
+	"ignite": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
+	"first_hit": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
+	"first_hit_melee": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
+	"first_hit_ranged": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
+	"first_hit_elemental": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
+	"first_hit_engineering": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
+	"hit_above_50": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
+	"hit_above_75": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
+	"hit_above_90": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
+	"hit_below_50": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
+	"hit_below_25": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
 }
 # 战斗中实时读取、可"本波获得"的机制 key（其余求和型机制只能永久获得）
 const GRANT_TEMP_KEYS = [
@@ -233,6 +308,8 @@ const NATIVE_TRIGGER_MAP = {
 	"explode_on_consumable": ["consumable", "explode"],
 	"gain_stat_for_killed_enemies_while_burning": ["burning_kill", "perm_stat"],
 	"effect_gain_stat_every_killed_enemies": ["kill", "perm_stat"],
+	# 袋子：拾取箱子时获得材料
+	"item_box_gold": ["crate", "gold"],
 }
 # 原版先验在组合权重中的强度
 const NATIVE_PRIOR_STRENGTH = 0.6
@@ -334,6 +411,14 @@ const ADJ_BY_TRIGGER = {
 	"still": ["AA_ADJ_ROOTED", "AA_ADJ_CALM"], "moving": ["AA_ADJ_RESTLESS", "AA_ADJ_WANDERING"],
 	"low_hp": ["AA_ADJ_DESPERATE", "AA_ADJ_CORNERED"], "full_hp": ["AA_ADJ_PROUD", "AA_ADJ_PRISTINE"],
 	"reroll": ["AA_ADJ_FICKLE", "AA_ADJ_GAMBLING"], "buy": ["AA_ADJ_THRIFTY", "AA_ADJ_SHOPAHOLIC"],
+	"crate": ["AA_ADJ_GREEDY", "AA_ADJ_CURIOUS"], "explode": ["AA_ADJ_BLAZING", "AA_ADJ_FIERCE"],
+	"crit": ["AA_ADJ_DEADLY", "AA_ADJ_KEEN"], "ignite": ["AA_ADJ_BLAZING", "AA_ADJ_SCORCHING"],
+	"first_hit": ["AA_ADJ_EAGER", "AA_ADJ_KEEN"], "first_hit_melee": ["AA_ADJ_EAGER", "AA_ADJ_FIERCE"],
+	"first_hit_ranged": ["AA_ADJ_EAGER", "AA_ADJ_KEEN"], "first_hit_elemental": ["AA_ADJ_EAGER", "AA_ADJ_SCORCHING"],
+	"first_hit_engineering": ["AA_ADJ_EAGER", "AA_ADJ_CURIOUS"],
+	"hit_above_50": ["AA_ADJ_PREDATORY", "AA_ADJ_EAGER"], "hit_above_75": ["AA_ADJ_PREDATORY", "AA_ADJ_EAGER"],
+	"hit_above_90": ["AA_ADJ_PREDATORY", "AA_ADJ_EAGER"], "hit_below_50": ["AA_ADJ_EXECUTING", "AA_ADJ_DEADLY"],
+	"hit_below_25": ["AA_ADJ_EXECUTING", "AA_ADJ_DEADLY"],
 }
 const ADJ_MECHANIC = ["AA_ADJ_ODD", "AA_ADJ_STRANGE", "AA_ADJ_CURIOUS", "AA_ADJ_ANCIENT"]
 const ADJ_SCALING = ["AA_ADJ_RESONANT", "AA_ADJ_SYNERGIC"]
@@ -390,7 +475,7 @@ const STAT_CATEGORY = {
 	"consumable_heal": "S", "stat_speed": "S",
 	"stat_luck": "E", "stat_harvesting": "E", "xp_gain": "E", "pickup_range": "E",
 }
-const PAYLOAD_CATEGORY = {"heal": "S", "gold": "E", "xp": "E", "damage": "A", "explode": "A"}
+const PAYLOAD_CATEGORY = {"heal": "S", "gold": "E", "xp": "E", "damage": "A", "explode": "A", "vuln": "A"}
 const CATEGORY_CLASSES = ["AA", "AS", "AE", "A-", "SA", "SS", "SE", "S-", "EA", "ES", "EE", "E-"]
 
 # 原版的非属性词条（角色的"想要词条"会用到）
@@ -518,6 +603,9 @@ const TAG_BINDINGS = {
 	"counter:burning_enemy": ["stat_elemental_damage"], "counter:structure": ["structure"], "counter:pet": ["pet"],
 	"counter:materials": ["economy"],
 	"payload:explode": ["explosive"], "payload:gold": ["economy"], "payload:xp": ["xp_gain"],
+	"trigger:explode": ["explosive"], "trigger:crit": ["stat_crit_chance"], "trigger:ignite": ["stat_elemental_damage"],
+	"trigger:first_hit_melee": ["stat_melee_damage"], "trigger:first_hit_ranged": ["stat_ranged_damage"],
+	"trigger:first_hit_elemental": ["stat_elemental_damage"], "trigger:first_hit_engineering": ["stat_engineering"],
 	"mech:pierce_on_crit": ["stat_crit_chance"], "mech:giant_crit_damage": ["stat_crit_chance"],
 	"mech:structures_can_crit": ["structure", "stat_crit_chance"],
 	"mech:burning_spread": ["stat_elemental_damage"], "mech:burning_cooldown_reduction": ["stat_elemental_damage"],

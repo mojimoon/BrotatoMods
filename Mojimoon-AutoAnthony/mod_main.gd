@@ -53,6 +53,7 @@ func _init() -> void:
 	var dir: String = ModLoaderMod.get_unpacked_dir() + MOD_ID + "/extensions/"
 	ModLoaderMod.install_script_extension(dir + "singletons/run_data.gd")
 	ModLoaderMod.install_script_extension(dir + "main.gd")
+	ModLoaderMod.install_script_extension(dir + "singletons/weapon_service.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/run/character_selection.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/run/weapon_selection.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/run/difficulty_selection/difficulty_selection.gd")
@@ -68,6 +69,7 @@ func _ready() -> void:
 
 # 存档反序列化按 get_id() 在 ItemService.effects 中查找效果脚本
 func register_effect_script() -> void:
+	_register_enemy_behavior()
 	if _effect_registered:
 		return
 	var isvc = _autoload("ItemService")
@@ -76,6 +78,22 @@ func register_effect_script() -> void:
 	if not TriggerEffect in isvc.effects:
 		isvc.effects.push_back(TriggerEffect)
 	_effect_registered = true
+
+
+# 挂在敌人身上的效果行为（命中 / 点燃扳机、受伤加成载荷）：注册到原版 EffectBehaviorService，
+# 与 DLC 的魅惑 / 诅咒行为相同；本 mod 未启用时 should_add_on_spawn 返回 false，不会挂到敌人上
+var _behavior_data = null
+
+
+func _register_enemy_behavior() -> void:
+	var svc = _autoload("EffectBehaviorService")
+	if svc == null:
+		return
+	if _behavior_data == null:
+		_behavior_data = load("res://items/global/effect_behavior_data.gd").new()
+		_behavior_data.scene = load(MOD_DIR + "aa/enemy_behavior.tscn")
+	if not _behavior_data in svc.enemy_effect_behaviors:
+		svc.enemy_effect_behaviors.push_back(_behavior_data)
 
 
 # 效果原文 + 说明（例如"……（生效后此道具消失）"）：按当前语言生成组合描述并注册

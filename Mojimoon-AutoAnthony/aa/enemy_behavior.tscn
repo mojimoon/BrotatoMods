@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=2]
+
+[ext_resource path="res://mods-unpacked/Mojimoon-AutoAnthony/aa/enemy_behavior.gd" type="Script" id=1]
+
+[node name="AutoAnthonyEnemyBehavior" type="Node2D"]
+script = ExtResource( 1 )

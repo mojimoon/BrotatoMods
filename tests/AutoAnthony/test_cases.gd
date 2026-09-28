@@ -366,22 +366,30 @@ func test_14_sliders() -> void:
 # 原版触发组合都能被通用系统重新表达：对每一种原版组合，生成器都能产出同类条款
 func test_15_every_native_combo_is_reachable() -> void:
 	var seen = {}
-	for s in range(1, 40):
+	# 扳机较多（含低权重的实验性扳机）：加大抽样
+	for s in range(1, 60):
 		var gen = Generator.new(_cfg(), s)
 		gen._collect_priors(isvc.items, isvc.characters, isvc.weapons)
 		gen.rng.seed = s
-		for i in 30:
+		for i in 50:
 			var c = gen.gen_clause(30.0, 6.0, false)
 			if not c.empty():
 				seen[c.trigger + "/" + c.payload] = true
 	for k in Catalog.NATIVE_TRIGGER_MAP:
 		var pair = Catalog.NATIVE_TRIGGER_MAP[k]
 		_check(seen.has(pair[0] + "/" + pair[1]), "native combo reachable: %s -> %s/%s" % [k, pair[0], pair[1]])
-	var legal_total = 0
+	# 原有扳机要求大部分组合可达；实验性扳机权重低，单独统计
+	var tot = [0, 0]
+	var got = [0, 0]
 	for t in Catalog.FREE_LEGAL:
-		legal_total += Catalog.FREE_LEGAL[t].size()
-	print("AUDIT distinct trigger/payload combos generated: %d of %d legal" % [seen.size(), legal_total])
-	_check(seen.size() > legal_total * 0.8, "most legal combos reachable")
+		var x = 1 if t in Catalog.EXPERIMENTAL_TRIGGERS else 0
+		for p in Catalog.FREE_LEGAL[t]:
+			tot[x] += 1
+			if seen.has(t + "/" + p):
+				got[x] += 1
+	print("AUDIT distinct trigger/payload combos generated: core %d of %d, experimental %d of %d" % [got[0], tot[0], got[1], tot[1]])
+	_check(got[0] > tot[0] * 0.8, "most legal combos reachable")
+	_check(got[1] > tot[1] * 0.4, "experimental combos reachable")
 
 
 func test_16_clause_fits_budget() -> void:
@@ -666,9 +674,15 @@ func test_50_all_translation_keys_exist() -> void:
 		var k = line.split(",")[0].replace("\"", "")
 		keys[k] = true
 	f.close()
+	for k in ["AA_T_FIRST_HIT_TYPED", "AA_T_FIRST_HIT_TYPED_EVERY", "AA_T_HIT_ABOVE", "AA_T_HIT_ABOVE_EVERY", "AA_T_HIT_BELOW", "AA_T_HIT_BELOW_EVERY", "AA_P_VULN"]:
+		_check(keys.has(k), "text key " + k)
 	for t in Catalog.TRIGGERS:
-		if not t in ["kill", "gold", "interval"]:
+		# 带参数的扳机（限定伤害类型的首次命中、命中高 / 低血敌人）共用一条带占位符的文本
+		if not t in ["kill", "gold", "interval"] and not Catalog.FIRST_HIT_STATS.has(t) and not t.begins_with("hit_above_") and not t.begins_with("hit_below_"):
 			_check(keys.has("AA_T_" + t.to_upper()), "trigger text for " + t)
+		for param in [1, 3]:
+			var txt = TriggerEffect.make({"trigger": t, "param": param, "payload": "gold", "value": 1}).get_text(0, false)
+			_check(txt.find("AA_") == -1 and txt.find("{") == -1, "rendered trigger text for %s: %s" % [t, txt])
 	var adjs = Catalog.ADJ_MECHANIC + Catalog.ADJ_SCALING + Catalog.ADJ_GAIN_MOD + Catalog.ADJ_GRANT
 	for s in Catalog.ADJ_BY_STAT:
 		adjs += Catalog.ADJ_BY_STAT[s]
@@ -2247,6 +2261,49 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 	# 半波
 	main._on_HalfWaveTimer_timeout()
 	yield(_wait_frames(2), "completed")
+	# ---- 实验性扳机 ----
+	var AAEnemyBehavior = load("res://mods-unpacked/Mojimoon-AutoAnthony/aa/enemy_behavior.gd")
+	# 拾取箱子（原版箱子消耗品）
+	var crate = main.get_node_from_pool(main._consumable_pool_id, main._consumables_container)
+	if crate == null:
+		crate = main.consumable_scene.instance()
+		main._consumables_container.add_child(crate)
+	crate.consumable_data = isvc.get_element_safe(isvc.consumables, "consumable_item_box")
+	crate.already_picked_up = false
+	crate.global_position = player.global_position
+	main._consumables.push_back(crate)
+	main.on_consumable_picked_up(crate, 0)
+	# 引发爆炸（经原版 WeaponService.explode，延迟生成）
+	var en_x = yield(_wait_enemy(main), "completed")
+	if en_x != null:
+		rt._explode(TriggerEffect.make({"trigger": "kill", "payload": "explode", "stat": "stat_max_hp", "value": 50}), 0, en_x.global_position)
+	yield(_wait_physics(8), "completed")
+	# 点燃敌人（原版燃烧，燃烧结算时触发）
+	var en_b = yield(_wait_enemy(main), "completed")
+	if en_b != null:
+		var bd = BurningData.new()
+		bd.chance = 1.0
+		bd.damage = 1
+		bd.duration = 3
+		bd.from = player
+		en_b.apply_burning(bd)
+	yield(tree.create_timer(1.6), "timeout")
+	# 首次命中 / 命中高低血：手枪的真实命中触发远程与高血部分；其余伤害类型与低血敌人用原版 on_hurt 入口模拟
+	var en_h = yield(_wait_enemy(main), "completed")
+	var beh = AAEnemyBehavior.find_on(en_h) if en_h != null else null
+	_check(beh != null, "enemies carry the mod's effect behavior")
+	if beh != null:
+		var hb = Hitbox.new()
+		hb.from = player
+		hb.scaling_stats = [[Keys.stat_ranged_damage_hash, 1.0]]
+		beh.on_hurt(hb)
+		hb.scaling_stats = [[Keys.stat_melee_damage_hash, 1.0], [Keys.stat_elemental_damage_hash, 1.0], [Keys.stat_engineering_hash, 1.0]]
+		# 第 1 波敌人生命只有个位数：放大上限后设为 5%
+		en_h.max_stats.health = max(en_h.max_stats.health, 40)
+		en_h.current_stats.health = 2
+		beh.on_hurt(hb)
+		hb.free()
+	yield(_wait_frames(2), "completed")
 	var fired = {}
 	for en in rt.entries[0]:
 		if en.effect in trig_effects:
@@ -2310,6 +2367,39 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 	yield(_wait_physics(12), "completed")
 	_check(player.max_stats.armor > a0, "granted stat-gain modification raises real armor (%d -> %d)" % [a0, player.max_stats.armor])
 
+	# 使该敌人受到的伤害提高：原版伤害计算（get_damage_value）实际变化，到时恢复
+	var AAEB = load("res://mods-unpacked/Mojimoon-AutoAnthony/aa/enemy_behavior.gd")
+	var en_v = yield(_wait_enemy(main), "completed")
+	if en_v != null:
+		var d0 = en_v.get_damage_value(100, 0, false).value
+		rt.execute(TriggerEffect.make({"trigger": "crit", "payload": "vuln", "value": 30, "value2": 1}), 0, en_v.global_position, false, null, en_v)
+		var d1 = en_v.get_damage_value(100, 0, false).value
+		_eq(d1, int(round(d0 * 1.3)), "vuln payload raises the damage that enemy takes (%d -> %d)" % [d0, d1])
+		yield(tree.create_timer(1.3), "timeout")
+		if is_instance_valid(en_v) and not en_v.dead:
+			_eq(en_v.get_damage_value(100, 0, false).value, d0, "vuln expires")
+	# 连锁：击杀 -> 爆炸（延迟生成）-> "引发爆炸时" -> 材料；并且超过连锁深度上限的事件不再触发
+	var chain_holder = _item("item_potato").duplicate()
+	chain_holder.effects = [
+		TriggerEffect.make({"trigger": "kill", "payload": "explode", "stat": "stat_max_hp", "value": 50}),
+		TriggerEffect.make({"trigger": "explode", "payload": "gold", "value": 9}),
+	]
+	rd.add_item(chain_holder, 0)
+	m.triggers_dirty = true
+	rt._check_dirty()
+	var en_c = yield(_wait_enemy(main), "completed")
+	if en_c != null:
+		var gc = rd.get_player_gold(0)
+		var _kc = en_c.take_damage(999999, TakeDamageArgs.new(0))
+		yield(_wait_physics(10), "completed")
+		_check(rd.get_player_gold(0) >= gc + 9, "chain kill -> explosion -> 'when you cause an explosion' gave materials (%d -> %d)" % [gc, rd.get_player_gold(0)])
+	var gd = rd.get_player_gold(0)
+	rt.fire("explode", 0, null, Catalog.MAX_CHAIN_DEPTH)
+	_eq(rd.get_player_gold(0), gd, "events beyond the chain depth limit do not fire")
+	rd.remove_item(chain_holder, 0)
+	m.triggers_dirty = true
+	rt._check_dirty()
+
 	# (C) 生成池中每种组合在战斗中都有效果。先移除 (A) 的测试条款（静止 / 移动等状态加成会同时切换，干扰前后比较）
 	for en in rt.entries[0].duplicate():
 		if en.effect in trig_effects:
@@ -2345,10 +2435,16 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 			var tgt = yield(_wait_enemy(main), "completed")
 			var before = _battle_snapshot(main)
 			var hp_before = _enemy_hp_map(main)
-			rt.execute(e, 0, tgt.global_position if tgt != null and is_instance_valid(tgt) else null, false)
+			var tb = AAEB.find_on(tgt) if tgt != null and is_instance_valid(tgt) else null
+			var vuln_before = tb._vuln_total if tb != null else 0
+			rt.execute(e, 0, tgt.global_position if tgt != null and is_instance_valid(tgt) else null, false, null, tgt if tgt != null and is_instance_valid(tgt) else null)
 			# 爆炸由 WeaponService 延迟生成，命中需要几帧
 			yield(_wait_physics(12 if e.payload == "explode" else 4), "completed")
-			if e.payload in ["damage", "explode"]:
+			if e.payload == "vuln":
+				if tb != null and is_instance_valid(tb) and tb._vuln_total > vuln_before:
+					changed = true
+					break
+			elif e.payload in ["damage", "explode"]:
 				if _any_enemy_hurt(main, hp_before):
 					changed = true
 					break
@@ -2643,7 +2739,7 @@ func test_105_next_wave_xp_spread() -> void:
 
 
 # ============================================================
-# 本局玩家角色的初始道具不重组（驯兽师：战利品虫 + 开局可选的四只宠物）；鱼钩、水熊虫锚定；蝾螈效果不参与组合
+# 本局玩家角色的初始道具不重组（驯兽师：战利品虫 + 开局可选的四只宠物）；鱼钩锚定；蝾螈效果不参与组合
 # ============================================================
 func test_106_starting_items_stay_native() -> void:
 	var bm = isvc.get_element_safe(isvc.characters, "character_beast_master")
@@ -2658,7 +2754,7 @@ func test_106_starting_items_stay_native() -> void:
 	# 其他角色的局里照常重组
 	var plan = _gen(42)
 	_check(plan.items.has("item_lootworm"), "lootworm reassembled in other runs")
-	# 法师：蛇、香肠；军火商：危险的兔子；负伤者：水熊虫（锚定）
+	# 法师：蛇、香肠；军火商：危险的兔子
 	for pair in [["character_mage", ["item_snake"]], ["character_arms_dealer", ["item_dangerous_bunny"]]]:
 		var ch = isvc.get_element_safe(isvc.characters, pair[0])
 		var sids = m.starting_item_ids([ch])
@@ -2686,7 +2782,30 @@ func test_106_starting_items_stay_native() -> void:
 	for t in 4:
 		for mech in gen.mechanics_by_tier[t]:
 			sources[mech.source] = true
+	_check(not plan.items.has("item_fish_hook"), "item_fish_hook anchored")
 	for id in ["item_fish_hook", "item_tardigrade"]:
-		_check(not plan.items.has(id), id + " anchored")
 		_check(sources.has(id), id + " effects still combine")
 	_check(not sources.has("item_axolotl"), "axolotl effect no longer combines")
+
+
+# 实验性扳机：出现频率与样例
+func test_107_experimental_triggers_audit() -> void:
+	var n = 0
+	var n_exp = 0
+	var by = {}
+	var shown = 0
+	for sd in SEEDS:
+		var plan = Generator.new(_cfg(), sd).generate(isvc.items, isvc.characters, [], [])
+		for id in plan.items:
+			for e in plan.items[id].effects:
+				if not e is TriggerEffect:
+					continue
+				n += 1
+				if e.trigger in Catalog.EXPERIMENTAL_TRIGGERS:
+					n_exp += 1
+					by[e.trigger] = by.get(e.trigger, 0) + 1
+					if shown < 10:
+						shown += 1
+						print("AUDIT experimental sample: " + e.get_text(0, false))
+	print("AUDIT experimental trigger clauses: %d of %d (%s)" % [n_exp, n, str(by)])
+	_check(n_exp > 0 and n_exp < n * 0.25, "experimental triggers appear but stay a minority")

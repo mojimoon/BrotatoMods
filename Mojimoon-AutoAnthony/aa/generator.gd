@@ -234,9 +234,58 @@ func _generate_tag_item(item, tag: String, items: Array) -> Dictionary:
 				r = c
 				break
 		if r.empty():
+			r = _generate_clause_tag_item(item, tag)
+		if r.empty():
 			r = _generate_mechanic_tag_item(item, tag)
 	cur_stat_bans = []
 	return r
+
+
+# 围绕一条带该词条的触发条款生成道具（扳机 / 载荷绑定了该词条，例如 静止 -> stand_still、爆炸 -> explosive）：条款 + 一行属性补足预算
+func _generate_clause_tag_item(item, tag: String) -> Dictionary:
+	var trig = []
+	for t in Catalog.TRIGGERS:
+		if Catalog.TRIGGER_TAGS.get(t, "") == tag or tag in Catalog.tags_for_binding("trigger:" + t):
+			trig.push_back(t)
+	var pay = []
+	for p in Catalog.PAYLOADS:
+		if Catalog.PAYLOAD_TAGS.get(p, "") == tag or tag in Catalog.tags_for_binding("payload:" + p):
+			pay.push_back(p)
+	if trig.empty() and pay.empty():
+		return {}
+	rng.seed = hash(str(seed_value) + "/tagclause/" + item.my_id + "/" + tag)
+	cur_tier = item.tier
+	var perm_mult: float = Catalog.PERM_MULT[item.tier]
+	var budget: float = item_budget(item) * Catalog.HIDDEN_TIER_MULT[item.tier] * _avg_mult() * _variance_mult()
+	var budget_total = budget
+	var c = {}
+	for attempt in 8:
+		var ft = trig[rng.randi() % trig.size()] if not trig.empty() else ""
+		var fp = pay[rng.randi() % pay.size()] if trig.empty() else ""
+		c = gen_clause(budget * 0.6, perm_mult, false, ft, fp)
+		if not c.empty():
+			break
+	if c.empty():
+		cur_tier = -1
+		return {}
+	_note_clause(c)
+	var ce = TriggerEffect.make(c)
+	budget -= Valuation.clause_value(c, perm_mult)
+	var effects = []
+	if budget > 1.0:
+		var stat = _pick_stat(false, [c.get("stat", "")])
+		var v = int(min(_round_to_unit(budget / Catalog.stat_w(stat), stat), _line_cap(stat, false)))
+		effects.push_back(_stat_effect(stat, v))
+	effects.push_back(ce)
+	cur_tier = -1
+	return {
+		"effects": effects,
+		"adj": _adj(Catalog.ADJ_BY_TRIGGER.get(c.trigger, Catalog.ADJ_MECHANIC)),
+		"tags": _tags_for(effects),
+		"main_stats": main_stats(effects),
+		"budget": budget_total,
+		"class": ["A", "-"],
+	}
 
 
 # 围绕一条带该词条的机制生成道具（敌人数量增减、更多树木……）：机制 + 一行属性补足预算；
@@ -1700,6 +1749,9 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 		"explode":
 			c.stat = _pick_stat(false, [], Catalog.DAMAGE_SCALING_STATS)
 			c.value = [50, 75, 100, 150][rng.randi() % 4]
+		"vuln":
+			c.value = 5
+			c.value2 = [2, 3, 4, 5][rng.randi() % 4]
 
 	# 高频扳机上的永久效果：先按预算定每波上限（2..10），再把频率调到上限的约两倍（多数波次能触发满）
 	var is_perm = payload == "perm_stat" or (payload == "grant" and c.get("grant_mode", "") == "perm")
@@ -1733,6 +1785,8 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 		k = clamp(k, 1, k_max)
 		if payload in ["damage", "explode"]:
 			c.value = int(min(c.value * k, 400))
+		elif payload == "vuln":
+			c.value = int(min(c.value * k, 50))
 		elif payload == "xp":
 			c.value = int(c.value * k)
 		else:
@@ -1787,6 +1841,8 @@ func _amount_cap(c: Dictionary, trigger: String) -> int:
 			return 20
 		"damage", "explode":
 			return 8
+		"vuln":
+			return 10
 		"grant":
 			var mx = int(c.get("grant_max", 5))
 			if c.get("grant_mode", "temp") == "perm":

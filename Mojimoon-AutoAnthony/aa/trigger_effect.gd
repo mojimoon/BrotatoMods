@@ -128,8 +128,18 @@ func _trigger_text(colored: bool) -> String:
 			t = tr("AA_T_STEPS_EVERY").replace("{0}", str(max(1, param)))
 		"interval":
 			t = tr("AA_T_INTERVAL").replace("{0}", str(param))
+		"explode", "crit", "ignite", "first_hit":
+			t = tr("AA_T_" + trigger.to_upper()) if param <= 1 else tr("AA_T_" + trigger.to_upper() + "_EVERY").replace("{0}", str(param))
 		_:
-			t = tr("AA_T_" + trigger.to_upper())
+			if Catalog.FIRST_HIT_STATS.has(trigger):
+				var k = "AA_T_FIRST_HIT_TYPED" if param <= 1 else "AA_T_FIRST_HIT_TYPED_EVERY"
+				t = tr(k).replace("{0}", str(param)).replace("{1}", tr(Catalog.FIRST_HIT_STATS[trigger].to_upper()))
+			elif trigger.begins_with("hit_above_") or trigger.begins_with("hit_below_"):
+				var base = "AA_T_HIT_ABOVE" if trigger.begins_with("hit_above_") else "AA_T_HIT_BELOW"
+				var k2 = base if param <= 1 else base + "_EVERY"
+				t = tr(k2).replace("{0}", str(param)).replace("{1}", trigger.get_slice("_", 2))
+			else:
+				t = tr("AA_T_" + trigger.to_upper())
 	if chance < 100:
 		t += tr("AA_CHANCE").replace("{0}", _col(str(chance) + "%", true, colored))
 	return t
@@ -160,6 +170,8 @@ func _payload_text(colored: bool) -> String:
 			return tr(k).replace("{0}", inner)
 		"explode":
 			return tr("AA_P_EXPLODE").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", stat_name)
+		"vuln":
+			return tr("AA_P_VULN").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", str(value2))
 	return ""
 
 

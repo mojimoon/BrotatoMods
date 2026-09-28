@@ -8,6 +8,7 @@ extends Node
 const Catalog = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/catalog.gd")
 const TriggerEffect = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/trigger_effect.gd")
 const Valuation = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/valuation.gd")
+const AAEnemyBehavior = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/enemy_behavior.gd")
 # 每波期望触发次数不超过该值时才显示浮动图标（避免高频扳机刷屏）
 const FEEDBACK_MAX_RATE = 12.0
 const EXPLOSION_EFFECT_PATH = "res://items/all/rip_and_tear/rip_and_tear_effect_1.tres"
@@ -89,18 +90,33 @@ func _check_dirty() -> void:
 # ============================================================
 # 事件入口
 # ============================================================
-func fire(event: String, player_index: int, pos = null) -> void:
+# chain_depth：延迟发生的事件（爆炸）携带的连锁深度；target：有目标敌人的事件（命中、暴击、点燃）；
+# info：命中事件的附加信息（hp_pct：命中前的生命百分比；first_any / first_stats：对该敌人的首次命中 / 首次某类伤害命中）
+func fire(event: String, player_index: int, pos = null, chain_depth: int = -1, target = null, info = null) -> void:
 	if player_index < 0 or player_index >= RunData.get_player_count():
 		return
 	_check_dirty()
-	if _depth > 2:
-		return	# 防止 "回血 -> 伤害 -> 击杀 -> 回血 ..." 之类的连锁无限递归
+	var saved_depth = _depth
+	if chain_depth >= 0:
+		_depth = max(_depth, chain_depth)
+	if _depth >= Catalog.MAX_CHAIN_DEPTH:
+		_depth = saved_depth
+		return	# 连锁（"A 触发 B、B 触发 C"）最多 MAX_CHAIN_DEPTH 层，防止无限递归
+	# 连锁中的触发（由另一条条款或本 mod 的爆炸引起）才受每秒次数上限约束
+	var chained = _depth > 0
 	_depth += 1
 	for en in entries[player_index]:
 		var e = en.effect
-		if e.trigger != event:
+		if not _matches(e.trigger, event, info):
 			continue
 		if e.cap > 0 and en.fired >= e.cap:
+			continue
+		# 每秒触发次数上限（连锁保护）
+		var sec = int(_elapsed)
+		if en.get("rate_sec", -1) != sec:
+			en["rate_sec"] = sec
+			en["rate_n"] = 0
+		if chained and en.rate_n >= Catalog.MAX_FIRES_PER_SECOND:
 			continue
 		if Catalog.TRIGGERS[e.trigger].gate == "every" and e.param > 1:
 			en.count += 1
@@ -110,12 +126,35 @@ func fire(event: String, player_index: int, pos = null) -> void:
 		if e.chance < 100 and randf() * 100.0 >= e.chance:
 			continue
 		en.fired += 1
-		execute(e, player_index, pos, en.show, en)
+		en.rate_n += 1
+		execute(e, player_index, pos, en.show, en, target)
 		if e.reset and e.payload == "temp_stat":
 			en.stack = en.get("stack", 0) + e.value
 	if event == "hit":
 		_reset_on_hit(player_index)
-	_depth -= 1
+	_depth = saved_depth
+
+
+# 事件与扳机的对应：命中事件（hit_enemy）按命中前的生命百分比分发到"命中高 / 低血敌人"；
+# 首次命中事件按"对该敌人首次命中 / 首次某类伤害命中"分发
+static func _matches(trigger: String, event: String, info) -> bool:
+	if event == "hit_enemy":
+		if info == null:
+			return false
+		if trigger.begins_with("hit_above_"):
+			return info.hp_pct >= float(trigger.get_slice("_", 2))
+		if trigger.begins_with("hit_below_"):
+			return info.hp_pct <= float(trigger.get_slice("_", 2))
+		return false
+	if event == "first_hit":
+		if info == null:
+			return false
+		if trigger == "first_hit":
+			return info.get("first_any", false)
+		if Catalog.FIRST_HIT_STATS.has(trigger):
+			return Catalog.FIRST_HIT_STATS[trigger] in info.get("first_stats", [])
+		return false
+	return trigger == event
 
 
 # "受伤时清空"：撤销该条款本波累积的临时属性
@@ -222,7 +261,7 @@ func _set_state(player_index: int, en: Dictionary, on: bool) -> void:
 # ============================================================
 # 载荷
 # ============================================================
-func execute(e, player_index: int, pos, show: bool = true, en = null) -> void:
+func execute(e, player_index: int, pos, show: bool = true, en = null, target = null) -> void:
 	var h = Keys.generate_hash(e.stat) if e.stat != "" else Keys.empty_hash
 	match e.payload:
 		"grant":
@@ -260,6 +299,8 @@ func execute(e, player_index: int, pos, show: bool = true, en = null) -> void:
 			_deal_damage(e, player_index)
 		"explode":
 			_explode(e, player_index, pos)
+		"vuln":
+			_vuln(e, target)
 
 
 func _on_timed_stat_timeout(serial: int, h: int, value: int, player_index: int) -> void:
@@ -315,7 +356,18 @@ func _explode(e, player_index: int, pos) -> void:
 	args.scaling_stats = []
 	args.from_player_index = player_index
 	args.damage_tracking_key_hash = Keys.empty_hash
+	# 爆炸延迟生成：记下当前连锁深度，"引发爆炸时"扳机从这里继续计数
+	args.set_meta("aa_depth", _depth)
 	WeaponService.call_deferred("explode", _explosion_effect, args)
+
+
+# 使目标敌人受到的伤害提高（挂在敌人身上的本 mod 效果行为节点）
+func _vuln(e, target) -> void:
+	if target == null or not is_instance_valid(target) or target.dead:
+		return
+	var b = AAEnemyBehavior.find_on(target)
+	if b != null:
+		b.add_vuln(e.value, float(max(1, e.value2)))
 
 
 func _get_player(player_index: int):

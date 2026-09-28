@@ -6,15 +6,15 @@
 
 | 处理 | 含义 | 估值 |
 | --- | --- | --- |
-| `trigger`（30 种） | 拆解为 (扳机, 载荷) 先验，由通用触发条款重新表达 | 单位价值 × 每波频率（见 README 第 4 节） |
+| `trigger`（31 种） | 拆解为 (扳机, 载荷) 先验，由通用触发条款重新表达 | 单位价值 × 每波频率（见 README 第 4 节） |
 | `scaling`（27 种） | 计数 × 属性自由搭配重新生成（原版 GainStatForEveryStatEffect） | 目标属性权重 × 数值 × 计数期望 / 每 N；计数期望由原版道具校准 |
 | `next_wave`（1 种） | 下一波（芹菜茶 / 孔雀）：一次性，下一波开始时生效；约一半附带同一行为下的负面行（敌人属性或自身属性降低） | 一波的价值 = 整局价值 / 剩余波数（≈ 2 × 永久累积倍率 − 1）；孔雀校准吻合 |
 | `gain_mod`（3 种） | 属性修改 ±XX% 重新生成（原版 StatGainsModificationEffect） | 属性权重 × 属性期望总量 × XX% |
-| `scalar`（39 种） | 原样搬运，并按预算缩放数值（1 单位 .. 原版 1.5 倍） | 来源道具剩余价值按数值比例折算 |
-| `mechanic`（53 种） | 原样搬运（炮台、宠物、爆炸、武器类加成……） | 道具：来源道具 (预算 − 属性行价值) / 机制数；角色：(角色总价值 − 可估值部分) / 机制数，限制 30–80 |
+| `scalar`（38 种） | 原样搬运，并按预算缩放数值（1 单位 .. 原版 1.5 倍） | 来源道具剩余价值按数值比例折算 |
+| `mechanic`（52 种） | 原样搬运（炮台、宠物、爆炸、武器类加成……） | 道具：来源道具 (预算 − 属性行价值) / 机制数；角色：(角色总价值 − 可估值部分) / 机制数，限制 30–80 |
 | `downside`（14 种） | 作为代价搬运 | 来源道具因它多拿到的正面预算（至少 3） |
 | `identity`（58 种） | 保留在角色上，不进入道具池（武器限制、初始装备、商店规则、负向机制……） | — |
-| `anchored`（3 种） | 建造者炮台的角色专属效果：不作为组件来源 | — |
+| `anchored`（4 种） | 建造者炮台的角色专属效果：不作为组件来源 | — |
 | `text`（6 种） | 纯描述行：需要的说明已合并进对应效果的同一行（“生效后此道具消失”“受到伤害时清空”），其余为音效 / 已用状态的提示 | — |
 | `excluded`（2 种） | 迷雾视野：只在迷雾事件中有意义，不搬运 | — |
 | `weapon`（35 种） | 武器专属效果：仅在“重组武器”时于同类型武器家族间整套交换 | 按等级对齐，不单独估值 |
@@ -45,6 +45,7 @@
 | `heal_on_dodge` | 1 | item | adrenaline 50% chance to heal 5 HP when dodging an attack |
 | `heal_on_kill` | 1 | item | goblet +15% chance to heal 1 HP when killing an enemy |
 | `heal_when_pickup_gold` | 1 | item | cute_monkey +8% chance to heal 1 HP when picking up a material |
+| `item_box_gold` | 1 | item | bag +15 materials when you pick up a crate |
 | `stats_below_half_health` | 2 | char | c:golem +40 % Attack Speed when you have less than 50% health / c:golem +20 % Speed when you have less than 50% health |
 | `stats_end_of_wave` | 15 | item,char | robot_arm +3 Melee Damage at the end of a wave / robot_arm +3 Engineering at the end of a wave |
 | `stats_on_fruit` | 1 | char | c:druid 33% chance to get +1 Luck when you pick up a fruit |
@@ -67,11 +68,11 @@
 | `gain_stat_for_every:free_weapon_slots` | 1 | char | c:captain +60 % XP Gain for every free weapon slot you have [+360] |
 | `gain_stat_for_every:item_bait` | 1 | char | c:fisherman +2 Harvesting for every 1 Bait you have [+0] |
 | `gain_stat_for_every:knockback` | 1 | item | coil +1 % Damage for every 1 Knockback you have [+0] |
-| `gain_stat_for_every:legendary_item` | 2 | item,char | fairy -3 HP Regeneration for every different Tier IV item you have / c:king +5 Max HP for every different Tier IV item you have [+0] |
-| `gain_stat_for_every:living_enemy` | 1 | item | community_support +1 % Attack Speed for every current living enemy [+0] |
-| `gain_stat_for_every:living_tree` | 1 | char | c:cryptid +3 HP Regeneration for every current living tree [+0] |
+| `gain_stat_for_every:legendary_item` | 2 | item,char | fairy -3 HP Regeneration for every different Tier IV item you have / c:king +5 Max HP for every different Tier IV item you have [+5] |
+| `gain_stat_for_every:living_enemy` | 1 | item | community_support +1 % Attack Speed for every current living enemy [+15] |
+| `gain_stat_for_every:living_tree` | 1 | char | c:cryptid +3 HP Regeneration for every current living tree [+3] |
 | `gain_stat_for_every:materials` | 4 | item,char | padding +1 Max HP for every 80 Materials you have [+0] / c:saver +1 % Damage for every 25 Materials you have [+1] |
-| `gain_stat_for_every:percent_player_missing_health` | 7 | char,weapon | c:vampire +2 % Damage for every 1% of missing health [+0] / c:vampire +1 % Life Steal for every 3% of missing health [+0] |
+| `gain_stat_for_every:percent_player_missing_health` | 7 | char,weapon | c:vampire +2 % Damage for every 1% of missing health [+66] / c:vampire +1 % Life Steal for every 3% of missing health [+11] |
 | `gain_stat_for_every:pet` | 1 | char | c:beast_master +2 % Speed for every permanent 1 Pet you have [+0] |
 | `gain_stat_for_every:stat_armor` | 2 | item,char | stone_skin +1 Max HP for every permanent 1 Armor you have [+0] / c:knight +2 Melee Damage for every 1 Armor you have [+0] |
 | `gain_stat_for_every:stat_crit_chance` | 1 | item | lucky_coin +2 Luck for every 1 % Crit Chance you have [+0] |
@@ -126,7 +127,6 @@
 | `hit_protection` | 1 | item | tardigrade Nullifies the damage of one hit taken every wave |
 | `increase_material_value` | 1 | char | c:buccaneer Picked up materials have +100% value |
 | `instant_gold_attracting` | 2 | item | baby_gecko +25% chance to instantly attract a material when it��s droppe / sifds_relic +100% chance to instantly attract a material when it��s dropp |
-| `item_box_gold` | 1 | item | bag +15 materials when you pick up a crate |
 | `item_hourglass` | 1 | item | hourglass Turns back time, decreasing the current wave count by 1 |
 | `items_price` | 1 | item | coupon -5 % Items Price |
 | `jellyshield_count` | 1 | item | jellyshield Spawns a Jellyshield pet that orbits around the player. It c |
@@ -160,7 +160,6 @@
 | `(EFFECT_PET_LOOTWORM)` | 1 | item | lootworm Spawns a Lootworm pet that collects materials and destroys t |
 | `(EFFECT_PET_RATZILLA)` | 1 | item | ratzilla Spawns a Ratzilla pet that deals 5 (+10%[/color |
 | `(EFFECT_PET_SCAPEGOAT)` | 1 | item | scapegoat Spawns a Scapegoat pet that moves around the map and gets ta |
-| `(EFFECT_SWAP_MAX_MIN_STAT_POS)` | 1 | item | axolotl Your highest (Max HP) and lowest (% Speed) positive primary  |
 | `(effect_garden)` | 1 | item | garden Spawns a garden that creates a fruit every 15 seconds |
 | `(effect_landmines)` | 1 | item | landmines A landmine spawns every 12 seconds dealing 10 ( |
 | `(effect_turret)` | 1 | item | turret Spawns a turret that shoots bullets dealing 10 ([color=white |
@@ -290,6 +289,7 @@
 
 | 效果 key | 次数 | 来源 | 示例 |
 | --- | --- | --- | --- |
+| `(EFFECT_SWAP_MAX_MIN_STAT_POS)` | 1 | item | axolotl Your highest (Max HP) and lowest (% Speed) positive primary  |
 | `projectile` | 4 | item | builder_turret_0 +1 projectile when you reach 30 Structure Range [0/30] / builder_turret_1 +1 projectile |
 | `projectiles` | 2 | item | builder_turret_2 +2 projectiles / builder_turret_3 +3 projectiles |
 | `stat_engineering` | 4 | item | builder_turret_0 This turret's stats are derived from your best ranged weapon / builder_turret_1 This turret's stats are derived from your best ranged weapon |

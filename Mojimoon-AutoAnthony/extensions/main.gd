@@ -54,14 +54,16 @@ func _on_enemy_died(enemy: Enemy, args: Entity.DieArgs) -> void:
 			rt.fire("burning_kill", p, pos)
 
 
-# 暴击击杀：原版在敌人受伤信号里带有是否暴击，死亡时 enemy.dead 已为真
+# 暴击 / 暴击击杀：原版在敌人受伤信号里带有是否暴击，死亡时 enemy.dead 已为真
 func _on_enemy_took_damage(enemy: Enemy, value: int, knockback_direction: Vector2, is_crit: bool, is_dodge: bool, is_protected: bool, armor_did_something: bool, args: TakeDamageArgs, hit_type: int, is_one_shot: bool) -> void:
 	._on_enemy_took_damage(enemy, value, knockback_direction, is_crit, is_dodge, is_protected, armor_did_something, args, hit_type, is_one_shot)
-	if not is_crit or not enemy.dead or _cleaning_up or args.from_player_index < 0:
+	if not is_crit or _cleaning_up or args.from_player_index < 0:
 		return
 	var rt = _aa_rt()
 	if rt != null:
-		rt.fire("crit_kill", args.from_player_index, enemy.global_position)
+		rt.fire("crit", args.from_player_index, enemy.global_position, -1, enemy if not enemy.dead else null)
+		if enemy.dead:
+			rt.fire("crit_kill", args.from_player_index, enemy.global_position)
 
 
 func _on_HalfWaveTimer_timeout() -> void:
@@ -75,10 +77,13 @@ func _on_HalfWaveTimer_timeout() -> void:
 func on_consumable_picked_up(consumable: Node, player_index: int) -> void:
 	var was_picked = consumable.already_picked_up
 	var pos = consumable.global_position
+	var data = consumable.consumable_data
 	.on_consumable_picked_up(consumable, player_index)
 	var rt = _aa_rt()
 	if rt != null and not was_picked and not _cleaning_up:
 		rt.fire("consumable", player_index, pos)
+		if data != null and (data.my_id_hash == Keys.consumable_item_box_hash or data.my_id_hash == Keys.consumable_legendary_item_box_hash):
+			rt.fire("crate", player_index, pos)
 
 
 func on_gold_picked_up(gold: Node, player_index: int) -> void:
