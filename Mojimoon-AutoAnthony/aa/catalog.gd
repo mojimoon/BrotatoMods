@@ -123,14 +123,14 @@ const INTERVAL_CHOICES = [3, 4, 5, 6, 8, 10, 12, 15]
 # ------------------------------------------------------------
 const PAYLOADS = {
 	"temp_stat": {"w": 0.4},
-	"perm_stat": {"w": 0.3},
-	"timed_stat": {"w": 0.5},
-	"heal": {"w": 0.5},
-	"gold": {"w": 0.5},
+	"perm_stat": {"w": 1.0},
+	"timed_stat": {"w": 0.3},
+	"heal": {"w": 0.3},
+	"gold": {"w": 0.3},
 	"xp": {"w": 0.3},
-	"damage": {"w": 0.6},
-	"explode": {"w": 0.5},
-	"grant": {"w": 2.5},
+	"damage": {"w": 0.4},
+	"explode": {"w": 0.4},
+	"grant": {"w": 2.0},
 }
 
 # 合法组合：触发扳机 -> 允许的载荷
