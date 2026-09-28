@@ -2809,3 +2809,36 @@ func test_107_experimental_triggers_audit() -> void:
 						print("AUDIT experimental sample: " + e.get_text(0, false))
 	print("AUDIT experimental trigger clauses: %d of %d (%s)" % [n_exp, n, str(by)])
 	_check(n_exp > 0 and n_exp < n * 0.25, "experimental triggers appear but stay a minority")
+
+
+# 几率类效果：单条效果生成时不超过 100%，价值按截断后的数值折算；叠加 / 诅咒不限制
+func test_108_percent_caps() -> void:
+	var n = 0
+	for sd in SEEDS:
+		var plan = Generator.new(_cfg(), sd).generate(isvc.items, isvc.characters, [], [])
+		for id in plan.items:
+			for e in plan.items[id].effects:
+				var cap = Catalog.pct_cap(e)
+				if cap > 0:
+					n += 1
+					_check(e.value <= cap, "%s: %s <= %d pct" % [id, e.get_text(0, false), cap])
+				if e is TriggerEffect and e.grant != null and Catalog.pct_cap(e.grant) > 0:
+					n += 1
+					_check(e.grant.value * e.value <= Catalog.pct_cap(e.grant), "single grant amount <= cap: " + e.get_text(0, false))
+	print("AUDIT capped-chance effects checked: %d" % n)
+	_check(n > 3, "capped effects appear")
+	# 希夫德圣物（100%）按超出上限的预算缩放：数值截断为 100%，价值按 100% 计（不是按想要的 150%）
+	var gen = Generator.new(_cfg(), 1)
+	gen._collect_priors(isvc.items, isvc.characters, isvc.weapons)
+	var relic = null
+	for t in 4:
+		for mech in gen.mechanics_by_tier[t]:
+			if mech.effect.key == "instant_gold_attracting" and mech.effect.value == 100:
+				relic = mech
+	_check(relic != null, "sifd's relic mechanic available")
+	if relic != null:
+		var e = gen._mechanic_copy(relic, relic.value * 1.5, "item_potato")
+		_eq(e.value, 100, "chance capped at 100")
+		_check(abs(e.get_meta("aa_value") - relic.value) < 0.01, "value follows the capped number (%.1f vs %.1f)" % [e.get_meta("aa_value"), relic.value])
+	# 战利品外星人出现几率是相对值，不受上限
+	_check(not Catalog.PCT_CAPS.has("loot_alien_chance"), "loot alien chance is relative, not capped")

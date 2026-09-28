@@ -215,7 +215,6 @@ const LEGAL = {
 	"hit_above_75": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
 	"hit_above_90": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
 	"hit_below_50": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
-	"hit_below_25": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
 }
 
 # ============================================================
@@ -259,7 +258,6 @@ const FREE_LEGAL = {
 	"hit_above_75": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
 	"hit_above_90": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
 	"hit_below_50": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
-	"hit_below_25": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
 }
 # 战斗中实时读取、可"本波获得"的机制 key（其余求和型机制只能永久获得）
 const GRANT_TEMP_KEYS = [
@@ -417,7 +415,6 @@ const ADJ_BY_TRIGGER = {
 	"first_hit_engineering": ["AA_ADJ_EAGER", "AA_ADJ_CURIOUS"],
 	"hit_above_50": ["AA_ADJ_PREDATORY", "AA_ADJ_EAGER"], "hit_above_75": ["AA_ADJ_PREDATORY", "AA_ADJ_EAGER"],
 	"hit_above_90": ["AA_ADJ_PREDATORY", "AA_ADJ_EAGER"], "hit_below_50": ["AA_ADJ_EXECUTING", "AA_ADJ_DEADLY"],
-	"hit_below_25": ["AA_ADJ_EXECUTING", "AA_ADJ_DEADLY"],
 }
 const ADJ_MECHANIC = ["AA_ADJ_ODD", "AA_ADJ_STRANGE", "AA_ADJ_CURIOUS", "AA_ADJ_ANCIENT"]
 const ADJ_SCALING = ["AA_ADJ_RESONANT", "AA_ADJ_SYNERGIC"]
@@ -668,3 +665,17 @@ static func counter_text(counter: String, perm_only: bool) -> String:
 	if COUNTER_TEXT.has(counter):
 		return COUNTER_TEXT[counter]
 	return "EFFECT_GAIN_STAT_FOR_EVERY_PERM_STAT" if perm_only else "EFFECT_GAIN_STAT_FOR_EVERY_STAT"
+
+# 几率类效果的上限（%）：单条效果超过 100% 没有意义。生成时（机制缩放、获得效果的单次数量）不超过此上限，
+# 价值按截断后的数值折算，多出的预算留给其他行。多条效果叠加 / 诅咒后超过 100% 与原版一致，不做限制。
+# 战利品外星人出现几率是相对值（+100% = 基础几率 ×2），不在此列
+const PCT_CAPS = {
+	"instant_gold_attracting": 100, "chance_double_gold": 100, "curse_locked_items": 100, "extra_item_in_crate": 100,
+}
+
+
+static func pct_cap(e) -> int:
+	if e == null:
+		return -1
+	var k = e.custom_key if e.custom_key != "" else e.key
+	return int(PCT_CAPS.get(k, -1))

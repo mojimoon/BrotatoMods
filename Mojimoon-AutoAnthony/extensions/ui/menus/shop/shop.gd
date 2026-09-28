@@ -125,3 +125,4 @@ func _aa_add_without(it, p: int, keys: Array) -> void:
 	var gear = _get_gear_container(p)
 	if gear != null:
 		gear.set_items_data(RunData.get_player_items(p))
+

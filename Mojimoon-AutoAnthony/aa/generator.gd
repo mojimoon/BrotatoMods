@@ -1050,7 +1050,10 @@ func _mechanic_copy(m: Dictionary, target: float = -1.0, holder_id: String = "")
 		var native_v = m.effect.value
 		var sg = 1 if native_v > 0 else -1
 		var want = round(abs(native_v) * target / abs(m.value))
-		var nv = int(clamp(want, 1, max(1.0, ceil(abs(native_v) * 1.5)))) * sg
+		var top = max(1.0, ceil(abs(native_v) * 1.5))
+		if Catalog.pct_cap(e) > 0:
+			top = min(top, Catalog.pct_cap(e))
+		var nv = int(clamp(want, 1, top)) * sg
 		e.value = nv
 		v = m.value * float(nv) / float(native_v)
 		# 丑牙：减速上限保持为单次减速的 4 倍（与原版诅咒逻辑一致）
@@ -1266,7 +1269,11 @@ func _pick_grant(mode: String) -> Dictionary:
 			tmpl.value = 1 if native_v > 0 else -1
 			var tags = m.get("tags", [])
 			tmpl.set_meta("aa_tags", tags)
-			return {"effect": tmpl, "unit": abs(m.value) / max(1.0, abs(native_v)), "max_units": int(max(1.0, ceil(abs(native_v) * 1.5)))}
+			var max_units = max(1.0, ceil(abs(native_v) * 1.5))
+			# 几率类：单次获得的数量不超过 100%（价值按单位计，数量受限即价值受限）
+			if Catalog.pct_cap(tmpl) > 0:
+				max_units = min(max_units, Catalog.pct_cap(tmpl))
+			return {"effect": tmpl, "unit": abs(m.value) / max(1.0, abs(native_v)), "max_units": int(max_units)}
 		elif kind == "scaling":
 			var cw = {}
 			for c in Catalog.COUNTER_TEXT:
@@ -1836,7 +1843,8 @@ func _amount_cap(c: Dictionary, trigger: String) -> int:
 		"heal":
 			return 6
 		"gold":
-			return 10 if rate <= 3 else 3
+			# 稀有扳机（拾取箱子：原版袋子 +15 材料）允许较大的单次数值
+			return 30 if rate <= 1.5 else (10 if rate <= 3 else 3)
 		"xp":
 			return 20
 		"damage", "explode":
