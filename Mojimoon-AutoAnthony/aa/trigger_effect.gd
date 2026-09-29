@@ -125,7 +125,7 @@ func _trigger_text(colored: bool) -> String:
 		"burning_kill":
 			t = tr("AA_T_BURNING_KILL") if param <= 1 else tr("AA_T_BURNING_KILL_EVERY").replace("{0}", str(param))
 		"steps":
-			t = tr("AA_T_STEPS_EVERY").replace("{0}", str(max(1, param)))
+			t = tr("AA_T_STEPS") if param <= 1 else tr("AA_T_STEPS_EVERY").replace("{0}", str(param))
 		"interval":
 			t = tr("AA_T_INTERVAL").replace("{0}", str(param))
 		"explode", "crit", "ignite", "first_hit":

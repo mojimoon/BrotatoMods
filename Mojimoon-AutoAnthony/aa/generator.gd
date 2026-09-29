@@ -1193,6 +1193,9 @@ func ban_reasons(effects: Array) -> Array:
 func main_stats(effects: Array) -> Array:
 	var vals = {}
 	for e in effects:
+		if e.get_script() == effect_script and e.key == "next_level_xp_needed" and e.value < 0:
+			vals["xp_gain"] = vals.get("xp_gain", 0.0) + e.get_meta("aa_value", 10.0)
+			continue
 		if e.value <= 0:
 			continue
 		if e is TriggerEffect:
@@ -1464,6 +1467,16 @@ func gen_char_component(target: float) -> Dictionary:
 				e4.set_meta("aa_value", val4)
 				e4.set_meta("aa_tags", [])
 				return {"effect": e4, "value": val4}
+			"xp_needed":
+				# 目标价值 -> 等价获得经验 g% -> 所需经验 X% = 100/(1+g%) - 100（反比例）
+				var g = target / Catalog.stat_w("xp_gain")
+				var x = int(round(Catalog.xp_needed_for_equiv(g) / 5.0) * 5)
+				x = int(clamp(x, Catalog.XP_NEEDED_MIN, -5))
+				var e6 = _xp_needed_effect(x)
+				var val6 = Catalog.stat_w("xp_gain") * Catalog.xp_needed_equiv_pct(x)
+				e6.set_meta("aa_value", val6)
+				e6.set_meta("aa_tags", ["xp_gain"])
+				return {"effect": e6, "value": val6}
 			"group_structures":
 				if not char_templates.has("group_structures") or target > Catalog.GROUP_STRUCTURES_VALUE * 2.5:
 					continue
@@ -1474,8 +1487,28 @@ func gen_char_component(target: float) -> Dictionary:
 	return {}
 
 
+func _xp_needed_effect(x: int) -> Effect:
+	var e = effect_script.new()
+	e.key = "next_level_xp_needed"
+	e.key_hash = Keys.generate_hash(e.key)
+	e.custom_key_hash = Keys.generate_hash("")
+	e.value = x
+	# 所需经验降低是好事：显式标注正负（原版变异体为 POSITIVE），原版诅咒据此加强好处 / 减弱代价
+	e.effect_sign = Effect.Sign.POSITIVE if x < 0 else Effect.Sign.NEGATIVE
+	return e
+
+
 # 代价：每波结束时敌人属性提高（船长），或 −1 武器栏。返回 {effects, value（折算后的补偿）}
 func gen_char_downside(comp: float, perm_mult: float) -> Dictionary:
+	# 升级所需经验 +X%：等价于获得经验降低 1 - 1/(1+X%)
+	if rng.randf() < 0.25:
+		var g = -comp * divisor / Catalog.stat_w("xp_gain")
+		if g > -80.0:
+			var x = int(clamp(round(Catalog.xp_needed_for_equiv(g) / 5.0) * 5, 5, Catalog.XP_NEEDED_MAX))
+			var ex = _xp_needed_effect(x)
+			var got_x = neg_value(abs(Catalog.stat_w("xp_gain") * Catalog.xp_needed_equiv_pct(x)))
+			ex.set_meta("aa_value", -got_x)
+			return {"effects": [ex], "value": got_x}
 	if comp >= Catalog.WEAPON_SLOT_W / divisor * 0.7 and comp <= Catalog.WEAPON_SLOT_W / divisor * 1.5 and rng.randf() < 0.3:
 		var e = _stat_effect("weapon_slot", -1)
 		var got = neg_value(Catalog.WEAPON_SLOT_W)
@@ -1662,7 +1695,7 @@ func gen_clause(target: float, perm_mult: float, negative: bool, fixed_trigger: 
 	return {}
 
 
-const NEGATIVE_TRIGGERS = ["hit", "dodge", "kill", "interval", "still", "moving", "wave_start", "consumable"]
+const NEGATIVE_TRIGGERS = ["hit", "dodge", "kill", "interval", "still", "moving", "consumable"]
 
 
 func _legal_payloads(trigger: String, negative: bool) -> Array:
@@ -1753,10 +1786,11 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 				c.cap = 1 + rng.randi() % 3
 		"damage":
 			c.stat = _pick_stat(false, [], Catalog.DAMAGE_SCALING_STATS)
-			c.value = [50, 75, 100, 150, 200][rng.randi() % 5]
+			# 单次伤害可以较小：高频扳机更应该频繁触发，而不是攒很多次打一下
+			c.value = [25, 50, 75, 100, 150][rng.randi() % 5]
 		"explode":
 			c.stat = _pick_stat(false, [], Catalog.DAMAGE_SCALING_STATS)
-			c.value = [50, 75, 100, 150][rng.randi() % 4]
+			c.value = [25, 50, 75, 100][rng.randi() % 4]
 		"vuln":
 			c.value = 5
 			c.value2 = [2, 3, 4, 5][rng.randi() % 4]
@@ -1770,10 +1804,13 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 			var cap = int(clamp(floor(budget / per_fire), 2, Catalog.PERM_CAP_MAX))
 			c.cap = cap
 			var rate = Valuation.raw_rate(trigger, 1, 100)
+			# 触发频率调到上限的约两倍，且高频扳机至少 MIN_FIRES_HIGH_FREQ 次
 			var want = cap * 2.0
+			if t.kind == "event" and t.e >= 20.0:
+				want = max(want, Catalog.MIN_FIRES_HIGH_FREQ)
 			if rate > want:
 				if t.gate == "every":
-					c.param = int(max(1, round(rate / want)))
+					c.param = int(max(1, floor(rate / want)))
 				elif t.gate == "chance" or t.kind == "shop":
 					c.chance = int(clamp(round(want / rate * 20.0) * 5, 5, 100))
 				elif trigger == "interval":
@@ -1802,7 +1839,9 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 	else:
 		# 预算不足：按扳机的门控方式降低频率
 		var ratio = budget / unit_v
-		if t.gate == "every":
+		if t.gate == "every" and ratio >= 0.1 and rng.randf() < Catalog.CHANCE_GATE_ON_EVERY:
+			c.chance = int(clamp(round(ratio * 20.0) * 5, 5, 100))
+		elif t.gate == "every":
 			c.param = int(max(1, ceil(1.0 / ratio)))
 		elif t.gate == "chance" or t.kind == "shop":
 			c.chance = int(clamp(round(ratio * 20.0) * 5, 5, 100))
@@ -1820,6 +1859,9 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 			var per_fire = abs(Valuation.clause_value(c, perm_mult)) / max(0.01, Valuation.fires_per_wave(trigger, c.param, c.chance, c.cap))
 			c.cap = int(clamp(floor(budget / max(0.01, per_fire)), 1, c.cap))
 
+	# 高频扳机门槛过高（每波实际只触发几次）：换别的组合
+	if t.kind == "event" and Catalog.TRIGGERS[trigger].e >= 20.0 and not negative 			and Valuation.raw_rate(trigger, c.param, c.chance) < Catalog.MIN_FIRES_HIGH_FREQ:
+		return {}
 	# 每隔 N 秒获得持续 M 秒的效果：M < N（否则等同于一直生效）
 	if trigger == "interval" and payload == "timed_stat":
 		c.value2 = int(clamp(c.value2, 1, max(1, c.param - 1)))

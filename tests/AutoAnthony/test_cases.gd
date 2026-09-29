@@ -2875,3 +2875,50 @@ func test_109_interval_duration_and_wave_start_grants() -> void:
 			_eq(w.grant_mode, "perm", "wave-start grant clause is permanent")
 	print("AUDIT interval timed clauses %d, wave-start grants %d" % [n_int, n_ws])
 	_check(n_int > 20 and n_ws > 20, "both shapes still generated")
+
+
+# 升级所需经验（反比例估值）、波初不生成本波属性、高频扳机不出现过高门槛
+func test_110_xp_needed_wave_start_and_frequency() -> void:
+	_check(abs(Catalog.xp_needed_equiv_pct(-67) - 203.0) < 1.0, "-67% xp needed = +203% xp gain")
+	_check(abs(Catalog.xp_needed_equiv_pct(100) + 50.0) < 0.01, "+100% xp needed = -50% xp gain")
+	var cfg = _cfg()
+	cfg.char_effects = true
+	var n_xp = [0, 0]
+	var low = 0
+	var n_hf = 0
+	var shown = 0
+	for sd in SEEDS:
+		var plan = Generator.new(cfg, sd).generate(isvc.items, isvc.characters, [], [])
+		for id in plan.items:
+			for e in plan.items[id].effects:
+				if e.key == "next_level_xp_needed" and not e is TriggerEffect:
+					n_xp[0 if e.value < 0 else 1] += 1
+					_check(e.value >= Catalog.XP_NEEDED_MIN and e.value <= Catalog.XP_NEEDED_MAX, "xp needed in range: %d" % e.value)
+					var expect = Catalog.stat_w("xp_gain") * Catalog.xp_needed_equiv_pct(e.value)
+					if e.value < 0:
+						_check(abs(e.get_meta("aa_value") - expect) < 0.01, "xp needed valued as inverse xp gain")
+						_check("xp_gain" in plan.items[id].main_stats, id + ": xp needed counts as xp gain")
+				if not e is TriggerEffect:
+					continue
+				_check(not (e.trigger == "wave_start" and e.payload == "temp_stat"), "no wave-start temp stat: " + e.get_text(0, false))
+				if Catalog.TRIGGERS[e.trigger].kind == "event" and Catalog.TRIGGERS[e.trigger].e >= 20.0 and e.value > 0 and not Catalog.ENEMY_STATS.has(e.stat):
+					n_hf += 1
+					var r = Valuation.raw_rate(e.trigger, e.param, e.chance)
+					if r < Catalog.MIN_FIRES_HIGH_FREQ - 0.01:
+						low += 1
+						print("AUDIT low-frequency high-freq clause: " + e.get_text(0, false))
+					if e.payload in ["damage", "heal", "gold", "xp", "explode"] and shown < 8:
+						shown += 1
+						print("AUDIT high-freq payload sample: " + e.get_text(0, false))
+	print("AUDIT xp-needed lines: %d good, %d downside; high-freq clauses %d (below min %d)" % [n_xp[0], n_xp[1], n_hf, low])
+	_check(n_xp[0] > 0 and n_xp[1] > 0, "xp needed appears as upside and downside")
+	_eq(low, 0, "high-frequency triggers fire at least MIN_FIRES_HIGH_FREQ times per wave")
+	# 运行时：多条叠加后所需经验不低于原版的 10%
+	m.start_new_run()
+	var h = Keys.next_level_xp_needed_hash
+	var saved = rd.get_player_effects(0)[h]
+	rd.get_player_effects(0)[h] = -150
+	var need = rd.get_next_level_xp_needed(0)
+	_check(need > 0 and abs(need - rd.get_xp_needed(rd.get_player_level(0) + 1) * 0.1) < 0.01, "stacked xp needed floored at -90%% (%s)" % str(need))
+	rd.get_player_effects(0)[h] = saved
+	m.on_menu_reset()

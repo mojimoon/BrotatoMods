@@ -71,10 +71,17 @@ const DAMAGE_SCALING_STATS = [
 const TEMP_STAT_BANNED = ["stat_harvesting", "xp_gain", "pickup_range", "consumable_heal"]
 
 # 每点"每波持续获得量"的价值
-const HEAL_W = 1.2		# 每波回复 1 点生命
-const GOLD_W = 1.0		# 每波获得 1 材料
-const XP_W = 0.3		# 每波获得 1 经验
-const DMG_W = 0.055		# 每波造成 1 点伤害
+# 下调（原值 1.2 / 1.0 / 0.3 / 0.055 由少数原版道具反推，与属性行比明显偏高）：
+#   回血：+1 生命再生（权重 2.8）约每波回复 12 点 -> 每点约 0.25；按 0.5 计（触发回血可在需要时集中）
+#   伤害：+1 远程伤害（权重 5）约作用于每波 300+ 次命中 -> 每点伤害约 0.015；按 0.022 计（直接伤害无视护甲 / 必中）
+const HEAL_W = 0.5		# 每波回复 1 点生命
+const GOLD_W = 0.75		# 每波获得 1 材料
+const XP_W = 0.25		# 每波获得 1 经验
+const DMG_W = 0.022		# 每波造成 1 点伤害
+# 高频扳机（每波 20 次以上）的最低有效触发次数：更低就换别的组合，避免"每命中 30 次"这类门槛过高的条款
+const MIN_FIRES_HIGH_FREQ = 6.0
+# 高频扳机预算不足时，改用几率门控（"击杀敌人时（25% 几率）"，类似幸运币）而不是"每 N 次"的概率
+const CHANCE_GATE_ON_EVERY = 0.5
 const EXPLOSION_TARGETS = 2.5	# 爆炸平均命中数
 
 # ------------------------------------------------------------
@@ -189,7 +196,8 @@ const LEGAL = {
 	"gold": ["temp_stat", "timed_stat", "heal", "xp", "damage", "explode"],
 	"heal": ["temp_stat", "timed_stat", "gold", "damage", "explode"],
 	"level_up": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "damage", "explode"],
-	"wave_start": ["temp_stat", "perm_stat", "gold"],
+	# 每波开始时"本波 +X 属性 / 本波获得"= 整波持有，与直接写在道具上无异：不生成
+	"wave_start": ["perm_stat", "gold"],
 	"wave_end": ["perm_stat", "gold", "xp"],
 	"interval": ["temp_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode"],
 	"still": ["temp_stat"],
@@ -231,7 +239,7 @@ const FREE_LEGAL = {
 	"gold": ["temp_stat", "perm_stat", "timed_stat", "heal", "xp", "damage", "explode", "grant"],
 	"heal": ["temp_stat", "perm_stat", "timed_stat", "gold", "xp", "damage", "explode", "grant"],
 	"level_up": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "damage", "explode", "grant"],
-	"wave_start": ["temp_stat", "perm_stat", "timed_stat", "gold", "xp", "grant"],
+	"wave_start": ["perm_stat", "timed_stat", "gold", "xp", "grant"],
 	"wave_end": ["perm_stat", "gold", "xp", "grant"],
 	"interval": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant"],
 	"still": ["temp_stat", "grant"],
@@ -628,7 +636,21 @@ const BURN_BONUS_W = 0.12		# 燃烧目标额外伤害，每 1%
 const PACIFIST_W = 0.4			# 每 0.01 材料+经验 / 存活敌人（波末约 30 个存活敌人）
 const WEAPON_SLOT_W = 25.0
 const GROUP_STRUCTURES_VALUE = 6.0
-const CHAR_COMPONENT_WEIGHTS = {"class_bonus": 0.5, "burn_bonus": 0.15, "pacifist": 0.15, "weapon_slot": 0.15, "group_structures": 0.05}
+const CHAR_COMPONENT_WEIGHTS = {"class_bonus": 0.5, "burn_bonus": 0.15, "pacifist": 0.15, "weapon_slot": 0.15, "group_structures": 0.05, "xp_needed": 0.15}
+# 升级所需经验 ±X%（变异体 / 宝宝 / 技术法师 / 船长）：等价于获得经验 ×1/(1+X%)，非线性
+#   -67% 所需经验 = +200% 获得经验；+100% 所需经验 = -50% 获得经验
+const XP_NEEDED_MIN = -60		# 单条最多 -60%（= +150% 经验）
+const XP_NEEDED_MAX = 100		# 代价最多 +100%（= -50% 经验）
+# 运行时总和的下限：多条叠加（或诅咒放大）后所需经验不低于原版的 10%，避免 ≤ -100% 时除零 / 负数
+const XP_NEEDED_TOTAL_FLOOR = -90
+
+
+static func xp_needed_equiv_pct(x: float) -> float:
+	return 100.0 / (1.0 + max(-99.0, x) / 100.0) - 100.0
+
+
+static func xp_needed_for_equiv(g: float) -> float:
+	return 100.0 / (1.0 + max(-99.0, g) / 100.0) - 100.0
 
 
 # T4 道具不出现 +收获（与原版一致）
