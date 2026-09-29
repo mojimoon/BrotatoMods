@@ -485,7 +485,7 @@ func _collect_priors(items: Array, characters: Array, weapons: Array) -> void:
 		special_share_by_tier[t] = special_share_by_tier[t] / n
 		if lines_by_tier[t].empty():
 			lines_by_tier[t] = [1, 2]
-	_collect_char_templates(characters)
+	_collect_char_templates(characters, items)
 	if cfg.get("char_effects", false):
 		_collect_character_mechanics(characters, effect_keys)
 
@@ -838,7 +838,7 @@ func _generate_item_once(item, force_special: bool) -> Dictionary:
 				if nw.value > main_line.value:
 					main_line = {"value": nw.value, "adj": _adj(Catalog.ADJ_BY_TRIGGER["wave_start"])}
 		elif kind == "char":
-			var ch = gen_char_component(budget * share)
+			var ch = gen_char_component(budget * share, item)
 			if not ch.empty():
 				effects.push_back(ch.effect)
 				budget -= ch.value
@@ -1193,6 +1193,9 @@ func ban_reasons(effects: Array) -> Array:
 func main_stats(effects: Array) -> Array:
 	var vals = {}
 	for e in effects:
+		if Catalog.WEAPON_COUNTERS.has(e.custom_key) and e.value > 0:
+			vals[e.key] = vals.get(e.key, 0.0) + e.get_meta("aa_value", 5.0)
+			continue
 		if e.get_script() == effect_script and e.key == "next_level_xp_needed" and e.value < 0:
 			vals["xp_gain"] = vals.get("xp_gain", 0.0) + e.get_meta("aa_value", 10.0)
 			continue
@@ -1398,11 +1401,29 @@ func _loot_alien_value() -> float:
 var char_templates: Dictionary = {}		# 原版角色效果模板：class_bonus（列表）/ pacifist / burn_bonus / group_structures
 
 
-func _collect_char_templates(characters: Array) -> void:
-	char_templates = {"class_bonus": []}
+func _collect_char_templates(characters: Array, items: Array = []) -> void:
+	char_templates = {"class_bonus": [], "weapon_counters": {}}
 	var class_script = load("res://effects/items/class_bonus_effect.gd")
+	for src in items + characters:
+		for e in src.effects:
+			if Catalog.WEAPON_COUNTERS.has(e.custom_key) and not char_templates.weapon_counters.has(e.custom_key):
+				char_templates.weapon_counters[e.custom_key] = e
 	for ch in characters:
 		for e in ch.effects:
+			if e.key == "cryptid" and e.value > 0:
+				char_templates["cryptid"] = e
+			elif e.custom_key == "charm_on_hit" and e.key != "":
+				char_templates["charm"] = e
+			elif e.key == "beast_master_effect":
+				char_templates["beast_master"] = e
+			elif e.key == "map_size":
+				char_templates["map_size"] = e
+			elif e.custom_key == "specific_items_price" and e.value < 0:
+				char_templates["self_price"] = e
+			elif e.key == "weapons_price" and e.value < 0:
+				char_templates["weapons_price"] = e
+			elif e.key == "items_price" and e.value > 0:
+				char_templates["items_price_up"] = e
 			if e.get_script() == class_script:
 				char_templates.class_bonus.push_back(e)
 			elif e.key == "pacifist" and e.value > 0:
@@ -1413,10 +1434,76 @@ func _collect_char_templates(characters: Array) -> void:
 				char_templates["group_structures"] = e
 
 
-func gen_char_component(target: float) -> Dictionary:
-	for _attempt in 4:
-		var kind = _pick_weighted(Catalog.CHAR_COMPONENT_WEIGHTS)
+func gen_char_component(target: float, holder = null) -> Dictionary:
+	var weights = Catalog.CHAR_COMPONENT_WEIGHTS.duplicate()
+	if cfg.get("char_effects", false):
+		for k in Catalog.MORE_CHAR_COMPONENT_WEIGHTS:
+			weights[k] = Catalog.MORE_CHAR_COMPONENT_WEIGHTS[k]
+	for _attempt in 6:
+		var kind = _pick_weighted(weights)
 		match kind:
+			"cryptid":
+				if not char_templates.has("cryptid"):
+					continue
+				var per = Catalog.CRYPTID_TREES * (Catalog.GOLD_W + Catalog.XP_W)
+				var vc = int(clamp(round(target / per), 1, 20))
+				var ec = char_templates.cryptid.duplicate()
+				ec.value = vc
+				var valc = vc * per
+				ec.set_meta("aa_value", valc)
+				ec.set_meta("aa_tags", ["economy", "exploration"])
+				return {"effect": ec, "value": valc}
+			"charm":
+				if not char_templates.has("charm"):
+					continue
+				var vh = int(clamp(round(target / Catalog.CHARM_W / 5.0) * 5, 5, 75))
+				var eh = char_templates.charm.duplicate()
+				eh.value = vh
+				var valh = vh * Catalog.CHARM_W
+				eh.set_meta("aa_value", valh)
+				eh.set_meta("aa_tags", [])
+				return {"effect": eh, "value": valh}
+			"beast_master":
+				if not char_templates.has("beast_master") or target > Catalog.BEAST_MASTER_VALUE * 2.5:
+					continue
+				var eb = char_templates.beast_master.duplicate()
+				eb.set_meta("aa_value", Catalog.BEAST_MASTER_VALUE)
+				eb.set_meta("aa_tags", ["pet"])
+				return {"effect": eb, "value": Catalog.BEAST_MASTER_VALUE}
+			"map_size":
+				# 价值约为 0：作为附带行（只占很少的预算）
+				if not char_templates.has("map_size"):
+					continue
+				var em = char_templates.map_size.duplicate()
+				em.value = Catalog.MAP_SIZE_VALUES[rng.randi() % Catalog.MAP_SIZE_VALUES.size()]
+				var valm = abs(em.value) * Catalog.MAP_SIZE_W
+				em.set_meta("aa_value", valm)
+				em.set_meta("aa_tags", [])
+				return {"effect": em, "value": valm}
+			"self_price":
+				if not char_templates.has("self_price") or holder == null:
+					continue
+				var es = char_templates.self_price.duplicate()
+				es.key = holder.my_id
+				es.key_hash = Keys.generate_hash(holder.my_id)
+				es.value = -100
+				var vals = item_budget(holder) * Catalog.SELF_PRICE_SHARE
+				if vals > target * 1.6:
+					continue
+				es.set_meta("aa_value", vals)
+				es.set_meta("aa_tags", ["economy"])
+				return {"effect": es, "value": vals}
+			"weapons_price":
+				if not char_templates.has("weapons_price"):
+					continue
+				var per_w = Catalog.WEAPON_SPEND_PER_WAVE / 100.0 * Catalog.GOLD_W
+				var vw = int(clamp(round(target / per_w / 5.0) * 5, 5, 50))
+				var ew = char_templates.weapons_price.duplicate()
+				ew.value = -vw
+				var valw = vw * per_w
+				ew.set_meta("aa_value", valw)
+				ew.set_meta("aa_tags", ["economy"])
+				return {"effect": ew, "value": valw}
 			"class_bonus":
 				if char_templates.class_bonus.empty() or ItemService.sets.empty():
 					continue
@@ -1487,6 +1574,40 @@ func gen_char_component(target: float) -> Dictionary:
 	return {}
 
 
+# 道具价格每 1% 的价值：取原版优惠券（-5% 道具价格）在机制池中的单位价值
+func _items_price_value_per_pct() -> float:
+	for t in 4:
+		for m in mechanics_by_tier[t]:
+			if m.effect.key == "items_price" and m.effect.value != 0:
+				return abs(m.value) / abs(m.effect.value)
+	return 0.0
+
+
+# 武器数量计数："每把 [不同 / 所有 / IV 级 / I 级] 武器 +X [属性]"（原版角色 / 道具效果）
+func gen_weapon_counter(target: float, negative: bool) -> Dictionary:
+	var kinds = char_templates.get("weapon_counters", {}).keys()
+	if kinds.empty():
+		return {}
+	for _attempt in 4:
+		var kind = kinds[rng.randi() % kinds.size()]
+		var stat = _pick_stat(negative, [], Catalog.SCALING_STATS)
+		var unit = Catalog.stat_unit(stat)
+		var per = Catalog.stat_w(stat) * unit * Catalog.WEAPON_COUNTERS[kind]
+		var n = int(round(abs(target) / per))
+		if n < 1 or n > 6:
+			continue
+		var e = char_templates.weapon_counters[kind].duplicate()
+		e.key = stat
+		e.key_hash = Keys.generate_hash(stat)
+		e.value = n * unit * (-1 if negative else 1)
+		e.effect_sign = Effect.Sign.FROM_VALUE
+		var val = n * per
+		e.set_meta("aa_value", -val if negative else val)
+		e.set_meta("aa_tags", [stat] if not negative else [])
+		return {"effect": e, "value": -val if negative else val}
+	return {}
+
+
 func _xp_needed_effect(x: int) -> Effect:
 	var e = effect_script.new()
 	e.key = "next_level_xp_needed"
@@ -1500,8 +1621,19 @@ func _xp_needed_effect(x: int) -> Effect:
 
 # 代价：每波结束时敌人属性提高（船长），或 −1 武器栏。返回 {effects, value（折算后的补偿）}
 func gen_char_downside(comp: float, perm_mult: float) -> Dictionary:
-	# 升级所需经验 +X%：等价于获得经验降低 1 - 1/(1+X%)
-	if rng.randf() < 0.25:
+	var more = cfg.get("char_effects", false)
+	# 更多角色效果：道具价格 +X%（变异体 / 节俭者）
+	if more and char_templates.has("items_price_up") and rng.randf() < Catalog.MORE_CHAR_DOWNSIDE_CHANCE * 0.5:
+		var per_p = _items_price_value_per_pct()
+		if per_p > 0.0:
+			var xp_ = int(clamp(round(comp * divisor / per_p / 5.0) * 5, 5, 50))
+			var ep = char_templates.items_price_up.duplicate()
+			ep.value = xp_
+			var got_p = neg_value(per_p * xp_)
+			ep.set_meta("aa_value", -got_p)
+			return {"effects": [ep], "value": got_p}
+	# 更多角色效果：升级所需经验 +X%：等价于获得经验降低 1 - 1/(1+X%)
+	if more and rng.randf() < Catalog.MORE_CHAR_DOWNSIDE_CHANCE * 0.5:
 		var g = -comp * divisor / Catalog.stat_w("xp_gain")
 		if g > -80.0:
 			var x = int(clamp(round(Catalog.xp_needed_for_equiv(g) / 5.0) * 5, 5, Catalog.XP_NEEDED_MAX))
@@ -1608,6 +1740,10 @@ static func _nice_nb(raw: float) -> int:
 # 计数型："每有 [计数] 获得 [属性]"，计数与属性自由搭配。返回 {effect, value}（value 带符号）
 # ============================================================
 func gen_scaling(target: float, negative: bool) -> Dictionary:
+	if rng.randf() < Catalog.WEAPON_COUNTER_CHANCE:
+		var wc = gen_weapon_counter(target, negative)
+		if not wc.empty():
+			return wc
 	for _attempt in 6:
 		var cw = {}
 		for c in Catalog.COUNTER_TEXT:
@@ -2063,6 +2199,13 @@ func handling_of(e, src) -> String:
 	if e.get_script() == effect_script and e.key == "":
 		return "text"
 	var k = e.custom_key if e.custom_key != "" else e.key
+	if Catalog.WEAPON_COUNTERS.has(e.custom_key):
+		return "weapon_counter"
+	if k in ["cryptid", "charm_on_hit", "beast_master_effect", "map_size", "specific_items_price", "weapons_price",
+			"group_structures", "next_level_xp_needed"] or (k == "items_price" and e.value > 0):
+		return "char_more"
+	if k in ["pacifist", "bonus_non_elemental_damage_against_burning_targets", "weapon_slot"] or e.get_script() == load("res://effects/items/class_bonus_effect.gd"):
+		return "char_component"
 	if src is CharacterData:
 		if not _is_transferable_character_mechanic(e, PlayerRunData.init_effects()):
 			return "identity"

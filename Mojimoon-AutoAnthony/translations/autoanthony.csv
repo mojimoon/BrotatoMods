@@ -75,7 +75,7 @@ key,en,fr,zh,ja,ko,zh_TW,ru,pl,es,pt,de,tr,it
 "AA_UI_FIXED_SEED","Fixed seed","","固定种子","","","固定种子","","","","","","",""
 "AA_UI_RANDOM","Random","","随机","","","随机","","","","","","",""
 "AA_UI_PREVIEW","Preview items","","预览道具","","","预览道具","","","","","","",""
-"AA_UI_CHAR_EFFECTS","Character effects on items","","道具含角色效果","","","道具含角色效果","","","","","","",""
+"AA_UI_CHAR_EFFECTS","More character effects","","更多角色效果","","","更多角色效果","","","","","","",""
 "AA_UI_RENAME","Rename items","","重组名称","","","重组名称","","","","","","",""
 "AA_UI_AVG","Average value","","平均数值","","","平均数值","","","","","","",""
 "AA_UI_VARIANCE","Variance","","浮动范围","","","浮动范围","","","","","","",""

@@ -10,10 +10,13 @@
 | `scaling`（27 种） | 计数 × 属性自由搭配重新生成（原版 GainStatForEveryStatEffect） | 目标属性权重 × 数值 × 计数期望 / 每 N；计数期望由原版道具校准 |
 | `next_wave`（1 种） | 下一波（芹菜茶 / 孔雀）：一次性，下一波开始时生效；约一半附带同一行为下的负面行（敌人属性或自身属性降低） | 一波的价值 = 整局价值 / 剩余波数（≈ 2 × 永久累积倍率 − 1）；孔雀校准吻合 |
 | `gain_mod`（3 种） | 属性修改 ±XX% 重新生成（原版 StatGainsModificationEffect） | 属性权重 × 属性期望总量 × XX% |
-| `scalar`（38 种） | 原样搬运，并按预算缩放数值（1 单位 .. 原版 1.5 倍） | 来源道具剩余价值按数值比例折算 |
-| `mechanic`（52 种） | 原样搬运（炮台、宠物、爆炸、武器类加成……） | 道具：来源道具 (预算 − 属性行价值) / 机制数；角色：(角色总价值 − 可估值部分) / 机制数，限制 30–80 |
+| `scalar`（37 种） | 原样搬运，并按预算缩放数值（1 单位 .. 原版 1.5 倍） | 来源道具剩余价值按数值比例折算 |
+| `mechanic`（49 种） | 原样搬运（炮台、宠物、爆炸、武器类加成……） | 道具：来源道具 (预算 − 属性行价值) / 机制数；角色：(角色总价值 − 可估值部分) / 机制数，限制 30–80 |
 | `downside`（14 种） | 作为代价搬运 | 来源道具因它多拿到的正面预算（至少 3） |
-| `identity`（58 种） | 保留在角色上，不进入道具池（武器限制、初始装备、商店规则、负向机制……） | — |
+| `weapon_counter`（4 种） | 武器数量计数（常规池）："每把 [不同 / 所有 / IV 级 / I 级] 武器 +X [属性]"，属性与数值重新生成 | 属性权重 × 数值 × 计数期望（不同武器 3.5 / 武器 5 / IV 级 1 / I 级 1.2） |
+| `char_component`（5 种） | 角色效果（常规池）：武器类型加成、对燃烧目标额外伤害、和平主义者、+武器栏 | 按原版角色数值与对应属性 / 材料估值 |
+| `char_more`（9 种） | 更多角色效果（选项开启时进入道具池）：构筑物聚集、升级所需经验 ±、神秘生物（每棵存活的树）、几率魅惑、宠物伤害缩放、地图大小 ±、自身价格 −100%、武器价格 −X%、道具价格 +X%（代价） | 升级所需经验按反比例（等价获得经验）；地图大小价值约为 0；其余按材料 / 经验 / 伤害估值 |
+| `identity`（44 种） | 保留在角色上，不进入道具池（武器限制、初始装备、商店规则、负向机制……） | — |
 | `anchored`（4 种） | 建造者炮台的角色专属效果：不作为组件来源 | — |
 | `text`（6 种） | 纯描述行：需要的说明已合并进对应效果的同一行（“生效后此道具消失”“受到伤害时清空”），其余为音效 / 已用状态的提示 | — |
 | `excluded`（2 种） | 迷雾视野：只在迷雾事件中有意义，不搬运 | — |
@@ -68,11 +71,11 @@
 | `gain_stat_for_every:free_weapon_slots` | 1 | char | c:captain +60 % XP Gain for every free weapon slot you have [+360] |
 | `gain_stat_for_every:item_bait` | 1 | char | c:fisherman +2 Harvesting for every 1 Bait you have [+0] |
 | `gain_stat_for_every:knockback` | 1 | item | coil +1 % Damage for every 1 Knockback you have [+0] |
-| `gain_stat_for_every:legendary_item` | 2 | item,char | fairy -3 HP Regeneration for every different Tier IV item you have / c:king +5 Max HP for every different Tier IV item you have [+5] |
-| `gain_stat_for_every:living_enemy` | 1 | item | community_support +1 % Attack Speed for every current living enemy [+15] |
-| `gain_stat_for_every:living_tree` | 1 | char | c:cryptid +3 HP Regeneration for every current living tree [+3] |
+| `gain_stat_for_every:legendary_item` | 2 | item,char | fairy -3 HP Regeneration for every different Tier IV item you have / c:king +5 Max HP for every different Tier IV item you have [+0] |
+| `gain_stat_for_every:living_enemy` | 1 | item | community_support +1 % Attack Speed for every current living enemy [+0] |
+| `gain_stat_for_every:living_tree` | 1 | char | c:cryptid +3 HP Regeneration for every current living tree [+0] |
 | `gain_stat_for_every:materials` | 4 | item,char | padding +1 Max HP for every 80 Materials you have [+0] / c:saver +1 % Damage for every 25 Materials you have [+1] |
-| `gain_stat_for_every:percent_player_missing_health` | 7 | char,weapon | c:vampire +2 % Damage for every 1% of missing health [+66] / c:vampire +1 % Life Steal for every 3% of missing health [+11] |
+| `gain_stat_for_every:percent_player_missing_health` | 7 | char,weapon | c:vampire +2 % Damage for every 1% of missing health [+0] / c:vampire +1 % Life Steal for every 3% of missing health [+0] |
 | `gain_stat_for_every:pet` | 1 | char | c:beast_master +2 % Speed for every permanent 1 Pet you have [+0] |
 | `gain_stat_for_every:stat_armor` | 2 | item,char | stone_skin +1 Max HP for every permanent 1 Armor you have [+0] / c:knight +2 Melee Damage for every 1 Armor you have [+0] |
 | `gain_stat_for_every:stat_crit_chance` | 1 | item | lucky_coin +2 Luck for every 1 % Crit Chance you have [+0] |
@@ -107,7 +110,6 @@
 
 | 效果 key | 次数 | 来源 | 示例 |
 | --- | --- | --- | --- |
-| `bonus_non_elemental_damage_against_burning_targets` | 1 | char | c:chef +200% damage from non elemental sources against burning targ |
 | `bounce` | 1 | item | ricochet Your projectiles gain +1 bounce |
 | `burning_cooldown_reduction` | 1 | item | eyes_surgery Burning activates 20% faster |
 | `burning_spread` | 1 | item | snake Burning spreads to an additional nearby enemy |
@@ -168,7 +170,6 @@
 | `(effect_turret_laser)` | 1 | item | turret_laser Spawns a turret that shoots piercing bullets dealing 20 ([co |
 | `(effect_turret_rocket)` | 1 | item | turret_rocket Spawns a turret that shoots explosive bullets dealing 25 ([c |
 | `(effect_tyler)` | 1 | item | tyler Spawns a little guy that slowly shoots 10 piercing lightning |
-| `EFFECT_WEAPON_CLASS_BONUS` | 4 | char | c:brawler +50 % Attack Speed with Unarmed weapons / c:wildling +30 % Life Steal with Primitive weapons |
 | `alien_eyes` | 1 | item | alien_eyes Shoots 6 alien eyes around you every 3 seconds dealing 8 ([c |
 | `bonus_damage_against_targets_above_hp` | 1 | item | small_fish +10% damage against targets above 75% health |
 | `bonus_weapon_class_damage_against_cursed_enemies` | 1 | char | c:sailor +200% damage with Naval weapons against cursed enemies |
@@ -177,7 +178,6 @@
 | `consumable_heal_over_time` | 1 | item | jerky Consumables heal you over 4 seconds instead of instantly |
 | `dodge_cap` | 4 | item,char | ghost_outfit Dodge is capped at 70% / c:ghost Dodge is capped at 90% |
 | `duplicate_item` | 1 | item | mirror Duplicates the next item you get from the shop (item limits  |
-| `effect_weapon_class_bonus` | 3 | char | c:crazy +100 Range with Precise weapons / c:artificer +100 % Damage with Tool weapons |
 | `enemy_percent_damage_taken` | 2 | item,char | ice_cube Enemies take 10% more damage for 3 seconds when first hit by / c:diver Enemies take 300% more damage for 3 seconds when hit by Rang |
 | `explode_on_consumable_burning` | 1 | char | c:chef Consumables explode for 5x1 (+100%[img= |
 | `explode_on_overkill` | 1 | char | c:ogre Enemies taking double their max health as damage explode for |
@@ -198,7 +198,6 @@
 | `remove_speed` | 1 | item | ugly_tooth Hitting an enemy removes 5% of their speed. Max 20% |
 | `structures_can_crit` | 1 | item | pile_of_books Your structures can crit |
 | `structures_cooldown_reduction` | 1 | item | improved_tools Increases the attack speed of your structures by 0% ([color= |
-| `unique_weapon_effects` | 3 | item | focus -3 % Attack Speed for every different weapon you have [+0] / spider +6 % Attack Speed for every different weapon you have [+0] |
 | `upgrade_random_weapon` | 1 | item | anvil A random weapon is upgraded when entering a shop. If you hav |
 | `wandering_bot` | 1 | item | wandering_bot Spawns a little bot that slows down nearby enemies |
 | `weapon_scaling_stats` | 2 | item | frozen_heart Weapon and pet damage additionally scales with 10% Elemental / nail Weapon and pet damage additionally scales with 20% Engineeri |
@@ -222,21 +221,50 @@
 | `piercing_damage` | 1 | item | sharp_bullet -20% Piercing Damage |
 | `speed_cap` | 1 | item | shackles Your Speed is capped at its current value [5] |
 
+### `weapon_counter`
+
+| 效果 key | 次数 | 来源 | 示例 |
+| --- | --- | --- | --- |
+| `additional_weapon_effects` | 1 | char | c:multitasker -5 % Damage for every weapon you have [+0] |
+| `tier_i_weapon_effects` | 2 | char | c:king -15 % Damage for every Tier I weapon you have [+0] / c:king -15 % Attack Speed for every Tier I weapon you have [+0] |
+| `tier_iv_weapon_effects` | 2 | char | c:king +25 % Damage for every Tier IV weapon you have [+0] / c:king +25 % Attack Speed for every Tier IV weapon you have [+0] |
+| `unique_weapon_effects` | 4 | item,char | focus -3 % Attack Speed for every different weapon you have [+0] / spider +6 % Attack Speed for every different weapon you have [+0] |
+
+### `char_component`
+
+| 效果 key | 次数 | 来源 | 示例 |
+| --- | --- | --- | --- |
+| `EFFECT_WEAPON_CLASS_BONUS` | 4 | char | c:brawler +50 % Attack Speed with Unarmed weapons / c:wildling +30 % Life Steal with Primitive weapons |
+| `bonus_non_elemental_damage_against_burning_targets` | 1 | char | c:chef +200% damage from non elemental sources against burning targ |
+| `effect_weapon_class_bonus` | 3 | char | c:crazy +100 Range with Precise weapons / c:artificer +100 % Damage with Tool weapons |
+| `pacifist` | 1 | char | c:pacifist Gain 0.65 material and XP for every living enemy at the end  |
+| `weapon_slot` | 5 | char | c:multitasker You can equip up to 12 weapons at a time / c:one_arm You can only equip one weapon at a time |
+
+### `char_more`
+
+| 效果 key | 次数 | 来源 | 示例 |
+| --- | --- | --- | --- |
+| `beast_master_effect` | 1 | char | c:beast_master Pet damage also scales with Melee Damage, Ranged Damage, Ele |
+| `charm_on_hit` | 1 | char | c:romantic Hitting an enemy that has less than 25% health has a 7% ([co |
+| `cryptid` | 1 | char | c:cryptid Gain 12 material and XP for every living tree at the end of  |
+| `group_structures` | 1 | char | c:engineer Structures spawn close to each other |
+| `items_price` | 4 | char | c:mutant +50 % Items Price / c:saver +50 % Items Price |
+| `map_size` | 2 | char | c:old -33% Map Size / c:explorer +33% Map Size |
+| `next_level_xp_needed` | 4 | char | c:mutant -66% XP required to level up / c:baby +130% XP required to level up |
+| `specific_items_price` | 2 | char | c:fisherman -100% Bait price / c:diver -100% Harpoon Gun price |
+| `weapons_price` | 1 | char | c:arms_dealer -95% Weapons Price |
+
 ### `identity`
 
 | 效果 key | 次数 | 来源 | 示例 |
 | --- | --- | --- | --- |
 | `DIE_IN_ONE_HIT` | 1 | char | c:wounded This character dies in One Hit |
 | `accuracy` | 1 | char | c:renegade -50% Accuracy |
-| `additional_weapon_effects` | 1 | char | c:multitasker -5 % Damage for every weapon you have [+0] |
 | `all_weapons_count_for_sets` | 1 | char | c:vagabond Equipped weapons always contribute to the class bonuses of o |
-| `beast_master_effect` | 1 | char | c:beast_master Pet damage also scales with Melee Damage, Ranged Damage, Ele |
 | `boosted_wanted_item_tag` | 1 | char | c:beast_master  |
 | `can_attack_while_moving` | 1 | char | c:soldier You can��t attack while moving |
-| `charm_on_hit` | 1 | char | c:romantic Hitting an enemy that has less than 25% health has a 7% ([co |
 | `convert_bonus_gold` | 1 | char | c:builder Every 5 uncollected materials are converted into 1 % Structu |
 | `convert_stats_end_of_wave` | 1 | char | c:demon 50% of your Materials are converted into Max HP at the end o |
-| `cryptid` | 1 | char | c:cryptid Gain 12 material and XP for every living tree at the end of  |
 | `cursed_starting_item` | 1 | char | c:creature You start with 1 cursed Fish Hook |
 | `destroy_weapons` | 1 | char | c:arms_dealer All of your weapons are destroyed when entering a shop |
 | `disable_item_locking` | 1 | char | c:gangster Can't lock items |
@@ -246,44 +274,34 @@
 | `enemy_speed` | 2 | char | c:old -25 % Enemy Speed / c:explorer +10 % Enemy Speed |
 | `gain_pct_gold_start_wave` | 1 | char | c:entrepreneur -100% of your materials at the start of waves |
 | `gold_drops` | 3 | char | c:farmer -50% materials dropped / c:streamer -50% materials dropped |
-| `group_structures` | 1 | char | c:engineer Structures spawn close to each other |
 | `guaranteed_shop_items` | 1 | char | c:fisherman Shops always sell a Bait |
 | `hp_shop` | 1 | char | c:demon You buy items using Max HP instead of materials |
 | `item_steals` | 1 | char | c:gangster Can steal 1 item per shop |
 | `item_steals_spawns_random_elite` | 1 | char | c:gangster Stealing from the shop can spawn an elite |
-| `items_price` | 6 | char | c:mutant +50 % Items Price / c:saver +50 % Items Price |
+| `items_price` | 2 | char | c:entrepreneur -25 % Items Price / c:baby -20 % Items Price |
 | `level_upgrades_modifications` | 1 | char | c:captain +100% stats gained from level upgrades |
 | `lose_hp_per_second` | 1 | char | c:sick You take 1 damage per second (does not give invulnerability  |
-| `map_size` | 2 | char | c:old -33% Map Size / c:explorer +33% Map Size |
 | `max_melee_weapons` | 1 | char | c:generalist You can only equip 3 melee weapons and 3 ranged weapons at a |
 | `max_ranged_weapons` | 1 | char | c:generalist  |
 | `max_turret_count` | 1 | char | c:builder  |
 | `max_weapon_tier` | 1 | char | c:wildling You can��t equip weapons above tier II |
 | `min_weapon_tier` | 2 | char | c:knight You can only equip tier II weapons or above / c:sailor You can only equip tier II weapons or above |
 | `minimum_weapons_in_shop` | 2 | char | c:arms_dealer Shops always sell at least one weapon / c:baby Shops always sell at least one weapon |
-| `next_level_xp_needed` | 4 | char | c:mutant -66% XP required to level up / c:baby +130% XP required to level up |
 | `no_duplicate_weapons` | 1 | char | c:vagabond You can't equip two of the same weapon at the same time |
 | `no_heal` | 1 | char | c:golem You can��t heal in any way |
 | `no_melee_weapons` | 2 | char | c:ranger You can't equip melee weapons / c:renegade You can't equip melee weapons |
 | `no_ranged_weapons` | 4 | char | c:gladiator You can't equip ranged weapons / c:knight You can't equip ranged weapons |
 | `number_of_enemies` | 2 | char | c:old -10% Enemies / c:jack -70% Enemies |
-| `pacifist` | 1 | char | c:pacifist Gain 0.65 material and XP for every living enemy at the end  |
 | `poisoned_fruit` | 1 | char | c:druid 33% of fruits are poisoned and hurt you (ignores Dodge and A |
 | `remove_shop_items` | 2 | char | c:builder You can't have structures / c:gangster  |
-| `specific_items_price` | 2 | char | c:fisherman -100% Bait price / c:diver -100% Harpoon Gun price |
 | `starting_item` | 12 | char | c:mage You start with 1 Snake / c:mage You start with 1 Scared Sausage |
 | `starting_weapon` | 7 | char | c:brawler You start with 1 Fist / c:crazy You start with 1 Knife |
 | `stat_curse` | 1 | char | c:sailor +25 Curse |
 | `stronger_elites_on_kill` | 1 | char | c:gangster All future elites and bosses become stronger when you kill a |
-| `tier_i_weapon_effects` | 2 | char | c:king -15 % Damage for every Tier I weapon you have [+0] / c:king -15 % Attack Speed for every Tier I weapon you have [+0] |
-| `tier_iv_weapon_effects` | 2 | char | c:king +25 % Damage for every Tier IV weapon you have [+0] / c:king +25 % Attack Speed for every Tier IV weapon you have [+0] |
 | `trees_start_wave` | 1 | char | c:explorer  |
-| `unique_weapon_effects` | 1 | char | c:gladiator +20 % Attack Speed for every different weapon you have [+0] |
 | `upgraded_baits` | 1 | char | c:fisherman Baits make some special enemies spawn throughout all future  |
 | `weapon_scaling_stats` | 1 | char | c:creature Weapon and pet damage additionally scales with 35% Curse |
-| `weapon_slot` | 5 | char | c:multitasker You can equip up to 12 weapons at a time / c:one_arm You can only equip one weapon at a time |
 | `weapon_slot_upgrades` | 1 | char | c:baby You gain a weapon slot when you level up instead of a stat u |
-| `weapons_price` | 1 | char | c:arms_dealer -95% Weapons Price |
 
 ### `anchored`
 

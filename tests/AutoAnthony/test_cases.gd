@@ -2922,3 +2922,70 @@ func test_110_xp_needed_wave_start_and_frequency() -> void:
 	_check(need > 0 and abs(need - rd.get_xp_needed(rd.get_player_level(0) + 1) * 0.1) < 0.01, "stacked xp needed floored at -90%% (%s)" % str(need))
 	rd.get_player_effects(0)[h] = saved
 	m.on_menu_reset()
+
+
+# 更多角色效果（选项）与武器数量计数（常规池）
+func test_111_more_character_effects() -> void:
+	var more_keys = {"cryptid": "cryptid", "charm_on_hit": "charm", "beast_master_effect": "beast_master", "map_size": "map_size",
+		"specific_items_price": "self_price", "weapons_price": "weapons_price", "group_structures": "group_structures",
+		"next_level_xp_needed": "xp_needed", "items_price+": "items_price_up"}
+	var seen = {}
+	var seen_off = {}
+	var counters = {}
+	var samples = []
+	for on in [true, false]:
+		var cfg = _cfg()
+		cfg.char_effects = on
+		# 部分效果权重很低：多用几个种子
+		for sd in range(1, 21):
+			var plan = Generator.new(cfg, sd).generate(isvc.items, isvc.characters, [], [])
+			for id in plan.items:
+				for e in plan.items[id].effects:
+					if e is TriggerEffect:
+						continue
+					var k = e.custom_key if e.custom_key in ["charm_on_hit", "specific_items_price"] else e.key
+					if k == "items_price" and e.value > 0:
+						k = "items_price+"
+					if Catalog.WEAPON_COUNTERS.has(e.custom_key):
+						counters[e.custom_key] = counters.get(e.custom_key, 0) + 1
+						if samples.size() < 12:
+							samples.push_back(e.get_text(0, false))
+						_check(abs(e.get_meta("aa_value")) > 0, "weapon counter valued")
+					if more_keys.has(k):
+						if on:
+							seen[k] = seen.get(k, 0) + 1
+							if samples.size() < 24:
+								samples.push_back(e.get_text(0, false))
+						else:
+							seen_off[k] = seen_off.get(k, 0) + 1
+					if k == "specific_items_price":
+						_eq(e.key, id, "self price effect targets its own item")
+	print("AUDIT more character effects (on): %s; with option off: %s; weapon counters: %s" % [str(seen), str(seen_off), str(counters)])
+	for s in samples:
+		print("AUDIT   sample: " + s)
+	_check(seen_off.empty(), "more character effects only with the option on")
+	for k in more_keys:
+		if k != "charm_on_hit" or tree.root.get_node("ProgressData").get_dlc_data("abyssal_terrors") != null:
+			_check(seen.has(k), "more character effect appears: " + k)
+	_check(counters.size() >= 3, "weapon counters appear in the regular pool")
+	# 武器数量计数在玩家身上实际生效：持有 2 把武器时"每把武器 +2 护甲"= +4
+	m.start_new_run()
+	var holder = _item("item_potato").duplicate()
+	var gen = Generator.new(_cfg(), 1)
+	gen._collect_priors(isvc.items, isvc.characters, isvc.weapons)
+	var tmpl = gen.char_templates.weapon_counters.get("additional_weapon_effects")
+	if tmpl != null:
+		var e = tmpl.duplicate()
+		e.key = "stat_armor"
+		e.key_hash = Keys.stat_armor_hash
+		e.value = 2
+		holder.effects = [e]
+		var fist = isvc.get_element_safe(isvc.weapons, "weapon_fist_1")
+		var _w1 = rd.add_weapon(fist, 0)
+		var _w2 = rd.add_weapon(fist, 0)
+		var a0 = rd.get_stat(Keys.stat_armor_hash, 0)
+		var nw = rd.get_player_weapons(0).size()
+		rd.add_item(holder, 0)
+		_eq(rd.get_stat(Keys.stat_armor_hash, 0) - a0, 2 * nw, "per-weapon counter applied (%d weapons)" % nw)
+		_check(e.get_text(0, false).find("AA_") == -1, "counter text: " + e.get_text(0, false))
+	m.on_menu_reset()

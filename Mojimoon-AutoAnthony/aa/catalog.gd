@@ -636,7 +636,34 @@ const BURN_BONUS_W = 0.12		# 燃烧目标额外伤害，每 1%
 const PACIFIST_W = 0.4			# 每 0.01 材料+经验 / 存活敌人（波末约 30 个存活敌人）
 const WEAPON_SLOT_W = 25.0
 const GROUP_STRUCTURES_VALUE = 6.0
-const CHAR_COMPONENT_WEIGHTS = {"class_bonus": 0.5, "burn_bonus": 0.15, "pacifist": 0.15, "weapon_slot": 0.15, "group_structures": 0.05, "xp_needed": 0.15}
+const CHAR_COMPONENT_WEIGHTS = {"class_bonus": 0.5, "burn_bonus": 0.15, "pacifist": 0.15, "weapon_slot": 0.15}
+# "更多角色效果"选项开启时追加的角色效果
+const MORE_CHAR_COMPONENT_WEIGHTS = {
+	"group_structures": 0.05, "xp_needed": 0.15, "cryptid": 0.1, "charm": 0.08, "beast_master": 0.05,
+	"map_size": 0.04, "self_price": 0.06, "weapons_price": 0.08,
+}
+# 更多角色效果的代价：道具价格 +X%、升级所需经验 +X%
+const MORE_CHAR_DOWNSIDE_CHANCE = 0.4
+# 神秘生物：波末每棵存活的树获得 X 材料与经验；波末平均存活约 2 棵树
+const CRYPTID_TREES = 2.0
+# 浪漫者：命中低于 25% 生命的敌人时几率魅惑（几率随最大生命缩放，原版 50 = 最大生命的 50%）；每 1 点系数的价值
+const CHARM_W = 0.3
+# 驯兽师：宠物伤害随四种伤害属性缩放（只在有宠物时有用，不可叠加）
+const BEAST_MASTER_VALUE = 8.0
+# 地图大小 ±X%：好坏取决于流派，价值约为 0（同 +诅咒）
+const MAP_SIZE_VALUES = [-15, -10, -5, 5, 10, 15]
+const MAP_SIZE_W = 0.02
+# 这件道具自身价格 -100%（渔夫的诱饵 / 潜水员的鱼叉枪）：后续同名道具免费，价值约为道具预算的 25%
+const SELF_PRICE_SHARE = 0.25
+# 武器价格 -X%（军火商）：每波约 40 材料花在武器上
+const WEAPON_SPEND_PER_WAVE = 40.0
+# 武器数量计数（常规池，计数型的一种）：原版的"每把不同武器 / 每把武器 / 每把 IV 级 / 每把 I 级武器"效果
+# 计数期望：不同武器约 3.5、武器约 5、IV 级武器全局平均约 1、I 级武器约 1.2
+const WEAPON_COUNTERS = {
+	"unique_weapon_effects": 3.5, "additional_weapon_effects": 5.0,
+	"tier_iv_weapon_effects": 1.0, "tier_i_weapon_effects": 1.2,
+}
+const WEAPON_COUNTER_CHANCE = 0.2
 # 升级所需经验 ±X%（变异体 / 宝宝 / 技术法师 / 船长）：等价于获得经验 ×1/(1+X%)，非线性
 #   -67% 所需经验 = +200% 获得经验；+100% 所需经验 = -50% 获得经验
 const XP_NEEDED_MIN = -60		# 单条最多 -60%（= +150% 经验）
