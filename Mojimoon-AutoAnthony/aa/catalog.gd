@@ -166,16 +166,16 @@ const INTERVAL_CHOICES = [3, 4, 5, 6, 8, 10, 12, 15]
 # ------------------------------------------------------------
 const PAYLOADS = {
 	"temp_stat": {"w": 0.4},
-	"perm_stat": {"w": 0.8},
-	"timed_stat": {"w": 0.3},
+	"perm_stat": {"w": 1.0},
+	"timed_stat": {"w": 0.4},
 	"heal": {"w": 0.3},
-	"gold": {"w": 0.3},
-	"xp": {"w": 0.3},
-	"damage": {"w": 0.4},
+	"gold": {"w": 0.2},
+	"xp": {"w": 0.2},
+	"damage": {"w": 0.2},
 	"explode": {"w": 0.4},
 	"grant": {"w": 2.0},
 	# 使该敌人受到的伤害提高 X%，持续 N 秒（原版冰块 / 潜水员的效果；只用于有目标敌人的扳机）
-	"vuln": {"w": 0.6},
+	"vuln": {"w": 0.5},
 }
 
 # 合法组合：触发扳机 -> 允许的载荷
@@ -560,8 +560,7 @@ const SCALAR_MECHANIC_EXCLUDED = ["hp_start_next_wave", "hp_start_wave", "speed_
 const ENEMY_STATS = {
 	"enemy_health": {"w": 0.6, "unit": 1},
 	"enemy_damage": {"w": 0.8, "unit": 1},
-	# 孔雀：+25% 敌人速度 ≈ +50% 敌人伤害 → 每 1% 速度按伤害的 2 倍估值
-	"enemy_speed": {"w": 1.6, "unit": 1},
+	"enemy_speed": {"w": 2.4, "unit": 1},
 }
 
 # ============================================================
@@ -624,12 +623,12 @@ static func tags_for_binding(k: String) -> Array:
 #   波末每个存活敌人获得材料与经验（和平主义者）；代价：每波结束敌人属性提高（船长）、−1 武器栏
 # ============================================================
 const CLASS_BONUS_SHARE = 0.35
-const CLASS_BONUS_STAT_W = {"stat_attack_speed": 1.4, "stat_percent_damage": 1.8, "stat_range": 0.6, "stat_lifesteal": 4.7, "stat_damage": 1.5}
+const CLASS_BONUS_STAT_W = {"stat_attack_speed": 1.4, "stat_percent_damage": 1.8, "stat_range": 0.35, "stat_lifesteal": 4.7, "stat_damage": 1.5}
 const BURN_BONUS_W = 0.12		# 燃烧目标额外伤害，每 1%
 const PACIFIST_W = 0.4			# 每 0.01 材料+经验 / 存活敌人（波末约 30 个存活敌人）
 const WEAPON_SLOT_W = 25.0
 const GROUP_STRUCTURES_VALUE = 6.0
-const CHAR_COMPONENT_WEIGHTS = {"class_bonus": 0.45, "burn_bonus": 0.15, "pacifist": 0.15, "weapon_slot": 0.15, "group_structures": 0.1}
+const CHAR_COMPONENT_WEIGHTS = {"class_bonus": 0.5, "burn_bonus": 0.15, "pacifist": 0.15, "weapon_slot": 0.15, "group_structures": 0.05}
 
 
 # T4 道具不出现 +收获（与原版一致）
