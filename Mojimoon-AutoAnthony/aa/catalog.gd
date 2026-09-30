@@ -716,7 +716,7 @@ const BETA_RESTRICTIONS = {
 	"min_weapon_tier": {"got": 4.0, "w": 0.5, "min_budget": 3.0},
 	"poisoned_fruit": {"got": 6.0, "w": 0.7, "min_budget": 4.0},
 	"stronger_elites_on_kill": {"got": 6.0, "w": 0.5, "min_budget": 4.0},
-	"disable_item_locking": {"got": 3.0, "w": 0.6, "min_budget": 2.0},
+	"disable_item_locking": {"got": 8.0, "w": 0.6, "min_budget": 6.0},
 	"remove_shop_items": {"got": 5.0, "w": 0.5, "min_budget": 4.0},
 }
 # 捆绑的第二行
