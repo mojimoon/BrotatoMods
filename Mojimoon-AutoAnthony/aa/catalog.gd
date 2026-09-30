@@ -33,7 +33,8 @@ const PERM_MULT_CHARACTER = 7.0
 const DOWNSIDE_DIVISOR = 2.5
 # 隐藏价值乘数（按稀有度）：用"真实频率"审计生成道具与原版纯属性道具的强度比 real，
 # real < 1 的档位乘以 1 / real 补齐，real >= 1 的保持不变。由测试 test_60 的审计结果标定。
-const HIDDEN_TIER_MULT = [1.0, 1.08, 1.05, 1.0]
+# 价格重新生成 + 正比预算后重新标定：不加乘数时 real = 1.05 / 0.91 / 0.92 / 1.06
+const HIDDEN_TIER_MULT = [1.0, 1.10, 1.08, 1.0]
 # 预算模型：同稀有度内 预算 = k × 价格（过原点的线性），k = 原版纯属性道具的净价值中位数 / 价格中位数
 # （T1–T4 约 0.40 / 0.35 / 0.38 / 0.56）。原版档内"价值 - 价格"几乎没有斜率（档内 R² 只有 0.07–0.33），
 # 任何档内曲线都是建模选择；旧的 价格^0.69 与正比模型对原版的拟合相同（R² 都是 0.918），而价格现在由本 mod 生成，
@@ -42,7 +43,7 @@ const HIDDEN_TIER_MULT = [1.0, 1.08, 1.05, 1.0]
 const PRICE_POOL_MIN = 5
 # 机制估值修正：来源道具 / 机制 key -> 估值倍率（< 1 = 同样预算给出更高的数值）
 #   从升级中获得的属性 +X%（藤壶）；MultiTool 里评级偏低的特殊机制道具（花园 C、眼罩）
-const MECHANIC_VALUE_MULT = {"level_upgrades_modifications": 0.5, "item_garden": 0.75, "item_eyepatch": 0.8}
+const MECHANIC_VALUE_MULT = {"level_upgrades_modifications": 0.6, "item_garden": 0.75, "item_eyepatch": 0.8}
 
 # ------------------------------------------------------------
 # 属性：权重（材料 / 点）、每次触发的自然粒度、是否百分比显示、伤害参考值（用于"X% 某属性的伤害"）
@@ -53,8 +54,8 @@ const STATS = {
 	"stat_lifesteal": {"w": 4.2, "unit": 1, "pct": true, "ref": 10.0},
 	"stat_percent_damage": {"w": 1.65, "unit": 1, "pct": true, "ref": 25.0},
 	"stat_melee_damage": {"w": 2.8, "unit": 1, "pct": false, "ref": 15.0},
-	"stat_ranged_damage": {"w": 5.9, "unit": 1, "pct": false, "ref": 15.0},
-	"stat_elemental_damage": {"w": 4.9, "unit": 1, "pct": false, "ref": 12.0},
+	"stat_ranged_damage": {"w": 5.45, "unit": 1, "pct": false, "ref": 15.0},
+	"stat_elemental_damage": {"w": 4.65, "unit": 1, "pct": false, "ref": 12.0},
 	"stat_attack_speed": {"w": 1.35, "unit": 1, "pct": true, "ref": 25.0},
 	"stat_crit_chance": {"w": 1.85, "unit": 1, "pct": true, "ref": 15.0},
 	"stat_engineering": {"w": 3.3, "unit": 1, "pct": false, "ref": 15.0},
