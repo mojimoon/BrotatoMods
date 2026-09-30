@@ -662,7 +662,7 @@ const BURN_BONUS_W = 0.12		# 燃烧目标额外伤害，每 1%
 const PACIFIST_W = 0.4			# 每 0.01 材料+经验 / 存活敌人（波末约 30 个存活敌人）
 const WEAPON_SLOT_W = 25.0
 const GROUP_STRUCTURES_VALUE = 6.0
-const CHAR_COMPONENT_WEIGHTS = {"class_bonus": 0.5, "burn_bonus": 0.15, "pacifist": 0.15, "weapon_slot": 0.15}
+const CHAR_COMPONENT_WEIGHTS = {"class_bonus": 0.5, "burn_bonus": 0.1, "pacifist": 0.05, "weapon_slot": 0.1}
 # "更多角色效果"选项开启时追加的角色效果
 const MORE_CHAR_COMPONENT_WEIGHTS = {
 	"group_structures": 0.05, "xp_needed": 0.15, "cryptid": 0.1, "charm": 0.08, "beast_master": 0.05,
