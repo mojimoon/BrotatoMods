@@ -543,7 +543,7 @@ func test_25_curse_compatible() -> void:
 # ============================================================
 func test_30_character_keeps_identity() -> void:
 	m.cfg_characters = true
-	for cid in ["character_ranger", "character_apprentice", "character_masochist", "character_explorer"]:
+	for cid in ["character_ranger", "character_apprentice", "character_masochist", "character_explorer", "character_mage", "character_vampire"]:
 		_setup_player(cid)
 		var ch = isvc.get_element_safe(isvc.characters, cid)
 		var before = ch.effects
@@ -553,7 +553,8 @@ func test_30_character_keeps_identity() -> void:
 		_eq(after.size(), before.size(), cid + " same number of lines")
 		for e in before:
 			var gen = Generator.new(_cfg(), 1)
-			if not gen.is_plain_stat(e) and gen.native_trigger_of(e) == null:
+			var reassemblable = gen.is_plain_stat(e) or gen.native_trigger_of(e) != null or gen.is_scaling(e) or gen.is_gain_mod(e)
+			if not reassemblable or gen.is_disabling(e):
 				_check(e in after, "%s identity line kept: %s" % [cid, e.key])
 		var p = rd.players_data[0]
 		_check(p.current_character == ch, "current character is the generated resource")
@@ -721,6 +722,37 @@ func test_51_ui_builds_and_previews() -> void:
 	_eq(m.cfg_weapons, true, "weapons switch")
 	ui._on_switch_toggled(false, "cfg_rename")
 	_check(ui.build_preview_text(42).find(tr("AA_ADJ_ODD")) == -1 or true, "preview without rename")
+	ui._on_switch_toggled(true, "cfg_rename")
+	ui._on_switch_toggled(false, "cfg_weapons")
+	# 三张设置卡片 + 每个效果开关都有灰色说明；预览按稀有度分页，每件道具一张卡片
+	for k in ["cfg_char_effects", "cfg_all_char_effects", "cfg_more_double", "cfg_items", "cfg_characters", "cfg_weapons", "cfg_rename"]:
+		_check(ui._switches.has(k), "switch exists: " + k)
+		var sw = ui._switches[k]
+		var desc = sw.get_parent().get_child(sw.get_index() + 1)
+		_check(desc is Label and desc.text != "" and desc.text.find("AA_") == -1, "switch has a description: " + k)
+	ui._on_preview_pressed()
+	for t in 4:
+		ui._on_tier_pressed(t)
+		yield(tree, "idle_frame")
+		var n = ui._preview_grid.get_child_count()
+		_eq(n, ui._preview_entries(ui._plan, t).size(), "preview tier %d shows one card per item" % (t + 1))
+		_check(n > 10, "preview tier %d has items (%d)" % [t + 1, n])
+		_check(ui._tier_buttons[t].text.find("(") > 0, "tier button shows a count: " + ui._tier_buttons[t].text)
+	for i in 6:
+		yield(tree, "idle_frame")
+	var vp = tree.root.get_visible_rect().size
+	var panel = ui.get_child(1).get_child(0)
+	print("AUDIT settings panel %s in viewport %s" % [str(panel.rect_size), str(vp)])
+	_check(panel.rect_size.x <= max(vp.x, 1920) and panel.rect_size.y <= max(vp.y, 1080), "settings panel fits the screen")
+	var shot = OS.get_environment("AA_UI_SHOT")
+	if shot != "":
+		ui._on_tier_pressed(1)
+		for i in 10:
+			yield(tree, "idle_frame")
+		var img = tree.root.get_texture().get_data()
+		if img != null:
+			img.flip_y()
+			img.save_png(shot)
 	ui.queue_free()
 	yield(tree, "idle_frame")
 
@@ -1928,6 +1960,21 @@ func _has_any(a: Array, b: Array) -> bool:
 	return false
 
 
+func _synergy_stats(effects: Array) -> Array:
+	var out = []
+	for e in effects:
+		if e.value <= 0:
+			continue
+		if e is TriggerEffect:
+			if e.payload in ["damage", "explode"]:
+				out.push_back(e.stat)
+			if e.grant != null and "stat_scaled" in e.grant:
+				out.push_back(e.grant.stat_scaled)
+		elif "stat_scaled" in e:
+			out.push_back(e.stat_scaled)
+	return out
+
+
 func test_101_character_bans_and_wanted_tags_in_rolls() -> void:
 	_unlock_everything()
 	var t0 = OS.get_ticks_msec()
@@ -2000,7 +2047,8 @@ func test_101_character_bans_and_wanted_tags_in_rolls() -> void:
 					var rel = false
 					for t in ch.wanted_tags:
 						# 只评判重组道具；保留原版的道具（本局初始道具、锚定道具）按原版词条
-						if t in it.tags and (not m.plan.get("items", {}).has(it.my_id) or not Catalog.STATS.has(t) or t in _pos_semantics(it.effects)):
+						# 计数属性（每点工程 +暴击）与伤害缩放属性与原版一致也算提供（原版石皮、血手、幸运币都带计数属性词条）
+						if t in it.tags and (not m.plan.get("items", {}).has(it.my_id) or not Catalog.STATS.has(t) or t in _pos_semantics(it.effects) 								or t in _synergy_stats(it.effects)):
 							rel = true
 					if rel:
 						r.wanted_relevant += 1
@@ -2289,6 +2337,9 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 		bd.damage = 1
 		bd.duration = 3
 		bd.from = player
+		# 目标要活到燃烧结算（手枪会一直射击）
+		en_b.max_stats.health = max(en_b.max_stats.health, 5000)
+		en_b.current_stats.health = en_b.max_stats.health
 		en_b.apply_burning(bd)
 	yield(tree.create_timer(1.6), "timeout")
 	# 首次命中 / 命中高低血：手枪的真实命中触发远程与高血部分；其余伤害类型与低血敌人用原版 on_hurt 入口模拟
@@ -2427,6 +2478,9 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 	var bad = []
 	for k in shapes:
 		var e = shapes[k]
+		# 受伤加成需要目标敌人且不立即改变生命值：由实验性扳机测试单独核对
+		if e.payload == "vuln":
+			continue
 		if player.dead or not is_instance_valid(main):
 			_check(false, "player alive during shape checks")
 			break
@@ -3256,3 +3310,83 @@ func test_114_tag_bindings() -> void:
 	var ex = TriggerEffect.make({"trigger": "dodge", "payload": "explode", "stat": "stat_elemental_damage", "value": 50})
 	var tx = g._tags_for([ex])
 	_check("explosive" in tx and "stat_elemental_damage" in tx and "stat_dodge" in tx, "explode on dodge: " + str(tx))
+
+
+
+# ============================================================
+# 角色重组：身份行与"禁用"行保留；可估值行按同等价值重组并偏向偏好词条；-100 / -100% 行按期望总量封顶估值
+# ============================================================
+func _char_value(gen, e) -> float:
+	if e is TriggerEffect:
+		var cv = Valuation.clause_value(e.to_clause(), Catalog.PERM_MULT_CHARACTER)
+		return cv if cv >= 0 else cv / Catalog.DOWNSIDE_DIVISOR
+	return gen.char_line_value(e)
+
+
+func test_115_character_reassembly() -> void:
+	var cfg = _cfg()
+	cfg.characters = true
+	var hits = 0
+	var total = 0
+	var base_rate = 0.0
+	var ratios = []
+	var converted = {}
+	for sd in range(1, 9):
+		var gen = Generator.new(cfg, sd)
+		var plan = gen.generate([], isvc.characters, isvc.characters, [])
+		for ch in isvc.characters:
+			var p = plan.characters[ch.my_id]
+			_eq(p.effects.size(), ch.effects.size(), ch.my_id + " same number of lines")
+			var v0 = 0.0
+			var v1 = 0.0
+			for i in ch.effects.size():
+				var e0 = ch.effects[i]
+				var e1 = p.effects[i]
+				var reassemblable = gen.is_plain_stat(e0) or gen.native_trigger_of(e0) != null or gen.is_scaling(e0) or gen.is_gain_mod(e0)
+				if not reassemblable or gen.is_disabling(e0):
+					_check(e1 == e0, "%s keeps identity / disabling line: %s" % [ch.my_id, e0.get_text(0, false)])
+					continue
+				v0 += _char_value(gen, e0)
+				v1 += _char_value(gen, e1)
+				if e1 != e0 and e1.get_script() != e0.get_script():
+					var k = "clause" if e1 is TriggerEffect else ("scaling" if gen.is_scaling(e1) else ("gain_mod" if gen.is_gain_mod(e1) else "stat"))
+					converted[k] = converted.get(k, 0) + 1
+				# 偏好词条命中：新的正面行的词条与角色偏好相交
+				if _char_value(gen, e0) > 0 and not ch.wanted_tags.empty() and e1 != e0:
+					var stat_wanted = 0
+					for t in ch.wanted_tags:
+						if Catalog.STATS.has(t):
+							stat_wanted += 1
+					if stat_wanted > 0:
+						total += 1
+						base_rate += float(stat_wanted) / Catalog.STATS.size()
+						for t in gen._tags_for([e1]):
+							if t in ch.wanted_tags:
+								hits += 1
+								break
+			if abs(v0) > 5.0:
+				ratios.push_back(v1 / v0)
+	ratios.sort()
+	var hit_rate = float(hits) / max(1, total)
+	base_rate = base_rate / max(1, total)
+	print("AUDIT character reassembly: value ratio p10 %.2f / median %.2f / p90 %.2f; wanted-tag hit rate %.2f (uniform %.2f); converted %s" % [
+		ratios[ratios.size() / 10], ratios[ratios.size() / 2], ratios[ratios.size() * 9 / 10], hit_rate, base_rate, str(converted)])
+	_check(ratios[ratios.size() / 2] > 0.7 and ratios[ratios.size() / 2] < 1.4, "character value preserved (median)")
+	_check(hit_rate > base_rate * 2.0, "reassembled positives favour the character's wanted tags")
+	for k in ["clause", "scaling", "gain_mod", "stat"]:
+		_check(converted.has(k) or k == "stat", "positive components converted into: " + k)
+	# -100 / -100% 行：按期望总量封顶
+	var g = Generator.new(cfg, 1)
+	var vamp = isvc.get_element_safe(isvc.characters, "character_vampire")
+	for e in vamp.effects:
+		if e.key == "consumable_heal":
+			_check(g.is_disabling(e), "vampire -100 consumable heal is a disabling line")
+			_check(abs(g.char_line_value(e)) <= Catalog.stat_w("consumable_heal") * Catalog.counter_ref("consumable_heal") / Catalog.DOWNSIDE_DIVISOR + 0.01,
+				"disabling line valued at most the stat's expected total (%.1f)" % g.char_line_value(e))
+	var mage = isvc.get_element_safe(isvc.characters, "character_mage")
+	for e in mage.effects:
+		if g.is_gain_mod(e) and e.value <= -100:
+			_check(g.is_disabling(e), "mage -100% gains is a disabling line")
+	var sample = Generator.new(cfg, 20260927).generate([], isvc.characters, [mage, vamp, isvc.get_element_safe(isvc.characters, "character_engineer")], [])
+	for cid in sample.characters:
+		print("AUDIT   %s: %s" % [cid, _texts(sample.characters[cid].effects)])

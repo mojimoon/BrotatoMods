@@ -82,6 +82,8 @@ var effect_script: Script
 # 条款约束（角色重组时使用）：禁用的扳机 / 载荷（反协同，如"无法回血"的角色不出现回血相关条款）
 var banned_triggers: Array = []
 var banned_payloads: Array = []
+# 角色重组时的偏好词条：偏好属性更常作为正面、很少作为代价；绑定了偏好词条的扳机 / 载荷 / 计数更常出现
+var wanted_bias: Array = []
 # 当前道具的代价是"无法回血"（全部角色效果）：生成完后撤销上面的临时禁用
 var item_banned_heal := false
 
@@ -660,14 +662,8 @@ func _collect_character_mechanics(characters: Array, effect_keys: Dictionary) ->
 		var known = 0.0
 		var mechs = []
 		for e in ch.effects:
-			if is_plain_stat(e):
-				known += line_value(e.key, e.value)
-				continue
-			var nt = native_trigger_of(e)
-			if nt != null and Catalog.STATS.has(e.key):
-				var native = {"trigger": nt[0], "payload": nt[1], "stat": e.key, "value": e.value, "param": 5 if nt[0] == "interval" else 1}
-				var cv = Valuation.clause_value(native, Catalog.PERM_MULT_CHARACTER)
-				known += cv if cv >= 0 else neg_value(cv)
+			if is_plain_stat(e) or is_gain_mod(e) or is_scaling(e) or (native_trigger_of(e) != null and Catalog.STATS.has(e.key)):
+				known += char_line_value(e)
 				continue
 			if _is_transferable_character_mechanic(e, effect_keys):
 				mechs.push_back(e)
@@ -750,6 +746,10 @@ func _pick_stat(neg: bool, exclude: Array = [], allowed = null) -> String:
 		var cat = neg_cat if neg else pos_cat
 		if cat != "" and cat != "-" and Catalog.STAT_CATEGORY.get(s, "") == cat:
 			w *= 4.0
+		if s in wanted_bias:
+			w *= 0.1 if neg else Catalog.WANTED_BIAS
+		elif not neg and not wanted_bias.empty() and _stat_has_wanted_tag(s):
+			w *= Catalog.WANTED_BIAS * 0.5
 		# 共现偏好：原版中与主属性一起出现（或被它拿来交换）的属性
 		if anchor_stat != "" and s != anchor_stat:
 			var table = posneg if neg else cooc
@@ -758,6 +758,22 @@ func _pick_stat(neg: bool, exclude: Array = [], allowed = null) -> String:
 		weights[s] = w
 	var s = _pick_weighted(weights)
 	return s if s != null else "stat_max_hp"
+
+
+# 属性带有偏好的功能性词条（knockback / explosive / pickup / consumable）
+func _stat_has_wanted_tag(s: String) -> bool:
+	return Catalog.STAT_EXTRA_TAGS.has(s) and Catalog.STAT_EXTRA_TAGS[s] in wanted_bias
+
+
+func _binding_wanted(k: String, extra: String = "") -> bool:
+	if wanted_bias.empty():
+		return false
+	if extra != "" and extra in wanted_bias:
+		return true
+	for t in Catalog.tags_for_binding(k):
+		if t in wanted_bias:
+			return true
+	return false
 
 
 static func _max_value(d: Dictionary) -> float:
@@ -2049,8 +2065,12 @@ func gen_scaling(target: float, negative: bool) -> Dictionary:
 		var cw = {}
 		for c in Catalog.COUNTER_TEXT:
 			cw[c] = 0.6 + counter_prior.get(c, 0.0)
+			if not negative and _binding_wanted("counter:" + c):
+				cw[c] *= Catalog.WANTED_BIAS
 		for st in Catalog.SCALING_STATS:
 			cw[st] = 0.15 * stat_pos_w.get(st, 0.5) / 5.0 + counter_prior.get(st, 0.0)
+			if not negative and st in wanted_bias:
+				cw[st] *= Catalog.WANTED_BIAS
 		var counter = _pick_weighted(cw)
 		var allowed = []
 		for st in Catalog.SCALING_STATS:
@@ -2162,6 +2182,8 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 				continue
 			tw[t] = (Catalog.TRIGGERS[t].w + Catalog.NATIVE_PRIOR_STRENGTH * log(1.0 + trigger_prior[t]) / 2.0) \
 				/ (1.0 + Catalog.REPEAT_PENALTY_TRIGGER * used_trigger.get(t, 0))
+			if not negative and _binding_wanted("trigger:" + t, Catalog.TRIGGER_TAGS.get(t, "")):
+				tw[t] *= Catalog.WANTED_BIAS
 		trigger = _pick_weighted(tw)
 	if trigger == null:
 		return {}
@@ -2174,6 +2196,8 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 			/ (1.0 + Catalog.REPEAT_PENALTY_COMBO * used_combo.get(trigger + "/" + p, 0) + Catalog.REPEAT_PENALTY_PAYLOAD * used_payload.get(p, 0))
 		if not negative and pos_cat != "" and Catalog.PAYLOAD_CATEGORY.get(p, "") == pos_cat:
 			pw[p] *= 3.0
+		if not negative and _binding_wanted("payload:" + p, Catalog.PAYLOAD_TAGS.get(p, "")):
+			pw[p] *= Catalog.WANTED_BIAS
 	var payload = _pick_weighted(pw)
 	if payload == null:
 		return {}
@@ -2349,36 +2373,74 @@ func _amount_cap(c: Dictionary, trigger: String) -> int:
 
 
 # ============================================================
-# 角色：保留身份行（初始物品、武器限制、属性成长修正、特殊机制），重掷普通属性行；
-# 原版触发行只重组一半——要么保留扳机换效果，要么保留效果换扳机——让角色仍然"像自己"
+# 角色：保留身份行（初始装备、武器限制、规则、特殊机制、"禁用"某属性的 -100 / -100% 行），
+# 其余可估值的行按同等价值重新组装，并偏向角色的偏好词条：
+#   正面属性行 / 正面属性修改 / 正面计数 -> 属性行（偏好属性）、触发条款（偏好扳机 / 载荷）、计数型或属性修改之一
+#   普通负面属性行 / 部分负面属性修改 -> 同类代价换一个非偏好属性
+#   原版触发行只重组一半（保留扳机换载荷，或保留载荷换扳机），让角色仍然像自己
 # ============================================================
 func generate_character(ch) -> Dictionary:
 	_seed_for(ch.my_id)
 	var perm_mult = Catalog.PERM_MULT_CHARACTER
 	banned_triggers = []
 	banned_payloads = []
+	wanted_bias = ch.wanted_tags.duplicate()
 	for e in ch.effects:
 		if e.key == "no_heal" and e.value > 0:
 			banned_triggers.push_back("heal")
 			banned_payloads.push_back("heal")
 	var out = []
-	var rerollable_pos = []
 	var main_adj = ""
 	var main_v = 0.0
 	var used = []
 	for e in ch.effects:
-		if is_plain_stat(e) and ((e.value > 0 and e.value <= 20) or (e.value < 0 and e.value >= -10)):
-			var neg = e.value < 0
-			var s = _pick_stat(neg, used + [e.key])
-			used.push_back(s)
-			var v = _round_to_unit(abs(e.value) * Catalog.stat_w(e.key) / Catalog.stat_w(s), s)
-			var ne = _stat_effect(s, -v if neg else v)
-			out.push_back(ne)
-			if not neg:
-				rerollable_pos.push_back(ne)
+		if is_plain_stat(e) and e.value > 0 and e.value <= 20:
+			var val = Valuation.stat_line_value(e.key, e.value) * _avg_mult()
+			var r = _char_reassemble_positive(val, perm_mult, used)
+			out.push_back(r.effect)
+			if r.value > main_v:
+				main_v = r.value
+				main_adj = r.adj
+			continue
+		if is_plain_stat(e) and e.value < 0 and not is_disabling(e):
+			var s2 = _pick_stat(true, used + [e.key] + wanted_bias)
+			used.push_back(s2)
+			# 同等数值强度（不按负面除数折算），换到非偏好属性上
+			var mag = Catalog.stat_w(e.key) * min(abs(e.value), Catalog.counter_ref(e.key))
+			var v2 = _round_to_unit(mag / Catalog.stat_w(s2), s2)
+			out.push_back(_stat_effect(s2, -v2))
+			continue
+		if is_gain_mod(e) and e.stats_modified.size() > 0:
+			# 偏好属性的正面修改（法师 +25% 元素）是角色的核心，保留
+			if e.value > 0 and not e.stats_modified[0] in wanted_bias and rng.randf() < Catalog.CHAR_CONVERT_CHANCE:
+				var gv = Valuation.gain_mod_value(e.stats_modified[0], e.value) * _avg_mult()
+				var rg = _char_reassemble_positive(gv, perm_mult, used)
+				out.push_back(rg.effect)
+				if rg.value > main_v:
+					main_v = rg.value
+					main_adj = rg.adj
+				continue
+			if e.value < 0 and not is_disabling(e):
+				# 部分降低（-25% .. -80%）：换一个非偏好属性，百分比不变
+				var ns = _pick_stat(true, used + e.stats_modified + wanted_bias, Catalog.GAIN_MOD_STATS)
+				used.push_back(ns)
+				var ge = e.duplicate()
+				ge.stat_displayed = ns
+				ge.stats_modified = [ns]
+				out.push_back(ge)
+				continue
+			out.push_back(e)
+			continue
+		if is_scaling(e) and e.value > 0 and not e.stat_scaled.begins_with("item_") and not e.key in wanted_bias 				and rng.randf() < Catalog.CHAR_CONVERT_CHANCE:
+			var sv = Valuation.scaling_value(e.key, e.value, e.stat_scaled, e.nb_stat_scaled) * _avg_mult()
+			var rs = _char_reassemble_positive(sv, perm_mult, used)
+			out.push_back(rs.effect)
+			if rs.value > main_v:
+				main_v = rs.value
+				main_adj = rs.adj
 			continue
 		var nt = native_trigger_of(e)
-		if nt != null and Catalog.STATS.has(e.key) and e.value != 0:
+		if nt != null and Catalog.STATS.has(e.key) and e.value != 0 and not is_disabling(e):
 			var native = {"trigger": nt[0], "payload": nt[1], "stat": e.key, "value": e.value, "param": 5 if nt[0] == "interval" else 1}
 			var nv = Valuation.clause_value(native, perm_mult)
 			var c = {}
@@ -2395,20 +2457,67 @@ func generate_character(ch) -> Dictionary:
 					main_adj = _adj(Catalog.ADJ_BY_TRIGGER[c.trigger])
 				continue
 		out.push_back(e)
-	# 额外把一条正面属性行换成等价触发条款
-	if not rerollable_pos.empty() and rng.randf() < 0.6 * _trigger_rate():
-		var victim = rerollable_pos[rng.randi() % rerollable_pos.size()]
-		var bv = Valuation.stat_line_value(victim.key, victim.value) * _avg_mult()
-		var c = gen_clause(bv, perm_mult, false)
-		if not c.empty():
-			out[out.find(victim)] = TriggerEffect.make(c)
-			if main_adj == "":
-				main_adj = _adj(Catalog.ADJ_BY_TRIGGER[c.trigger])
 	if main_adj == "":
 		main_adj = _adj(Catalog.ADJ_MECHANIC)
 	banned_triggers = []
 	banned_payloads = []
+	wanted_bias = []
 	return {"effects": out, "adj": main_adj}
+
+
+# 角色的一条正面组件按价值 val 重新组装：属性行 / 触发条款 / 计数型 / 属性修改（偏向偏好词条）。返回 {effect, value, adj}
+func _char_reassemble_positive(val: float, perm_mult: float, used: Array) -> Dictionary:
+	var kind = _pick_weighted(Catalog.CHAR_REASSEMBLE_KINDS)
+	if kind == "clause":
+		var c = gen_clause(val, perm_mult, false)
+		if not c.empty():
+			_note_clause(c)
+			return {"effect": TriggerEffect.make(c), "value": Valuation.clause_value(c, perm_mult), "adj": _adj(Catalog.ADJ_BY_TRIGGER[c.trigger])}
+	elif kind == "scaling":
+		var sc = gen_scaling(val, false)
+		if not sc.empty():
+			return {"effect": sc.effect, "value": sc.value, "adj": _adj(Catalog.ADJ_SCALING)}
+	elif kind == "gain_mod":
+		var gm = gen_gain_mod(val, false)
+		if not gm.empty():
+			return {"effect": gm.effect, "value": gm.value, "adj": _adj(Catalog.ADJ_GAIN_MOD)}
+	var st = _pick_stat(false, used)
+	used.push_back(st)
+	var v = _round_to_unit(val / Catalog.stat_w(st), st)
+	return {"effect": _stat_effect(st, v), "value": v * Catalog.stat_w(st), "adj": _adj(Catalog.ADJ_BY_STAT.get(st, Catalog.ADJ_MECHANIC))}
+
+
+# "禁用"某属性的行：-100% 属性修改、数值大到让属性归零的负面行（吸血鬼 -100 消耗品回复、速度型 静止时 -100 护甲）。
+# 这些数值本身没有意义，按"该属性的期望总量"封顶估值，重组时保留为身份行
+func is_disabling(e) -> bool:
+	if is_gain_mod(e):
+		return e.value <= -100
+	if e.value >= 0 or not Catalog.STATS.has(e.key):
+		return false
+	return abs(e.value) > Catalog.counter_ref(e.key) * 2.0
+
+
+# 角色行的价值（负面按除数折算）；负面数值不超过该属性的期望总量（-100 与 -10 000 一样只是"归零"）
+func char_line_value(e) -> float:
+	if is_plain_stat(e):
+		var mag = abs(e.value)
+		if e.value < 0:
+			mag = min(mag, Catalog.counter_ref(e.key))
+		return line_value(e.key, int(mag) * int(sign(e.value)))
+	if is_gain_mod(e) and e.stats_modified.size() > 0:
+		var gv = Valuation.gain_mod_value(e.stats_modified[0], int(clamp(e.value, -100, 1000)))
+		return gv if gv >= 0 else neg_value(gv)
+	if is_scaling(e):
+		var sv = Valuation.scaling_value(e.key, e.value, e.stat_scaled, e.nb_stat_scaled)
+		return sv if sv >= 0 else neg_value(sv)
+	var nt = native_trigger_of(e)
+	if nt != null and Catalog.STATS.has(e.key):
+		var v = e.value
+		if v < 0:
+			v = -int(min(abs(v), Catalog.counter_ref(e.key)))
+		var cv = Valuation.clause_value({"trigger": nt[0], "payload": nt[1], "stat": e.key, "value": v, "param": 5 if nt[0] == "interval" else 1}, Catalog.PERM_MULT_CHARACTER)
+		return cv if cv >= 0 else neg_value(cv)
+	return 0.0
 
 
 # ============================================================

@@ -768,6 +768,14 @@ const LOSE_GOLD_CHANCE = 0.35
 # 下一波正面：敌人属性降低（单条上限）
 const NEXT_WAVE_ENEMY_DOWN_MAX = 40
 
+# ============================================================
+# 角色重组：正面组件（属性行 / 属性修改 / 计数）按同等价值换成这些类型之一；属性修改 / 计数换成别的类型的概率
+# 偏好词条：偏好属性作为正面的权重 ×WANTED_BIAS（作为代价 ×0.1），绑定偏好词条的扳机 / 载荷 / 计数同样加权
+# ============================================================
+const CHAR_REASSEMBLE_KINDS = {"stat": 0.4, "clause": 0.35, "scaling": 0.13, "gain_mod": 0.12}
+const CHAR_CONVERT_CHANCE = 0.5
+const WANTED_BIAS = 4.0
+
 # T4 道具不出现 +收获（与原版一致）
 const T4_BANNED_POSITIVE_STATS = ["stat_harvesting"]
 # 负面触发条款使用敌人属性（生命 / 伤害 / 速度提高）的概率

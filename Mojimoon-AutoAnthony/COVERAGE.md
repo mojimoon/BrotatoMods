@@ -73,8 +73,8 @@
 | `gain_stat_for_every:item_bait` | 1 | char | c:fisherman +2 Harvesting for every 1 Bait you have [+0] |
 | `gain_stat_for_every:knockback` | 1 | item | coil +1 % Damage for every 1 Knockback you have [+0] |
 | `gain_stat_for_every:legendary_item` | 2 | item,char | fairy -3 HP Regeneration for every different Tier IV item you have / c:king +5 Max HP for every different Tier IV item you have [+5] |
-| `gain_stat_for_every:living_enemy` | 1 | item | community_support +1 % Attack Speed for every current living enemy [+15] |
-| `gain_stat_for_every:living_tree` | 1 | char | c:cryptid +3 HP Regeneration for every current living tree [+3] |
+| `gain_stat_for_every:living_enemy` | 1 | item | community_support +1 % Attack Speed for every current living enemy [+21] |
+| `gain_stat_for_every:living_tree` | 1 | char | c:cryptid +3 HP Regeneration for every current living tree [+0] |
 | `gain_stat_for_every:materials` | 4 | item,char | padding +1 Max HP for every 80 Materials you have [+0] / c:saver +1 % Damage for every 25 Materials you have [+1] |
 | `gain_stat_for_every:percent_player_missing_health` | 7 | char,weapon | c:vampire +2 % Damage for every 1% of missing health [+66] / c:vampire +1 % Life Steal for every 3% of missing health [+11] |
 | `gain_stat_for_every:pet` | 1 | char | c:beast_master +2 % Speed for every permanent 1 Pet you have [+0] |
