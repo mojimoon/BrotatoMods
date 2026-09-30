@@ -54,6 +54,9 @@ func run(p_tree: SceneTree):
 			yield(state, "completed")
 		print("  ran ", t)
 	m.on_menu_reset()
+	_reset()
+	_write_items_table()
+	m.on_menu_reset()
 
 	print("")
 	print("%d checks, %d failures" % [_checks, _failures.size()])
@@ -62,6 +65,63 @@ func run(p_tree: SceneTree):
 	if _failures.empty():
 		print("ALL TESTS PASSED")
 	return 0 if _failures.empty() else 1
+
+
+# 每次测试都输出：默认设置（固定种子 42）下全部重组道具的 markdown 表格 -> mods/tests/AutoAnthony/ITEMS.md
+const ITEMS_TABLE_SEED = 42
+const ITEMS_TABLE_PATH = "res://mods/tests/AutoAnthony/ITEMS.md"
+
+
+func _write_items_table() -> void:
+	var prev = TranslationServer.get_locale()
+	TranslationServer.set_locale("zh")
+	var gen = Generator.new(_cfg(), ITEMS_TABLE_SEED)
+	var plan = gen.generate(m.native_only(isvc.items), m.native_only(isvc.characters), [], [])
+	var strip = RegEx.new()
+	strip.compile("\\[img[^\\]]*\\][^\\[]*\\[/img\\]|\\[/?color\\]|\\[color=[^\\]]*\\]")
+	var entries = []
+	for it in isvc.items:
+		if plan.items.has(it.my_id):
+			entries.push_back(it)
+	entries.sort_custom(self, "_sort_tier_price")
+	var count = [0, 0, 0, 0]
+	var lines = []
+	for it in entries:
+		var p = plan.items[it.my_id]
+		count[it.tier] += 1
+		var nm = tr("AA_NAME_FMT").replace("{0}", tr(p.adj)).replace("{1}", tr(it.name))
+		var fx = []
+		for e in p.effects:
+			var t = strip.sub(e.get_text(0, false), "", true).strip_edges()
+			if t != "":
+				fx.push_back(t.replace("|", "/").replace("\n", " "))
+		var mark = ""
+		if p.get("core", "") != "":
+			mark = "核心"
+		elif p.get("wanted_tag", "") != "":
+			mark = "词条保底"
+		if p.get("unique", false):
+			mark += ("，" if mark != "" else "") + "独特"
+		lines.push_back("| T%d | %s | %d | %d | %s | %s |" % [it.tier + 1, nm, p.price, it.value, PoolStringArray(fx).join("<br>"), mark])
+	var out = "# 默认设置下的全部重组道具\n\n"
+	out += "由测试在每次运行结束时自动生成（`test_cases.gd` 的 `_write_items_table`）。默认设置：重组道具、重组名称开启，其余选项关闭，平均数值 / 浮动范围 / 触发效果 100%，保留原版道具 0%；种子 " + str(ITEMS_TABLE_SEED) + "。\n\n"
+	out += "共 %d 件：T1 %d、T2 %d、T3 %d、T4 %d。锚定道具（望远镜、诱饵、口袋工厂、美西螈、鱼钩等）保持原版，不在表内。\n\n" % [entries.size(), count[0], count[1], count[2], count[3]]
+	out += "| 稀有度 | 道具 | 价格 | 原版价格 | 效果 | 备注 |\n| --- | --- | --- | --- | --- | --- |\n"
+	out += PoolStringArray(lines).join("\n") + "\n"
+	var f = File.new()
+	if f.open(ITEMS_TABLE_PATH, File.WRITE) == OK:
+		f.store_string(out)
+		f.close()
+		print("items table: ", ProjectSettings.globalize_path(ITEMS_TABLE_PATH), " (", entries.size(), " items)")
+	else:
+		printerr("FAIL could not write ", ITEMS_TABLE_PATH)
+	TranslationServer.set_locale(prev)
+
+
+func _sort_tier_price(a, b) -> bool:
+	if a.tier != b.tier:
+		return a.tier < b.tier
+	return a.my_id < b.my_id
 
 
 # ============================================================
@@ -3512,3 +3572,26 @@ func test_117_all_locales_translated() -> void:
 	TranslationServer.set_locale("ja")
 	_eq(tr("AA_T_STILL"), "静止中", "Japanese text at runtime")
 	TranslationServer.set_locale(prev)
+
+
+
+# ============================================================
+# T3 及以上的道具至少有两条效果（各选项组合下）
+# ============================================================
+func test_118_t3_min_two_lines() -> void:
+	var worst = {}
+	for opts in [{}, {"char_effects": true, "all_char_effects": true, "more_double": true}, {"triggers": 50}, {"avg": 50}]:
+		var cfg = _cfg()
+		for k in opts:
+			cfg[k] = opts[k]
+		for sd in range(1, 9):
+			var gen = Generator.new(cfg, sd)
+			gen.player_wanted_tags = ["structure", "pet", "explosive", "stat_curse", "consumable", "stat_luck"]
+			var plan = gen.generate(isvc.items, isvc.characters, [], [])
+			for id in plan.items:
+				var it = _item(id)
+				var n = Generator.visible_lines(plan.items[id].effects)
+				if it.tier >= Catalog.MIN_LINES_TIER:
+					_check(n >= Catalog.MIN_LINES, "T%d item %s has %d effect line(s): %s" % [it.tier + 1, id, n, _texts(plan.items[id].effects)])
+				worst[it.tier] = min(worst.get(it.tier, 99), n)
+	print("AUDIT minimum effect lines by tier: ", worst)

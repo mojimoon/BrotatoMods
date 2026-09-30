@@ -120,6 +120,11 @@ func generate(items: Array, all_characters: Array, selected: Array, weapons: Arr
 				plan.items[item.my_id] = r
 		cur_stat_bans = []
 		_ensure_player_wanted_tags(plan, items, gen_items, core)
+		for item in gen_items:
+			if plan.items.has(item.my_id):
+				_ensure_min_lines(item, plan.items[item.my_id])
+		cur_stat_bans = []
+		cur_tier = -1
 		for id in plan.items:
 			plan.items[id]["unique"] = has_unique_effect(plan.items[id].effects)
 			plan.items[id]["price"] = int(gen_prices.get(id, 0))
@@ -129,6 +134,51 @@ func generate(items: Array, all_characters: Array, selected: Array, weapons: Arr
 	if cfg.get("weapons", false):
 		plan.weapons = generate_weapons(weapons)
 	return plan
+
+
+# T3 及以上的道具至少有两条效果（catalog.MIN_LINES_TIER / MIN_LINES），价值不变：
+#   有可拆的正面属性行 -> 拆出一半换成另一条等价的属性行
+#   否则（唯一的效果是触发条款 / 机制）-> 加一条代价和它换来的一条正面属性
+static func visible_lines(effects: Array) -> int:
+	var n = 0
+	for e in effects:
+		if e.get_text(0, false) != "":
+			n += 1
+	return n
+
+
+func _ensure_min_lines(item, r: Dictionary) -> void:
+	if item.tier < Catalog.MIN_LINES_TIER or visible_lines(r.effects) >= Catalog.MIN_LINES:
+		return
+	rng.seed = hash(str(seed_value) + "/minlines/" + item.my_id)
+	cur_tier = item.tier
+	cur_stat_bans = Catalog.ITEM_STAT_BANS.get(item.my_id, [])
+	var effects: Array = r.effects.duplicate()
+	var used = []
+	var split = null
+	for e in effects:
+		if Catalog.STATS.has(e.key):
+			used.push_back(e.key)
+		if is_plain_stat(e) and e.value >= 2 * Catalog.stat_unit(e.key) and (split == null or line_value(e.key, e.value) > line_value(split.key, split.value)):
+			split = e
+	if split != null:
+		var unit = Catalog.stat_unit(split.key)
+		var half = int(floor(split.value / 2.0 / unit) * unit)
+		var s2 = _pick_stat(false, used)
+		var v2 = _round_to_unit(half * Catalog.stat_w(split.key) / Catalog.stat_w(s2), s2)
+		var idx = effects.find(split)
+		effects[idx] = _stat_effect(split.key, split.value - half)
+		effects.insert(idx + 1, _stat_effect(s2, v2))
+	else:
+		var ns = _pick_stat(true, used)
+		var nv = int(min(_round_to_unit(float(r.budget) * 0.15 * divisor / Catalog.stat_w(ns), ns), _line_cap(ns, true)))
+		var ps = _pick_stat(false, used + [ns])
+		var pv = _round_to_unit(neg_value(nv * Catalog.stat_w(ns)) / Catalog.stat_w(ps), ps)
+		effects.push_front(_stat_effect(ps, pv))
+		effects.push_back(_stat_effect(ns, -nv))
+	r.effects = effects
+	r.tags = _tags_for(effects)
+	r.main_stats = main_stats(effects)
 
 
 # 带"设定值 / 列表"型角色效果的道具（catalog.BETA_UNIQUE_KEYS）：设为独特

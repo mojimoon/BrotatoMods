@@ -787,6 +787,10 @@ const CHAR_REASSEMBLE_KINDS = {"stat": 0.4, "clause": 0.35, "scaling": 0.13, "ga
 const CHAR_CONVERT_CHANCE = 0.5
 const WANTED_BIAS = 4.0
 
+# T3 及以上（稀有度索引 >= 2）的道具至少有两条效果
+const MIN_LINES_TIER = 2
+const MIN_LINES = 2
+
 # T4 道具不出现 +收获（与原版一致）
 const T4_BANNED_POSITIVE_STATS = ["stat_harvesting"]
 # 负面触发条款使用敌人属性（生命 / 伤害 / 速度提高）的概率

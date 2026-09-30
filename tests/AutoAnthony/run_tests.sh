@@ -53,7 +53,7 @@ ERRORS=$(awk '
 	}
 ' "$LOG")
 
-grep -E "^(  ran |FAIL |[0-9]+ checks|ALL TESTS PASSED|user dir|Refusing|Mod node|AUDIT)" "$LOG"
+grep -E "^(  ran |FAIL |[0-9]+ checks|ALL TESTS PASSED|user dir|Refusing|Mod node|AUDIT|items table)" "$LOG"
 if [ -n "$ERRORS" ]; then
 	echo
 	echo "Script errors from the mod or tests:"
