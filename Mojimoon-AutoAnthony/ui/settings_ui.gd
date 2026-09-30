@@ -357,6 +357,11 @@ func _item_name(item, p: Dictionary) -> String:
 	return nm
 
 
+# 重组道具的价格由本 mod 生成（不继承原版价格）
+func _item_price(item, p: Dictionary) -> int:
+	return int(p.price) if int(p.get("price", 0)) > 0 else int(item.value)
+
+
 func _item_card(item, p: Dictionary, width: float) -> Control:
 	var color = ItemService.get_color_from_tier(item.tier)
 	var card = PanelContainer.new()
@@ -382,7 +387,7 @@ func _item_card(item, p: Dictionary, width: float) -> Control:
 	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	nm.clip_text = true
 	head.add_child(nm)
-	var price = str(item.value)
+	var price = str(_item_price(item, p))
 	if p.get("unique", false):
 		price = tr("AA_UI_UNIQUE") + "  " + price
 	head.add_child(_label(price, FONT_DESC, C_TEXT_DIM))
@@ -411,7 +416,7 @@ func build_preview_text(p_seed: int) -> String:
 	for item in _preview_entries(plan, -1):
 		var p = plan.items[item.my_id]
 		var color = ItemService.get_color_from_tier(item.tier).to_html(false)
-		text += "[color=#" + color + "]" + _item_name(item, p) + "[/color]  [color=#" + C_TEXT_DIM.to_html(false) + "]" + str(item.value) + "[/color]\n"
+		text += "[color=#" + color + "]" + _item_name(item, p) + "[/color]  [color=#" + C_TEXT_DIM.to_html(false) + "]" + str(_item_price(item, p)) + "[/color]\n"
 		for e in p.effects:
 			var line = e.get_text(0)
 			if line != "":

@@ -330,6 +330,9 @@ func _activate(state: Dictionary) -> void:
 			res.tracking_text = "[EMPTY]"
 			# 原版的"限制 (N)"/"独特"属于原道具，不继承到重组后的道具上；带设定值型角色效果的道具为独特
 			res.max_nb = 1 if p.get("unique", false) else -1
+			# 价格不再继承原道具：用本次生成的价格（同稀有度原版价格分布）
+			if int(p.get("price", 0)) > 0:
+				res.value = int(p.price)
 			# 金鱼 / 沙漏 / 镜子在原版"用后 / 移除时变成另一件道具"：重组后不再继承
 			res.replaced_by = null
 			if rename:
@@ -458,6 +461,7 @@ func _backup(res) -> void:
 	var b = {"res": res, "effects": res.effects, "name": res.name}
 	if res is ItemData:
 		b.tags = res.tags
+		b.value = res.value
 		b.tracking_text = res.tracking_text
 		b.max_nb = res.max_nb
 		b.replaced_by = res.replaced_by
@@ -476,6 +480,7 @@ func restore() -> void:
 			res.banned_items = b.banned_items
 		if b.has("tags"):
 			res.tags = b.tags
+			res.value = b.value
 			res.tracking_text = b.tracking_text
 			res.max_nb = b.max_nb
 			res.replaced_by = b.replaced_by
@@ -540,6 +545,7 @@ func _materialize_owned(owned: Array) -> void:
 			res.name = tmpl.name
 			if res is ItemData and not res is CharacterData:
 				res.tags = tmpl.tags
+				res.value = tmpl.value
 				res.tracking_text = tmpl.tracking_text
 				res.max_nb = tmpl.max_nb
 				res.replaced_by = tmpl.replaced_by
@@ -597,6 +603,7 @@ func _repair_item(it) -> void:
 	it.name = tmpl.name
 	if not it is CharacterData:
 		it.tags = tmpl.tags
+		it.value = tmpl.value
 		it.tracking_text = tmpl.tracking_text
 		it.max_nb = tmpl.max_nb
 		it.replaced_by = tmpl.replaced_by

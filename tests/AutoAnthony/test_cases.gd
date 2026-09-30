@@ -426,12 +426,19 @@ func test_20_start_run_and_restore() -> void:
 	_check(potato.effects != orig_effects, "potato reassembled in place")
 	_check(potato.name != orig_name, "name composed")
 	_eq(potato.tracking_text, "[EMPTY]", "tracking text hidden")
-	_eq(potato.value, 95, "price preserved")
+	# 价格不再继承原道具：取自同稀有度原版价格分布，回到主菜单后还原
+	var t4_prices = []
+	for it in isvc.items:
+		if it.tier == 3 and it != potato:
+			t4_prices.push_back(it.value)
+	_eq(potato.value, m.plan.items["item_potato"].price, "generated price applied")
+	_check(potato.value >= 80 and potato.value <= 130, "generated price within the tier's native range (%d)" % potato.value)
 	_eq(potato.tier, 3, "tier preserved")
 	var anchored = _item("item_spyglass")
 	var coupon_before = anchored.effects
 	m.on_menu_reset()
 	_check(potato.effects == orig_effects, "restored effects")
+	_eq(potato.value, 95, "restored price")
 	_eq(potato.name, orig_name, "restored name")
 	_check(anchored.effects == coupon_before, "anchored untouched")
 	_eq(m.active_state, null, "inactive after reset")
@@ -710,6 +717,9 @@ func test_50_all_translation_keys_exist() -> void:
 
 
 func test_51_ui_builds_and_previews() -> void:
+	var prev_locale = TranslationServer.get_locale()
+	if OS.get_environment("AA_LOCALE") != "":
+		TranslationServer.set_locale(OS.get_environment("AA_LOCALE"))
 	var scene = load(MOD_DIR + "ui/settings_ui.tscn")
 	var ui = scene.instance()
 	tree.root.add_child(ui)
@@ -754,6 +764,7 @@ func test_51_ui_builds_and_previews() -> void:
 			img.flip_y()
 			img.save_png(shot)
 	ui.queue_free()
+	TranslationServer.set_locale(prev_locale)
 	yield(tree, "idle_frame")
 
 
@@ -2569,14 +2580,14 @@ func test_103_scaling_grants_probe() -> void:
 			# 只用纯属性道具，避免原版的计数型效果随战斗变化干扰基线
 			var plain = true
 			for e in it.effects:
-				if e.get_script() != load("res://items/global/effect.gd") or e.custom_key != "" or e.key == "stat_max_hp":
+				if e.get_script() != load("res://items/global/effect.gd") or e.custom_key != "" or e.key == "stat_max_hp" or not Catalog.STATS.has(e.key):
 					plain = false
 			if not plain:
 				continue
 			rd.add_item(it, 0)
 			added += 1
 	for it in isvc.items:
-		if it.tier == 3 and not it.is_cursed and it.effects.size() == 1 and it.effects[0].get_script() == load("res://items/global/effect.gd") and it.effects[0].key != "stat_max_hp":
+		if it.tier == 3 and not it.is_cursed and it.effects.size() == 1 and it.effects[0].get_script() == load("res://items/global/effect.gd") and it.effects[0].key != "stat_max_hp" 				and it.effects[0].custom_key == "" and Catalog.STATS.has(it.effects[0].key):
 			rd.add_item(it, 0)
 			break
 	rd.add_gold(80, 0)
@@ -3149,7 +3160,8 @@ func test_112_all_character_effects() -> void:
 		rd.add_item(holder, 0)
 		LinkedStats.reset_player(0)
 		Utils.reset_stat_cache(0)
-		var a0 = Utils.get_stat(Keys.stat_armor_hash, 0)
+		# 只看计数带来的部分（X 自己的效果也可能给护甲）：联动属性 = 总属性 − 永久属性
+		var a0 = Utils.get_stat(Keys.stat_armor_hash, 0) - rd.get_stat(Keys.stat_armor_hash, 0)
 		var n0 = rd.get_nb_item(Keys.generate_hash(x), 0)
 		rd.add_item(_item(x), 0)
 		rd.add_item(_item(x), 0)
@@ -3157,7 +3169,7 @@ func test_112_all_character_effects() -> void:
 		Utils.reset_stat_cache(0)
 		var dn = rd.get_nb_item(Keys.generate_hash(x), 0) - n0
 		_check(dn >= 1, "guaranteed item added (%d)" % dn)
-		_eq(Utils.get_stat(Keys.stat_armor_hash, 0) - a0, 3 * dn, "+3 armor for every owned guaranteed item")
+		_eq(Utils.get_stat(Keys.stat_armor_hash, 0) - rd.get_stat(Keys.stat_armor_hash, 0) - a0, 3 * dn, "+3 armor for every owned guaranteed item")
 		var args = ItemServiceGetShopItemsArgs.new([[], [], [], []], 0)
 		var shop = isvc.get_player_shop_items(rd.current_wave, 0, args)
 		var found = false
@@ -3390,3 +3402,113 @@ func test_115_character_reassembly() -> void:
 	var sample = Generator.new(cfg, 20260927).generate([], isvc.characters, [mage, vamp, isvc.get_element_safe(isvc.characters, "character_engineer")], [])
 	for cid in sample.characters:
 		print("AUDIT   %s: %s" % [cid, _texts(sample.characters[cid].effects)])
+
+
+# ============================================================
+# 价格与预算：重组道具的价格取自同稀有度原版价格分布（不继承原道具）；同稀有度内预算与价格成正比；
+# 开局后写到道具资源上、回主菜单后还原
+# ============================================================
+func test_116_generated_prices_and_budget() -> void:
+	var cfg = _cfg()
+	cfg.variance = 0
+	var gen = Generator.new(cfg, 42)
+	var plan = gen.generate(isvc.items, isvc.characters, [], [])
+	var plan2 = Generator.new(cfg, 42).generate(isvc.items, isvc.characters, [], [])
+	var plan3 = Generator.new(cfg, 43).generate(isvc.items, isvc.characters, [], [])
+	var lo = [9999, 9999, 9999, 9999]
+	var hi = [0, 0, 0, 0]
+	var native_sum = [0.0, 0.0, 0.0, 0.0]
+	var gen_sum = [0.0, 0.0, 0.0, 0.0]
+	var n = [0, 0, 0, 0]
+	for id in plan.items:
+		var it = _item(id)
+		if it.value >= Catalog.PRICE_POOL_MIN:
+			lo[it.tier] = min(lo[it.tier], it.value)
+			hi[it.tier] = max(hi[it.tier], it.value)
+	var changed = 0
+	var differ_seed = 0
+	for id in plan.items:
+		var it = _item(id)
+		var p = plan.items[id]
+		_check(p.price >= lo[it.tier] and p.price <= hi[it.tier], "%s price %d within tier range [%d, %d]" % [id, p.price, lo[it.tier], hi[it.tier]])
+		_eq(p.price, plan2.items[id].price, "price deterministic for a seed: " + id)
+		if p.price != it.value:
+			changed += 1
+		if plan3.items.has(id) and plan3.items[id].price != p.price:
+			differ_seed += 1
+		native_sum[it.tier] += it.value
+		gen_sum[it.tier] += p.price
+		n[it.tier] += 1
+		# 同稀有度内预算与价格成正比（浮动为 0 时）
+		var expect = max(2.0, gen.tier_value_median[it.tier] * p.price / gen.tier_price_median[it.tier]) * Catalog.HIDDEN_TIER_MULT[it.tier]
+		_check(abs(p.budget - expect) < 0.01, "%s budget proportional to its price (%.2f vs %.2f)" % [id, p.budget, expect])
+	_check(changed > plan.items.size() / 2, "most items get a new price (%d / %d)" % [changed, plan.items.size()])
+	_check(differ_seed > plan.items.size() / 3, "prices depend on the seed (%d)" % differ_seed)
+	for t in 4:
+		var a = native_sum[t] / max(1, n[t])
+		var b = gen_sum[t] / max(1, n[t])
+		print("AUDIT prices T%d: native mean %.1f, generated mean %.1f, range [%d, %d], k = %.3f" % [t + 1, a, b, lo[t], hi[t], gen.tier_value_median[t] / gen.tier_price_median[t]])
+		_check(abs(a - b) < a * 0.15, "generated prices follow the tier's native distribution (T%d)" % (t + 1))
+	# 写到资源上并在回主菜单后还原
+	var before = {}
+	for it in isvc.items:
+		before[it.my_id] = it.value
+	m.cfg_seed = 42
+	m.start_new_run()
+	for id in m.plan.items:
+		_eq(_item(id).value, m.plan.items[id].price, "generated price written to the item: " + id)
+	m.on_menu_reset()
+	for it in isvc.items:
+		_eq(it.value, before[it.my_id], "price restored: " + it.my_id)
+	# 估值修正：从升级中获得的属性 +X% 估值降低（同样预算数值更高）
+	var found = false
+	for t in 4:
+		for mech in gen.mechanics_by_tier[t]:
+			if mech.effect.key == "level_upgrades_modifications" and not mech.down:
+				found = true
+				print("AUDIT level upgrades mechanic: +%d%% valued %.1f (%.2f per %%)" % [mech.effect.value, mech.value, mech.value / mech.effect.value])
+	_check(found or tree.root.get_node("ProgressData").get_dlc_data("abyssal_terrors") == null, "level upgrade mechanic collected")
+	_check(Catalog.MECHANIC_VALUE_MULT["level_upgrades_modifications"] < 1.0, "level upgrade valuation lowered")
+
+
+
+# ============================================================
+# 本地化：原版的 13 种语言每个 key 都有文本，占位符与英文一致
+# ============================================================
+func test_117_all_locales_translated() -> void:
+	var f = File.new()
+	_check(f.open(MOD_DIR + "translations/autoanthony.csv", File.READ) == OK, "csv opens")
+	var lines = f.get_as_text().split("\n", false)
+	f.close()
+	var header = m._parse_csv_line(lines[0].strip_edges())
+	_eq(header.size(), 14, "key + 13 locales")
+	for l in ["en", "fr", "zh", "ja", "ko", "zh_TW", "ru", "pl", "es", "pt", "de", "tr", "it"]:
+		_check(l in header, "locale column: " + l)
+	var re = RegEx.new()
+	re.compile("\\{[0-9]\\}")
+	var n = 0
+	for li in range(1, lines.size()):
+		var row = m._parse_csv_line(lines[li].strip_edges())
+		if row.size() < 2 or row[0] == "":
+			continue
+		n += 1
+		_eq(row.size(), header.size(), "row has every locale: " + row[0])
+		var ph = []
+		for mt in re.search_all(row[1]):
+			ph.push_back(mt.get_string())
+		ph.sort()
+		for i in range(1, min(row.size(), header.size())):
+			_check(row[i] != "", "%s translated in %s" % [row[0], header[i]])
+			var got = []
+			for mt in re.search_all(row[i]):
+				got.push_back(mt.get_string())
+			got.sort()
+			_check(got == ph, "%s placeholders kept in %s: %s" % [row[0], header[i], row[i]])
+	_check(n > 190, "rows checked (%d)" % n)
+	# 运行时切换语言后能取到对应文本
+	var prev = TranslationServer.get_locale()
+	TranslationServer.set_locale("de")
+	_eq(tr("AA_T_LEVEL_UP"), "Beim Levelaufstieg", "German text at runtime")
+	TranslationServer.set_locale("ja")
+	_eq(tr("AA_T_STILL"), "静止中", "Japanese text at runtime")
+	TranslationServer.set_locale(prev)

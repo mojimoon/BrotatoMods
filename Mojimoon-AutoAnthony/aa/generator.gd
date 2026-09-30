@@ -49,7 +49,9 @@ var payload_prior: Dictionary = {}
 var trigger_stat_prior: Dictionary = {}
 var mechanics_by_tier: Array = [[], [], [], []]	# {effect, value, down, source}
 var character_budget: float = Catalog.CHARACTER_BUDGET_DEFAULT
-# 预算模型：原版纯属性道具每档的净价值中位数与价格中位数（档内价格弹性见 catalog.PRICE_ELASTICITY）
+# 本次生成的道具价格 {道具 ID: 价格}（重组道具不再继承原版价格）
+var gen_prices: Dictionary = {}
+# 预算模型：原版纯属性道具每档的净价值中位数与价格中位数（同稀有度内预算与价格成正比）
 var tier_value_median: Array = [8.0, 18.0, 29.0, 55.0]
 var tier_price_median: Array = [20.0, 48.0, 72.0, 100.0]
 var divisor: float = Catalog.DOWNSIDE_DIVISOR
@@ -110,6 +112,7 @@ func generate(items: Array, all_characters: Array, selected: Array, weapons: Arr
 		for item in items:
 			if _is_reassemblable_item(item) and not _keeps_native(item):
 				gen_items.push_back(item)
+		assign_prices(gen_items)
 		var core = pick_core_items(gen_items)
 		for item in gen_items:
 			var r = generate_item(item, core.get(item.my_id, ""))
@@ -119,6 +122,7 @@ func generate(items: Array, all_characters: Array, selected: Array, weapons: Arr
 		_ensure_player_wanted_tags(plan, items, gen_items, core)
 		for id in plan.items:
 			plan.items[id]["unique"] = has_unique_effect(plan.items[id].effects)
+			plan.items[id]["price"] = int(gen_prices.get(id, 0))
 	if cfg.get("characters", false):
 		for ch in selected:
 			plan.characters[ch.my_id] = generate_character(ch)
@@ -158,7 +162,7 @@ func pick_core_items(gen_items: Array) -> Dictionary:
 				break
 			var weights = {}
 			for k in pool.size():
-				var d = abs(log(max(1.0, pool[k].value) / tier_price_median[t]))
+				var d = abs(log(max(1.0, price_of(pool[k])) / tier_price_median[t]))
 				weights[k] = 1.0 / (0.25 + d)
 			var k = _pick_weighted(weights)
 			res[pool[k].my_id] = st
@@ -591,14 +595,36 @@ static func _median(arr: Array) -> float:
 	return a[a.size() / 2]
 
 
-# 原版道具的效果预算（不含平均数值与浮动）
-#   tier（默认）：同稀有度原版纯属性道具的净价值中位数 × (价格 / 该档价格中位数) ^ 弹性
-#   intercept：价格 − 稀有度截距（线性价格模型）
+# 道具的价格：重组道具用本次生成的价格，其余（原版来源、保留原版的道具）用原版价格
+func price_of(item) -> float:
+	return float(gen_prices.get(item.my_id, item.value))
+
+
+# 道具的效果预算（不含平均数值与浮动）
+#   tier（默认）：同稀有度内与价格成正比，k = 原版纯属性道具的净价值中位数 / 价格中位数
+#   intercept：价格 − 稀有度截距
 func item_budget(item) -> float:
+	var price = price_of(item)
 	if cfg.get("budget_model", "tier") == "intercept":
-		return max(3.0, item.value - Catalog.TIER_INTERCEPT[item.tier])
+		return max(3.0, price - Catalog.TIER_INTERCEPT[item.tier])
 	var t = item.tier
-	return max(2.0, tier_value_median[t] * pow(max(1.0, item.value) / tier_price_median[t], Catalog.PRICE_ELASTICITY))
+	return max(2.0, tier_value_median[t] * max(1.0, price) / tier_price_median[t])
+
+
+# 为每件重组道具生成价格：从同稀有度被重组道具的原版价格中有放回抽取（按种子与道具 ID 确定）
+func assign_prices(gen_items: Array) -> void:
+	var pools = [[], [], [], []]
+	for it in gen_items:
+		if it.value >= Catalog.PRICE_POOL_MIN:
+			pools[it.tier].push_back(it.value)
+	for t in 4:
+		pools[t].sort()
+	for it in gen_items:
+		var pool: Array = pools[it.tier]
+		if pool.empty():
+			continue
+		rng.seed = hash(str(seed_value) + "/price/" + it.my_id)
+		gen_prices[it.my_id] = int(pool[rng.randi() % pool.size()])
 
 
 # 道具机制估值：正面机制平分"价格 − 截距 − 属性行价值"；
@@ -612,7 +638,7 @@ func _add_item_mechanics(src, mechs: Array, stat_value: float, pos_value: float)
 		else:
 			ups += 1
 	var budget = item_budget(src)
-	var each_up = max(5.0, (budget - stat_value) / max(1, ups))
+	var each_up = max(5.0, (budget - stat_value) / max(1, ups)) * float(Catalog.MECHANIC_VALUE_MULT.get(src.my_id, 1.0))
 	var each_down = max(3.0, 0.15 * max(budget, 0.0))
 	if ups == 0 and downs > 0:
 		each_down = max(3.0, (pos_value - budget) / downs)
@@ -621,12 +647,13 @@ func _add_item_mechanics(src, mechs: Array, stat_value: float, pos_value: float)
 		var k = e.custom_key if e.custom_key != "" else e.key
 		var scalar = ((e.get_script() == effect_script and e.storage_method == 0 and e.custom_key == "") or k in Catalog.SCALAR_EXTRA_KEYS) \
 			and e.value != 0 and not e.key in Catalog.SCALAR_MECHANIC_EXCLUDED and not down
+		var key_mult = float(Catalog.MECHANIC_VALUE_MULT.get(k, 1.0))
 		mechanics_by_tier[src.tier].push_back({
-			"effect": e, "value": -each_down if down else each_up, "down": down, "source": src.my_id,
+			"effect": e, "value": -each_down if down else each_up * key_mult, "down": down, "source": src.my_id,
 			"tags": _extra_tags(src), "scalar": scalar,
 		})
 		if cfg.get("more_double", false):
-			_add_mirrored_mechanic(src, e, each_up, down, scalar)
+			_add_mirrored_mechanic(src, e, each_up * key_mult, down, scalar)
 
 
 # 更多双面效果：可缩放正面机制的反面作为代价；敌人生命 / 伤害提高（负面机制）的反面作为好处
@@ -1050,7 +1077,7 @@ func _gen_downsides(item, comp: float, perm_mult: float, used_stats: Array, budg
 		if not cd.empty():
 			downsides += cd.effects
 			got = cd.value
-	elif r >= 0.37 and r < 0.41:
+	elif r >= 0.37 and r < 0.40:
 		var nd = gen_next_wave_downside(comp, perm_mult)
 		if not nd.empty():
 			downsides += nd.effects

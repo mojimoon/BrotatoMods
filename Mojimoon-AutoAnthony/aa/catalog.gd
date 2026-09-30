@@ -3,7 +3,10 @@ extends Reference
 # 东尼算法（Brotato）静态目录：价值货币、触发扳机、效果载荷、合法组合与原版触发器的拆解映射。
 #
 # 价值货币：1 点价值 ≈ 商店价格中的 1 材料。
-# 对原版纯属性道具做岭回归：价格 ≈ 稀有度截距 + Σ 正面属性权重 × 数值 + Σ 负面属性权重 × 数值 / D。
+# 对原版纯属性道具（97 件）做岭回归：价格 ≈ 稀有度截距 + Σ 正面属性权重 × 数值 + Σ 负面属性权重 × 数值 / D，
+# 先验取 ArosRising MultiTool "Value Settings" 的升级等价比（闪避 1 : 最大生命 1 : 暴击 1 : 速度 1 : 近战 1.5 : 再生 1.5 :
+# 工程 2 : 吸血 2 : 远程 3 : 元素 3 : 护甲 3 : %伤害 0.75 : 收获 0.75 : 攻速 0.6 : 幸运 0.4 : 范围 0.15）× 2 材料，
+# 岭强度 300：R² = 0.95，价格的中位相对误差 9%。
 # 负面除数 D 的网格搜索（平均相对误差）：D=1 13.0%，1.5 12.7%，2 12.6%，2.5–8 12.4–12.5%，不计负面 12.8%。
 # 数据只能说明"负面远不如正面值钱"（可以卖掉无关或次要的属性）；实验后取 D=2.5。
 #
@@ -18,8 +21,8 @@ extends Reference
 
 const WAVE_SECONDS = 60.0
 
-# 稀有度截距（Tier 0..3）：原版价格中与效果无关的部分
-const TIER_INTERCEPT = [11.5, 30.0, 40.9, 39.0]
+# 稀有度截距（Tier 0..3）：原版价格中与效果无关的部分（只用于可选的 intercept 预算模型）
+const TIER_INTERCEPT = [11.9, 31.5, 44.6, 42.5]
 # 永久累积倍率：Tier 越高通常购买越晚、剩余波数越少。角色视为整局持有。
 # 由原版"每波永久成长"道具反推（警戒戒指 6.4、机械臂 3.5、魔法叶 3.3、鬼火 2.5、宝宝乌贼 6.1），中位约 3.5
 const PERM_MULT = [5.0, 4.5, 4.0, 3.5]
@@ -31,34 +34,41 @@ const DOWNSIDE_DIVISOR = 2.5
 # 隐藏价值乘数（按稀有度）：用"真实频率"审计生成道具与原版纯属性道具的强度比 real，
 # real < 1 的档位乘以 1 / real 补齐，real >= 1 的保持不变。由测试 test_60 的审计结果标定。
 const HIDDEN_TIER_MULT = [1.0, 1.08, 1.05, 1.0]
-# 档内价格弹性：原版同稀有度道具的 log(净价值) 对 log(价格) 的斜率（约 0.69）
-const PRICE_ELASTICITY = 0.69
+# 预算模型：同稀有度内 预算 = k × 价格（过原点的线性），k = 原版纯属性道具的净价值中位数 / 价格中位数
+# （T1–T4 约 0.40 / 0.35 / 0.38 / 0.56）。原版档内"价值 - 价格"几乎没有斜率（档内 R² 只有 0.07–0.33），
+# 任何档内曲线都是建模选择；旧的 价格^0.69 与正比模型对原版的拟合相同（R² 都是 0.918），而价格现在由本 mod 生成，
+# 用正比关系最直接：贵一倍的道具就强一倍。
+# 重组道具的价格：从同稀有度被重组道具的原版价格分布中有放回抽取（不是均匀分布；低于此值的占位价格不参与）
+const PRICE_POOL_MIN = 5
+# 机制估值修正：来源道具 / 机制 key -> 估值倍率（< 1 = 同样预算给出更高的数值）
+#   从升级中获得的属性 +X%（藤壶）；MultiTool 里评级偏低的特殊机制道具（花园 C、眼罩）
+const MECHANIC_VALUE_MULT = {"level_upgrades_modifications": 0.5, "item_garden": 0.75, "item_eyepatch": 0.8}
 
 # ------------------------------------------------------------
 # 属性：权重（材料 / 点）、每次触发的自然粒度、是否百分比显示、伤害参考值（用于"X% 某属性的伤害"）
 # ------------------------------------------------------------
 const STATS = {
-	"stat_max_hp": {"w": 3.5, "unit": 1, "pct": false, "ref": 40.0},
-	"stat_hp_regeneration": {"w": 2.8, "unit": 1, "pct": false, "ref": 8.0},
-	"stat_lifesteal": {"w": 4.7, "unit": 1, "pct": true, "ref": 10.0},
-	"stat_percent_damage": {"w": 1.8, "unit": 1, "pct": true, "ref": 25.0},
+	"stat_max_hp": {"w": 2.9, "unit": 1, "pct": false, "ref": 40.0},
+	"stat_hp_regeneration": {"w": 3.0, "unit": 1, "pct": false, "ref": 8.0},
+	"stat_lifesteal": {"w": 4.2, "unit": 1, "pct": true, "ref": 10.0},
+	"stat_percent_damage": {"w": 1.65, "unit": 1, "pct": true, "ref": 25.0},
 	"stat_melee_damage": {"w": 2.8, "unit": 1, "pct": false, "ref": 15.0},
-	"stat_ranged_damage": {"w": 5.0, "unit": 1, "pct": false, "ref": 15.0},
-	"stat_elemental_damage": {"w": 4.4, "unit": 1, "pct": false, "ref": 12.0},
-	"stat_attack_speed": {"w": 1.4, "unit": 1, "pct": true, "ref": 25.0},
-	"stat_crit_chance": {"w": 2.1, "unit": 1, "pct": true, "ref": 15.0},
+	"stat_ranged_damage": {"w": 5.9, "unit": 1, "pct": false, "ref": 15.0},
+	"stat_elemental_damage": {"w": 4.9, "unit": 1, "pct": false, "ref": 12.0},
+	"stat_attack_speed": {"w": 1.35, "unit": 1, "pct": true, "ref": 25.0},
+	"stat_crit_chance": {"w": 1.85, "unit": 1, "pct": true, "ref": 15.0},
 	"stat_engineering": {"w": 3.3, "unit": 1, "pct": false, "ref": 15.0},
 	"stat_range": {"w": 0.6, "unit": 5, "pct": false, "ref": 60.0},
-	"stat_armor": {"w": 6.5, "unit": 1, "pct": false, "ref": 8.0},
-	"stat_dodge": {"w": 2.6, "unit": 1, "pct": true, "ref": 20.0},
-	"stat_speed": {"w": 2.4, "unit": 1, "pct": true, "ref": 15.0},
-	"stat_luck": {"w": 1.1, "unit": 1, "pct": false, "ref": 30.0},
+	"stat_armor": {"w": 6.0, "unit": 1, "pct": false, "ref": 8.0},
+	"stat_dodge": {"w": 2.4, "unit": 1, "pct": true, "ref": 20.0},
+	"stat_speed": {"w": 2.1, "unit": 1, "pct": true, "ref": 15.0},
+	"stat_luck": {"w": 0.9, "unit": 1, "pct": false, "ref": 30.0},
 	"stat_harvesting": {"w": 0.95, "unit": 1, "pct": false, "ref": 40.0},
-	"xp_gain": {"w": 0.66, "unit": 1, "pct": true, "ref": 0.0},
+	"xp_gain": {"w": 0.5, "unit": 1, "pct": true, "ref": 0.0},
 	"pickup_range": {"w": 0.46, "unit": 5, "pct": true, "ref": 0.0},
-	"knockback": {"w": 0.8, "unit": 1, "pct": false, "ref": 0.0},
-	"explosion_damage": {"w": 0.95, "unit": 5, "pct": true, "ref": 0.0},
-	"explosion_size": {"w": 0.81, "unit": 5, "pct": true, "ref": 0.0},
+	"knockback": {"w": 0.7, "unit": 1, "pct": false, "ref": 0.0},
+	"explosion_damage": {"w": 0.93, "unit": 5, "pct": true, "ref": 0.0},
+	"explosion_size": {"w": 0.7, "unit": 5, "pct": true, "ref": 0.0},
 	"consumable_heal": {"w": 5.2, "unit": 1, "pct": false, "ref": 0.0},
 }
 
@@ -515,9 +525,9 @@ const HEAL_KEYS = ["heal_on_kill", "heal_on_crit_kill", "heal_when_pickup_gold",
 # 仙女（每个普通 / 传说道具）→ 普通约 12、传说约 1.5。其余属性取 STATS.ref × 1.2。
 # ============================================================
 const COUNTER_REF = {
-	"stat_armor": 10.0, "stat_elemental_damage": 15.0, "stat_speed": 16.0, "stat_crit_chance": 25.0,
+	"stat_armor": 8.0, "stat_elemental_damage": 12.0, "stat_speed": 16.0, "stat_crit_chance": 25.0,
 	"stat_dodge": 25.0, "knockback": 12.0,
-	"materials": 320.0, "structure": 3.0, "living_enemy": 24.0, "burning_enemy": 8.0, "living_tree": 3.0,
+	"materials": 240.0, "structure": 3.0, "living_enemy": 24.0, "burning_enemy": 8.0, "living_tree": 3.0,
 	"percent_player_missing_health": 30.0, "different_item": 18.0, "common_item": 12.0, "legendary_item": 1.5,
 	"free_weapon_slots": 0.8,
 }
@@ -561,7 +571,7 @@ const GAIN_MOD_STATS = [
 const GAIN_MOD_STEPS = [10, 15, 20, 25, 33, 40, 50]
 
 # 特殊行的类型比例：触发条款 / 计数型 / 属性修改 / 搬运机制
-const SPECIAL_KIND_WEIGHTS = {"trigger": 0.42, "scaling": 0.16, "gain_mod": 0.07, "mechanic": 0.18, "next_wave": 0.08, "char": 0.09}
+const SPECIAL_KIND_WEIGHTS = {"trigger": 0.43, "scaling": 0.16, "gain_mod": 0.07, "mechanic": 0.19, "next_wave": 0.06, "char": 0.09}
 # 可按预算缩放数值的机制（原版 Effect，数值线性含义）：缩放范围为原版数值的 1 单位 .. 1.5 倍
 const SCALAR_MECHANIC_EXCLUDED = ["hp_start_next_wave", "hp_start_wave", "speed_cap", "hp_cap", "lock_current_weapons", "dodge_cap", "one_shot_trees", "structures_can_crit"]
 
