@@ -622,6 +622,16 @@ const TAG_BINDINGS = {
 	"mech:structure_attack_speed": ["structure"], "mech:tree_turrets": ["structure"], "mech:group_structures": ["structure"],
 	"mech:structures_cooldown_reduction": ["structure"], "mech:pacifist": ["economy"],
 	"mech:extra_loot_aliens_next_wave": ["economy"],
+	# 依据原版：闪避触发（肾上腺素、还击）带闪避；拾取材料触发（可爱猴子、小象）带拾取；箱子（袋子）带探索；
+	# 对高血量目标增伤（小鱼）带 %伤害；黑旗（诅咒敌人掉材料）带诅咒；其余机制按原版来源道具的词条
+	"trigger:dodge": ["stat_dodge"], "trigger:gold": ["pickup"], "trigger:crate": ["exploration"],
+	"payload:vuln": ["stat_percent_damage"],
+	"mech:gold_on_cursed_enemy_kill": ["stat_curse"], "mech:harvesting_growth": ["stat_harvesting"],
+	"mech:instant_gold_attracting": ["pickup"], "mech:chance_double_gold": ["pickup", "economy"],
+	"mech:enemy_fruit_drops": ["consumable"], "mech:trees": ["exploration"], "mech:one_shot_trees": ["exploration"],
+	"mech:free_rerolls": ["economy"], "mech:items_price": ["economy"], "mech:recycling_gains": ["economy"],
+	"mech:remove_speed": ["less_enemy_speed"], "mech:bonus_damage_against_targets_above_hp": ["stat_percent_damage"],
+	"mech:damage_against_bosses": ["stat_percent_damage"],
 }
 
 

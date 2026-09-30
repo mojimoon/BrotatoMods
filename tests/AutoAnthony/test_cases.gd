@@ -3192,3 +3192,67 @@ func test_113_more_double_sided() -> void:
 	_eq(rd.get_player_gold(0), 15, "lose 5 materials")
 	main_rt.free()
 	m.on_menu_reset()
+
+
+
+# ============================================================
+# 词条绑定：生成道具的触发（伤害类型、闪避、拾取材料、箱子……）、载荷（爆炸、伤害缩放属性）、计数、
+# 机制（燃烧、敌人减速……）都带上对应的原版词条（角色的偏好词条据此命中）
+# ============================================================
+func test_114_tag_bindings() -> void:
+	var cfg = _cfg()
+	cfg.char_effects = true
+	cfg.more_double = true
+	var checked = {}
+	var missing = []
+	for sd in range(1, 11):
+		var gen = Generator.new(cfg, sd)
+		var plan = gen.generate(isvc.items, isvc.characters, [], [])
+		for id in plan.items:
+			var p = plan.items[id]
+			for e in p.effects:
+				var want = []
+				var what = ""
+				if e is TriggerEffect and e.value > 0:
+					want += Catalog.tags_for_binding("trigger:" + e.trigger)
+					want += Catalog.tags_for_binding("payload:" + e.payload)
+					what = e.trigger + "/" + e.payload
+					if e.payload in ["damage", "explode"] and Catalog.STATS.has(e.stat):
+						want.push_back(e.stat)
+						what += "/" + e.stat
+					if e.payload == "explode":
+						want.push_back("explosive")
+				elif gen.is_scaling(e) and e.value > 0:
+					want += Catalog.tags_for_binding("counter:" + e.stat_scaled)
+					if Catalog.STATS.has(e.stat_scaled):
+						want.push_back(e.stat_scaled)
+					want.push_back(e.key)
+					what = "counter:" + e.stat_scaled
+				elif e.key == "enemy_speed" and e.value < 0 and e.custom_key == "":
+					want.push_back("less_enemy_speed")
+					what = "enemy_speed-"
+				elif e.has_meta("aa_value") and e.get_meta("aa_value") > 0:
+					var k = e.custom_key if e.custom_key != "" else e.key
+					want += Catalog.tags_for_binding("mech:" + k)
+					what = "mech:" + k
+				for t in want:
+					checked[what] = true
+					if not t in p.tags:
+						missing.push_back("%s: %s missing %s (%s)" % [id, what, t, str(p.tags)])
+	print("AUDIT tag bindings checked on %d kinds of effects, %d missing" % [checked.size(), missing.size()])
+	for x in missing.slice(0, min(10, missing.size()) - 1) if not missing.empty() else []:
+		print("AUDIT   " + x)
+	_check(missing.empty(), "every generated effect carries its bound tags")
+	for k in ["dodge/", "gold/", "first_hit_elemental/", "ignite/", "crit_kill/"]:
+		var found = false
+		for w in checked:
+			if w.begins_with(k):
+				found = true
+		_check(found, "tag binding exercised: " + k)
+	# 伤害 / 爆炸载荷带缩放属性；计数属性也是词条
+	var g = Generator.new(cfg, 1)
+	var dmg = TriggerEffect.make({"trigger": "kill", "payload": "damage", "stat": "stat_luck", "value": 50})
+	_check("stat_luck" in g._tags_for([dmg]), "damage payload scaling from luck carries the luck tag")
+	var ex = TriggerEffect.make({"trigger": "dodge", "payload": "explode", "stat": "stat_elemental_damage", "value": 50})
+	var tx = g._tags_for([ex])
+	_check("explosive" in tx and "stat_elemental_damage" in tx and "stat_dodge" in tx, "explode on dodge: " + str(tx))

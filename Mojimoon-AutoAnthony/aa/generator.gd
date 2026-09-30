@@ -1179,9 +1179,14 @@ func _tags_for(effects: Array) -> Array:
 				add += Catalog.tags_for_binding("payload:" + e.payload)
 				if e.grant != null and is_scaling(e.grant):
 					add += Catalog.tags_for_binding("counter:" + e.grant.stat_scaled)
+					if Catalog.STATS.has(e.grant.stat_scaled):
+						add.push_back(e.grant.stat_scaled)
 				elif e.grant != null:
 					add += Catalog.tags_for_binding("mech:" + e.grant.key)
 				add.push_back(Catalog.STAT_EXTRA_TAGS.get(e.stat, ""))
+				# 伤害 / 爆炸载荷：缩放属性也是词条（原版赛博球"按幸运造成伤害"带幸运）
+				if e.payload in ["damage", "explode"] and Catalog.STATS.has(e.stat):
+					add.push_back(e.stat)
 				if e.grant != null:
 					if is_scaling(e.grant):
 						add.push_back(e.grant.key)
@@ -1189,15 +1194,22 @@ func _tags_for(effects: Array) -> Array:
 						add.push_back(e.grant.stat_displayed)
 					elif e.grant.has_meta("aa_tags"):
 						add += e.grant.get_meta("aa_tags")
-		elif e.get_script() == effect_script and Catalog.STATS.has(e.key):
+		elif e.get_script() == effect_script and Catalog.STATS.has(e.key) and e.custom_key == "":
 			if e.value > 0:
 				add.push_back(e.key)
 				add.push_back(Catalog.STAT_EXTRA_TAGS.get(e.key, ""))
 		elif is_scaling(e) or is_gain_mod(e):
 			if e.value > 0:
 				add.push_back(e.key if is_scaling(e) else e.stat_displayed)
+				# 搬运来的机制恰好也用这两个效果类（改良工具：构筑物攻速）：同样按机制 key 绑定
+				add += Catalog.tags_for_binding("mech:" + (e.custom_key if e.custom_key != "" else e.key))
+				if e.has_meta("aa_tags") and e.get_meta("aa_value", 0.0) > 0:
+					add += e.get_meta("aa_tags")
 				if is_scaling(e):
 					add += Catalog.tags_for_binding("counter:" + e.stat_scaled)
+					# 计数属性也是词条（每点护甲 +生命：想要护甲的角色也会想要它）
+					if Catalog.STATS.has(e.stat_scaled):
+						add.push_back(e.stat_scaled)
 		elif is_next_wave(e):
 			if e.value > 0 and Catalog.STATS.has(e.key):
 				add.push_back(e.key)
@@ -1209,6 +1221,9 @@ func _tags_for(effects: Array) -> Array:
 			add.push_back(e.key)
 		if e.key == "number_of_enemies" and e.value != 0:
 			add.push_back("more_enemies" if e.value > 0 else "less_enemies")
+		# 敌人速度降低（蜗牛、丑牙）：老人想要 less_enemy_speed
+		if e.key == "enemy_speed" and e.value < 0 and not e is TriggerEffect:
+			add.push_back("less_enemy_speed")
 		for t in add:
 			if t != "" and not t in tags:
 				tags.push_back(t)
