@@ -539,6 +539,8 @@ const SCALING_STATS = [
 static func counter_ref(counter: String) -> float:
 	if COUNTER_REF.has(counter):
 		return COUNTER_REF[counter]
+	if counter.begins_with("item_"):
+		return GUARANTEED_ITEM_COPIES
 	if STATS.has(counter) and STATS[counter].ref > 0:
 		return STATS[counter].ref * 1.2
 	return 10.0
@@ -679,6 +681,57 @@ static func xp_needed_equiv_pct(x: float) -> float:
 static func xp_needed_for_equiv(g: float) -> float:
 	return 100.0 / (1.0 + max(-99.0, g) / 100.0) - 100.0
 
+
+# ============================================================
+# 全部角色效果（BETA 选项）：其余可以原样搬到道具上的角色效果（不新增效果、不改原版逻辑）。
+# 多数是重大限制，作为代价时换来的预算较高（got，已是折算后的补偿，单位：材料）；
+# min_budget：道具总预算低于此值时不使用（避免低稀有度道具带"一击必死"这类代价）
+# 捆绑：同一角色里互相依赖的两行一起出现（多面手的近战 / 远程武器上限、军火商的摧毁武器 + 商店至少一把武器）
+# 排除（需要大量补丁 / 按角色或道具 ID 硬编码 / 诅咒处理不正确）：初始道具 / 武器、恶魔的材料转生命与生命购物、
+# 建造者的材料转构筑物属性、渔夫的强化诱饵（只对诱饵生效）、无法装备武器、诅咒与空文本的内部效果
+# ============================================================
+const BETA_RESTRICTIONS = {
+	"die_in_one_hit": {"got": 45.0, "w": 1.0, "min_budget": 35.0},
+	"can_attack_while_moving": {"got": 30.0, "w": 0.8, "min_budget": 25.0},
+	"destroy_weapons": {"got": 40.0, "w": 0.7, "min_budget": 30.0},
+	"no_heal": {"got": 18.0, "w": 1.0, "min_budget": 14.0},
+	"max_weapon_tier": {"got": 18.0, "w": 0.7, "min_budget": 14.0},
+	"no_melee_weapons": {"got": 10.0, "w": 1.0, "min_budget": 8.0},
+	"no_ranged_weapons": {"got": 10.0, "w": 1.0, "min_budget": 8.0},
+	"no_duplicate_weapons": {"got": 8.0, "w": 0.8, "min_budget": 6.0},
+	"max_melee_weapons": {"got": 6.0, "w": 0.7, "min_budget": 5.0},
+	"min_weapon_tier": {"got": 4.0, "w": 0.5, "min_budget": 3.0},
+	"poisoned_fruit": {"got": 6.0, "w": 0.7, "min_budget": 4.0},
+	"stronger_elites_on_kill": {"got": 6.0, "w": 0.5, "min_budget": 4.0},
+	"disable_item_locking": {"got": 3.0, "w": 0.6, "min_budget": 2.0},
+	"remove_shop_items": {"got": 5.0, "w": 0.5, "min_budget": 4.0},
+}
+# 捆绑的第二行
+const BETA_BUNDLES = {"max_melee_weapons": "max_ranged_weapons", "destroy_weapons": "minimum_weapons_in_shop"}
+# 全部角色效果开启时，代价里使用这些限制的概率
+const BETA_RESTRICTION_CHANCE = 0.5
+# 正面效果（进入"角色效果"特殊行）
+const BETA_POSITIVE_WEIGHTS = {
+	"all_weapons_sets": 0.06, "min_weapons_shop": 0.03, "weapon_slot_upgrades": 0.05,
+	"item_steals": 0.04, "guaranteed_item": 0.08,
+}
+# 升级属性 ±X%（船长 / 藤壶；正面已在常规机制池）：每波约 1.3 次升级，每次升级约值 8 材料
+const LEVELS_PER_WAVE = 1.3
+const LEVEL_UPGRADE_VALUE = 8.0
+const ALL_WEAPONS_SETS_VALUE = 10.0
+const MIN_WEAPONS_SHOP_VALUE = 2.0
+# 升级时获得武器栏而不是属性（宝宝）：上限 6 + k，每个武器栏约 25，减去失去的一次升级
+const WEAPON_SLOT_UPGRADE_NET = 13.0
+# 每个商店可偷 1 件道具（黑帮，偷窃可能生成精英）：每波约值 12 材料
+const ITEM_STEAL_PER_WAVE = 12.0
+# 商店总是出售 [某件一级道具] + 每有 1 个该道具获得 +N 属性（渔夫与诱饵）：平均每两波买一件，持有期间平均约 3.5 件
+const GUARANTEED_ITEM_COPIES = 3.5
+# 带"设定值 / 列表"型角色效果（原版按角色只有一份）的道具设为独特，避免同一效果叠加后撤销出错
+const BETA_UNIQUE_KEYS = [
+	"die_in_one_hit", "can_attack_while_moving", "destroy_weapons", "minimum_weapons_in_shop", "max_weapon_tier",
+	"min_weapon_tier", "max_melee_weapons", "max_ranged_weapons", "remove_shop_items", "weapon_slot_upgrades",
+	"all_weapons_count_for_sets", "guaranteed_shop_items",
+]
 
 # T4 道具不出现 +收获（与原版一致）
 const T4_BANNED_POSITIVE_STATS = ["stat_harvesting"]

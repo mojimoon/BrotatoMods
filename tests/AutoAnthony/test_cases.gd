@@ -87,6 +87,7 @@ func _reset() -> void:
 	m.cfg_variance = 100
 	m.cfg_triggers = 100
 	m.cfg_char_effects = false
+	m.cfg_all_char_effects = false
 	m.cfg_rename = true
 	m.cfg_native_ratio = 0
 	m.cfg_fixed_seed = true
@@ -2988,4 +2989,126 @@ func test_111_more_character_effects() -> void:
 		rd.add_item(holder, 0)
 		_eq(rd.get_stat(Keys.stat_armor_hash, 0) - a0, 2 * nw, "per-weapon counter applied (%d weapons)" % nw)
 		_check(e.get_text(0, false).find("AA_") == -1, "counter text: " + e.get_text(0, false))
+	m.on_menu_reset()
+
+
+# ============================================================
+# 全部角色效果（BETA）：只在选项开启时出现；限制带高补偿、只在高预算道具上；设定值型效果所在道具为独特；
+# 无法回血的道具不带回血；每种效果加到玩家身上生效、移除后恢复
+# ============================================================
+func test_112_all_character_effects() -> void:
+	var seen = {}
+	var seen_off = {}
+	var samples = []
+	for on in [true, false]:
+		var cfg = _cfg()
+		cfg.char_effects = true
+		cfg.all_char_effects = on
+		for sd in range(1, 31):
+			var gen = Generator.new(cfg, sd)
+			var plan = gen.generate(isvc.items, isvc.characters, [], [])
+			for id in plan.items:
+				var p = plan.items[id]
+				var has_beta = false
+				var no_heal = false
+				for e in p.effects:
+					var k = e.custom_key if e.custom_key in ["remove_shop_items", "guaranteed_shop_items"] else e.key
+					if gen.is_scaling(e) and e.stat_scaled.begins_with("item_"):
+						k = "item_counter"
+						_check(e.stat_scaled != id, "guaranteed item is another item")
+					elif gen.handling_of(e, null) != "char_beta":
+						continue
+					has_beta = true
+					if on:
+						seen[k] = seen.get(k, 0) + 1
+						if samples.size() < 40 and not "sample:" + k in samples:
+							samples.push_back("sample:" + k)
+							samples.push_back("%s (T%d, budget %.0f): %s" % [id, _item(id).tier + 1, p.budget, _texts(p.effects)])
+					else:
+						seen_off[k] = true
+					if k == "no_heal":
+						no_heal = true
+					if Catalog.BETA_RESTRICTIONS.has(k):
+						_check(p.budget >= Catalog.BETA_RESTRICTIONS[k].min_budget, "restriction %s only on items with enough budget (%.0f)" % [k, p.budget])
+				_eq(p.get("unique", false), Generator.has_unique_effect(p.effects), "unique flag: " + id)
+				if no_heal:
+					for e in p.effects:
+						var ek = e.custom_key if e.custom_key != "" else e.key
+						_check(not (e is TriggerEffect and (e.payload == "heal" or e.trigger == "heal")) and not (ek in Catalog.HEAL_KEYS and e.value > 0),
+							"no heal effect on a 'cannot heal' item: " + _texts(p.effects))
+				if has_beta:
+					for e in p.effects:
+						var t = e.get_text(0, false)
+						_check(t.find("AA_") == -1, "beta text translated: " + t)
+	print("AUDIT all character effects (on): %s; with option off: %s" % [str(seen), str(seen_off)])
+	for s in samples:
+		if not s.begins_with("sample:"):
+			print("AUDIT   " + s)
+	_check(seen_off.empty(), "all character effects only with the option on")
+	var gen0 = Generator.new(_cfg(), 1)
+	gen0._collect_priors(isvc.items, isvc.characters, isvc.weapons)
+	var expect = Catalog.BETA_RESTRICTIONS.keys() + ["all_weapons_count_for_sets",
+		"weapon_slot_upgrades", "item_steals", "guaranteed_shop_items", "item_counter"]
+	for k in expect:
+		if gen0._beta_tmpl(k) != null:
+			_check(seen.has(k), "all character effect appears: " + k)
+
+	# 真实生效与撤销
+	m.start_new_run()
+	var beta = gen0.char_templates.beta
+	var keys = beta.keys()
+	keys.sort()
+	for k in keys:
+		if k == "item_counter":
+			continue
+		var e = beta[k].duplicate()
+		var holder = _item("item_potato").duplicate()
+		holder.effects = [e]
+		var h = e.custom_key_hash if e.custom_key in ["remove_shop_items", "guaranteed_shop_items"] else e.key_hash
+		var before = str(rd.get_player_effect(h, 0))
+		rd.add_item(holder, 0)
+		var during = str(rd.get_player_effect(h, 0))
+		rd.remove_item(holder, 0)
+		var after = str(rd.get_player_effect(h, 0))
+		# 数值为 0 的伴随行（偷窃生成精英的参数）不改变效果值
+		if e.value != 0 or e.storage_method == Effect.StorageMethod.REPLACE:
+			_check(during != before or k == "can_attack_while_moving" and during == "0", "%s applies (%s -> %s)" % [k, before, during])
+		_eq(after, before, "%s is reverted when the item is removed" % k)
+	# 商店总是出售 X + 每有 1 个 X 获得属性
+	var gi = beta.get("guaranteed_shop_items")
+	var ic = beta.get("item_counter")
+	if gi != null and ic != null:
+		var x = "item_coupon"
+		var e1 = gi.duplicate()
+		e1.key = x
+		e1.key_hash = Keys.generate_hash(x)
+		var e2 = ic.duplicate()
+		e2.key = "stat_armor"
+		e2.key_hash = Keys.stat_armor_hash
+		e2.value = 3
+		e2.stat_scaled = x
+		e2.stat_scaled_hash = Keys.generate_hash(x)
+		e2.nb_stat_scaled = 1
+		var holder = _item("item_potato").duplicate()
+		holder.effects = [e1, e2]
+		rd.add_item(holder, 0)
+		LinkedStats.reset_player(0)
+		Utils.reset_stat_cache(0)
+		var a0 = Utils.get_stat(Keys.stat_armor_hash, 0)
+		var n0 = rd.get_nb_item(Keys.generate_hash(x), 0)
+		rd.add_item(_item(x), 0)
+		rd.add_item(_item(x), 0)
+		LinkedStats.reset_player(0)
+		Utils.reset_stat_cache(0)
+		var dn = rd.get_nb_item(Keys.generate_hash(x), 0) - n0
+		_check(dn >= 1, "guaranteed item added (%d)" % dn)
+		_eq(Utils.get_stat(Keys.stat_armor_hash, 0) - a0, 3 * dn, "+3 armor for every owned guaranteed item")
+		var args = ItemServiceGetShopItemsArgs.new([[], [], [], []], 0)
+		var shop = isvc.get_player_shop_items(rd.current_wave, 0, args)
+		var found = false
+		for entry in shop:
+			if entry[0].my_id == x:
+				found = true
+		_check(found, "shop always sells the guaranteed item")
+		_check(e1.get_text(0, false).find(TranslationServer.translate(x.to_upper())) >= 0, "guaranteed item text names the item: " + e1.get_text(0, false))
 	m.on_menu_reset()

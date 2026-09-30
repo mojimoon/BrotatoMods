@@ -16,7 +16,8 @@
 | `weapon_counter`（4 种） | 武器数量计数（常规池）："每把 [不同 / 所有 / IV 级 / I 级] 武器 +X [属性]"，属性与数值重新生成 | 属性权重 × 数值 × 计数期望（不同武器 3.5 / 武器 5 / IV 级 1 / I 级 1.2） |
 | `char_component`（5 种） | 角色效果（常规池）：武器类型加成、对燃烧目标额外伤害、和平主义者、+武器栏 | 按原版角色数值与对应属性 / 材料估值 |
 | `char_more`（9 种） | 更多角色效果（选项开启时进入道具池）：构筑物聚集、升级所需经验 ±、神秘生物（每棵存活的树）、几率魅惑、宠物伤害缩放、地图大小 ±、自身价格 −100%、武器价格 −X%、道具价格 +X%（代价） | 升级所需经验按反比例（等价获得经验）；地图大小价值约为 0；其余按材料 / 经验 / 伤害估值 |
-| `identity`（44 种） | 保留在角色上，不进入道具池（武器限制、初始装备、商店规则、负向机制……） | — |
+| `char_beta`（21 种） | 全部角色效果（BETA 选项）：一击必死、移动时无法攻击、进店摧毁武器、无法回血、武器等级 / 类型 / 数量限制、毒果、精英变强、无法锁定、无法拥有构筑物（代价，高补偿）；所有武器计入套装、商店至少一把武器、升级获得武器栏、每店偷 1 件、商店总是出售某道具 + 每有 1 个该道具获得属性 | 限制按固定补偿（3–45 材料，大代价只出现在高预算道具上）；正面按武器栏 / 商店价值估值；设定值型效果所在道具为独特 |
+| `identity`（24 种） | 保留在角色上，不进入道具池（武器限制、初始装备、商店规则、负向机制……） | — |
 | `anchored`（4 种） | 建造者炮台的角色专属效果：不作为组件来源 | — |
 | `text`（6 种） | 纯描述行：需要的说明已合并进对应效果的同一行（“生效后此道具消失”“受到伤害时清空”），其余为音效 / 已用状态的提示 | — |
 | `excluded`（2 种） | 迷雾视野：只在迷雾事件中有意义，不搬运 | — |
@@ -71,11 +72,11 @@
 | `gain_stat_for_every:free_weapon_slots` | 1 | char | c:captain +60 % XP Gain for every free weapon slot you have [+360] |
 | `gain_stat_for_every:item_bait` | 1 | char | c:fisherman +2 Harvesting for every 1 Bait you have [+0] |
 | `gain_stat_for_every:knockback` | 1 | item | coil +1 % Damage for every 1 Knockback you have [+0] |
-| `gain_stat_for_every:legendary_item` | 2 | item,char | fairy -3 HP Regeneration for every different Tier IV item you have / c:king +5 Max HP for every different Tier IV item you have [+0] |
-| `gain_stat_for_every:living_enemy` | 1 | item | community_support +1 % Attack Speed for every current living enemy [+0] |
+| `gain_stat_for_every:legendary_item` | 2 | item,char | fairy -3 HP Regeneration for every different Tier IV item you have / c:king +5 Max HP for every different Tier IV item you have [+5] |
+| `gain_stat_for_every:living_enemy` | 1 | item | community_support +1 % Attack Speed for every current living enemy [+14] |
 | `gain_stat_for_every:living_tree` | 1 | char | c:cryptid +3 HP Regeneration for every current living tree [+0] |
 | `gain_stat_for_every:materials` | 4 | item,char | padding +1 Max HP for every 80 Materials you have [+0] / c:saver +1 % Damage for every 25 Materials you have [+1] |
-| `gain_stat_for_every:percent_player_missing_health` | 7 | char,weapon | c:vampire +2 % Damage for every 1% of missing health [+0] / c:vampire +1 % Life Steal for every 3% of missing health [+0] |
+| `gain_stat_for_every:percent_player_missing_health` | 7 | char,weapon | c:vampire +2 % Damage for every 1% of missing health [+66] / c:vampire +1 % Life Steal for every 3% of missing health [+11] |
 | `gain_stat_for_every:pet` | 1 | char | c:beast_master +2 % Speed for every permanent 1 Pet you have [+0] |
 | `gain_stat_for_every:stat_armor` | 2 | item,char | stone_skin +1 Max HP for every permanent 1 Armor you have [+0] / c:knight +2 Melee Damage for every 1 Armor you have [+0] |
 | `gain_stat_for_every:stat_crit_chance` | 1 | item | lucky_coin +2 Luck for every 1 % Crit Chance you have [+0] |
@@ -254,36 +255,20 @@
 | `specific_items_price` | 2 | char | c:fisherman -100% Bait price / c:diver -100% Harpoon Gun price |
 | `weapons_price` | 1 | char | c:arms_dealer -95% Weapons Price |
 
-### `identity`
+### `char_beta`
 
 | 效果 key | 次数 | 来源 | 示例 |
 | --- | --- | --- | --- |
 | `DIE_IN_ONE_HIT` | 1 | char | c:wounded This character dies in One Hit |
-| `accuracy` | 1 | char | c:renegade -50% Accuracy |
 | `all_weapons_count_for_sets` | 1 | char | c:vagabond Equipped weapons always contribute to the class bonuses of o |
-| `boosted_wanted_item_tag` | 1 | char | c:beast_master  |
 | `can_attack_while_moving` | 1 | char | c:soldier You can��t attack while moving |
-| `convert_bonus_gold` | 1 | char | c:builder Every 5 uncollected materials are converted into 1 % Structu |
-| `convert_stats_end_of_wave` | 1 | char | c:demon 50% of your Materials are converted into Max HP at the end o |
-| `cursed_starting_item` | 1 | char | c:creature You start with 1 cursed Fish Hook |
 | `destroy_weapons` | 1 | char | c:arms_dealer All of your weapons are destroyed when entering a shop |
 | `disable_item_locking` | 1 | char | c:gangster Can't lock items |
-| `enemy_damage` | 1 | char | c:jack +35 % Enemy damage |
-| `enemy_gold_drops` | 4 | char | c:explorer -50% materials dropped from enemies / c:cryptid -50% materials dropped from enemies |
-| `enemy_health` | 4 | char | c:jack +175 % Enemy health / c:curious +25 % Enemy health |
-| `enemy_speed` | 2 | char | c:old -25 % Enemy Speed / c:explorer +10 % Enemy Speed |
-| `gain_pct_gold_start_wave` | 1 | char | c:entrepreneur -100% of your materials at the start of waves |
-| `gold_drops` | 3 | char | c:farmer -50% materials dropped / c:streamer -50% materials dropped |
 | `guaranteed_shop_items` | 1 | char | c:fisherman Shops always sell a Bait |
-| `hp_shop` | 1 | char | c:demon You buy items using Max HP instead of materials |
 | `item_steals` | 1 | char | c:gangster Can steal 1 item per shop |
 | `item_steals_spawns_random_elite` | 1 | char | c:gangster Stealing from the shop can spawn an elite |
-| `items_price` | 2 | char | c:entrepreneur -25 % Items Price / c:baby -20 % Items Price |
-| `level_upgrades_modifications` | 1 | char | c:captain +100% stats gained from level upgrades |
-| `lose_hp_per_second` | 1 | char | c:sick You take 1 damage per second (does not give invulnerability  |
 | `max_melee_weapons` | 1 | char | c:generalist You can only equip 3 melee weapons and 3 ranged weapons at a |
 | `max_ranged_weapons` | 1 | char | c:generalist  |
-| `max_turret_count` | 1 | char | c:builder  |
 | `max_weapon_tier` | 1 | char | c:wildling You can��t equip weapons above tier II |
 | `min_weapon_tier` | 2 | char | c:knight You can only equip tier II weapons or above / c:sailor You can only equip tier II weapons or above |
 | `minimum_weapons_in_shop` | 2 | char | c:arms_dealer Shops always sell at least one weapon / c:baby Shops always sell at least one weapon |
@@ -291,17 +276,39 @@
 | `no_heal` | 1 | char | c:golem You can��t heal in any way |
 | `no_melee_weapons` | 2 | char | c:ranger You can't equip melee weapons / c:renegade You can't equip melee weapons |
 | `no_ranged_weapons` | 4 | char | c:gladiator You can't equip ranged weapons / c:knight You can't equip ranged weapons |
-| `number_of_enemies` | 2 | char | c:old -10% Enemies / c:jack -70% Enemies |
 | `poisoned_fruit` | 1 | char | c:druid 33% of fruits are poisoned and hurt you (ignores Dodge and A |
-| `remove_shop_items` | 2 | char | c:builder You can't have structures / c:gangster  |
+| `remove_shop_items` | 1 | char | c:builder You can't have structures |
+| `stronger_elites_on_kill` | 1 | char | c:gangster All future elites and bosses become stronger when you kill a |
+| `weapon_slot_upgrades` | 1 | char | c:baby You gain a weapon slot when you level up instead of a stat u |
+
+### `identity`
+
+| 效果 key | 次数 | 来源 | 示例 |
+| --- | --- | --- | --- |
+| `accuracy` | 1 | char | c:renegade -50% Accuracy |
+| `boosted_wanted_item_tag` | 1 | char | c:beast_master  |
+| `convert_bonus_gold` | 1 | char | c:builder Every 5 uncollected materials are converted into 1 % Structu |
+| `convert_stats_end_of_wave` | 1 | char | c:demon 50% of your Materials are converted into Max HP at the end o |
+| `cursed_starting_item` | 1 | char | c:creature You start with 1 cursed Fish Hook |
+| `enemy_damage` | 1 | char | c:jack +35 % Enemy damage |
+| `enemy_gold_drops` | 4 | char | c:explorer -50% materials dropped from enemies / c:cryptid -50% materials dropped from enemies |
+| `enemy_health` | 4 | char | c:jack +175 % Enemy health / c:curious +25 % Enemy health |
+| `enemy_speed` | 2 | char | c:old -25 % Enemy Speed / c:explorer +10 % Enemy Speed |
+| `gain_pct_gold_start_wave` | 1 | char | c:entrepreneur -100% of your materials at the start of waves |
+| `gold_drops` | 3 | char | c:farmer -50% materials dropped / c:streamer -50% materials dropped |
+| `hp_shop` | 1 | char | c:demon You buy items using Max HP instead of materials |
+| `items_price` | 2 | char | c:entrepreneur -25 % Items Price / c:baby -20 % Items Price |
+| `level_upgrades_modifications` | 1 | char | c:captain +100% stats gained from level upgrades |
+| `lose_hp_per_second` | 1 | char | c:sick You take 1 damage per second (does not give invulnerability  |
+| `max_turret_count` | 1 | char | c:builder  |
+| `number_of_enemies` | 2 | char | c:old -10% Enemies / c:jack -70% Enemies |
+| `remove_shop_items` | 1 | char | c:gangster  |
 | `starting_item` | 12 | char | c:mage You start with 1 Snake / c:mage You start with 1 Scared Sausage |
 | `starting_weapon` | 7 | char | c:brawler You start with 1 Fist / c:crazy You start with 1 Knife |
 | `stat_curse` | 1 | char | c:sailor +25 Curse |
-| `stronger_elites_on_kill` | 1 | char | c:gangster All future elites and bosses become stronger when you kill a |
 | `trees_start_wave` | 1 | char | c:explorer  |
 | `upgraded_baits` | 1 | char | c:fisherman Baits make some special enemies spawn throughout all future  |
 | `weapon_scaling_stats` | 1 | char | c:creature Weapon and pet damage additionally scales with 35% Curse |
-| `weapon_slot_upgrades` | 1 | char | c:baby You gain a weapon slot when you level up instead of a stat u |
 
 ### `anchored`
 

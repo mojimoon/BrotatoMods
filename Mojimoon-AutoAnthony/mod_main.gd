@@ -24,7 +24,8 @@ var enabled: bool = true
 var cfg_items: bool = true
 var cfg_characters: bool = false
 var cfg_weapons: bool = false
-var cfg_char_effects: bool = false	# 道具可含角色效果
+var cfg_char_effects: bool = false	# 更多角色效果
+var cfg_all_char_effects: bool = false	# 全部角色效果（BETA）
 var cfg_rename: bool = true			# 重组名称
 var cfg_avg: int = 100				# 平均数值 50–200%
 var cfg_variance: int = 100			# 浮动范围 50–200%（100% = 原版离散度）
@@ -135,6 +136,7 @@ func get_cfg() -> Dictionary:
 		"characters": cfg_characters,
 		"weapons": cfg_weapons,
 		"char_effects": cfg_char_effects,
+		"all_char_effects": cfg_all_char_effects,
 		"rename": cfg_rename,
 		"avg": cfg_avg,
 		"variance": cfg_variance,
@@ -177,6 +179,7 @@ func _load_settings() -> void:
 	cfg_characters = bool(d.get("characters", false))
 	cfg_weapons = bool(d.get("weapons", false))
 	cfg_char_effects = bool(d.get("char_effects", false))
+	cfg_all_char_effects = bool(d.get("all_char_effects", false))
 	cfg_rename = bool(d.get("rename", true))
 	cfg_avg = int(clamp(int(d.get("avg", 100)), 50, 200))
 	cfg_variance = int(clamp(int(d.get("variance", 100)), 50, 200))
@@ -322,8 +325,8 @@ func _activate(state: Dictionary) -> void:
 			res.effects = p.effects
 			res.tags = p.tags
 			res.tracking_text = "[EMPTY]"
-			# 原版的"限制 (N)"/"独特"属于原道具，不继承到重组后的道具上
-			res.max_nb = -1
+			# 原版的"限制 (N)"/"独特"属于原道具，不继承到重组后的道具上；带设定值型角色效果的道具为独特
+			res.max_nb = 1 if p.get("unique", false) else -1
 			# 金鱼 / 沙漏 / 镜子在原版"用后 / 移除时变成另一件道具"：重组后不再继承
 			res.replaced_by = null
 			if rename:

@@ -82,6 +82,8 @@ var effect_script: Script
 # 条款约束（角色重组时使用）：禁用的扳机 / 载荷（反协同，如"无法回血"的角色不出现回血相关条款）
 var banned_triggers: Array = []
 var banned_payloads: Array = []
+# 当前道具的代价是"无法回血"（全部角色效果）：生成完后撤销上面的临时禁用
+var item_banned_heal := false
 
 
 func _init(p_cfg: Dictionary, p_seed: int) -> void:
@@ -113,12 +115,22 @@ func generate(items: Array, all_characters: Array, selected: Array, weapons: Arr
 				plan.items[item.my_id] = r
 		cur_stat_bans = []
 		_ensure_player_wanted_tags(plan, items, gen_items, core)
+		for id in plan.items:
+			plan.items[id]["unique"] = has_unique_effect(plan.items[id].effects)
 	if cfg.get("characters", false):
 		for ch in selected:
 			plan.characters[ch.my_id] = generate_character(ch)
 	if cfg.get("weapons", false):
 		plan.weapons = generate_weapons(weapons)
 	return plan
+
+
+# 带"设定值 / 列表"型角色效果的道具（catalog.BETA_UNIQUE_KEYS）：设为独特
+static func has_unique_effect(effects: Array) -> bool:
+	for e in effects:
+		if e.key in Catalog.BETA_UNIQUE_KEYS or e.custom_key in Catalog.BETA_UNIQUE_KEYS:
+			return true
+	return false
 
 
 # "保留原版道具"滑条：按道具 ID 的种子决定是否保留原版
@@ -794,9 +806,15 @@ func _generate_item_once(item, force_special: bool) -> Dictionary:
 	# 1) 代价：负面效果的实际强度 = 换来的预算 × 负面除数
 	var downsides = []
 	if neg_cat != "-":
-		var dres = _gen_downsides(item, budget_total * rng.randf_range(0.1, 0.35), perm_mult, used_stats)
+		var dres = _gen_downsides(item, budget_total * rng.randf_range(0.1, 0.35), perm_mult, used_stats, budget_total)
 		downsides = dres.effects
 		budget += dres.got
+		# 代价是"无法回血"：同一道具不再出现回血相关的条款 / 机制
+		for d in downsides:
+			if d.key == "no_heal" and not "heal" in banned_payloads:
+				banned_payloads.push_back("heal")
+				banned_triggers.push_back("heal")
+				item_banned_heal = true
 
 	# 2) 特殊行：数量按原版同稀有度"带特殊行的比例" × 触发效果滑条；约 70% 为触发条款，其余为搬运机制
 	var p_special = special_share_by_tier[tier] * _trigger_rate()
@@ -840,7 +858,7 @@ func _generate_item_once(item, force_special: bool) -> Dictionary:
 		elif kind == "char":
 			var ch = gen_char_component(budget * share, item)
 			if not ch.empty():
-				effects.push_back(ch.effect)
+				effects += ch.get("effects", [ch.effect])
 				budget -= ch.value
 				done = true
 				if ch.value > main_line.value:
@@ -910,6 +928,10 @@ func _generate_item_once(item, force_special: bool) -> Dictionary:
 			main_line = {"value": v * Catalog.stat_w(s), "adj": _adj(Catalog.ADJ_BY_STAT.get(s, Catalog.ADJ_MECHANIC))}
 		i += 1
 
+	if item_banned_heal:
+		banned_payloads.erase("heal")
+		banned_triggers.erase("heal")
+		item_banned_heal = false
 	# 原版的书写顺序：正面属性在前，触发 / 机制随后，负面在最后
 	var ordered = stat_lines + effects + _preserved_lines(item) + downsides
 	pos_cat = ""
@@ -949,7 +971,7 @@ func _generate_core_item(item, stat: String) -> Dictionary:
 	var used_stats = [stat]
 	var downsides = []
 	if item.tier in Catalog.CORE_TIERS:
-		var dres = _gen_downsides(item, budget_total * rng.randf_range(0.15, 0.4), perm_mult, used_stats)
+		var dres = _gen_downsides(item, budget_total * rng.randf_range(0.15, 0.4), perm_mult, used_stats, budget_total)
 		downsides = dres.effects
 		budget += dres.got
 	var cap = int(ceil(_line_cap(stat, false) * Catalog.CORE_LINE_CAP_MULT))
@@ -971,7 +993,7 @@ func _generate_core_item(item, stat: String) -> Dictionary:
 
 
 # 代价：换来 comp 预算的负面效果（实际强度 = comp × 负面除数）
-func _gen_downsides(item, comp: float, perm_mult: float, used_stats: Array) -> Dictionary:
+func _gen_downsides(item, comp: float, perm_mult: float, used_stats: Array, budget_total: float = -1.0) -> Dictionary:
 	var tier: int = item.tier
 	var downsides = []
 	var got = 0.0
@@ -981,8 +1003,8 @@ func _gen_downsides(item, comp: float, perm_mult: float, used_stats: Array) -> D
 		if not sc.empty():
 			downsides.push_back(sc.effect)
 			got = neg_value(abs(sc.value))
-	elif r >= 0.45 and r < 0.52:
-		var cd = gen_char_downside(comp, perm_mult)
+	elif (r >= 0.45 and r < 0.52) or (r >= 0.41 and r < 0.45 and cfg.get("all_char_effects", false)):
+		var cd = gen_char_downside(comp, perm_mult, budget_total)
 		if not cd.empty():
 			downsides += cd.effects
 			got = cd.value
@@ -1101,6 +1123,9 @@ func _pick_mechanic(tier: int, downside: bool, max_abs_value: float):
 			var min_value = abs(m.value)
 			if m.get("scalar", false):
 				min_value = abs(m.value) / max(1.0, abs(m.effect.value))
+			var mk = m.effect.custom_key if m.effect.custom_key != "" else m.effect.key
+			if "heal" in banned_payloads and mk in Catalog.HEAL_KEYS:
+				continue
 			if m.down == downside and min_value <= max_abs_value:
 				pool.push_back(m)
 		if not pool.empty():
@@ -1212,7 +1237,7 @@ func main_stats(effects: Array) -> Array:
 			vals[e.key] = vals.get(e.key, 0.0) + Valuation.scaling_value(e.key, e.value, e.stat_scaled, e.nb_stat_scaled)
 		elif is_gain_mod(e) and e.stats_modified.size() > 0:
 			vals[e.stats_modified[0]] = vals.get(e.stats_modified[0], 0.0) + Valuation.gain_mod_value(e.stats_modified[0], e.value)
-		elif e.key == "weapon_slot":
+		elif e.key == "weapon_slot" or e.key == "weapon_slot_upgrades":
 			vals["weapon_slot"] = vals.get("weapon_slot", 0.0) + Catalog.WEAPON_SLOT_W
 		elif is_next_wave(e) and Catalog.STATS.has(e.key):
 			vals[e.key] = vals.get(e.key, 0.0) + e.get_meta("aa_value", 5.0)
@@ -1399,11 +1424,34 @@ func _loot_alien_value() -> float:
 # 来自角色、默认进入道具池的效果。返回 {effect, value}
 # ============================================================
 var char_templates: Dictionary = {}		# 原版角色效果模板：class_bonus（列表）/ pacifist / burn_bonus / group_structures
+# 全部角色效果："商店总是出售"的候选（一级、可掉落的道具 ID）
+var guaranteed_candidates: Array = []
 
 
 func _collect_char_templates(characters: Array, items: Array = []) -> void:
-	char_templates = {"class_bonus": [], "weapon_counters": {}}
+	char_templates = {"class_bonus": [], "weapon_counters": {}, "beta": {}}
 	var class_script = load("res://effects/items/class_bonus_effect.gd")
+	# 全部角色效果：按 key（列表型按 custom_key）收集模板
+	var beta_keys = Catalog.BETA_RESTRICTIONS.keys() + Catalog.BETA_BUNDLES.values() + [
+		"all_weapons_count_for_sets", "minimum_weapons_in_shop", "weapon_slot_upgrades", "item_steals",
+		"item_steals_spawns_random_elite",
+	]
+	for ch in characters:
+		for e in ch.effects:
+			var bk = e.key
+			if e.custom_key in ["remove_shop_items", "guaranteed_shop_items"]:
+				bk = e.custom_key
+				if e.custom_key == "remove_shop_items" and e.key != "structure":
+					continue
+			elif e.get_script() == scaling_script and e.stat_scaled.begins_with("item_"):
+				bk = "item_counter"
+			if (bk in beta_keys or bk in ["guaranteed_shop_items", "item_counter"]) and not char_templates.beta.has(bk):
+				char_templates.beta[bk] = e
+	guaranteed_candidates = []
+	for it in items:
+		if it.tier == 0 and it.can_be_looted and not it is CharacterData and not it is WeaponData 				and not it.my_id in Catalog.ANCHORED_ITEMS and not it.my_id in run_excluded_ids:
+			guaranteed_candidates.push_back(it.my_id)
+	guaranteed_candidates.sort()
 	for src in items + characters:
 		for e in src.effects:
 			if Catalog.WEAPON_COUNTERS.has(e.custom_key) and not char_templates.weapon_counters.has(e.custom_key):
@@ -1439,8 +1487,17 @@ func gen_char_component(target: float, holder = null) -> Dictionary:
 	if cfg.get("char_effects", false):
 		for k in Catalog.MORE_CHAR_COMPONENT_WEIGHTS:
 			weights[k] = Catalog.MORE_CHAR_COMPONENT_WEIGHTS[k]
+	if cfg.get("all_char_effects", false):
+		for k in Catalog.BETA_POSITIVE_WEIGHTS:
+			weights[k] = Catalog.BETA_POSITIVE_WEIGHTS[k]
+	var pm: float = Catalog.PERM_MULT[holder.tier] if holder != null else Catalog.PERM_MULT[2]
 	for _attempt in 6:
 		var kind = _pick_weighted(weights)
+		if kind in Catalog.BETA_POSITIVE_WEIGHTS:
+			var bp = _gen_beta_positive(kind, target, pm, holder)
+			if bp.empty():
+				continue
+			return bp
 		match kind:
 			"cryptid":
 				if not char_templates.has("cryptid"):
@@ -1574,6 +1631,126 @@ func gen_char_component(target: float, holder = null) -> Dictionary:
 	return {}
 
 
+# ============================================================
+# 全部角色效果（BETA）：正面效果。返回 {effect, effects（全部行）, value}
+# ============================================================
+func _beta_tmpl(k: String):
+	return char_templates.get("beta", {}).get(k, null)
+
+
+func _beta_line(tmpl, value, aa_value: float, tags: Array = []):
+	var e = tmpl.duplicate()
+	e.value = value
+	e.set_meta("aa_value", aa_value)
+	e.set_meta("aa_tags", tags)
+	return e
+
+
+func _gen_beta_positive(kind: String, target: float, pm: float, holder) -> Dictionary:
+	match kind:
+		"all_weapons_sets":
+			var t = _beta_tmpl("all_weapons_count_for_sets")
+			var val = Catalog.ALL_WEAPONS_SETS_VALUE
+			if t == null or target < val * 0.4 or target > val * 2.5:
+				return {}
+			var e = _beta_line(t, 1, val)
+			return {"effect": e, "effects": [e], "value": val}
+		"min_weapons_shop":
+			var t = _beta_tmpl("minimum_weapons_in_shop")
+			var val = Catalog.MIN_WEAPONS_SHOP_VALUE
+			if t == null or target > val * 3.0:
+				return {}
+			var e = _beta_line(t, 1, val)
+			return {"effect": e, "effects": [e], "value": val}
+		"weapon_slot_upgrades":
+			var t = _beta_tmpl("weapon_slot_upgrades")
+			if t == null or target < Catalog.WEAPON_SLOT_UPGRADE_NET * 0.6:
+				return {}
+			var k = int(clamp(round(target / Catalog.WEAPON_SLOT_UPGRADE_NET), 1, 3))
+			var val = k * Catalog.WEAPON_SLOT_UPGRADE_NET
+			# 设定值：诅咒不放大（上限翻倍会让之后每次升级都变成武器栏）
+			var e = _beta_line(t, 6 + k, val)
+			e.effect_sign = Effect.Sign.NEUTRAL
+			return {"effect": e, "effects": [e], "value": val}
+		"item_steals":
+			var t = _beta_tmpl("item_steals")
+			var t2 = _beta_tmpl("item_steals_spawns_random_elite")
+			var val = Catalog.ITEM_STEAL_PER_WAVE * pm
+			if t == null or t2 == null or target < val * 0.6 or target > val * 1.8:
+				return {}
+			var e = _beta_line(t, 1, val, ["economy"])
+			var e2 = t2.duplicate()
+			return {"effect": e, "effects": [e, e2], "value": val}
+		"guaranteed_item":
+			var t = _beta_tmpl("guaranteed_shop_items")
+			var tc = _beta_tmpl("item_counter")
+			if t == null or tc == null or guaranteed_candidates.empty():
+				return {}
+			var x = guaranteed_candidates[rng.randi() % guaranteed_candidates.size()]
+			if holder != null and x == holder.my_id:
+				return {}
+			var stat = _pick_stat(false, [], Catalog.SCALING_STATS)
+			var unit = Catalog.stat_unit(stat)
+			var per = Catalog.stat_w(stat) * unit * Catalog.counter_ref(x)
+			var n = int(clamp(round(target / per), 1, 5))
+			var val = n * per
+			if val > target * 1.6:
+				return {}
+			var e = t.duplicate()
+			e.key = x
+			e.key_hash = Keys.generate_hash(x)
+			e.set_meta("aa_value", 0.0)
+			e.set_meta("aa_tags", [])
+			var e2 = tc.duplicate()
+			e2.key = stat
+			e2.key_hash = Keys.generate_hash(stat)
+			e2.value = n * unit
+			e2.stat_scaled = x
+			e2.stat_scaled_hash = Keys.generate_hash(x)
+			e2.nb_stat_scaled = 1
+			e2.set_meta("aa_value", val)
+			e2.set_meta("aa_tags", [stat])
+			return {"effect": e2, "effects": [e, e2], "value": val}
+	return {}
+
+
+# 全部角色效果（BETA）：重大限制作为代价。返回 {effects, value（换来的预算）}；budget_total 用于限制大代价只出现在高预算道具上
+func gen_beta_restriction(comp: float, budget_total: float) -> Dictionary:
+	var w = {}
+	for k in Catalog.BETA_RESTRICTIONS:
+		var r = Catalog.BETA_RESTRICTIONS[k]
+		var tk = "remove_shop_items" if k == "remove_shop_items" else k
+		if _beta_tmpl(tk) == null or budget_total < r.min_budget or r.got > max(comp * 4.0, budget_total * 1.2):
+			continue
+		if Catalog.BETA_BUNDLES.has(k) and _beta_tmpl(Catalog.BETA_BUNDLES[k]) == null:
+			continue
+		# 与预算越接近越常见
+		w[k] = r.w / (1.0 + abs(log(max(0.5, r.got) / max(0.5, comp))))
+	var k = _pick_weighted(w)
+	if k == null:
+		return {}
+	var got: float = Catalog.BETA_RESTRICTIONS[k].got
+	var tmpl = _beta_tmpl(k)
+	var e = tmpl.duplicate()
+	if k == "poisoned_fruit":
+		var v = int(clamp(round(comp / got * tmpl.value / 5.0) * 5, 10, 50))
+		e.value = v
+		got = got * float(v) / float(tmpl.value)
+	e.set_meta("aa_value", -got)
+	e.set_meta("aa_tags", [])
+	var out = [e]
+	if Catalog.BETA_BUNDLES.has(k):
+		var e2 = _beta_tmpl(Catalog.BETA_BUNDLES[k]).duplicate()
+		e2.set_meta("aa_value", 0.0)
+		e2.set_meta("aa_tags", [])
+		out.push_back(e2)
+	# 设定值型上限（近战 / 远程武器数、最高武器等级）：诅咒不改（原版会把上限当作负面减小，反而更严）
+	for x in out:
+		if x.key in ["max_melee_weapons", "max_ranged_weapons", "max_weapon_tier", "min_weapon_tier"]:
+			x.effect_sign = Effect.Sign.NEUTRAL
+	return {"effects": out, "value": got}
+
+
 # 道具价格每 1% 的价值：取原版优惠券（-5% 道具价格）在机制池中的单位价值
 func _items_price_value_per_pct() -> float:
 	for t in 4:
@@ -1620,8 +1797,12 @@ func _xp_needed_effect(x: int) -> Effect:
 
 
 # 代价：每波结束时敌人属性提高（船长），或 −1 武器栏。返回 {effects, value（折算后的补偿）}
-func gen_char_downside(comp: float, perm_mult: float) -> Dictionary:
+func gen_char_downside(comp: float, perm_mult: float, budget_total: float = -1.0) -> Dictionary:
 	var more = cfg.get("char_effects", false)
+	if cfg.get("all_char_effects", false) and budget_total > 0.0 and rng.randf() < Catalog.BETA_RESTRICTION_CHANCE:
+		var br = gen_beta_restriction(comp, budget_total)
+		if not br.empty():
+			return br
 	# 更多角色效果：道具价格 +X%（变异体 / 节俭者）
 	if more and char_templates.has("items_price_up") and rng.randf() < Catalog.MORE_CHAR_DOWNSIDE_CHANCE * 0.5:
 		var per_p = _items_price_value_per_pct()
@@ -2204,6 +2385,13 @@ func handling_of(e, src) -> String:
 	if k in ["cryptid", "charm_on_hit", "beast_master_effect", "map_size", "specific_items_price", "weapons_price",
 			"group_structures", "next_level_xp_needed"] or (k == "items_price" and e.value > 0):
 		return "char_more"
+	if e.key == "die_in_one_hit":
+		return "char_beta"
+	if k in Catalog.BETA_RESTRICTIONS or k in Catalog.BETA_BUNDLES.values() or k in [
+			"all_weapons_count_for_sets", "weapon_slot_upgrades", "item_steals", "item_steals_spawns_random_elite",
+			"guaranteed_shop_items"] or (is_scaling(e) and e.stat_scaled.begins_with("item_")):
+		if not (k == "remove_shop_items" and e.key != "structure"):
+			return "char_beta"
 	if k in ["pacifist", "bonus_non_elemental_damage_against_burning_targets", "weapon_slot"] or e.get_script() == load("res://effects/items/class_bonus_effect.gd"):
 		return "char_component"
 	if src is CharacterData:
