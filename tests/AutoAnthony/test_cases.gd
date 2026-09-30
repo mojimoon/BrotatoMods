@@ -88,6 +88,7 @@ func _reset() -> void:
 	m.cfg_triggers = 100
 	m.cfg_char_effects = false
 	m.cfg_all_char_effects = false
+	m.cfg_more_double = false
 	m.cfg_rename = true
 	m.cfg_native_ratio = 0
 	m.cfg_fixed_seed = true
@@ -3111,4 +3112,83 @@ func test_112_all_character_effects() -> void:
 				found = true
 		_check(found, "shop always sells the guaranteed item")
 		_check(e1.get_text(0, false).find(TranslationServer.translate(x.to_upper())) >= 0, "guaranteed item text names the item: " + e1.get_text(0, false))
+	m.on_menu_reset()
+
+
+# ============================================================
+# 更多双面效果：常规池效果的对立面只在选项开启时出现，数值不超过上限；"失去材料"不会让材料低于 0
+# ============================================================
+func _double_kind(gen, e) -> String:
+	var class_script = load("res://effects/items/class_bonus_effect.gd")
+	if e is TriggerEffect:
+		return "lose_gold" if e.payload == "gold" and e.value < 0 else ""
+	if e.get_script() == class_script:
+		return "class_bonus-" if e.value < 0 else ""
+	if e.custom_key == "stats_end_of_wave" and Catalog.ENEMY_STATS.has(e.key) and e.value < 0:
+		return "enemy_decay"
+	if e.custom_key == "stats_next_wave" and Catalog.ENEMY_STATS.has(e.key) and e.value < 0:
+		return "next_wave_enemy_down"
+	if e.custom_key != "" or gen.is_plain_stat(e) and e.key != "weapon_slot":
+		return ""
+	if e.key == "weapon_slot" and e.value < 0:
+		return "weapon_slot-1"
+	if e.key == "weapons_price" and e.value > 0:
+		return "weapons_price+"
+	if e.key == "items_price" and e.value > 0:
+		return "items_price+"
+	if Catalog.DOUBLE_NEG_CAPS.has(e.key) and Catalog.is_downside_mechanic(e):
+		return "neg:" + e.key
+	if Catalog.DOUBLE_POS_ENEMY_CAPS.has(e.key) and e.value < 0:
+		return "pos:" + e.key
+	return ""
+
+
+func test_113_more_double_sided() -> void:
+	var seen = {}
+	var seen_off = {}
+	var samples = {}
+	for on in [true, false]:
+		var cfg = _cfg()
+		cfg.more_double = on
+		for sd in range(1, 21):
+			var gen = Generator.new(cfg, sd)
+			var plan = gen.generate(isvc.items, isvc.characters, [], [])
+			for id in plan.items:
+				for e in plan.items[id].effects:
+					var k = _double_kind(gen, e)
+					if k == "":
+						continue
+					if on:
+						seen[k] = seen.get(k, 0) + 1
+						if not samples.has(k):
+							samples[k] = "%s: %s" % [id, _texts(plan.items[id].effects)]
+					else:
+						seen_off[k] = true
+					if k.begins_with("neg:"):
+						_check(abs(e.value) <= Catalog.DOUBLE_NEG_CAPS[e.key], "mirrored downside capped: " + e.get_text(0, false))
+						_check(e.get_meta("aa_value") < 0, "mirrored downside valued as a downside")
+					if k.begins_with("pos:"):
+						_check(abs(e.value) <= Catalog.DOUBLE_POS_ENEMY_CAPS[e.key], "enemy stat reduction capped: " + e.get_text(0, false))
+					var t = e.get_text(0, false)
+					_check(t != "" and t.find("AA_") == -1, "double-sided text: " + t)
+	print("AUDIT more double-sided (on): %s; with option off: %s" % [str(seen), str(seen_off)])
+	for k in samples:
+		print("AUDIT   %s -> %s" % [k, samples[k]])
+	for k in seen_off:
+		_check(k == "items_price+", "double-sided effect only with the option on: " + k)
+	for k in ["lose_gold", "class_bonus-", "enemy_decay", "next_wave_enemy_down", "weapon_slot-1", "weapons_price+",
+			"neg:gold_drops", "neg:enemy_gold_drops", "neg:reroll_price", "neg:enemy_speed", "pos:enemy_health", "pos:enemy_damage"]:
+		_check(seen.has(k), "double-sided effect appears: " + k)
+	# 失去材料
+	m.start_new_run()
+	var main_rt = load(MOD_DIR + "aa/runtime.gd").new()
+	var te = TriggerEffect.make({"trigger": "kill", "payload": "gold", "value": -5})
+	_check(te.get_text(0, false).find("5") >= 0 and te.get_text(0, false).find("-5") == -1, "lose gold text: " + te.get_text(0, false))
+	rd.add_gold(3 - rd.get_player_gold(0), 0)
+	main_rt.execute(te, 0, null, false)
+	_eq(rd.get_player_gold(0), 0, "losing materials stops at 0")
+	rd.add_gold(20, 0)
+	main_rt.execute(te, 0, null, false)
+	_eq(rd.get_player_gold(0), 15, "lose 5 materials")
+	main_rt.free()
 	m.on_menu_reset()

@@ -292,7 +292,11 @@ func execute(e, player_index: int, pos, show: bool = true, en = null, target = n
 		"heal":
 			RunData.emit_signal("healing_effect", e.value, player_index, Keys.empty_hash)
 		"gold":
-			RunData.add_gold(e.value, player_index)
+			# 负值（更多双面效果的代价）：失去材料，不低于 0
+			if e.value < 0:
+				RunData.remove_gold(-e.value, player_index)
+			else:
+				RunData.add_gold(e.value, player_index)
 		"xp":
 			RunData.add_xp(e.value, player_index)
 		"damage":

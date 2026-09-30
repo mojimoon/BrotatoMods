@@ -159,6 +159,8 @@ func _payload_text(colored: bool) -> String:
 		"heal":
 			return tr("AA_P_HEAL").replace("{0}", _col(str(value), good, colored))
 		"gold":
+			if value < 0:
+				return tr("AA_P_LOSE_GOLD").replace("{0}", _col(str(-value), good, colored))
 			return tr("AA_P_GOLD").replace("{0}", _col(str(value), good, colored))
 		"xp":
 			return tr("AA_P_XP").replace("{0}", _col(str(value), good, colored))

@@ -623,6 +623,32 @@ func _add_item_mechanics(src, mechs: Array, stat_value: float, pos_value: float)
 			"effect": e, "value": -each_down if down else each_up, "down": down, "source": src.my_id,
 			"tags": _extra_tags(src), "scalar": scalar,
 		})
+		if cfg.get("more_double", false):
+			_add_mirrored_mechanic(src, e, each_up, down, scalar)
+
+
+# 更多双面效果：可缩放正面机制的反面作为代价；敌人生命 / 伤害提高（负面机制）的反面作为好处
+func _add_mirrored_mechanic(src, e, each_up: float, down: bool, scalar: bool) -> void:
+	var k = e.key
+	if e.custom_key != "" or e.value == 0:
+		return
+	if not down and scalar and Catalog.DOUBLE_NEG_CAPS.has(k):
+		var me = e.duplicate()
+		me.value = -e.value
+		if not Catalog.is_downside_mechanic(me):
+			return
+		# 代价的价值 = 正面每单位价值 × 数值 / 负面除数
+		mechanics_by_tier[src.tier].push_back({
+			"effect": me, "value": -neg_value(each_up), "down": true, "source": src.my_id, "tags": [],
+			"scalar": true, "top": Catalog.DOUBLE_NEG_CAPS[k], "mirror": true,
+		})
+	elif down and Catalog.DOUBLE_POS_ENEMY_CAPS.has(k) and e.value > 0:
+		var pe = e.duplicate()
+		pe.value = -e.value
+		mechanics_by_tier[src.tier].push_back({
+			"effect": pe, "value": Catalog.stat_w(k) * e.value, "down": false, "source": src.my_id, "tags": [],
+			"scalar": true, "top": Catalog.DOUBLE_POS_ENEMY_CAPS[k], "mirror": true,
+		})
 
 
 # 角色机制估值：假设所有角色总价值相近。角色总价值 = 只由可估值行（属性行、原版触发行）组成的角色的中位数；
@@ -1027,8 +1053,9 @@ func _gen_downsides(item, comp: float, perm_mult: float, used_stats: Array, budg
 	elif r < 0.25:
 		var m = _pick_mechanic(tier, true, comp * 2.0)
 		if m != null:
-			downsides.push_back(_mechanic_copy(m, -1.0, item.my_id))
-			got = abs(m.value)
+			var dm = _mechanic_copy(m, comp if m.get("mirror", false) else -1.0, item.my_id)
+			downsides.push_back(dm)
+			got = abs(dm.get_meta("aa_value"))
 	if got == 0.0:
 		var s = _pick_stat(true, used_stats)
 		var v = int(min(_round_to_unit(comp * divisor / Catalog.stat_w(s), s), _line_cap(s, true)))
@@ -1073,6 +1100,8 @@ func _mechanic_copy(m: Dictionary, target: float = -1.0, holder_id: String = "")
 		var sg = 1 if native_v > 0 else -1
 		var want = round(abs(native_v) * target / abs(m.value))
 		var top = max(1.0, ceil(abs(native_v) * 1.5))
+		if m.has("top"):
+			top = m.top
 		if Catalog.pct_cap(e) > 0:
 			top = min(top, Catalog.pct_cap(e))
 		var nv = int(clamp(want, 1, top)) * sg
@@ -1285,7 +1314,7 @@ func _pick_grant(mode: String) -> Dictionary:
 			for t in 4:
 				for m in mechanics_by_tier[t]:
 					var e = m.effect
-					if m.down or not m.get("scalar", false) or e.get_script() != effect_script or e.storage_method != 0 or e.custom_key != "":
+					if m.down or m.get("mirror", false) or not m.get("scalar", false) or e.get_script() != effect_script or e.storage_method != 0 or e.custom_key != "":
 						continue
 					if e.key in Catalog.GRANT_BANNED_KEYS:
 						continue
@@ -1366,13 +1395,27 @@ func _next_wave_effect(stat: String, value: int) -> Effect:
 
 func gen_next_wave(target: float, perm_mult: float, allow_pair: bool) -> Dictionary:
 	var W = Catalog.remaining_waves(perm_mult)
-	var kind = _pick_weighted(Catalog.NEXT_WAVE_POS_KINDS)
-	var pair = allow_pair and rng.randf() < Catalog.NEXT_WAVE_PAIR_CHANCE
+	var kinds = Catalog.NEXT_WAVE_POS_KINDS.duplicate()
+	if cfg.get("more_double", false):
+		kinds["enemy_down"] = 0.3
+	var kind = _pick_weighted(kinds)
+	var pair = allow_pair and kind != "enemy_down" and rng.randf() < Catalog.NEXT_WAVE_PAIR_CHANCE
 	var comp = target * rng.randf_range(0.3, 0.6) if pair else 0.0
 	var out = []
 	var value = 0.0
 	var capped = false
-	if kind == "loot_aliens":
+	if kind == "enemy_down":
+		# 下一波敌人属性降低：一波的价值 = 整局价值 / 剩余波数
+		var ek = Catalog.ENEMY_STATS.keys()[rng.randi() % Catalog.ENEMY_STATS.size()]
+		var wn = Catalog.stat_w(ek) / W
+		var vn = int(clamp(round((target + comp) / wn / 5.0) * 5, 5, Catalog.NEXT_WAVE_ENEMY_DOWN_MAX))
+		var en = _next_wave_effect(ek, -vn)
+		en.effect_sign = Effect.Sign.POSITIVE
+		value = vn * wn
+		capped = vn == Catalog.NEXT_WAVE_ENEMY_DOWN_MAX
+		en.set_meta("aa_value", value)
+		out.push_back(en)
+	elif kind == "loot_aliens":
 		var n = int(clamp(round((target + comp) / _loot_alien_value()), 1, 4))
 		var e = effect_script.new()
 		e.key = "extra_loot_aliens_next_wave"
@@ -1487,6 +1530,8 @@ func gen_char_component(target: float, holder = null) -> Dictionary:
 	if cfg.get("char_effects", false):
 		for k in Catalog.MORE_CHAR_COMPONENT_WEIGHTS:
 			weights[k] = Catalog.MORE_CHAR_COMPONENT_WEIGHTS[k]
+	if cfg.get("more_double", false):
+		weights["enemy_decay"] = 0.1
 	if cfg.get("all_char_effects", false):
 		for k in Catalog.BETA_POSITIVE_WEIGHTS:
 			weights[k] = Catalog.BETA_POSITIVE_WEIGHTS[k]
@@ -1499,6 +1544,25 @@ func gen_char_component(target: float, holder = null) -> Dictionary:
 				continue
 			return bp
 		match kind:
+			"enemy_decay":
+				# 每波结束时敌人生命 / 伤害 -X%（船长的反面，逐波累积）
+				var ek = ["enemy_health", "enemy_damage"][rng.randi() % 2]
+				var wd = Catalog.stat_w(ek) * pm
+				var vd = int(clamp(round(target / wd), 1, Catalog.ENEMY_DECAY_MAX))
+				if vd * wd > target * 1.6:
+					continue
+				var ed = effect_script.new()
+				ed.key = ek
+				ed.key_hash = Keys.generate_hash(ek)
+				ed.custom_key = "stats_end_of_wave"
+				ed.custom_key_hash = Keys.generate_hash("stats_end_of_wave")
+				ed.storage_method = Effect.StorageMethod.KEY_VALUE
+				ed.text_key = "effect_gain_stat_end_of_wave"
+				ed.value = -vd
+				ed.effect_sign = Effect.Sign.POSITIVE
+				ed.set_meta("aa_value", vd * wd)
+				ed.set_meta("aa_tags", [])
+				return {"effect": ed, "value": vd * wd}
 			"cryptid":
 				if not char_templates.has("cryptid"):
 					continue
@@ -1804,7 +1868,7 @@ func gen_char_downside(comp: float, perm_mult: float, budget_total: float = -1.0
 		if not br.empty():
 			return br
 	# 更多角色效果：道具价格 +X%（变异体 / 节俭者）
-	if more and char_templates.has("items_price_up") and rng.randf() < Catalog.MORE_CHAR_DOWNSIDE_CHANCE * 0.5:
+	if (more or cfg.get("more_double", false)) and char_templates.has("items_price_up") and rng.randf() < Catalog.MORE_CHAR_DOWNSIDE_CHANCE * 0.5:
 		var per_p = _items_price_value_per_pct()
 		if per_p > 0.0:
 			var xp_ = int(clamp(round(comp * divisor / per_p / 5.0) * 5, 5, 50))
@@ -1822,7 +1886,13 @@ func gen_char_downside(comp: float, perm_mult: float, budget_total: float = -1.0
 			var got_x = neg_value(abs(Catalog.stat_w("xp_gain") * Catalog.xp_needed_equiv_pct(x)))
 			ex.set_meta("aa_value", -got_x)
 			return {"effects": [ex], "value": got_x}
-	if comp >= Catalog.WEAPON_SLOT_W / divisor * 0.7 and comp <= Catalog.WEAPON_SLOT_W / divisor * 1.5 and rng.randf() < 0.3:
+	var double = cfg.get("more_double", false)
+	if double and rng.randf() < 0.35:
+		var dd = _gen_double_char_downside(comp)
+		if not dd.empty():
+			return dd
+	# -1 武器栏只在"更多双面效果"开启时出现（常规池只有 +1 武器栏）
+	if double and comp >= Catalog.WEAPON_SLOT_W / divisor * 0.7 and comp <= Catalog.WEAPON_SLOT_W / divisor * 1.5 and rng.randf() < 0.3:
 		var e = _stat_effect("weapon_slot", -1)
 		var got = neg_value(Catalog.WEAPON_SLOT_W)
 		e.set_meta("aa_value", -got)
@@ -1843,6 +1913,41 @@ func gen_char_downside(comp: float, perm_mult: float, budget_total: float = -1.0
 	var got2 = neg_value(w * v * perm_mult)
 	e2.set_meta("aa_value", -got2)
 	return {"effects": [e2], "value": got2}
+
+
+# 更多双面效果的代价：-X% [类型] 武器属性、+X% 武器价格
+func _gen_double_char_downside(comp: float) -> Dictionary:
+	if rng.randf() < 0.5 and not char_templates.class_bonus.empty() and not ItemService.sets.empty():
+		var tmpl = char_templates.class_bonus[rng.randi() % char_templates.class_bonus.size()]
+		var sets = []
+		for st in ItemService.sets:
+			if st.my_id != "set_legendary":
+				sets.push_back(st)
+		var chosen = sets[rng.randi() % sets.size()]
+		var w = Catalog.CLASS_BONUS_STAT_W.get(tmpl.stat_displayed_name, 1.5)
+		var unit = 10 if tmpl.stat_displayed_name == "stat_range" else 5
+		var raw = comp * divisor / (w * Catalog.CLASS_BONUS_SHARE)
+		var v = int(clamp(round(raw / unit) * unit, unit, max(unit, tmpl.value)))
+		var e = tmpl.duplicate()
+		e.set_id = chosen.my_id
+		e.set_id_hash = Keys.generate_hash(chosen.my_id)
+		e.stat_hash = Keys.generate_hash(e.stat_name)
+		e.value = -v
+		var got = neg_value(w * v * Catalog.CLASS_BONUS_SHARE)
+		e.set_meta("aa_value", -got)
+		e.set_meta("aa_tags", [])
+		return {"effects": [e], "value": got}
+	if char_templates.has("weapons_price"):
+		var per_w = Catalog.WEAPON_SPEND_PER_WAVE / 100.0 * Catalog.GOLD_W
+		var vw = int(clamp(round(comp * divisor / per_w / 5.0) * 5, 5, 50))
+		var ew = char_templates.weapons_price.duplicate()
+		ew.value = vw
+		ew.effect_sign = Effect.Sign.NEGATIVE
+		var got_w = neg_value(vw * per_w)
+		ew.set_meta("aa_value", -got_w)
+		ew.set_meta("aa_tags", [])
+		return {"effects": [ew], "value": got_w}
+	return {}
 
 
 func gen_next_wave_downside(comp: float, perm_mult: float) -> Dictionary:
@@ -2017,7 +2122,11 @@ const NEGATIVE_TRIGGERS = ["hit", "dodge", "kill", "interval", "still", "moving"
 
 func _legal_payloads(trigger: String, negative: bool) -> Array:
 	if negative:
-		return ["temp_stat"] if trigger in NEGATIVE_TRIGGERS else []
+		var neg = ["temp_stat"] if trigger in NEGATIVE_TRIGGERS else []
+		# 更多双面效果：代价可以是"失去材料"
+		if cfg.get("more_double", false) and trigger in Catalog.LOSE_GOLD_TRIGGERS and rng.randf() < Catalog.LOSE_GOLD_CHANCE:
+			neg.push_back("gold")
+		return neg
 	var out = []
 	var table = Catalog.FREE_LEGAL if cfg.get("free_triggers", true) else Catalog.LEGAL
 	for p in table[trigger]:
@@ -2186,7 +2295,7 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 	if c.payload in ["temp_stat", "perm_stat", "timed_stat"]:
 		c.value = int(min(c.value, _line_cap(c.stat, negative)))
 	if negative:
-		# 敌人属性的"代价"方向是提高（正值），自身属性是降低（负值）
+		# 敌人属性的"代价"方向是提高（正值），自身属性 / 材料是降低（负值）
 		c.value = abs(c.value) if Catalog.ENEMY_STATS.has(c.stat) else -abs(c.value)
 	return c
 

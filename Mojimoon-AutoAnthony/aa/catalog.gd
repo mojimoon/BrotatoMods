@@ -353,6 +353,9 @@ const DOWNSIDE_SIGN = {
 	"speed_cap": 0, "hp_cap": 0, "lock_current_weapons": 0, "extra_enemies_next_wave": 0, "number_of_enemies": -1,
 	"gold_drops": -1, "enemy_gold_drops": -1, "dodge_cap": -1, "gain_pct_gold_start_wave": -1,
 	"accuracy": -1, "burning_cooldown_reduction": -1, "piercing_damage": -1,
+	# 更多双面效果：可缩放机制的反面
+	"damage_against_bosses": -1, "recycling_gains": -1, "structure_attack_speed": -1, "loot_alien_chance": -1,
+	"level_upgrades_modifications": -1,
 }
 # 角色效果中不能搬到道具上的身份 / 结构性 key
 const CHAR_MECHANIC_BANNED = [
@@ -732,6 +735,28 @@ const BETA_UNIQUE_KEYS = [
 	"min_weapon_tier", "max_melee_weapons", "max_ranged_weapons", "remove_shop_items", "weapon_slot_upgrades",
 	"all_weapons_count_for_sets", "guaranteed_shop_items",
 ]
+
+# ============================================================
+# 更多双面效果（选项）：常规池里只以正面 / 只以负面出现的效果，加入它们的对立面
+#   可缩放机制的反面作为代价（-X% 材料掉落 = 贪婪之帽的反面、+X% 刷新价格、+X% 敌人速度……）：
+#     价值 = 正面每单位价值 × 数值 / 负面除数；数值上限见 DOUBLE_NEG_CAPS（避免 -100% 等于禁用）
+#   负面机制的反面作为好处：-X% 敌人生命 / 伤害（黑旗的反面），按敌人属性的整局价值估值
+#   -1 武器栏、-X% [类型] 武器属性、+X% 武器价格、+X% 道具价格（代价）；每波结束时敌人属性降低（船长的反面）、
+#   下一波敌人属性降低；触发条款的代价可以是"失去材料"
+# ============================================================
+const DOUBLE_NEG_CAPS = {
+	"gold_drops": 50, "enemy_gold_drops": 50, "damage_against_bosses": 50, "recycling_gains": 50,
+	"gain_pct_gold_start_wave": 50, "structure_attack_speed": 30, "loot_alien_chance": 50,
+	"level_upgrades_modifications": 40, "reroll_price": 50, "enemy_speed": 15,
+}
+const DOUBLE_POS_ENEMY_CAPS = {"enemy_health": 15, "enemy_damage": 15}
+# 每波结束时敌人属性 -X%（每波累积）的单次上限
+const ENEMY_DECAY_MAX = 2
+# "失去材料"代价可以挂在这些扳机上
+const LOSE_GOLD_TRIGGERS = ["kill", "hit", "dodge", "interval", "consumable"]
+const LOSE_GOLD_CHANCE = 0.35
+# 下一波正面：敌人属性降低（单条上限）
+const NEXT_WAVE_ENEMY_DOWN_MAX = 40
 
 # T4 道具不出现 +收获（与原版一致）
 const T4_BANNED_POSITIVE_STATS = ["stat_harvesting"]

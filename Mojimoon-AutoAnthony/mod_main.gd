@@ -26,6 +26,7 @@ var cfg_characters: bool = false
 var cfg_weapons: bool = false
 var cfg_char_effects: bool = false	# 更多角色效果
 var cfg_all_char_effects: bool = false	# 全部角色效果（BETA）
+var cfg_more_double: bool = false	# 更多双面效果
 var cfg_rename: bool = true			# 重组名称
 var cfg_avg: int = 100				# 平均数值 50–200%
 var cfg_variance: int = 100			# 浮动范围 50–200%（100% = 原版离散度）
@@ -137,6 +138,7 @@ func get_cfg() -> Dictionary:
 		"weapons": cfg_weapons,
 		"char_effects": cfg_char_effects,
 		"all_char_effects": cfg_all_char_effects,
+		"more_double": cfg_more_double,
 		"rename": cfg_rename,
 		"avg": cfg_avg,
 		"variance": cfg_variance,
@@ -180,6 +182,7 @@ func _load_settings() -> void:
 	cfg_weapons = bool(d.get("weapons", false))
 	cfg_char_effects = bool(d.get("char_effects", false))
 	cfg_all_char_effects = bool(d.get("all_char_effects", false))
+	cfg_more_double = bool(d.get("more_double", false))
 	cfg_rename = bool(d.get("rename", true))
 	cfg_avg = int(clamp(int(d.get("avg", 100)), 50, 200))
 	cfg_variance = int(clamp(int(d.get("variance", 100)), 50, 200))
