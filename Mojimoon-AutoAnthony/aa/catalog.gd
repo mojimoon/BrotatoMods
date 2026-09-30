@@ -657,7 +657,7 @@ static func tags_for_binding(k: String) -> Array:
 #   波末每个存活敌人获得材料与经验（和平主义者）；代价：每波结束敌人属性提高（船长）、−1 武器栏
 # ============================================================
 const CLASS_BONUS_SHARE = 0.35
-const CLASS_BONUS_STAT_W = {"stat_attack_speed": 1.4, "stat_percent_damage": 1.8, "stat_range": 0.35, "stat_lifesteal": 4.7, "stat_damage": 1.5}
+const CLASS_BONUS_STAT_W = {"stat_attack_speed": 1.4, "stat_percent_damage": 1.5, "stat_range": 0.35, "stat_lifesteal": 4.7, "stat_damage": 1.8}
 const BURN_BONUS_W = 0.12		# 燃烧目标额外伤害，每 1%
 const PACIFIST_W = 0.4			# 每 0.01 材料+经验 / 存活敌人（波末约 30 个存活敌人）
 const WEAPON_SLOT_W = 25.0
