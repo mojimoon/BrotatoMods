@@ -450,7 +450,7 @@ B 站 UP 主们已经玩出了不少花样：大嗓门 + 外星绅士、杰克 +
 
 **Every run, a brand-new item pool.** Auto-Anthonyology breaks every item into its parts — stats, triggers, effects, mechanics — and puts them back together at random, at the same value. Same icons, same rarities, completely different items.
 
-Inspired by the *Auto-Anthonyology* mod for Slay the Spire 2, which itself comes from Challenge #45 of The Binding of Isaac: Repentance. Many thanks to the original authors!
+Inspired by the *Auto-Anthonyology* mod for Slay the Spire 2, which itself comes from Challenge #45 of The Binding of Isaac: Repentance. Many thanks to the original author!
 
 ### How to use
 
@@ -458,12 +458,10 @@ On the character, weapon or difficulty selection screen, click **Auto-Anthony** 
 
 ### What does it do?
 
-- **Any trigger, any effect**: "when you dodge", "every 5 seconds", "when you pick up a crate", "the first time you hit an enemy with Elemental Damage"... can now be paired with any effect: stats for the wave, permanent stats, healing, materials, XP, damage, explosions, "enemies take more damage", or even another item's effect ("when you kill an enemy: gain '+1 Armor for every 6 Elemental Damage' until the end of the wave").
-- **Fair values**: every effect is priced in materials. Stat weights are fitted on the original items (guided by the stat values of ArosRising's Brotato MultiTool); triggers are priced as *value per activation × activations per wave*. Each item's budget follows its price and rarity, so a 100-material legendary is really worth ~100 materials.
-- **Prices are rerolled too**: items no longer keep their original price; a new one is drawn from the original price range of the same rarity.
-- **Feels like Brotato**: the number of stat lines, how often items have a downside, which stats go together, and how often items have special effects all follow the original items of the same rarity. Every T1–T3 rarity is guaranteed one "pure" item for each core stat (damage, melee, ranged, elemental, engineering, attack speed, harvesting, XP), and every tag your character wants is guaranteed to exist.
-- **Names**: "Hiking Anvil", "Synergic Adrenaline", "Charged Cape"... the adjective tells you the main effect.
-- **Safe**: the seed is saved with your run (loading rebuilds the same items), cursed items (Abyssal Terrors) work as usual, items added by other mods are left untouched.
+- **Any trigger, any effect**: "when you dodge", "every 5 seconds", "when you pick up a crate", "the first time you hit an enemy with Elemental Damage"... can now be paired with any effect: stats for the wave, permanent stats, healing, materials, XP, damage, explosions, "enemies take more damage", or even another item's effect ("when you kill a burning enemy: explode for 100% of your Ranged Damage"). Everything you can imagine is now possible.
+- **Fair values**: every effect is priced in materials. Stat weights are fitted on the original items (guided by the stat values of ArosRising's Brotato MultiTool); triggers are priced as *value per activation × activations per wave*. This gives a fair price for every effect, and every item is worth its price.
+- **Feels like Brotato**: the number of stat lines, how often items have a downside, which stats go together, and how often items have special effects all follow the original items of the same rarity. A pure item for each important stat (damage, melee, ranged, elemental, engineering, attack speed, harvesting, XP gain) is guaranteed for every T1–T3 rarity, and every tag your character wants is guaranteed to exist.
+- **Easy to use and compatible**: the seed is saved with your run (loading rebuilds the same items). Cursed items work as usual, items added by other mods are left untouched.
 - **Full language support**: English, Français, 简体中文, 日本語, 한국어, 繁體中文, Русский, Polski, Español, Português, Deutsch, Türkçe, Italiano.
 
 ### Options
@@ -497,7 +495,7 @@ On the character, weapon or difficulty selection screen, click **Auto-Anthony** 
 | Keep original items | 0% | Keeps a share of the original items out of the reassembly. |
 | Fixed seed | Off | When on, every run generates the same item pool (easy to share). |
 
-The **Item preview** at the bottom lists the whole item pool for the current settings and seed, one card per item, without starting a run.
+The **Item preview** at the bottom lists the whole item pool for the current settings and seed without starting a run. Share your seed with friends to let them try the same item pool!
 
 If you like this mod, please consider liking, favoriting and sharing it, thank you! Comments and suggestions are also very welcome!
 
@@ -505,7 +503,7 @@ If you like this mod, please consider liking, favoriting and sharing it, thank y
 
 [b]Every run, a brand-new item pool.[/b] Auto-Anthonyology breaks every item into its parts — stats, triggers, effects, mechanics — and puts them back together at random, at the same value. Same icons, same rarities, completely different items.
 
-Inspired by the [i]Auto-Anthonyology[/i] mod for Slay the Spire 2, which itself comes from Challenge #45 of The Binding of Isaac: Repentance. Many thanks to the original authors!
+Inspired by the [i]Auto-Anthonyology[/i] mod for Slay the Spire 2, which itself comes from Challenge #45 of The Binding of Isaac: Repentance. Many thanks to the original author!
 
 [h1]How to use[/h1]
 
@@ -514,12 +512,10 @@ On the character, weapon or difficulty selection screen, click [b]Auto-Anthony[/
 [h1]What does it do?[/h1]
 
 [list]
-[*][b]Any trigger, any effect[/b]: "when you dodge", "every 5 seconds", "when you pick up a crate", "the first time you hit an enemy with Elemental Damage"... can now be paired with any effect: stats for the wave, permanent stats, healing, materials, XP, damage, explosions, "enemies take more damage", or even another item's effect ("when you kill an enemy: gain '+1 Armor for every 6 Elemental Damage' until the end of the wave").
-[*][b]Fair values[/b]: every effect is priced in materials. Stat weights are fitted on the original items (guided by the stat values of ArosRising's Brotato MultiTool); triggers are priced as [i]value per activation × activations per wave[/i]. Each item's budget follows its price and rarity, so a 100-material legendary is really worth ~100 materials.
-[*][b]Prices are rerolled too[/b]: items no longer keep their original price; a new one is drawn from the original price range of the same rarity.
-[*][b]Feels like Brotato[/b]: the number of stat lines, how often items have a downside, which stats go together, and how often items have special effects all follow the original items of the same rarity. Every T1–T3 rarity is guaranteed one "pure" item for each core stat (damage, melee, ranged, elemental, engineering, attack speed, harvesting, XP), and every tag your character wants is guaranteed to exist.
-[*][b]Names[/b]: "Hiking Anvil", "Synergic Adrenaline", "Charged Cape"... the adjective tells you the main effect.
-[*][b]Safe[/b]: the seed is saved with your run (loading rebuilds the same items), cursed items (Abyssal Terrors) work as usual, items added by other mods are left untouched.
+[*][b]Any trigger, any effect[/b]: "when you dodge", "every 5 seconds", "when you pick up a crate", "the first time you hit an enemy with Elemental Damage"... can now be paired with any effect: stats for the wave, permanent stats, healing, materials, XP, damage, explosions, "enemies take more damage", or even another item's effect ("when you kill an burning enemy: explode for 100% of your Ranged Damage"). Everything you can imagine is now possible.
+[*][b]Fair values[/b]: every effect is priced in materials. Stat weights are fitted on the original items (guided by the stat values of ArosRising's Brotato MultiTool); triggers are priced as [i]value per activation × activations per wave[/i]. This gives a fair price for every effect, and every item is worth its price.
+[*][b]Feels like Brotato[/b]: the number of stat lines, how often items have a downside, which stats go together, and how often items have special effects all follow the original items of the same rarity. A pure item for each important stat (damage, melee, ranged, elemental, engineering, attack speed, harvesting, XP gain) is guaranteed for every T1–T3 rarity, and every tag your character wants is guaranteed to exist.
+[*][b]Easy to use and compatible[/b]: the seed is saved with your run (loading rebuilds the same items). Cursed items work as usual, items added by other mods are left untouched.
 [*][b]Full language support[/b]: English, Français, 简体中文, 日本語, 한국어, 繁體中文, Русский, Polski, Español, Português, Deutsch, Türkçe, Italiano.
 [/list]
 
@@ -557,7 +553,7 @@ On the character, weapon or difficulty selection screen, click [b]Auto-Anthony[/
 [tr][td]Fixed seed[/td][td]Off[/td][td]When on, every run generates the same item pool (easy to share).[/td][/tr]
 [/table]
 
-The [b]Item preview[/b] at the bottom lists the whole item pool for the current settings and seed, one card per item, without starting a run.
+The [b]Item preview[/b] at the bottom lists the whole item pool for the current settings and seed without starting a run. Share your seed with friends to let them try the same item pool!
 
 [pullquote]If you like this mod, please consider liking, favoriting and sharing it, thank you! Comments and suggestions are also very welcome![/pullquote]
 
@@ -577,12 +573,10 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 ### 特色
 
-- **任意触发 × 任意效果**："闪避时""每 5 秒""拾取箱子时""首次用元素伤害命中敌人时"……可以搭配任意效果：本波属性、永久属性、回血、材料、经验、伤害、爆炸、"该敌人受到的伤害提高"，甚至是另一件道具的效果（"击杀敌人时：本波获得「每 6 点元素伤害 +1 护甲」"）。
-- **公平的数值**：每种效果都按材料计价。属性权重由原版道具拟合（参考 ArosRising《Brotato MultiTool》的属性价值），触发效果按"单次价值 × 每波触发次数"计价。每件道具的预算由价格和稀有度决定，100 材料的传说道具就值 100 材料左右。
-- **价格也会重新生成**：道具不再沿用原价，而是在同稀有度原版道具的价格范围内重新抽取。
-- **还是土豆兄弟的味道**：属性行数、带负面效果的概率、哪些属性常一起出现、带特殊效果的比例，都跟随原版同稀有度道具。T1–T3 每个稀有度为每种核心属性（%伤害、近战、远程、元素、工程、攻速、收获、经验）保证一件"纯净"道具，你的角色想要的每种词条也都保证存在。
-- **名字**："共鸣铁砧""古怪的外星魔法""急速头巾"……形容词告诉你主效果是什么。
-- **安全**：种子随存档保存（读档重建同一套道具），深海魔怪的诅咒道具照常生效，其他 mod 加入的道具不受影响。
+- **任意触发 × 任意效果**："闪避时""每 5 秒""拾取箱子时""首次用元素伤害命中敌人时"……可以搭配任意效果：本波属性、永久属性、回血、材料、经验、伤害、爆炸、"该敌人受到的伤害提高"，甚至是另一件道具的效果（"击杀燃烧中的敌人时，引发爆炸，造成相当于 100% 远程伤害的伤害"）。只有你想不到，没有东尼做不到。
+- **公平的数值**：每种效果都按材料计价。属性权重由原版道具拟合（感谢 ArosRising's Brotato MultiTool），触发效果按"单次价值 × 每波触发次数"计价，以此保证每条效果的价值公平，每件道具都值它的价格。
+- **还是土豆兄弟的味道**：属性行数、带负面效果的概率、哪些属性常一起出现、带特殊效果的比例，默认都跟随原版同稀有度道具。T1–T3 每个稀有度为每种关键属性（%伤害、近战、远程、元素、工程、攻速、收获、经验）保证一件核心道具，你的角色想要的每种词条也都保证存在。
+- **易用又兼容**：种子会随存档保存，加载存档会重建同样的道具池；诅咒道具照常生效；其他 mod 添加的道具不受影响。
 - **全语言支持**：English、Français、简体中文、日本語、한국어、繁體中文、Русский、Polski、Español、Português、Deutsch、Türkçe、Italiano。
 
 ### 选项说明
@@ -616,7 +610,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 | 保留原版道具 | 0% | 保留一定比例的原版道具不参与重组。 |
 | 固定种子 | 关 | 开启后每局生成同一套道具池（便于分享）。 |
 
-设置页下方的 **道具预览** 会按当前设置与种子列出整个道具池，每件道具一张卡片，无需开局。
+设置页下方的 **道具预览** 可以在开始一局之前，按当前设置与种子列出整个道具池。快来跟好友分享你的道具池吧！
 
 <!-- BBCode
 
@@ -631,12 +625,10 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 [h1]特色[/h1]
 
 [list]
-[*][b]任意触发 × 任意效果[/b]："闪避时""每 5 秒""拾取箱子时""首次用元素伤害命中敌人时"……可以搭配任意效果：本波属性、永久属性、回血、材料、经验、伤害、爆炸、"该敌人受到的伤害提高"，甚至是另一件道具的效果（"击杀敌人时：本波获得「每 6 点元素伤害 +1 护甲」"）。
-[*][b]公平的数值[/b]：每种效果都按材料计价。属性权重由原版道具拟合（参考 ArosRising《Brotato MultiTool》的属性价值），触发效果按"单次价值 × 每波触发次数"计价。每件道具的预算由价格和稀有度决定，100 材料的传说道具就值 100 材料左右。
-[*][b]价格也会重新生成[/b]：道具不再沿用原价，而是在同稀有度原版道具的价格范围内重新抽取。
-[*][b]还是土豆兄弟的味道[/b]：属性行数、带负面效果的概率、哪些属性常一起出现、带特殊效果的比例，都跟随原版同稀有度道具。T1–T3 每个稀有度为每种核心属性（%伤害、近战、远程、元素、工程、攻速、收获、经验）保证一件"纯净"道具，你的角色想要的每种词条也都保证存在。
-[*][b]名字[/b]："共鸣铁砧""古怪的外星魔法""急速头巾"……形容词告诉你主效果是什么。
-[*][b]安全[/b]：种子随存档保存（读档重建同一套道具），深海魔怪的诅咒道具照常生效，其他 mod 加入的道具不受影响。
+[*][b]任意触发 × 任意效果[/b]："闪避时""每 5 秒""拾取箱子时""首次用元素伤害命中敌人时"……可以搭配任意效果：本波属性、永久属性、回血、材料、经验、伤害、爆炸、"该敌人受到的伤害提高"，甚至是另一件道具的效果（"击杀燃烧中的敌人时，引发爆炸，造成相当于 100% 远程伤害的伤害"）。只有你想不到，没有东尼做不到。
+[*][b]公平的数值[/b]：每种效果都按材料计价。属性权重由原版道具拟合（感谢 ArosRising's Brotato MultiTool），触发效果按"单次价值 × 每波触发次数"计价，以此保证每条效果的价值公平，每件道具都值它的价格。
+[*][b]还是土豆兄弟的味道[/b]：属性行数、带负面效果的概率、哪些属性常一起出现、带特殊效果的比例，默认都跟随原版同稀有度道具。T1–T3 每个稀有度为每种关键属性（%伤害、近战、远程、元素、工程、攻速、收获、经验）保证一件核心道具，你的角色想要的每种词条也都保证存在。
+[*][b]易用又兼容[/b]：种子会随存档保存，加载存档会重建同样的道具池；诅咒道具照常生效；其他 mod 添加的道具不受影响。
 [*][b]全语言支持[/b]：English、Français、简体中文、日本語、한국어、繁體中文、Русский、Polski、Español、Português、Deutsch、Türkçe、Italiano。
 [/list]
 
@@ -674,7 +666,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 [tr][td]固定种子[/td][td]关[/td][td]开启后每局生成同一套道具池（便于分享）。[/td][/tr]
 [/table]
 
-设置页下方的 [b]道具预览[/b] 会按当前设置与种子列出整个道具池，每件道具一张卡片，无需开局。
+设置页下方的 [b]道具预览[/b] 可以在开始一局之前，按当前设置与种子列出整个道具池。快来跟好友分享你的道具池吧！
 
 [pullquote]如果你喜欢这个 mod，欢迎点赞、收藏、转发，多谢啦！有问题或建议欢迎在评论区留言！[/pullquote]
 
