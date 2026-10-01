@@ -28,9 +28,9 @@ var cfg_char_effects: bool = false	# 更多角色效果
 var cfg_all_char_effects: bool = false	# 全部角色效果（BETA）
 var cfg_more_double: bool = false	# 更多双面效果
 var cfg_rename: bool = true			# 重组名称
-var cfg_avg: int = 100				# 平均数值 50–200%
-var cfg_variance: int = 100			# 浮动范围 50–200%（100% = 原版离散度）
-var cfg_triggers: int = 100			# 触发效果 50–200%（100% = 原版特殊行比例）
+var cfg_avg: int = 100				# 平均数值 50–250%
+var cfg_variance: int = 150			# 浮动范围 50–250%（100% = 原版离散度）
+var cfg_triggers: int = 150			# 触发效果 50–250%（100% = 原版特殊行比例）
 var cfg_native_ratio: int = 0		# 保留原版道具 0–100%
 var cfg_fixed_seed: bool = false
 var cfg_seed: int = 0
@@ -188,9 +188,9 @@ func apply_settings(d: Dictionary) -> void:
 	cfg_all_char_effects = bool(d.get("all_char_effects", false))
 	cfg_more_double = bool(d.get("more_double", false))
 	cfg_rename = bool(d.get("rename", true))
-	cfg_avg = int(clamp(int(d.get("avg", 100)), 50, 200))
-	cfg_variance = int(clamp(int(d.get("variance", 100)), 50, 200))
-	cfg_triggers = int(clamp(int(d.get("triggers", 100)), 50, 200))
+	cfg_avg = int(clamp(int(d.get("avg", 100)), 50, 250))
+	cfg_variance = int(clamp(int(d.get("variance", 150)), 50, 250))
+	cfg_triggers = int(clamp(int(d.get("triggers", 150)), 50, 250))
 	cfg_native_ratio = int(clamp(int(d.get("native_ratio", 0)), 0, 100))
 	cfg_fixed_seed = bool(d.get("fixed_seed", false))
 	cfg_seed = int(d.get("seed", 0))

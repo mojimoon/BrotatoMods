@@ -44,9 +44,9 @@ const EFFECT_SWITCHES = [
 ]
 # [配置字段, 名称 key, 最小, 最大, 步长, 说明 key]
 const SLIDERS = [
-	["cfg_avg", "AA_UI_AVG", 50, 200, 5, "AA_UI_AVG_DESC"],
-	["cfg_variance", "AA_UI_VARIANCE", 50, 200, 5, "AA_UI_VARIANCE_DESC"],
-	["cfg_triggers", "AA_UI_TRIGGERS", 50, 200, 5, "AA_UI_TRIGGERS_DESC"],
+	["cfg_avg", "AA_UI_AVG", 50, 250, 5, "AA_UI_AVG_DESC"],
+	["cfg_variance", "AA_UI_VARIANCE", 50, 250, 5, "AA_UI_VARIANCE_DESC"],
+	["cfg_triggers", "AA_UI_TRIGGERS", 50, 250, 5, "AA_UI_TRIGGERS_DESC"],
 	["cfg_native_ratio", "AA_UI_NATIVE", 0, 100, 5, "AA_UI_NATIVE_DESC"],
 ]
 

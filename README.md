@@ -490,8 +490,8 @@ On the character, weapon or difficulty selection screen, click **Auto-Anthony** 
 | Option | Default | What it does |
 | --- | --- | --- |
 | Average value | 100% | Multiplier of the expected effect value (100% = original value). |
-| Variance | 100% | Random spread of the effect value (100% = spread of the original items). |
-| Triggers | 100% | Chance that an item has a triggered or mechanic effect (100% = same as original items of the same rarity). |
+| Variance | 150% | Random spread of the effect value (100% = spread of the original items). |
+| Triggers | 150% | Chance that an item has a triggered or mechanic effect (100% = same as original items of the same rarity). |
 | Keep original items | 0% | Keeps a share of the original items out of the reassembly. |
 | Fixed seed | Off | When on, every run generates the same item pool (easy to share). |
 
@@ -547,8 +547,8 @@ On the character, weapon or difficulty selection screen, click [b]Auto-Anthony[/
 [table]
 [tr][th]Option[/th][th]Default[/th][th]What it does[/th][/tr]
 [tr][td]Average value[/td][td]100%[/td][td]Multiplier of the expected effect value (100% = original value).[/td][/tr]
-[tr][td]Variance[/td][td]100%[/td][td]Random spread of the effect value (100% = spread of the original items).[/td][/tr]
-[tr][td]Triggers[/td][td]100%[/td][td]Chance that an item has a triggered or mechanic effect (100% = same as original items of the same rarity).[/td][/tr]
+[tr][td]Variance[/td][td]150%[/td][td]Random spread of the effect value (100% = spread of the original items).[/td][/tr]
+[tr][td]Triggers[/td][td]150%[/td][td]Chance that an item has a triggered or mechanic effect (100% = same as original items of the same rarity).[/td][/tr]
 [tr][td]Keep original items[/td][td]0%[/td][td]Keeps a share of the original items out of the reassembly.[/td][/tr]
 [tr][td]Fixed seed[/td][td]Off[/td][td]When on, every run generates the same item pool (easy to share).[/td][/tr]
 [/table]
@@ -605,8 +605,8 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 | 选项 | 默认 | 作用 |
 | --- | --- | --- |
 | 平均数值 | 100% | 特效价值期望值的倍率（100% = 原版价值）。 |
-| 浮动范围 | 100% | 特效价值的随机浮动（100% = 原版离散度）。 |
-| 触发效果 | 100% | 道具带有触发或机制型特效的概率（100% = 相当于原版同稀有度道具）。 |
+| 浮动范围 | 150% | 特效价值的随机浮动（100% = 原版离散度）。 |
+| 触发效果 | 150% | 道具带有触发或机制型特效的概率（100% = 相当于原版同稀有度道具）。 |
 | 保留原版道具 | 0% | 保留一定比例的原版道具不参与重组。 |
 | 固定种子 | 关 | 开启后每局生成同一套道具池（便于分享）。 |
 
@@ -660,8 +660,8 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 [table]
 [tr][th]选项[/th][th]默认[/th][th]作用[/th][/tr]
 [tr][td]平均数值[/td][td]100%[/td][td]特效价值期望值的倍率（100% = 原版价值）。[/td][/tr]
-[tr][td]浮动范围[/td][td]100%[/td][td]特效价值的随机浮动（100% = 原版离散度）。[/td][/tr]
-[tr][td]触发效果[/td][td]100%[/td][td]道具带有触发或机制型特效的概率（100% = 相当于原版同稀有度道具）。[/td][/tr]
+[tr][td]浮动范围[/td][td]150%[/td][td]特效价值的随机浮动（100% = 原版离散度）。[/td][/tr]
+[tr][td]触发效果[/td][td]150%[/td][td]道具带有触发或机制型特效的概率（100% = 相当于原版同稀有度道具）。[/td][/tr]
 [tr][td]保留原版道具[/td][td]0%[/td][td]保留一定比例的原版道具不参与重组。[/td][/tr]
 [tr][td]固定种子[/td][td]关[/td][td]开启后每局生成同一套道具池（便于分享）。[/td][/tr]
 [/table]
@@ -689,3 +689,17 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 ![](img/aa-4.jpg)
 
 </details>
+
+<!--
+
+土豆兄弟：东尼算法 (Brotato: Auto-Anthonyology)
+
+每一局，都是全新的道具池！东尼算法把每件道具拆成属性、触发条件、效果和机制，再按同等价值随机拼回去：图标和稀有度不变，道具却完全不同。
+
+"闪避时""首次用远程伤害击中敌人时""敌袭过半时"……"%攻击速度的修改增加5%，直到敌袭结束""引发爆炸""获得+1贯通"，任何触发条件都能搭配任何效果；数值按原版道具拟合，虽然有千万种不同组合，还是熟悉的土豆兄弟手感。如果想要追求更刺激的体验，可以选择重组角色和武器，加入一击必死、偷窃商店等全部角色机制，或者为每个效果都加上对立面。
+
+灵感来自《杀戮尖塔 2》的东尼算法 mod 与《以撒的结合：忏悔》挑战 45。快用分享码一键分享你的道具池！
+
+创意工坊：https://steamcommunity.com/sharedfiles/filedetails/?id=3671094202
+
+-->

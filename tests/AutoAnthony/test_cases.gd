@@ -55,6 +55,9 @@ func run(p_tree: SceneTree):
 		print("  ran ", t)
 	m.on_menu_reset()
 	_reset()
+	# 表格用真正的默认设置（浮动范围、触发效果默认 150%）
+	m.cfg_variance = 150
+	m.cfg_triggers = 150
 	_write_items_table()
 	m.on_menu_reset()
 
@@ -104,7 +107,7 @@ func _write_items_table() -> void:
 			mark += ("，" if mark != "" else "") + "独特"
 		lines.push_back("| T%d | %s | %d | %d | %s | %s |" % [it.tier + 1, nm, p.price, it.value, PoolStringArray(fx).join("<br>"), mark])
 	var out = "# 默认设置下的全部重组道具\n\n"
-	out += "由测试在每次运行结束时自动生成（`test_cases.gd` 的 `_write_items_table`）。默认设置：重组道具、重组名称开启，其余选项关闭，平均数值 / 浮动范围 / 触发效果 100%，保留原版道具 0%；种子 " + str(ITEMS_TABLE_SEED) + "。\n\n"
+	out += "由测试在每次运行结束时自动生成（`test_cases.gd` 的 `_write_items_table`）。默认设置：重组道具、重组名称开启，其余选项关闭，平均数值 100%、浮动范围 150%、触发效果 150%，保留原版道具 0%；种子 " + str(ITEMS_TABLE_SEED) + "。\n\n"
 	out += "共 %d 件：T1 %d、T2 %d、T3 %d、T4 %d。锚定道具（望远镜、诱饵、口袋工厂、美西螈、鱼钩等）保持原版，不在表内。\n\n" % [entries.size(), count[0], count[1], count[2], count[3]]
 	out += "| 稀有度 | 道具 | 价格 | 原版价格 | 效果 | 备注 |\n| --- | --- | --- | --- | --- | --- |\n"
 	out += PoolStringArray(lines).join("\n") + "\n"
