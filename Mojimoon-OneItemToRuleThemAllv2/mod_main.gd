@@ -48,6 +48,7 @@ var _shop_once_state: Dictionary = {}
 
 func _init() -> void:
 	var dir: String = ModLoaderMod.get_unpacked_dir() + MOD_ID + "/extensions/"
+	ModLoaderMod.install_script_extension(dir + "ui/menus/run/character_selection.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/run/weapon_selection.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/run/difficulty_selection/difficulty_selection.gd")
 	ModLoaderMod.install_script_extension(dir + "singletons/item_service.gd")
@@ -388,6 +389,43 @@ func reset_counter() -> void:
 	replace_counter = 0
 	crate_counter = 0
 	legendary_counter = 0
+
+
+# ============================================================
+# 入口按钮（角色 / 武器 / 难度选择界面左上角，返回按钮旁）
+# ============================================================
+const UI_SCENE_PATH = "res://mods-unpacked/Mojimoon-OneItemToRuleThemAllv2/ui/item_picker_ui.tscn"
+const FONT_26_PATH = "res://resources/fonts/actual/base/font_26.tres"
+
+
+# 在选择界面 screen 的返回按钮旁加"替换物品"按钮。
+# 应在 call_deferred 中调用，确保其他 mod 的按钮已就位。
+static func add_config_button(screen: Node) -> void:
+	if screen == null or not screen.is_inside_tree():
+		return
+	var back_button = screen.get_node_or_null("%BackButton")
+	if back_button == null or back_button.has_node("MojiPickerBtn"):
+		return
+	var btn = Button.new()
+	btn.name = "MojiPickerBtn"
+	btn.text = TranslationServer.translate("MOJI_BTN_OPEN")
+	btn.rect_min_size = Vector2(220, 50)
+	btn.focus_mode = Control.FOCUS_ALL
+	btn.add_font_override("font", load(FONT_26_PATH))
+	place_config_button(back_button, btn)
+	btn.connect("pressed", _get_mod(), "open_picker", [screen])
+
+
+func open_picker(screen: Node) -> void:
+	var scene = load(UI_SCENE_PATH)
+	if scene == null or screen == null:
+		return
+	var ui = scene.instance()
+	var layer = CanvasLayer.new()
+	layer.layer = 100
+	screen.get_tree().current_scene.add_child(layer)
+	layer.add_child(ui)
+	ui.connect("tree_exited", layer, "queue_free")
 
 
 # ============================================================

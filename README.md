@@ -155,16 +155,17 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 
 **What if every item turned into a Potato, a Gentle Alien, a Candy Bag...?** This mod is all you need: One Item to Rule Them All.
 
-**Now with a major upgrade**: a brand-new UI, better UX, and independent replacement for T4 crates!
+**Now with a major upgrade**: a brand-new UI, better UX, three side-by-side replacement pools (shop, crates, T4 crates), and settings import/export!
 
 ### How to use
 
-After picking a character, click **Replace Items** in the top-left corner of the weapon/difficulty selection screen. Pick the items you want from the list, then start the run. That's it!
+After picking a character, click **Replace Items** in the top-left corner of the character/weapon/difficulty selection screen. Pick the items you want from the list, then start the run. That's it!
 
 ### Features
 
 - **Round-robin rotation**: pick several items and they take turns (e.g., A-B-A-B), in the order you chose them.
-- **T4 Crate Pool**: give T4 crates their own items, or replace only the first few.
+- **Separate pools**: shops, crates and T4 crates each get their own items, or replace only the first few crates.
+- **Import / export**: share your whole setup as a code through the clipboard.
 - **Detailed yet intuitive UI**: item search, rarity colors, numbered pools, and a live description of exactly what will be replaced.
 - **Full language support**: English, Français, 简体中文, 日本語, 한국어, 繁體中文, Русский, Polski, Español, Português, Deutsch, Türkçe, Italiano.
 
@@ -172,30 +173,39 @@ After picking a character, click **Replace Items** in the top-left corner of the
 
 **Enable** (default: **on**): the master switch. When it's off, nothing is replaced and your settings are kept.
 
-**What to Replace**
+**Curse** (default: off): replaced items are always cursed (random strength that grows with the wave, just like naturally cursed items). *Requires the Abyssal Terrors DLC*.
+
+Even when it's off, a curse on the original item carries over to its replacement.
+
+The three cards each have their own replacement pool.
+
+**Shop**
 
 | Option | Default | What it does |
 | --- | --- | --- |
 | Starting items | Off | Your character's starting items (the character itself and weapons are untouched). |
-| Crates | **On** | Items from crates. |
 | All items in shop | **On** | Every item slot in the shop (weapons are untouched). |
 | Shops always sell | Off | Upon each shop reroll, one of the slots is guaranteed to be one of the selected items. |
 | Sold once per wave | Off | Each wave, the shop will sell all of the selected items once, then back to random. |
 
 "All items in shop", "Shops always sell" and "Sold once per wave" are mutually exclusive, at most one of them can be enabled.
 
-**Curse** (default: off): replaced items are always cursed (random strength that grows with the wave, just like naturally cursed items). *Requires the Abyssal Terrors DLC*.
+**Crate / T4 Crate**
 
-Even when it's off, a curse on the original item carries over to its replacement.
+Crates (including the extra items from treasure maps) and T4 crates are configured separately, each with four modes:
 
-All of the above are replaced with items from the **General Replacement Pool**. You can also choose how T4 crates are replaced:
-
-| Mode | T4 crates |
+| Mode | What it does |
 | --- | --- |
-| Off (default) | Still generated randomly. |
-| Same as above | Use the General Replacement Pool. |
-| Independent | Use the Independent Replacement Pool, rotating A-B-A-B. |
-| One-time | The first N T4 crates become your N items, in order. After that, back to random. |
+| Off | Still generated randomly. |
+| Shop | Use the Shop pool. |
+| Independent | Use the card's own pool, rotating A-B-A-B. |
+| One-time | The first N crates become your N items, in order. After that, back to random. |
+
+Defaults: Crate = **Shop**, T4 Crate = **Off**.
+
+**Import / Export**
+
+The **Import settings** and **Export settings** buttons at the top copy all of your settings to the clipboard as a share code, or load them back from it. Handy for sharing a setup with friends.
 
 ### Try these combos
 
@@ -214,17 +224,18 @@ Note: this is an entirely different mod. **Do not enable v1 and v2 at the same t
 
 [b]What if every item turned into a Potato, a Gentle Alien, a Candy Bag...?[/b] This mod is all you need: One Item to Rule Them All.
 
-[b]Now with a major upgrade[/b]: a brand-new UI, better UX, and independent replacement for T4 crates!
+[b]Now with a major upgrade[/b]: a brand-new UI, better UX, three side-by-side replacement pools (shop, crates, T4 crates), and settings import/export!
 
 [h1]How to use[/h1]
 
-After picking a character, click [b]Replace Items[/b] in the top-left corner of the weapon/difficulty selection screen. Pick the items you want from the list, then start the run. That's it!
+After picking a character, click [b]Replace Items[/b] in the top-left corner of the character/weapon/difficulty selection screen. Pick the items you want from the list, then start the run. That's it!
 
 [h1]Features[/h1]
 
 [list]
 [*][b]Round-robin rotation[/b]: pick several items and they take turns (e.g., A-B-A-B), in the order you chose them.
-[*][b]T4 Crate Pool[/b]: give T4 crates their own items, or replace only the first few.
+[*][b]Separate pools[/b]: shops, crates and T4 crates each get their own items, or replace only the first few crates.
+[*][b]Import / export[/b]: share your whole setup as a code through the clipboard.
 [*][b]Detailed yet intuitive UI[/b]: item search, rarity colors, numbered pools, and a live description of exactly what will be replaced.
 [*][b]Full language support[/b]: English, Français, 简体中文, 日本語, 한국어, 繁體中文, Русский, Polski, Español, Português, Deutsch, Türkçe, Italiano.
 [/list]
@@ -233,12 +244,17 @@ After picking a character, click [b]Replace Items[/b] in the top-left corner of 
 
 [b]Enable[/b] (default: [b]on[/b]): the master switch. When it's off, nothing is replaced and your settings are kept.
 
-[h2]What to Replace[/h2]
+[b]Curse[/b] (default: off): replaced items are always cursed (random strength that grows with the wave, just like naturally cursed items). [i]Requires the Abyssal Terrors DLC[/i].
+
+Even when it's off, a curse on the original item carries over to its replacement.
+
+The three cards each have their own replacement pool.
+
+[h2]Shop[/h2]
 
 [table]
 [tr][th]Option[/th][th]Default[/th][th]What it does[/th][/tr]
 [tr][td]Starting items[/td][td]Off[/td][td]Your character's starting items (the character itself and weapons are untouched).[/td][/tr]
-[tr][td]Crates[/td][td][b]On[/b][/td][td]Items from crates.[/td][/tr]
 [tr][td]All items in shop[/td][td][b]On[/b][/td][td]Every item slot in the shop (weapons are untouched).[/td][/tr]
 [tr][td]Shops always sell[/td][td]Off[/td][td]Upon each shop reroll, one of the slots is guaranteed to be one of the selected items.[/td][/tr]
 [tr][td]Sold once per wave[/td][td]Off[/td][td]Each wave, the shop will sell all of the selected items once, then back to random.[/td][/tr]
@@ -246,19 +262,23 @@ After picking a character, click [b]Replace Items[/b] in the top-left corner of 
 
 "All items in shop", "Shops always sell" and "Sold once per wave" are mutually exclusive, at most one of them can be enabled.
 
-[b]Curse[/b] (default: off): replaced items are always cursed (random strength that grows with the wave, just like naturally cursed items). [i]Requires the Abyssal Terrors DLC[/i].
+[h2]Crate / T4 Crate[/h2]
 
-Even when it's off, a curse on the original item carries over to its replacement.
-
-All of the above are replaced with items from the [b]General Replacement Pool[/b]. You can also choose how T4 crates are replaced:
+Crates (including the extra items from treasure maps) and T4 crates are configured separately, each with four modes:
 
 [table]
-[tr][th]Mode[/th][th]T4 crates[/th][/tr]
-[tr][td]Off (default)[/td][td]Still generated randomly.[/td][/tr]
-[tr][td]Same as above[/td][td]Use the General Replacement Pool.[/td][/tr]
-[tr][td]Independent[/td][td]Use the Independent Replacement Pool, rotating A-B-A-B.[/td][/tr]
-[tr][td]One-time[/td][td]The first N T4 crates become your N items, in order. After that, back to random.[/td][/tr]
+[tr][th]Mode[/th][th]What it does[/th][/tr]
+[tr][td]Off[/td][td]Still generated randomly.[/td][/tr]
+[tr][td]Shop[/td][td]Use the Shop pool.[/td][/tr]
+[tr][td]Independent[/td][td]Use the card's own pool, rotating A-B-A-B.[/td][/tr]
+[tr][td]One-time[/td][td]The first N crates become your N items, in order. After that, back to random.[/td][/tr]
 [/table]
+
+Defaults: Crate = [b]Shop[/b], T4 Crate = [b]Off[/b].
+
+[h2]Import / Export[/h2]
+
+The [b]Import settings[/b] and [b]Export settings[/b] buttons at the top copy all of your settings to the clipboard as a share code, or load them back from it. Handy for sharing a setup with friends.
 
 [h1]Try these combos[/h1]
 
@@ -287,16 +307,17 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 **假如所有道具变成土豆、外星绅士、糖果袋……** 你只需要这个 mod，One Item to Rule Them All。
 
-**现已迎来重大升级**，全新 UI、交互优化、支持 T4 箱子独立替换！
+**现已迎来重大升级**，全新 UI、交互优化，商店、箱子、T4 箱子三个替换池并排显示，还能导入导出设置！
 
 ### 如何使用
 
-选择角色后，在武器/难度选择界面左上角点击 **替换物品**。在物品列表中选择想要替换的物品，然后开始游戏。就这么简单！
+选择角色后，在角色/武器/难度选择界面左上角点击 **替换物品**。在物品列表中选择想要替换的物品，然后开始游戏。就这么简单！
 
 ### 特色
 
 - **A-B-A-B 轮流替换**：选多件物品时，按选择顺序轮流出现。
-- **T4 箱子池**：给 T4 箱子单独指定物品，或者只替换前几个。
+- **独立替换池**：商店、箱子、T4 箱子各自指定物品，或者只替换前几个箱子。
+- **导入 / 导出**：通过剪贴板分享整套设置。
 - **详细又直观的 UI**：搜索道具、稀有度底色、带序号的替换池，还会实时告诉你哪些东西会被替换。
 - **全语言支持**：English、Français、简体中文、日本語、한국어、繁體中文、Русский、Polski、Español、Português、Deutsch、Türkçe、Italiano。
 
@@ -304,30 +325,39 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 **启用**（默认：**开**）：总开关。关闭后不做任何替换，设置保留。
 
-**替换对象**
+**诅咒**（默认：关）：替换后的物品固定被诅咒（强度随机并随波次提升，和游戏里自然出现的诅咒物品一致）。*需要深海魔怪 DLC*。
+
+即使关闭，原物品被诅咒时，也会传递到替换后的物品上。
+
+三张卡片各自拥有独立的替换池。
+
+**商店**
 
 | 选项 | 默认 | 作用 |
 | --- | --- | --- |
 | 起始物品 | 关 | 角色开局自带的物品（不含角色本身和武器）。 |
-| 箱子 | **开** | 箱子开出的物品。 |
 | 所有商店物品 | **开** | 商店里的所有物品槽位（不含武器）。 |
 | 商店通常销售 | 关 | 每次商店刷新时，固定有一个槽位是所选物品之一。 |
 | 每波销售一次 | 关 | 每波商店固定销售所选的所有物品各一次，这之后恢复随机。 |
 
 “所有商店物品”、“商店通常销售”和“每波销售一次”互斥，最多只能启用其中一个。
 
-**诅咒**（默认：关）：替换后的物品固定被诅咒（强度随机并随波次提升，和游戏里自然出现的诅咒物品一致）。*需要深海魔怪 DLC*。
+**箱子 / T4箱子**
 
-即使关闭，原物品被诅咒时，也会传递到替换后的物品上。
+箱子（含藏宝图的额外物品）和 T4 箱子分别设置，各有四种模式：
 
-以上这些物品会被替换成 **通用替换池** 中的物品。此外，你还可以选择 T4 箱子的替换方式：
-
-| 模式 | T4 箱子 |
+| 模式 | 作用 |
 | --- | --- |
-| 禁用（默认） | 仍然随机生成。 |
-| 同上 | 使用通用替换池。 |
-| 独立 | 使用独立替换池，A-B-A-B 轮流替换。 |
-| 单次 | 前 N 个 T4 箱子按顺序变成你选的 N 件物品，之后恢复随机。 |
+| 禁用 | 仍然随机生成。 |
+| 商店 | 使用商店的替换池。 |
+| 独立 | 使用该卡片自己的替换池，A-B-A-B 轮流替换。 |
+| 单次 | 前 N 个箱子按顺序变成你选的 N 件物品，之后恢复随机。 |
+
+默认值：箱子 = **商店**，T4 箱子 = **禁用**。
+
+**导入 / 导出**
+
+顶部的 **导入设置** 和 **导出设置** 按钮可以把全部设置作为分享码复制到剪贴板，或从剪贴板读取。方便和朋友分享配置。
 
 ### 试试这些组合
 
@@ -346,17 +376,18 @@ B 站 UP 主们已经做了很多有趣的组合，欢迎参考：
 
 [b]假如所有道具变成土豆、外星绅士、糖果袋……[/b] 你只需要这个 mod，One Item to Rule Them All。
 
-[b]现已迎来重大升级[/b]，全新 UI、交互优化、支持 T4 箱子独立替换！
+[b]现已迎来重大升级[/b]，全新 UI、交互优化，商店、箱子、T4 箱子三个替换池并排显示，还能导入导出设置！
 
 [h1]如何使用[/h1]
 
-选择角色后，在武器/难度选择界面左上角点击 [b]替换物品[/b]。在物品列表中选择想要替换的物品，然后开始游戏。就这么简单！
+选择角色后，在角色/武器/难度选择界面左上角点击 [b]替换物品[/b]。在物品列表中选择想要替换的物品，然后开始游戏。就这么简单！
 
 [h1]特色[/h1]
 
 [list]
 [*][b]A-B-A-B 轮流替换[/b]：选多件物品时，按选择顺序轮流出现。
-[*][b]T4 箱子池[/b]：给 T4 箱子单独指定物品，或者只替换前几个。
+[*][b]独立替换池[/b]：商店、箱子、T4 箱子各自指定物品，或者只替换前几个箱子。
+[*][b]导入 / 导出[/b]：通过剪贴板分享整套设置。
 [*][b]详细又直观的 UI[/b]：搜索道具、稀有度底色、带序号的替换池，还会实时告诉你哪些东西会被替换。
 [*][b]全语言支持[/b]：English、Français、简体中文、日本語、한국어、繁體中文、Русский、Polski、Español、Português、Deutsch、Türkçe、Italiano。
 [/list]
@@ -365,12 +396,17 @@ B 站 UP 主们已经做了很多有趣的组合，欢迎参考：
 
 [b]启用[/b]（默认：[b]开[/b]）：总开关。关闭后不做任何替换，设置保留。
 
-[h2]替换对象[/h2]
+[b]诅咒[/b]（默认：关）：替换后的物品固定被诅咒（强度随机并随波次提升，和游戏里自然出现的诅咒物品一致）。[i]需要深海魔怪 DLC[/i]。
+
+即使关闭，原物品被诅咒时，也会传递到替换后的物品上。
+
+三张卡片各自拥有独立的替换池。
+
+[h2]商店[/h2]
 
 [table]
 [tr][th]选项[/th][th]默认[/th][th]作用[/th][/tr]
 [tr][td]起始物品[/td][td]关[/td][td]角色开局自带的物品（不含角色本身和武器）。[/td][/tr]
-[tr][td]箱子[/td][td][b]开[/b][/td][td]箱子开出的物品。[/td][/tr]
 [tr][td]所有商店物品[/td][td][b]开[/b][/td][td]商店里的所有物品槽位（不含武器）。[/td][/tr]
 [tr][td]商店通常销售[/td][td]关[/td][td]每次商店刷新时，固定有一个槽位是所选物品之一。[/td][/tr]
 [tr][td]每波销售一次[/td][td]关[/td][td]每波商店固定销售所选的所有物品各一次，这之后恢复随机。[/td][/tr]
@@ -378,19 +414,23 @@ B 站 UP 主们已经做了很多有趣的组合，欢迎参考：
 
 “所有商店物品”、“商店通常销售”和“每波销售一次”互斥，最多只能启用其中一个。
 
-[b]诅咒[/b]（默认：关）：替换后的物品固定被诅咒（强度随机并随波次提升，和游戏里自然出现的诅咒物品一致）。[i]需要深海魔怪 DLC[/i]。
+[h2]箱子 / T4箱子[/h2]
 
-即使关闭，原物品被诅咒时，也会传递到替换后的物品上。
-
-以上这些物品会被替换成 [b]通用替换池[/b] 中的物品。此外，你还可以选择 T4 箱子的替换方式：
+箱子（含藏宝图的额外物品）和 T4 箱子分别设置，各有四种模式：
 
 [table]
-[tr][th]模式[/th][th]T4 箱子[/th][/tr]
-[tr][td]禁用（默认）[/td][td]仍然随机生成。[/td][/tr]
-[tr][td]同上[/td][td]使用通用替换池。[/td][/tr]
-[tr][td]独立[/td][td]使用独立替换池，A-B-A-B 轮流替换。[/td][/tr]
-[tr][td]单次[/td][td]前 N 个 T4 箱子按顺序变成你选的 N 件物品，之后恢复随机。[/td][/tr]
+[tr][th]模式[/th][th]作用[/th][/tr]
+[tr][td]禁用[/td][td]仍然随机生成。[/td][/tr]
+[tr][td]商店[/td][td]使用商店的替换池。[/td][/tr]
+[tr][td]独立[/td][td]使用该卡片自己的替换池，A-B-A-B 轮流替换。[/td][/tr]
+[tr][td]单次[/td][td]前 N 个箱子按顺序变成你选的 N 件物品，之后恢复随机。[/td][/tr]
 [/table]
+
+默认值：箱子 = [b]商店[/b]，T4 箱子 = [b]禁用[/b]。
+
+[h2]导入 / 导出[/h2]
+
+顶部的 [b]导入设置[/b] 和 [b]导出设置[/b] 按钮可以把全部设置作为分享码复制到剪贴板，或从剪贴板读取。方便和朋友分享配置。
 
 [h1]试试这些组合[/h1]
 
@@ -435,7 +475,7 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 
 假如所有道具都变成土豆、外星绅士、糖果袋……？装上这个 mod 就能实现！
 
-v2 迎来重大升级：全新 UI、交互优化，还支持 T4 箱子独立替换。开局前选好物品，商店和箱子里就只剩你选的那些。
+v2 迎来重大升级：全新 UI、交互优化，商店、箱子、T4 箱子各有独立替换池，还能导入导出设置。开局前选好物品，商店和箱子里就只剩你选的那些。
 
 B 站 UP 主们已经玩出了不少花样：大嗓门 + 外星绅士、杰克 + 糖果袋、恶魔 + 土豆……你也来试试？
 

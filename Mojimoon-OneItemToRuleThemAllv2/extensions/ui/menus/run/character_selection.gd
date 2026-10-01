@@ -1,6 +1,6 @@
-extends "res://ui/menus/run/difficulty_selection/difficulty_selection.gd"
+extends "res://ui/menus/run/character_selection.gd"
 
-# 在难度选择界面左上角（返回按钮旁）加"替换物品"按钮，点击打开物品选择弹窗。
+# 在角色选择界面左上角（返回按钮旁）加"替换物品"按钮，点击打开物品选择弹窗。
 
 const ModMain = preload("res://mods-unpacked/Mojimoon-OneItemToRuleThemAllv2/mod_main.gd")
 

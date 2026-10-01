@@ -546,7 +546,7 @@ func _keys_used_in(path: String, out: Dictionary) -> void:
 
 func test_22_all_used_keys_exist() -> void:
 	var used = {}
-	for p in ["ui/item_picker_ui.gd", "extensions/ui/menus/run/weapon_selection.gd", "extensions/ui/menus/run/difficulty_selection/difficulty_selection.gd"]:
+	for p in ["mod_main.gd", "ui/item_picker_ui.gd", "extensions/ui/menus/run/character_selection.gd", "extensions/ui/menus/run/weapon_selection.gd", "extensions/ui/menus/run/difficulty_selection/difficulty_selection.gd"]:
 		_keys_used_in(MOD_DIR + p, used)
 	var defined = {}
 	for r in _csv_rows():
@@ -994,3 +994,29 @@ func test_33_ui_import_export() -> void:
 	ui.queue_free()
 	yield(tree, "idle_frame")
 	_remove(m.SETTINGS_PATH)
+
+
+func test_34_entry_button_on_all_three_screens() -> void:
+	for path in ["character_selection.gd", "weapon_selection.gd", "difficulty_selection/difficulty_selection.gd"]:
+		var f = File.new()
+		_check(f.file_exists(MOD_DIR + "extensions/ui/menus/run/" + path), path + " is extended")
+		f.open(MOD_DIR + "extensions/ui/menus/run/" + path, File.READ)
+		_check(f.get_as_text().find("ModMain.add_config_button(self)") != -1, path + " adds the button")
+		f.close()
+	# 按钮挂到返回按钮上，且不会重复添加
+	var screen = Control.new()
+	var back = Button.new()
+	back.name = "BackButton"
+	back.unique_name_in_owner = true
+	screen.add_child(back)
+	back.owner = screen
+	tree.root.add_child(screen)
+	m.add_config_button(screen)
+	m.add_config_button(screen)
+	var n = 0
+	for c in back.get_children():
+		if c.name.begins_with("MojiPickerBtn"):
+			n += 1
+	_eq(n, 1, "button added exactly once")
+	_eq(back.get_node("MojiPickerBtn").text, "Replace Items", "button label")
+	screen.queue_free()
