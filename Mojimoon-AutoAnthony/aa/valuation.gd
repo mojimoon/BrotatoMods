@@ -74,7 +74,7 @@ static func main_value(c: Dictionary, perm_mult: float) -> float:
 		"temp_stat":
 			return _stat_sign(stat) * Catalog.stat_w(stat) * v * avg_stack(trigger, param, chance, cap, bool(c.get("reset", false)))
 		"perm_stat":
-			return _stat_sign(stat) * Catalog.stat_w(stat) * v * fires_per_wave(trigger, param, chance, cap) * perm_mult
+			return _stat_sign(stat) * Catalog.stat_w(stat) * v * fires_per_wave(trigger, param, chance, cap) * perm_mult * _capped_perm(cap)
 		"timed_stat":
 			var f = fires_per_wave(trigger, param, chance, cap)
 			return _stat_sign(stat) * Catalog.stat_w(stat) * v * f * v2 / Catalog.WAVE_SECONDS
@@ -90,7 +90,7 @@ static func main_value(c: Dictionary, perm_mult: float) -> float:
 			# 被获得效果的价值（作为整局持有的道具行）× 数量 × 叠层 / 在场率 或 永久累积
 			var unit = float(c.get("grant_unit", 0.0)) * v
 			if c.get("grant_mode", "temp") == "perm":
-				return unit * fires_per_wave(trigger, param, chance, cap) * perm_mult
+				return unit * fires_per_wave(trigger, param, chance, cap) * perm_mult * _capped_perm(cap)
 			return unit * avg_stack(trigger, param, chance, cap, bool(c.get("reset", false)))
 		"explode":
 			return Catalog.DMG_W * Catalog.EXPLOSION_TARGETS * damage_per_proc(stat, int(v)) * fires_per_wave(trigger, param, chance, cap)
@@ -100,6 +100,11 @@ static func main_value(c: Dictionary, perm_mult: float) -> float:
 				/ (Catalog.WAVE_SECONDS * Catalog.VULN_CONCURRENT_TARGETS), 0.0, 1.0)
 			return Catalog.stat_w("stat_percent_damage") * v * cover
 	return 0.0
+
+
+# 带每波上限的永久效果：每次触发的期望价值折算（catalog.PERM_CAPPED_FIRE_VALUE）
+static func _capped_perm(cap: int) -> float:
+	return Catalog.PERM_CAPPED_FIRE_VALUE if cap > 0 else 1.0
 
 
 # 普通属性行价值（负面行按补偿比例折算为负价值）

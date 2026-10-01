@@ -2,15 +2,21 @@
     "name": "AutoAnthony",
     "namespace": "Mojimoon",
     "version_number": "0.0.42",
-    "description": "Auto-Anthonyology: every run, items (optionally characters and weapons) are decomposed into components and reassembled under the same value budget; any trigger can drive any effect.",
+    "description": "土豆兄弟：东尼算法 Brotato: Auto-Anthonyology — 每局把道具（可选：角色、武器）拆成组件，按同等价值随机重组；任何触发条件都能驱动任何效果。Every run, items (optionally characters and weapons) are broken into components and reassembled at equal value; any trigger can drive any effect.",
     "website_url": "",
     "dependencies": [],
     "extra": {
         "godot": {
             "incompatibilities": [],
-            "authors": ["Mojimoon"],
-            "compatible_mod_loader_version": ["6.3.0"],
-            "compatible_game_version": ["1.1.X.X"],
+            "authors": [
+                "Mojimoon"
+            ],
+            "compatible_mod_loader_version": [
+                "6.3.0"
+            ],
+            "compatible_game_version": [
+                "1.1.X.X"
+            ],
             "optional_dependencies": []
         }
     }

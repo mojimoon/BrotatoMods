@@ -1197,9 +1197,15 @@ func _mechanic_copy(m: Dictionary, target: float = -1.0, holder_id: String = "")
 			top = m.top
 		if Catalog.pct_cap(e) > 0:
 			top = min(top, Catalog.pct_cap(e))
-		var nv = int(clamp(want, 1, top)) * sg
+		var ic = Catalog.MECHANIC_INTERCEPT.get(e.key, {})
+		if not ic.empty():
+			# 非线性：价值 = 单位价值 × (数值 - offset)
+			want = round(ic.offset + (abs(native_v) - ic.offset) * target / abs(m.value))
+		var nv = int(clamp(want, ic.get("min", 1), top)) * sg
 		e.value = nv
 		v = m.value * float(nv) / float(native_v)
+		if not ic.empty():
+			v = m.value * float(abs(nv) - ic.offset) / float(abs(native_v) - ic.offset)
 		# 丑牙：减速上限保持为单次减速的 4 倍（与原版诅咒逻辑一致）
 		if e.key == "remove_speed" and "value2" in e:
 			e.value2 = nv * 4
@@ -1245,6 +1251,9 @@ func _pick_mechanic(tier: int, downside: bool, max_abs_value: float):
 			var min_value = abs(m.value)
 			if m.get("scalar", false):
 				min_value = abs(m.value) / max(1.0, abs(m.effect.value))
+				var ic = Catalog.MECHANIC_INTERCEPT.get(m.effect.key, {})
+				if not ic.empty():
+					min_value = abs(m.value) * (ic.min - ic.offset) / max(1.0, abs(m.effect.value) - ic.offset)
 			var mk = m.effect.custom_key if m.effect.custom_key != "" else m.effect.key
 			if "heal" in banned_payloads and mk in Catalog.HEAL_KEYS:
 				continue
@@ -1734,27 +1743,10 @@ func gen_char_component(target: float, holder = null) -> Dictionary:
 				ew.set_meta("aa_tags", ["economy"])
 				return {"effect": ew, "value": valw}
 			"class_bonus":
-				if char_templates.class_bonus.empty() or ItemService.sets.empty():
+				var cb = _gen_class_bonus(target, false)
+				if cb.empty():
 					continue
-				var tmpl = char_templates.class_bonus[rng.randi() % char_templates.class_bonus.size()]
-				var sets = []
-				for st in ItemService.sets:
-					if st.my_id != "set_legendary":
-						sets.push_back(st)
-				var chosen = sets[rng.randi() % sets.size()]
-				var w = Catalog.CLASS_BONUS_STAT_W.get(tmpl.stat_displayed_name, 1.5)
-				var unit = 10 if tmpl.stat_displayed_name == "stat_range" else 5
-				var raw = target / (w * Catalog.CLASS_BONUS_SHARE)
-				var v = int(clamp(round(raw / unit) * unit, unit, max(unit, tmpl.value * 1.5)))
-				var e = tmpl.duplicate()
-				e.set_id = chosen.my_id
-				e.set_id_hash = Keys.generate_hash(chosen.my_id)
-				e.stat_hash = Keys.generate_hash(e.stat_name)
-				e.value = v
-				var val = w * v * Catalog.CLASS_BONUS_SHARE
-				e.set_meta("aa_value", val)
-				e.set_meta("aa_tags", [tmpl.stat_displayed_name] if Catalog.STATS.has(tmpl.stat_displayed_name) else [])
-				return {"effect": e, "value": val}
+				return cb
 			"burn_bonus":
 				if not char_templates.has("burn_bonus"):
 					continue
@@ -2023,28 +2015,74 @@ func gen_char_downside(comp: float, perm_mult: float, budget_total: float = -1.0
 	return {"effects": [e2], "value": got2}
 
 
+# 武器类型加成：使用 [类型] 武器 ±X [属性]（catalog.CLASS_BONUS_KINDS）。返回 {effect, value}（value 带符号）
+func _gen_class_bonus(target: float, negative: bool) -> Dictionary:
+	if char_templates.class_bonus.empty() or ItemService.sets.empty():
+		return {}
+	var kinds = []
+	for k in Catalog.CLASS_BONUS_KINDS:
+		# 贯通为负可能低于 0：只作为好处
+		if not (negative and Catalog.CLASS_BONUS_KINDS[k].get("ranged_only", false)):
+			kinds.push_back(k)
+	var disp = kinds[rng.randi() % kinds.size()]
+	var kd = Catalog.CLASS_BONUS_KINDS[disp]
+	var ranged = _ranged_only_sets()
+	var sets = []
+	for st in ItemService.sets:
+		if st.my_id == "set_legendary":
+			continue
+		if kd.get("ranged_only", false) and not st.my_id in ranged:
+			continue
+		sets.push_back(st)
+	if sets.empty():
+		return {}
+	var chosen = sets[rng.randi() % sets.size()]
+	var per = kd.w * Catalog.CLASS_BONUS_SHARE
+	var v = int(clamp(round(abs(target) / per / kd.unit) * kd.unit, kd.unit, kd.max))
+	var e = char_templates.class_bonus[0].duplicate()
+	e.stat_displayed_name = disp
+	e.stat_name = kd.name
+	e.stat_hash = Keys.generate_hash(kd.name)
+	e.set_id = chosen.my_id
+	e.set_id_hash = Keys.generate_hash(chosen.my_id)
+	e.value = -v if negative else v
+	e.effect_sign = Effect.Sign.FROM_VALUE
+	var val = per * v
+	var tag = "stat_crit_chance" if disp == "stat_crit_damage" else ("stat_ranged_damage" if disp == "piercing" else disp)
+	e.set_meta("aa_value", -val if negative else val)
+	e.set_meta("aa_tags", [tag] if Catalog.STATS.has(tag) and not negative else [])
+	return {"effect": e, "value": -val if negative else val}
+
+
+# 只包含远程武器的武器类型（可以加贯通）
+var _ranged_sets_cache = null
+
+
+func _ranged_only_sets() -> Array:
+	if _ranged_sets_cache != null:
+		return _ranged_sets_cache
+	var types = {}
+	for w in ItemService.weapons:
+		for st in w.sets:
+			if not types.has(st.my_id):
+				types[st.my_id] = {}
+			types[st.my_id][w.type] = true
+	_ranged_sets_cache = []
+	for id in types:
+		if types[id].size() == 1 and types[id].has(WeaponType.RANGED):
+			_ranged_sets_cache.push_back(id)
+	return _ranged_sets_cache
+
+
 # 更多双面效果的代价：-X% [类型] 武器属性、+X% 武器价格
 func _gen_double_char_downside(comp: float) -> Dictionary:
-	if rng.randf() < 0.5 and not char_templates.class_bonus.empty() and not ItemService.sets.empty():
-		var tmpl = char_templates.class_bonus[rng.randi() % char_templates.class_bonus.size()]
-		var sets = []
-		for st in ItemService.sets:
-			if st.my_id != "set_legendary":
-				sets.push_back(st)
-		var chosen = sets[rng.randi() % sets.size()]
-		var w = Catalog.CLASS_BONUS_STAT_W.get(tmpl.stat_displayed_name, 1.5)
-		var unit = 10 if tmpl.stat_displayed_name == "stat_range" else 5
-		var raw = comp * divisor / (w * Catalog.CLASS_BONUS_SHARE)
-		var v = int(clamp(round(raw / unit) * unit, unit, max(unit, tmpl.value)))
-		var e = tmpl.duplicate()
-		e.set_id = chosen.my_id
-		e.set_id_hash = Keys.generate_hash(chosen.my_id)
-		e.stat_hash = Keys.generate_hash(e.stat_name)
-		e.value = -v
-		var got = neg_value(w * v * Catalog.CLASS_BONUS_SHARE)
-		e.set_meta("aa_value", -got)
-		e.set_meta("aa_tags", [])
-		return {"effects": [e], "value": got}
+	if rng.randf() < 0.5:
+		var cb = _gen_class_bonus(comp * divisor, true)
+		if not cb.empty():
+			var got = neg_value(abs(cb.value))
+			cb.effect.set_meta("aa_value", -got)
+			cb.effect.set_meta("aa_tags", [])
+			return {"effects": [cb.effect], "value": got}
 	if char_templates.has("weapons_price"):
 		var per_w = Catalog.WEAPON_SPEND_PER_WAVE / 100.0 * Catalog.GOLD_W
 		var vw = int(clamp(round(comp * divisor / per_w / 5.0) * 5, 5, 50))

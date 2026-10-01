@@ -3595,3 +3595,69 @@ func test_118_t3_min_two_lines() -> void:
 					_check(n >= Catalog.MIN_LINES, "T%d item %s has %d effect line(s): %s" % [it.tier + 1, id, n, _texts(plan.items[id].effects)])
 				worst[it.tier] = min(worst.get(it.tier, 99), n)
 	print("AUDIT minimum effect lines by tier: ", worst)
+
+
+# ============================================================
+# 武器类型加成：暴击率 / 暴击伤害 / 贯通都能出现并在武器上正确生效；拷问的回血不低于 4；带上限的永久效果
+# ============================================================
+func test_119_class_bonus_and_value_tweaks() -> void:
+	var seen = {}
+	var caps = []
+	var torture = []
+	for sd in range(1, 21):
+		var gen = Generator.new(_cfg(), sd)
+		var plan = gen.generate(isvc.items, isvc.characters, [], [])
+		var ranged = gen._ranged_only_sets()
+		for id in plan.items:
+			for e in plan.items[id].effects:
+				if e.get_script() == load("res://effects/items/class_bonus_effect.gd"):
+					seen[e.stat_displayed_name] = seen.get(e.stat_displayed_name, 0) + 1
+					if e.stat_name == "piercing":
+						_check(e.set_id in ranged, "piercing only on ranged-only classes: " + e.set_id)
+					var t = e.get_text(0, false)
+					_check(t.find("STAT_") == -1 and t.find("AA_") == -1, "class bonus text: " + t)
+				if e.key == "torture":
+					torture.push_back(e.value)
+					_check(e.value >= 4, "torture heals at least 4 per second (%d)" % e.value)
+				if e is TriggerEffect and e.cap > 0 and (e.payload == "perm_stat" or e.grant_mode == "perm"):
+					caps.push_back(e.cap)
+	caps.sort()
+	print("AUDIT class bonus stats: %s; torture values: %s; perm caps median %d max %d" % [str(seen), str(torture), caps[caps.size() / 2] if not caps.empty() else 0, caps.back() if not caps.empty() else 0])
+	for k in ["stat_crit_chance", "stat_crit_damage", "piercing"]:
+		_check(seen.has(k), "class bonus can give " + k)
+	# 实际武器属性：手枪（枪械）+10% 暴击率、+1 贯通；小刀（精准）+10% 暴击率
+	m.start_new_run()
+	var g = Generator.new(_cfg(), 1)
+	g._collect_priors(isvc.items, isvc.characters, isvc.weapons)
+	var tmpl = g.char_templates.class_bonus[0]
+	var pistol = isvc.get_element_safe(isvc.weapons, "weapon_pistol_1")
+	var knife = isvc.get_element_safe(isvc.weapons, "weapon_knife_1")
+	var gun_set = pistol.sets[0]
+	var holder = _item("item_potato").duplicate()
+	var fx = []
+	for spec in [["crit_chance", "stat_crit_chance", 10, gun_set.my_id], ["piercing", "piercing", 1, gun_set.my_id], ["crit_chance", "stat_crit_chance", 10, knife.sets[0].my_id]]:
+		var e = tmpl.duplicate()
+		e.stat_name = spec[0]
+		e.stat_hash = Keys.generate_hash(spec[0])
+		e.stat_displayed_name = spec[1]
+		e.value = spec[2]
+		e.set_id = spec[3]
+		e.set_id_hash = Keys.generate_hash(spec[3])
+		fx.push_back(e)
+	holder.effects = fx
+	var pa = WeaponServiceInitStatsArgs.new()
+	pa.sets = pistol.sets
+	var ka = WeaponServiceInitStatsArgs.new()
+	ka.sets = knife.sets
+	var p0 = WeaponService.init_ranged_stats(pistol.stats, 0, false, pa)
+	var k0 = WeaponService.init_melee_stats(knife.stats, 0, ka)
+	rd.add_item(holder, 0)
+	var p1 = WeaponService.init_ranged_stats(pistol.stats, 0, false, pa)
+	var k1 = WeaponService.init_melee_stats(knife.stats, 0, ka)
+	_check(abs(p1.crit_chance - p0.crit_chance - 0.10) < 0.001, "gun +10%% crit chance (%.3f -> %.3f)" % [p0.crit_chance, p1.crit_chance])
+	_eq(p1.piercing - p0.piercing, 1, "gun +1 piercing")
+	_check(abs(k1.crit_chance - k0.crit_chance - 0.10) < 0.001, "knife (precise) +10%% crit chance (%.3f -> %.3f)" % [k0.crit_chance, k1.crit_chance])
+	rd.remove_item(holder, 0)
+	var p2 = WeaponService.init_ranged_stats(pistol.stats, 0, false, pa)
+	_check(abs(p2.crit_chance - p0.crit_chance) < 0.001 and p2.piercing == p0.piercing, "class bonus removed cleanly")
+	m.on_menu_reset()

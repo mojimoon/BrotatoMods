@@ -439,3 +439,261 @@ B 站 UP 主们已经玩出了不少花样：大嗓门 + 外星绅士、杰克 +
 
 -->
 
+
+## [Brotato: Auto-Anthonyology](Mojimoon-AutoAnthony)
+
+[Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3671094202) | [Open in Steam Client](https://link.steam.watch/url/CommunityFilePage/3671094202)
+
+> Brotato: Auto-Anthonyology / 土豆兄弟：东尼算法
+
+![](img/aa-icon.png)
+
+**Every run, a brand-new item pool.** Auto-Anthonyology breaks every item into its parts — stats, triggers, effects, mechanics — and puts them back together at random, at the same value. Same icons, same rarities, completely different items.
+
+Inspired by the *Auto-Anthonyology* mod for Slay the Spire 2, which itself comes from Challenge #45 of The Binding of Isaac: Repentance. Many thanks to the original authors!
+
+### How to use
+
+On the character, weapon or difficulty selection screen, click **Auto-Anthony** in the top-left corner (next to the back button). Pick your options, preview the item pool if you like, then start a run. The new items take effect when the run starts; going back to the main menu restores the original game.
+
+### What does it do?
+
+- **Any trigger, any effect**: "when you dodge", "every 5 seconds", "when you pick up a crate", "the first time you hit an enemy with Elemental Damage"... can now be paired with any effect: stats for the wave, permanent stats, healing, materials, XP, damage, explosions, "enemies take more damage", or even another item's effect ("when you kill an enemy: gain '+1 Armor for every 6 Elemental Damage' until the end of the wave").
+- **Fair values**: every effect is priced in materials. Stat weights are fitted on the original items (guided by the stat values of ArosRising's Brotato MultiTool); triggers are priced as *value per activation × activations per wave*. Each item's budget follows its price and rarity, so a 100-material legendary is really worth ~100 materials.
+- **Prices are rerolled too**: items no longer keep their original price; a new one is drawn from the original price range of the same rarity.
+- **Feels like Brotato**: the number of stat lines, how often items have a downside, which stats go together, and how often items have special effects all follow the original items of the same rarity. Every T1–T3 rarity is guaranteed one "pure" item for each core stat (damage, melee, ranged, elemental, engineering, attack speed, harvesting, XP), and every tag your character wants is guaranteed to exist.
+- **Names**: "Hiking Anvil", "Synergic Adrenaline", "Charged Cape"... the adjective tells you the main effect.
+- **Safe**: the seed is saved with your run (loading rebuilds the same items), cursed items (Abyssal Terrors) work as usual, items added by other mods are left untouched.
+- **Full language support**: English, Français, 简体中文, 日本語, 한국어, 繁體中文, Русский, Polski, Español, Português, Deutsch, Türkçe, Italiano.
+
+### Options
+
+**Enable** (default: **on**): the master switch. When it's off, the game is unchanged and your settings are kept.
+
+**Reassembly**
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| Reassemble items | **On** | Items keep their icon and rarity; their effects are reassembled from effects of equal value. |
+| Reassemble character (BETA) | Off | Characters keep their identity (starting gear, restrictions, special mechanics...). Other stats, modifiers and triggered effects are reassembled at equal value, favouring the character's preferred tags. |
+| Reassemble weapons (BETA) | Off | Weapon families of the same type (melee / ranged) swap the special effects of the same tier (experimental). |
+| Reassemble names | **On** | Names become "main-effect adjective + original name". Off: original names are kept. |
+
+**Effects**
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| More character effects | Off | Gives more character mechanics to items, e.g. structures spawning close together, XP required, charm chance, pet damage, map size, items / weapons price. |
+| All character effects (BETA) | Off | Also adds the extreme character mechanics (stealing from the shop, weapon slots on level up, guaranteed shop items...) and their drawbacks (dying in one hit, no attacking while moving, weapons destroyed when entering a shop, no healing, weapon restrictions...). Big drawbacks come with big numbers. Items with set-value effects are unique. |
+| More double-sided effects | Off | Adds the opposite side of effects that are pure upsides or pure drawbacks, e.g. -materials dropped, +reroll price, -1 weapon slot, -enemy health, -enemy damage, losing materials on a trigger. |
+
+**Values**
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| Average value | 100% | Multiplier of the expected effect value (100% = original value). |
+| Variance | 100% | Random spread of the effect value (100% = spread of the original items). |
+| Triggers | 100% | Chance that an item has a triggered or mechanic effect (100% = same as original items of the same rarity). |
+| Keep original items | 0% | Keeps a share of the original items out of the reassembly. |
+| Fixed seed | Off | When on, every run generates the same item pool (easy to share). |
+
+The **Item preview** at the bottom lists the whole item pool for the current settings and seed, one card per item, without starting a run.
+
+If you like this mod, please consider liking, favoriting and sharing it, thank you! Comments and suggestions are also very welcome!
+
+<!-- BBCode
+
+[b]Every run, a brand-new item pool.[/b] Auto-Anthonyology breaks every item into its parts — stats, triggers, effects, mechanics — and puts them back together at random, at the same value. Same icons, same rarities, completely different items.
+
+Inspired by the [i]Auto-Anthonyology[/i] mod for Slay the Spire 2, which itself comes from Challenge #45 of The Binding of Isaac: Repentance. Many thanks to the original authors!
+
+[h1]How to use[/h1]
+
+On the character, weapon or difficulty selection screen, click [b]Auto-Anthony[/b] in the top-left corner (next to the back button). Pick your options, preview the item pool if you like, then start a run. The new items take effect when the run starts; going back to the main menu restores the original game.
+
+[h1]What does it do?[/h1]
+
+[list]
+[*][b]Any trigger, any effect[/b]: "when you dodge", "every 5 seconds", "when you pick up a crate", "the first time you hit an enemy with Elemental Damage"... can now be paired with any effect: stats for the wave, permanent stats, healing, materials, XP, damage, explosions, "enemies take more damage", or even another item's effect ("when you kill an enemy: gain '+1 Armor for every 6 Elemental Damage' until the end of the wave").
+[*][b]Fair values[/b]: every effect is priced in materials. Stat weights are fitted on the original items (guided by the stat values of ArosRising's Brotato MultiTool); triggers are priced as [i]value per activation × activations per wave[/i]. Each item's budget follows its price and rarity, so a 100-material legendary is really worth ~100 materials.
+[*][b]Prices are rerolled too[/b]: items no longer keep their original price; a new one is drawn from the original price range of the same rarity.
+[*][b]Feels like Brotato[/b]: the number of stat lines, how often items have a downside, which stats go together, and how often items have special effects all follow the original items of the same rarity. Every T1–T3 rarity is guaranteed one "pure" item for each core stat (damage, melee, ranged, elemental, engineering, attack speed, harvesting, XP), and every tag your character wants is guaranteed to exist.
+[*][b]Names[/b]: "Hiking Anvil", "Synergic Adrenaline", "Charged Cape"... the adjective tells you the main effect.
+[*][b]Safe[/b]: the seed is saved with your run (loading rebuilds the same items), cursed items (Abyssal Terrors) work as usual, items added by other mods are left untouched.
+[*][b]Full language support[/b]: English, Français, 简体中文, 日本語, 한국어, 繁體中文, Русский, Polski, Español, Português, Deutsch, Türkçe, Italiano.
+[/list]
+
+[h1]Options[/h1]
+
+[b]Enable[/b] (default: [b]on[/b]): the master switch. When it's off, the game is unchanged and your settings are kept.
+
+[h2]Reassembly[/h2]
+
+[table]
+[tr][th]Option[/th][th]Default[/th][th]What it does[/th][/tr]
+[tr][td]Reassemble items[/td][td][b]On[/b][/td][td]Items keep their icon and rarity; their effects are reassembled from effects of equal value.[/td][/tr]
+[tr][td]Reassemble character (BETA)[/td][td]Off[/td][td]Characters keep their identity (starting gear, restrictions, special mechanics...). Other stats, modifiers and triggered effects are reassembled at equal value, favouring the character's preferred tags.[/td][/tr]
+[tr][td]Reassemble weapons (BETA)[/td][td]Off[/td][td]Weapon families of the same type (melee / ranged) swap the special effects of the same tier (experimental).[/td][/tr]
+[tr][td]Reassemble names[/td][td][b]On[/b][/td][td]Names become "main-effect adjective + original name". Off: original names are kept.[/td][/tr]
+[/table]
+
+[h2]Effects[/h2]
+
+[table]
+[tr][th]Option[/th][th]Default[/th][th]What it does[/th][/tr]
+[tr][td]More character effects[/td][td]Off[/td][td]Gives more character mechanics to items, e.g. structures spawning close together, XP required, charm chance, pet damage, map size, items / weapons price.[/td][/tr]
+[tr][td]All character effects (BETA)[/td][td]Off[/td][td]Also adds the extreme character mechanics (stealing from the shop, weapon slots on level up, guaranteed shop items...) and their drawbacks (dying in one hit, no attacking while moving, weapons destroyed when entering a shop, no healing, weapon restrictions...). Big drawbacks come with big numbers. Items with set-value effects are unique.[/td][/tr]
+[tr][td]More double-sided effects[/td][td]Off[/td][td]Adds the opposite side of effects that are pure upsides or pure drawbacks, e.g. -materials dropped, +reroll price, -1 weapon slot, -enemy health, -enemy damage, losing materials on a trigger.[/td][/tr]
+[/table]
+
+[h2]Values[/h2]
+
+[table]
+[tr][th]Option[/th][th]Default[/th][th]What it does[/th][/tr]
+[tr][td]Average value[/td][td]100%[/td][td]Multiplier of the expected effect value (100% = original value).[/td][/tr]
+[tr][td]Variance[/td][td]100%[/td][td]Random spread of the effect value (100% = spread of the original items).[/td][/tr]
+[tr][td]Triggers[/td][td]100%[/td][td]Chance that an item has a triggered or mechanic effect (100% = same as original items of the same rarity).[/td][/tr]
+[tr][td]Keep original items[/td][td]0%[/td][td]Keeps a share of the original items out of the reassembly.[/td][/tr]
+[tr][td]Fixed seed[/td][td]Off[/td][td]When on, every run generates the same item pool (easy to share).[/td][/tr]
+[/table]
+
+The [b]Item preview[/b] at the bottom lists the whole item pool for the current settings and seed, one card per item, without starting a run.
+
+[pullquote]If you like this mod, please consider liking, favoriting and sharing it, thank you! Comments and suggestions are also very welcome![/pullquote]
+
+GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/url]
+
+-->
+
+---
+
+**每一局，都是全新的道具池。** 东尼算法把每件道具拆成零件——属性、触发条件、效果、机制——再按同等价值随机拼回去。图标和稀有度不变，道具却完全不同。
+
+灵感来自《杀戮尖塔 2》的东尼算法（Auto-Anthonyology）mod，后者源于《以撒的结合：忏悔》中的挑战 45。在此向原作者致谢！
+
+### 如何使用
+
+在角色 / 武器 / 难度选择界面左上角（返回按钮旁）点击 **东尼算法**。选好设置，可以先预览道具池，然后开始游戏。新道具在开局时生效；回到主菜单后游戏自动还原。
+
+### 特色
+
+- **任意触发 × 任意效果**："闪避时""每 5 秒""拾取箱子时""首次用元素伤害命中敌人时"……可以搭配任意效果：本波属性、永久属性、回血、材料、经验、伤害、爆炸、"该敌人受到的伤害提高"，甚至是另一件道具的效果（"击杀敌人时：本波获得「每 6 点元素伤害 +1 护甲」"）。
+- **公平的数值**：每种效果都按材料计价。属性权重由原版道具拟合（参考 ArosRising《Brotato MultiTool》的属性价值），触发效果按"单次价值 × 每波触发次数"计价。每件道具的预算由价格和稀有度决定，100 材料的传说道具就值 100 材料左右。
+- **价格也会重新生成**：道具不再沿用原价，而是在同稀有度原版道具的价格范围内重新抽取。
+- **还是土豆兄弟的味道**：属性行数、带负面效果的概率、哪些属性常一起出现、带特殊效果的比例，都跟随原版同稀有度道具。T1–T3 每个稀有度为每种核心属性（%伤害、近战、远程、元素、工程、攻速、收获、经验）保证一件"纯净"道具，你的角色想要的每种词条也都保证存在。
+- **名字**："共鸣铁砧""古怪的外星魔法""急速头巾"……形容词告诉你主效果是什么。
+- **安全**：种子随存档保存（读档重建同一套道具），深海魔怪的诅咒道具照常生效，其他 mod 加入的道具不受影响。
+- **全语言支持**：English、Français、简体中文、日本語、한국어、繁體中文、Русский、Polski、Español、Português、Deutsch、Türkçe、Italiano。
+
+### 选项说明
+
+**启用**（默认：**开**）：总开关。关闭后游戏保持原版，设置保留。
+
+**重组内容**
+
+| 选项 | 默认 | 作用 |
+| --- | --- | --- |
+| 重组道具 | **开** | 道具保留图标、稀有度，效果使用同价值特效重组。 |
+| 重组角色 (BETA) | 关 | 角色保留身份（初始装备、限制、特殊机制等）。其余属性/修改/触发效果使用同价值特效重组，保留角色偏好词条。 |
+| 重组武器 (BETA) | 关 | 同类型（近战/远程）武器家族互换相同等级的特效（实验性）。 |
+| 重组名称 | **开** | 开启后命名格式为"主效果形容词+原名称"；关闭则保留原名。 |
+
+**效果设置**
+
+| 选项 | 默认 | 作用 |
+| --- | --- | --- |
+| 更多角色效果 | 关 | 将更多角色机制赋予道具。如：构筑物生成在一起、经验需求、魅惑几率、宠物伤害、地图大小、道具/武器价格。 |
+| 全部角色效果 (BETA) | 关 | 进一步加入角色机制中的极端效果（如：窃取商品、升级得武器栏、商店定向出售）与代价（如：一击必死、移动时无法攻击、进入商店摧毁武器、无法回血、武器限制等）。代价越大，数值越高。带设定值型效果的道具视为独特。 |
+| 更多双面效果 | 关 | 为纯增益/纯代价效果强制增加对立面。如：-材料掉落、+刷新价格、-武器栏、-敌人血量、-敌人伤害、触发时失去材料。 |
+
+**数值设置**
+
+| 选项 | 默认 | 作用 |
+| --- | --- | --- |
+| 平均数值 | 100% | 特效价值期望值的倍率（100% = 原版价值）。 |
+| 浮动范围 | 100% | 特效价值的随机浮动（100% = 原版离散度）。 |
+| 触发效果 | 100% | 道具带有触发或机制型特效的概率（100% = 相当于原版同稀有度道具）。 |
+| 保留原版道具 | 0% | 保留一定比例的原版道具不参与重组。 |
+| 固定种子 | 关 | 开启后每局生成同一套道具池（便于分享）。 |
+
+设置页下方的 **道具预览** 会按当前设置与种子列出整个道具池，每件道具一张卡片，无需开局。
+
+<!-- BBCode
+
+[b]每一局，都是全新的道具池。[/b] 东尼算法把每件道具拆成零件——属性、触发条件、效果、机制——再按同等价值随机拼回去。图标和稀有度不变，道具却完全不同。
+
+灵感来自《杀戮尖塔 2》的东尼算法（Auto-Anthonyology）mod，后者源于《以撒的结合：忏悔》中的挑战 45。在此向原作者致谢！
+
+[h1]如何使用[/h1]
+
+在角色 / 武器 / 难度选择界面左上角（返回按钮旁）点击 [b]东尼算法[/b]。选好设置，可以先预览道具池，然后开始游戏。新道具在开局时生效；回到主菜单后游戏自动还原。
+
+[h1]特色[/h1]
+
+[list]
+[*][b]任意触发 × 任意效果[/b]："闪避时""每 5 秒""拾取箱子时""首次用元素伤害命中敌人时"……可以搭配任意效果：本波属性、永久属性、回血、材料、经验、伤害、爆炸、"该敌人受到的伤害提高"，甚至是另一件道具的效果（"击杀敌人时：本波获得「每 6 点元素伤害 +1 护甲」"）。
+[*][b]公平的数值[/b]：每种效果都按材料计价。属性权重由原版道具拟合（参考 ArosRising《Brotato MultiTool》的属性价值），触发效果按"单次价值 × 每波触发次数"计价。每件道具的预算由价格和稀有度决定，100 材料的传说道具就值 100 材料左右。
+[*][b]价格也会重新生成[/b]：道具不再沿用原价，而是在同稀有度原版道具的价格范围内重新抽取。
+[*][b]还是土豆兄弟的味道[/b]：属性行数、带负面效果的概率、哪些属性常一起出现、带特殊效果的比例，都跟随原版同稀有度道具。T1–T3 每个稀有度为每种核心属性（%伤害、近战、远程、元素、工程、攻速、收获、经验）保证一件"纯净"道具，你的角色想要的每种词条也都保证存在。
+[*][b]名字[/b]："共鸣铁砧""古怪的外星魔法""急速头巾"……形容词告诉你主效果是什么。
+[*][b]安全[/b]：种子随存档保存（读档重建同一套道具），深海魔怪的诅咒道具照常生效，其他 mod 加入的道具不受影响。
+[*][b]全语言支持[/b]：English、Français、简体中文、日本語、한국어、繁體中文、Русский、Polski、Español、Português、Deutsch、Türkçe、Italiano。
+[/list]
+
+[h1]选项说明[/h1]
+
+[b]启用[/b]（默认：[b]开[/b]）：总开关。关闭后游戏保持原版，设置保留。
+
+[h2]重组内容[/h2]
+
+[table]
+[tr][th]选项[/th][th]默认[/th][th]作用[/th][/tr]
+[tr][td]重组道具[/td][td][b]开[/b][/td][td]道具保留图标、稀有度，效果使用同价值特效重组。[/td][/tr]
+[tr][td]重组角色 (BETA)[/td][td]关[/td][td]角色保留身份（初始装备、限制、特殊机制等）。其余属性/修改/触发效果使用同价值特效重组，保留角色偏好词条。[/td][/tr]
+[tr][td]重组武器 (BETA)[/td][td]关[/td][td]同类型（近战/远程）武器家族互换相同等级的特效（实验性）。[/td][/tr]
+[tr][td]重组名称[/td][td][b]开[/b][/td][td]开启后命名格式为"主效果形容词+原名称"；关闭则保留原名。[/td][/tr]
+[/table]
+
+[h2]效果设置[/h2]
+
+[table]
+[tr][th]选项[/th][th]默认[/th][th]作用[/th][/tr]
+[tr][td]更多角色效果[/td][td]关[/td][td]将更多角色机制赋予道具。如：构筑物生成在一起、经验需求、魅惑几率、宠物伤害、地图大小、道具/武器价格。[/td][/tr]
+[tr][td]全部角色效果 (BETA)[/td][td]关[/td][td]进一步加入角色机制中的极端效果（如：窃取商品、升级得武器栏、商店定向出售）与代价（如：一击必死、移动时无法攻击、进入商店摧毁武器、无法回血、武器限制等）。代价越大，数值越高。带设定值型效果的道具视为独特。[/td][/tr]
+[tr][td]更多双面效果[/td][td]关[/td][td]为纯增益/纯代价效果强制增加对立面。如：-材料掉落、+刷新价格、-武器栏、-敌人血量、-敌人伤害、触发时失去材料。[/td][/tr]
+[/table]
+
+[h2]数值设置[/h2]
+
+[table]
+[tr][th]选项[/th][th]默认[/th][th]作用[/th][/tr]
+[tr][td]平均数值[/td][td]100%[/td][td]特效价值期望值的倍率（100% = 原版价值）。[/td][/tr]
+[tr][td]浮动范围[/td][td]100%[/td][td]特效价值的随机浮动（100% = 原版离散度）。[/td][/tr]
+[tr][td]触发效果[/td][td]100%[/td][td]道具带有触发或机制型特效的概率（100% = 相当于原版同稀有度道具）。[/td][/tr]
+[tr][td]保留原版道具[/td][td]0%[/td][td]保留一定比例的原版道具不参与重组。[/td][/tr]
+[tr][td]固定种子[/td][td]关[/td][td]开启后每局生成同一套道具池（便于分享）。[/td][/tr]
+[/table]
+
+设置页下方的 [b]道具预览[/b] 会按当前设置与种子列出整个道具池，每件道具一张卡片，无需开局。
+
+[pullquote]如果你喜欢这个 mod，欢迎点赞、收藏、转发，多谢啦！有问题或建议欢迎在评论区留言！[/pullquote]
+
+GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/url]
+
+-->
+
+<details>
+
+<summary>Screenshots</summary>
+
+![](img/aa-0.png)
+
+![](img/aa-1.jpg)
+
+![](img/aa-2.jpg)
+
+![](img/aa-3.jpg)
+
+![](img/aa-4.jpg)
+
+</details>

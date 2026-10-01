@@ -27,7 +27,10 @@ const TIER_INTERCEPT = [11.9, 31.5, 44.6, 42.5]
 # 由原版"每波永久成长"道具反推（警戒戒指 6.4、机械臂 3.5、魔法叶 3.3、鬼火 2.5、宝宝乌贼 6.1），中位约 3.5
 const PERM_MULT = [5.0, 4.5, 4.0, 3.5]
 # 高频扳机上永久效果的每波上限最大值
-const PERM_CAP_MAX = 10
+const PERM_CAP_MAX = 20
+# 带每波上限的永久效果：每次触发的期望价值折算（上限常在波次后段才达到、后半局获得的永久属性用得少），
+# 同样预算下每波上限约为原来的 2 倍
+const PERM_CAPPED_FIRE_VALUE = 0.55
 const PERM_MULT_CHARACTER = 7.0
 # 负面效果的价值除数：-3 远程伤害只按 -1 远程伤害计价
 const DOWNSIDE_DIVISOR = 2.5
@@ -657,7 +660,22 @@ static func tags_for_binding(k: String) -> Array:
 #   波末每个存活敌人获得材料与经验（和平主义者）；代价：每波结束敌人属性提高（船长）、−1 武器栏
 # ============================================================
 const CLASS_BONUS_SHARE = 0.35
-const CLASS_BONUS_STAT_W = {"stat_attack_speed": 1.4, "stat_percent_damage": 1.5, "stat_range": 0.35, "stat_lifesteal": 4.7, "stat_damage": 1.8}
+# 武器类型加成可选的属性：显示名 -> {原版武器属性字段 name, 每点权重 w, 粒度 unit, 上限 max}
+#   原版角色用过的（攻速、%伤害、范围、吸血、伤害、暴击伤害）之外，加入暴击率与贯通：
+#   原版的类型加成直接把数值加到武器属性上，暴击率是小数、贯通会被远程武器的通用计算覆盖，
+#   两者由本 mod 的 WeaponService 扩展修正（暴击率按百分比、贯通在通用计算之后再加）；
+#   近战武器没有贯通字段，贯通只给全是远程武器的类型（原版只有枪械）
+const CLASS_BONUS_KINDS = {
+	"stat_attack_speed": {"name": "attack_speed_mod", "w": 1.4, "unit": 5, "max": 60},
+	"stat_percent_damage": {"name": "stat_percent_damage", "w": 1.5, "unit": 5, "max": 60},
+	"stat_range": {"name": "max_range", "w": 0.35, "unit": 10, "max": 100},
+	"stat_lifesteal": {"name": "lifesteal", "w": 4.7, "unit": 5, "max": 30},
+	"stat_damage": {"name": "damage", "w": 1.8, "unit": 5, "max": 15},
+	"stat_crit_damage": {"name": "crit_damage", "w": 0.45, "unit": 25, "max": 200},
+	"stat_crit_chance": {"name": "crit_chance", "w": 1.85, "unit": 5, "max": 25},
+	"piercing": {"name": "piercing", "w": 15.0, "unit": 1, "max": 2, "ranged_only": true},
+}
+# （旧表，武器类型加成的权重见 CLASS_BONUS_KINDS）
 const BURN_BONUS_W = 0.12		# 燃烧目标额外伤害，每 1%
 const PACIFIST_W = 0.4			# 每 0.01 材料+经验 / 存活敌人（波末约 30 个存活敌人）
 const WEAPON_SLOT_W = 25.0
@@ -686,7 +704,7 @@ const WEAPON_SPEND_PER_WAVE = 40.0
 # 武器数量计数（常规池，计数型的一种）：原版的"每把不同武器 / 每把武器 / 每把 IV 级 / 每把 I 级武器"效果
 # 计数期望：不同武器约 3.5、武器约 5、IV 级武器全局平均约 1、I 级武器约 1.2
 const WEAPON_COUNTERS = {
-	"unique_weapon_effects": 3.5, "additional_weapon_effects": 5.0,
+	"unique_weapon_effects": 2.5, "additional_weapon_effects": 5.0,
 	"tier_iv_weapon_effects": 1.0, "tier_i_weapon_effects": 1.2,
 }
 const WEAPON_COUNTER_CHANCE = 0.2
@@ -786,6 +804,10 @@ const NEXT_WAVE_ENEMY_DOWN_MAX = 40
 const CHAR_REASSEMBLE_KINDS = {"stat": 0.4, "clause": 0.35, "scaling": 0.13, "gain_mod": 0.12}
 const CHAR_CONVERT_CHANCE = 0.5
 const WANTED_BIAS = 4.0
+
+# 非线性的机制：价值 = 单位价值 × (数值 - offset)，数值不低于 min
+#   拷问（每秒回复 X 生命，不能以其他方式回血）：回复太少时整件道具等于"无法回血"，至少 4 点才有意义
+const MECHANIC_INTERCEPT = {"torture": {"offset": 3, "min": 4}}
 
 # T3 及以上（稀有度索引 >= 2）的道具至少有两条效果
 const MIN_LINES_TIER = 2
