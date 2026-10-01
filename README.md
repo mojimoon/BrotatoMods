@@ -517,7 +517,7 @@ On the character, weapon or difficulty selection screen, click **Auto-Anthony** 
 | Option | Default | What it does |
 | --- | --- | --- |
 | Reassemble items | **On** | Items keep their icon and rarity; their effects are reassembled from effects of equal value. |
-| Reassemble starting items | Off | The starting items of this run's characters (e.g. Technomage's turrets, Beast Master's pets) are reassembled too. Off: they stay original for the run. |
+| Reassemble starting items | Off | The starting items of this run's characters (e.g. Mage's Snakes) are reassembled too. Off: they stay original for the run. |
 | Reassemble character (BETA) | Off | Characters keep their identity (starting gear, restrictions, special mechanics...). Other stats, modifiers and triggered effects are reassembled at equal value, favouring the character's preferred tags. |
 | Reassemble weapons (BETA) | Off | Weapon families of the same type (melee / ranged) swap the special effects of the same tier (experimental). |
 | Reassemble names | **On** | Names become "main-effect adjective + original name". Off: original names are kept. |
@@ -573,7 +573,7 @@ On the character, weapon or difficulty selection screen, click [b]Auto-Anthony[/
 [table]
 [tr][th]Option[/th][th]Default[/th][th]What it does[/th][/tr]
 [tr][td]Reassemble items[/td][td][b]On[/b][/td][td]Items keep their icon and rarity; their effects are reassembled from effects of equal value.[/td][/tr]
-[tr][td]Reassemble starting items[/td][td]Off[/td][td]The starting items of this run's characters (e.g. Technomage's turrets, Beast Master's pets) are reassembled too. Off: they stay original for the run.[/td][/tr]
+[tr][td]Reassemble starting items[/td][td]Off[/td][td]The starting items of this run's characters (e.g. Mage's Snakes) are reassembled too. Off: they stay original for the run.[/td][/tr]
 [tr][td]Reassemble character (BETA)[/td][td]Off[/td][td]Characters keep their identity (starting gear, restrictions, special mechanics...). Other stats, modifiers and triggered effects are reassembled at equal value, favouring the character's preferred tags.[/td][/tr]
 [tr][td]Reassemble weapons (BETA)[/td][td]Off[/td][td]Weapon families of the same type (melee / ranged) swap the special effects of the same tier (experimental).[/td][/tr]
 [tr][td]Reassemble names[/td][td][b]On[/b][/td][td]Names become "main-effect adjective + original name". Off: original names are kept.[/td][/tr]
@@ -634,7 +634,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 | 选项 | 默认 | 作用 |
 | --- | --- | --- |
 | 重组道具 | **开** | 道具保留图标、稀有度，效果使用同价值特效重组。 |
-| 重组初始道具 | 关 | 本局角色的初始道具（如技术法师的炮台、驯兽师的宠物）也参与重组。关闭时这些道具在本局保持原版。 |
+| 重组初始道具 | 关 | 本局角色的初始道具（如法师的蛇）也参与重组。关闭时这些道具在本局保持原版。 |
 | 重组角色 (BETA) | 关 | 角色保留身份（初始装备、限制、特殊机制等）。其余属性/修改/触发效果使用同价值特效重组，保留角色偏好词条。 |
 | 重组武器 (BETA) | 关 | 同类型（近战/远程）武器家族互换相同等级的特效（实验性）。 |
 | 重组名称 | **开** | 开启后命名格式为"主效果形容词+原名称"；关闭则保留原名。 |
@@ -688,7 +688,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 [table]
 [tr][th]选项[/th][th]默认[/th][th]作用[/th][/tr]
 [tr][td]重组道具[/td][td][b]开[/b][/td][td]道具保留图标、稀有度，效果使用同价值特效重组。[/td][/tr]
-[tr][td]重组初始道具[/td][td]关[/td][td]本局角色的初始道具（如技术法师的炮台、驯兽师的宠物）也参与重组。关闭时这些道具在本局保持原版。[/td][/tr]
+[tr][td]重组初始道具[/td][td]关[/td][td]本局角色的初始道具（如法师的蛇）也参与重组。关闭时这些道具在本局保持原版。[/td][/tr]
 [tr][td]重组角色 (BETA)[/td][td]关[/td][td]角色保留身份（初始装备、限制、特殊机制等）。其余属性/修改/触发效果使用同价值特效重组，保留角色偏好词条。[/td][/tr]
 [tr][td]重组武器 (BETA)[/td][td]关[/td][td]同类型（近战/远程）武器家族互换相同等级的特效（实验性）。[/td][/tr]
 [tr][td]重组名称[/td][td][b]开[/b][/td][td]开启后命名格式为"主效果形容词+原名称"；关闭则保留原名。[/td][/tr]
