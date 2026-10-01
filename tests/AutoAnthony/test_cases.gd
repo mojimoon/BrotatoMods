@@ -800,6 +800,27 @@ func test_51_ui_builds_and_previews() -> void:
 		var sw = ui._switches[k]
 		var desc = sw.get_parent().get_child(sw.get_index() + 1)
 		_check(desc is Label and desc.text != "" and desc.text.find("AA_") == -1, "switch has a description: " + k)
+	# 导出 / 导入设置（经由剪贴板）
+	m.cfg_avg = 135
+	m.cfg_seed = 12345
+	m.cfg_more_double = true
+	ui.test_clipboard = ""
+	ui._on_export_pressed()
+	var code = ui.test_clipboard
+	_check(code.begins_with("AA1:"), "export puts a share code on the clipboard")
+	m.cfg_avg = 100
+	m.cfg_seed = 1
+	m.cfg_more_double = false
+	ui._on_import_pressed()
+	_eq(m.cfg_avg, 135, "import restores average value")
+	_eq(m.cfg_seed, 12345, "import restores seed")
+	_eq(m.cfg_more_double, true, "import restores switches")
+	_eq(int(ui._sliders["cfg_avg"].value), 135, "import refreshes the slider")
+	_eq(ui._seed_edit.text, "12345", "import refreshes the seed box")
+	ui.test_clipboard = "not a code"
+	ui._on_import_pressed()
+	_eq(m.cfg_avg, 135, "invalid code changes nothing")
+	_check(not m.import_settings_code("AA1:@@@"), "garbage code rejected")
 	ui._on_preview_pressed()
 	for t in 4:
 		ui._on_tier_pressed(t)

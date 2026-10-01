@@ -495,7 +495,7 @@ On the character, weapon or difficulty selection screen, click **Auto-Anthony** 
 | Keep original items | 0% | Keeps a share of the original items out of the reassembly. |
 | Fixed seed | Off | When on, every run generates the same item pool (easy to share). |
 
-The **Item preview** at the bottom lists the whole item pool for the current settings and seed without starting a run. Share your seed with friends to let them try the same item pool!
+The **Item preview** at the bottom lists the whole item pool for the current settings and seed without starting a run. Use **Export settings** to copy all settings (including the seed) as a share code, and **Import settings** to load one: share your item pool with friends!
 
 If you like this mod, please consider liking, favoriting and sharing it, thank you! Comments and suggestions are also very welcome!
 
@@ -553,7 +553,7 @@ On the character, weapon or difficulty selection screen, click [b]Auto-Anthony[/
 [tr][td]Fixed seed[/td][td]Off[/td][td]When on, every run generates the same item pool (easy to share).[/td][/tr]
 [/table]
 
-The [b]Item preview[/b] at the bottom lists the whole item pool for the current settings and seed without starting a run. Share your seed with friends to let them try the same item pool!
+The [b]Item preview[/b] at the bottom lists the whole item pool for the current settings and seed without starting a run. Use [b]Export settings[/b] to copy all settings (including the seed) as a share code, and [b]Import settings[/b] to load one: share your item pool with friends!
 
 [pullquote]If you like this mod, please consider liking, favoriting and sharing it, thank you! Comments and suggestions are also very welcome![/pullquote]
 
@@ -610,7 +610,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 | 保留原版道具 | 0% | 保留一定比例的原版道具不参与重组。 |
 | 固定种子 | 关 | 开启后每局生成同一套道具池（便于分享）。 |
 
-设置页下方的 **道具预览** 可以在开始一局之前，按当前设置与种子列出整个道具池。快来跟好友分享你的道具池吧！
+设置页下方的 **道具预览** 可以在开始一局之前，按当前设置与种子列出整个道具池。用 **导出设置** 把全部设置（含种子）复制为分享码，用 **导入设置** 读取分享码，快来跟好友分享你的道具池吧！
 
 <!-- BBCode
 
@@ -666,7 +666,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 [tr][td]固定种子[/td][td]关[/td][td]开启后每局生成同一套道具池（便于分享）。[/td][/tr]
 [/table]
 
-设置页下方的 [b]道具预览[/b] 可以在开始一局之前，按当前设置与种子列出整个道具池。快来跟好友分享你的道具池吧！
+设置页下方的 [b]道具预览[/b] 可以在开始一局之前，按当前设置与种子列出整个道具池。用 [b]导出设置[/b] 把全部设置（含种子）复制为分享码，用 [b]导入设置[/b] 读取分享码，快来跟好友分享你的道具池吧！
 
 [pullquote]如果你喜欢这个 mod，欢迎点赞、收藏、转发，多谢啦！有问题或建议欢迎在评论区留言！[/pullquote]
 

@@ -222,6 +222,15 @@ func _build_preview(root: Control) -> void:
 		head.add_child(btn)
 		_tier_buttons.push_back(btn)
 	head.add_child(_spacer())
+	# 导入 / 导出设置：分享码经由剪贴板
+	var import_btn = _button(tr("AA_UI_IMPORT"), FONT_SMALL)
+	_apply_action_style(import_btn, C_ACCENT_2)
+	import_btn.connect("pressed", self, "_on_import_pressed")
+	head.add_child(import_btn)
+	var export_btn = _button(tr("AA_UI_EXPORT"), FONT_SMALL)
+	_apply_action_style(export_btn, C_ACCENT_2)
+	export_btn.connect("pressed", self, "_on_export_pressed")
+	head.add_child(export_btn)
 	var prev_btn = _button(tr("AA_UI_PREVIEW"), FONT_SMALL)
 	_apply_action_style(prev_btn, C_ACCENT)
 	prev_btn.connect("pressed", self, "_on_preview_pressed")
@@ -316,6 +325,39 @@ func _on_preview_pressed() -> void:
 	_preview_hint.text = tr("AA_UI_PREVIEW_SEED").replace("{0}", str(_mod.cfg_seed))
 	_refresh_tier_buttons()
 	_fill_preview()
+
+
+# 剪贴板（测试时用 test_clipboard 代替系统剪贴板）
+var test_clipboard = null
+
+
+func _clipboard_get() -> String:
+	return test_clipboard if test_clipboard != null else OS.clipboard
+
+
+func _clipboard_set(text: String) -> void:
+	if test_clipboard != null:
+		test_clipboard = text
+	else:
+		OS.clipboard = text
+
+
+func _on_export_pressed() -> void:
+	_clipboard_set(_mod.export_settings_code())
+	_preview_hint.text = tr("AA_UI_EXPORTED")
+
+
+func _on_import_pressed() -> void:
+	if _mod.import_settings_code(_clipboard_get()):
+		_seed_edit.text = str(_mod.cfg_seed)
+		_seed_switch.pressed = _mod.cfg_fixed_seed
+		_enable_switch.pressed = _mod.enabled
+		for key in _sliders:
+			_sliders[key].value = _mod.get(key)
+		_refresh_all()
+		_preview_hint.text = tr("AA_UI_IMPORTED")
+	else:
+		_preview_hint.text = tr("AA_UI_IMPORT_FAILED")
 
 
 func _on_tier_pressed(t: int) -> void:

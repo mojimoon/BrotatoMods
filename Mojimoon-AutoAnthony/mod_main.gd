@@ -175,7 +175,11 @@ func _load_settings() -> void:
 	file.close()
 	if parsed.error != OK or not parsed.result is Dictionary:
 		return
-	var d: Dictionary = parsed.result
+	apply_settings(parsed.result)
+
+
+# 设置字典 -> 字段（读取本地设置与"导入设置"共用；缺少的字段取默认值）
+func apply_settings(d: Dictionary) -> void:
 	enabled = bool(d.get("enabled", true))
 	cfg_items = bool(d.get("items", true))
 	cfg_characters = bool(d.get("characters", false))
@@ -190,6 +194,32 @@ func _load_settings() -> void:
 	cfg_native_ratio = int(clamp(int(d.get("native_ratio", 0)), 0, 100))
 	cfg_fixed_seed = bool(d.get("fixed_seed", false))
 	cfg_seed = int(d.get("seed", 0))
+
+
+# 导出 / 导入设置：分享码 = "AA1:" + Base64(JSON)，与本地设置文件的字段相同
+const SHARE_PREFIX = "AA1:"
+
+
+func export_settings_code() -> String:
+	var data = get_cfg()
+	data["enabled"] = enabled
+	data["fixed_seed"] = cfg_fixed_seed
+	data["seed"] = cfg_seed
+	return SHARE_PREFIX + Marshalls.utf8_to_base64(JSON.print(data))
+
+
+# 成功返回 true；无法识别的文本不改动任何设置
+func import_settings_code(code: String) -> bool:
+	code = code.strip_edges()
+	if not code.begins_with(SHARE_PREFIX):
+		return false
+	var text = Marshalls.base64_to_utf8(code.substr(SHARE_PREFIX.length()))
+	var parsed = JSON.parse(text)
+	if parsed.error != OK or not parsed.result is Dictionary or not parsed.result.has("items"):
+		return false
+	apply_settings(parsed.result)
+	save_settings()
+	return true
 
 
 # ============================================================
