@@ -2335,12 +2335,17 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 				var ek = Catalog.ENEMY_STATS.keys()
 				c.stat = ek[rng.randi() % ek.size()]
 				c.value = 1
+			elif not negative and payload == "temp_stat" and rng.randf() < Catalog.TEMP_ENEMY_COUNT_CHANCE 					and not "number_of_enemies" in cur_stat_bans:
+				c.stat = "number_of_enemies"
+				c.value = 1
+				if payload == "temp_stat" and t.kind == "event":
+					c.cap = Catalog.TEMP_ENEMY_COUNT_STACKS[rng.randi() % Catalog.TEMP_ENEMY_COUNT_STACKS.size()]
 			else:
 				c.stat = _pick_stat(negative, Catalog.TEMP_STAT_BANNED + ([anchor_stat] if negative else []))
 				c.value = Catalog.stat_unit(c.stat)
 			if payload == "timed_stat":
 				c.value2 = [3, 4, 5, 6, 8][rng.randi() % 5]
-			if payload == "temp_stat" and t.kind == "event" and Valuation.raw_rate(trigger, 1, 100) > 6.0 and rng.randf() < 0.5:
+			if payload == "temp_stat" and t.kind == "event" and c.cap == 0 and Valuation.raw_rate(trigger, 1, 100) > 6.0 and rng.randf() < 0.5:
 				c.cap = [10, 15, 20, 30][rng.randi() % 4]
 			if payload == "temp_stat" and not negative and t.kind == "event" and t.timing > 0.0 and t.timing < 1.0 \
 					and trigger != "hit" and rng.randf() < Catalog.RESET_ON_HIT_CHANCE:
@@ -2455,6 +2460,8 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 	# 单次触发的属性数值同样受原版单行上限约束
 	if c.payload in ["temp_stat", "perm_stat", "timed_stat"]:
 		c.value = int(min(c.value, _line_cap(c.stat, negative)))
+		if c.stat == "number_of_enemies":
+			c.value = int(min(c.value, Catalog.TEMP_ENEMY_COUNT_MAX))
 	if negative:
 		# 敌人属性的"代价"方向是提高（正值），自身属性 / 材料是降低（负值）
 		c.value = abs(c.value) if Catalog.ENEMY_STATS.has(c.stat) else -abs(c.value)

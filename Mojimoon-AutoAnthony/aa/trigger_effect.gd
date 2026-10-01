@@ -150,7 +150,7 @@ func _trigger_text(colored: bool) -> String:
 
 func _payload_text(colored: bool) -> String:
 	var good = (value >= 0) != Catalog.ENEMY_STATS.has(stat)
-	var stat_name = tr(stat.to_upper()) if stat != "" else ""
+	var stat_name = tr(Catalog.STAT_NAME_KEYS.get(stat, stat.to_upper())) if stat != "" else ""
 	match payload:
 		"temp_stat":
 			var k = "AA_P_STATE_STAT" if Catalog.TRIGGERS[trigger].kind == "state" else "AA_P_TEMP_STAT"

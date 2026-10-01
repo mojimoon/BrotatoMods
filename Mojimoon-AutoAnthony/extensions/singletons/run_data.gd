@@ -14,6 +14,15 @@ func reset(restart: bool = false) -> void:
 	.reset(restart)
 
 
+# 敌人数量：原版直接读道具效果总和（刷怪组、会召唤的敌人），本 mod 的临时 +敌人数量（TempStats）也要计入
+func sum_all_player_effects(key: int) -> int:
+	var sum = .sum_all_player_effects(key)
+	if key == Keys.number_of_enemies_hash:
+		for p in get_player_count():
+			sum += int(TempStats.get_stat(key, p))
+	return sum
+
+
 # 升级所需经验：本 mod 的道具可能叠加多条"-X% 所需经验"，总和不低于 XP_NEEDED_TOTAL_FLOOR
 func get_next_level_xp_needed(player_index) -> float:
 	var m = AAMain.get_mod()

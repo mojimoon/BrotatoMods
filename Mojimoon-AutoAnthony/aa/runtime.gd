@@ -252,11 +252,11 @@ func _set_state(player_index: int, en: Dictionary, on: bool) -> void:
 	var h = Keys.generate_hash(e.stat)
 	if on:
 		TempStats.add_stat(h, e.value, player_index)
-		if en.get("show", false):
+		if en.get("show", false) and not e.stat in Catalog.NO_POPUP_STATS:
 			RunData.emit_signal("stat_added", h, e.value, 0.0, player_index)
 	else:
 		TempStats.remove_stat(h, e.value, player_index)
-		if en.get("show", false):
+		if en.get("show", false) and not e.stat in Catalog.NO_POPUP_STATS:
 			RunData.emit_signal("stat_removed", h, e.value, 0.0, player_index)
 
 
@@ -276,7 +276,7 @@ func execute(e, player_index: int, pos, show: bool = true, en = null, target = n
 			_refresh(player_index)
 		"temp_stat":
 			TempStats.add_stat(h, e.value, player_index)
-			if show:
+			if show and not e.stat in Catalog.NO_POPUP_STATS:
 				RunData.emit_signal("stat_added", h, e.value, 0.0, player_index)
 
 		"perm_stat":
@@ -285,7 +285,7 @@ func execute(e, player_index: int, pos, show: bool = true, en = null, target = n
 			LinkedStats.reset_player(player_index)
 		"timed_stat":
 			TempStats.add_stat(h, e.value, player_index)
-			if show:
+			if show and not e.stat in Catalog.NO_POPUP_STATS:
 				RunData.emit_signal("stat_added", h, e.value, 0.0, player_index)
 			var serial = _wave_serial
 			var timer = get_tree().create_timer(max(0.1, e.value2), false)

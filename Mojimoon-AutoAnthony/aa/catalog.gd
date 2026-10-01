@@ -75,8 +75,19 @@ const STATS = {
 	"consumable_heal": {"w": 5.2, "unit": 1, "pct": false, "ref": 0.0},
 }
 
+# 原版名称不带"%"的属性：触发条款里用本 mod 的名称
+const STAT_NAME_KEYS = {"number_of_enemies": "AA_STAT_NUMBER_OF_ENEMIES"}
+# 没有属性图标的属性：触发时不弹出浮动图标
+const NO_POPUP_STATS = ["number_of_enemies"]
+# 临时 +敌人数量 %（本波 / 持续 N 秒 / 状态期间）：正面（更多材料与经验），原版诅咒把它当中性。
+#   每 1% 约多 1 个击杀的材料与经验（每波约 100 击杀）再扣掉难度，按 0.5 计；单次最多 +10%，事件扳机最多叠 3–5 次
+const ENEMY_COUNT_W = 0.5
+const TEMP_ENEMY_COUNT_CHANCE = 0.06
+const TEMP_ENEMY_COUNT_MAX = 10
+const TEMP_ENEMY_COUNT_STACKS = [3, 4, 5]
+
 # 次要正面属性：作为属性行（非核心属性）时只分到通常份额的这一比例，余下预算交给其他属性行
-const MINOR_POSITIVE_STATS = {"knockback": 0.5, "stat_range": 0.65, "pickup_range": 0.5}
+const MINOR_POSITIVE_STATS = {"knockback": 0.35, "stat_range": 0.65, "pickup_range": 0.35}
 
 # 可作为"对随机敌人造成 X% 属性伤害"缩放源的属性
 const DAMAGE_SCALING_STATS = [
@@ -483,6 +494,8 @@ static func is_downside_mechanic(e) -> bool:
 static func stat_w(stat: String) -> float:
 	if STATS.has(stat):
 		return STATS[stat].w
+	if stat == "number_of_enemies":
+		return ENEMY_COUNT_W
 	if ENEMY_STATS.has(stat):
 		return ENEMY_STATS[stat].w
 	return 1.0
@@ -527,7 +540,7 @@ const CATEGORY_CLASSES = ["AA", "AS", "AE", "A-", "SA", "SS", "SE", "S-", "EA", 
 # 原版的非属性词条（角色的"想要词条"会用到）
 const STAT_EXTRA_TAGS = {
 	"consumable_heal": "consumable", "explosion_damage": "explosive", "explosion_size": "explosive",
-	"knockback": "knockback", "pickup_range": "pickup",
+	"knockback": "knockback", "pickup_range": "pickup", "number_of_enemies": "more_enemies",
 }
 const TRIGGER_TAGS = {"still": "stand_still", "consumable": "consumable"}
 const PAYLOAD_TAGS = {"explode": "explosive", "gold": "economy"}
