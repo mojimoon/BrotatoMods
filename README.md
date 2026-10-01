@@ -517,6 +517,7 @@ On the character, weapon or difficulty selection screen, click **Auto-Anthony** 
 | Option | Default | What it does |
 | --- | --- | --- |
 | Reassemble items | **On** | Items keep their icon and rarity; their effects are reassembled from effects of equal value. |
+| Reassemble starting items | Off | The starting items of this run's characters (e.g. Technomage's turrets, Beast Master's pets) are reassembled too. Off: they stay original for the run. |
 | Reassemble character (BETA) | Off | Characters keep their identity (starting gear, restrictions, special mechanics...). Other stats, modifiers and triggered effects are reassembled at equal value, favouring the character's preferred tags. |
 | Reassemble weapons (BETA) | Off | Weapon families of the same type (melee / ranged) swap the special effects of the same tier (experimental). |
 | Reassemble names | **On** | Names become "main-effect adjective + original name". Off: original names are kept. |
@@ -525,7 +526,7 @@ On the character, weapon or difficulty selection screen, click **Auto-Anthony** 
 
 | Option | Default | What it does |
 | --- | --- | --- |
-| More character effects | Off | Gives more character mechanics to items, e.g. structures spawning close together, XP required, charm chance, pet damage, map size, items / weapons price. |
+| More character effects | Off | Gives more character mechanics to items, e.g. structures spawning close together, XP required, charm chance, pet damage, map size, items / weapons price, and the "when you hit an enemy with a damage type" trigger. |
 | All character effects (BETA) | Off | Also adds the extreme character mechanics (stealing from the shop, weapon slots on level up, guaranteed shop items...) and their drawbacks (dying in one hit, no attacking while moving, weapons destroyed when entering a shop, no healing, weapon restrictions...). Big drawbacks come with big numbers. Items with set-value effects are unique. |
 | More double-sided effects | Off | Adds the opposite side of effects that are pure upsides or pure drawbacks, e.g. -materials dropped, +reroll price, -1 weapon slot, -enemy health, -enemy damage, losing materials on a trigger. |
 
@@ -572,6 +573,7 @@ On the character, weapon or difficulty selection screen, click [b]Auto-Anthony[/
 [table]
 [tr][th]Option[/th][th]Default[/th][th]What it does[/th][/tr]
 [tr][td]Reassemble items[/td][td][b]On[/b][/td][td]Items keep their icon and rarity; their effects are reassembled from effects of equal value.[/td][/tr]
+[tr][td]Reassemble starting items[/td][td]Off[/td][td]The starting items of this run's characters (e.g. Technomage's turrets, Beast Master's pets) are reassembled too. Off: they stay original for the run.[/td][/tr]
 [tr][td]Reassemble character (BETA)[/td][td]Off[/td][td]Characters keep their identity (starting gear, restrictions, special mechanics...). Other stats, modifiers and triggered effects are reassembled at equal value, favouring the character's preferred tags.[/td][/tr]
 [tr][td]Reassemble weapons (BETA)[/td][td]Off[/td][td]Weapon families of the same type (melee / ranged) swap the special effects of the same tier (experimental).[/td][/tr]
 [tr][td]Reassemble names[/td][td][b]On[/b][/td][td]Names become "main-effect adjective + original name". Off: original names are kept.[/td][/tr]
@@ -581,7 +583,7 @@ On the character, weapon or difficulty selection screen, click [b]Auto-Anthony[/
 
 [table]
 [tr][th]Option[/th][th]Default[/th][th]What it does[/th][/tr]
-[tr][td]More character effects[/td][td]Off[/td][td]Gives more character mechanics to items, e.g. structures spawning close together, XP required, charm chance, pet damage, map size, items / weapons price.[/td][/tr]
+[tr][td]More character effects[/td][td]Off[/td][td]Gives more character mechanics to items, e.g. structures spawning close together, XP required, charm chance, pet damage, map size, items / weapons price, and the "when you hit an enemy with a damage type" trigger.[/td][/tr]
 [tr][td]All character effects (BETA)[/td][td]Off[/td][td]Also adds the extreme character mechanics (stealing from the shop, weapon slots on level up, guaranteed shop items...) and their drawbacks (dying in one hit, no attacking while moving, weapons destroyed when entering a shop, no healing, weapon restrictions...). Big drawbacks come with big numbers. Items with set-value effects are unique.[/td][/tr]
 [tr][td]More double-sided effects[/td][td]Off[/td][td]Adds the opposite side of effects that are pure upsides or pure drawbacks, e.g. -materials dropped, +reroll price, -1 weapon slot, -enemy health, -enemy damage, losing materials on a trigger.[/td][/tr]
 [/table]
@@ -632,6 +634,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 | 选项 | 默认 | 作用 |
 | --- | --- | --- |
 | 重组道具 | **开** | 道具保留图标、稀有度，效果使用同价值特效重组。 |
+| 重组初始道具 | 关 | 本局角色的初始道具（如技术法师的炮台、驯兽师的宠物）也参与重组。关闭时这些道具在本局保持原版。 |
 | 重组角色 (BETA) | 关 | 角色保留身份（初始装备、限制、特殊机制等）。其余属性/修改/触发效果使用同价值特效重组，保留角色偏好词条。 |
 | 重组武器 (BETA) | 关 | 同类型（近战/远程）武器家族互换相同等级的特效（实验性）。 |
 | 重组名称 | **开** | 开启后命名格式为"主效果形容词+原名称"；关闭则保留原名。 |
@@ -640,7 +643,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 | 选项 | 默认 | 作用 |
 | --- | --- | --- |
-| 更多角色效果 | 关 | 将更多角色机制赋予道具。如：构筑物生成在一起、经验需求、魅惑几率、宠物伤害、地图大小、道具/武器价格。 |
+| 更多角色效果 | 关 | 将更多角色机制赋予道具。如：构筑物生成在一起、经验需求、魅惑几率、宠物伤害、地图大小、道具/武器价格，以及“用某类伤害命中敌人时”的触发条件。 |
 | 全部角色效果 (BETA) | 关 | 进一步加入角色机制中的极端效果（如：窃取商品、升级得武器栏、商店定向出售）与代价（如：一击必死、移动时无法攻击、进入商店摧毁武器、无法回血、武器限制等）。代价越大，数值越高。带设定值型效果的道具视为独特。 |
 | 更多双面效果 | 关 | 为纯增益/纯代价效果强制增加对立面。如：-材料掉落、+刷新价格、-武器栏、-敌人血量、-敌人伤害、触发时失去材料。 |
 
@@ -685,6 +688,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 [table]
 [tr][th]选项[/th][th]默认[/th][th]作用[/th][/tr]
 [tr][td]重组道具[/td][td][b]开[/b][/td][td]道具保留图标、稀有度，效果使用同价值特效重组。[/td][/tr]
+[tr][td]重组初始道具[/td][td]关[/td][td]本局角色的初始道具（如技术法师的炮台、驯兽师的宠物）也参与重组。关闭时这些道具在本局保持原版。[/td][/tr]
 [tr][td]重组角色 (BETA)[/td][td]关[/td][td]角色保留身份（初始装备、限制、特殊机制等）。其余属性/修改/触发效果使用同价值特效重组，保留角色偏好词条。[/td][/tr]
 [tr][td]重组武器 (BETA)[/td][td]关[/td][td]同类型（近战/远程）武器家族互换相同等级的特效（实验性）。[/td][/tr]
 [tr][td]重组名称[/td][td][b]开[/b][/td][td]开启后命名格式为"主效果形容词+原名称"；关闭则保留原名。[/td][/tr]
@@ -694,7 +698,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 [table]
 [tr][th]选项[/th][th]默认[/th][th]作用[/th][/tr]
-[tr][td]更多角色效果[/td][td]关[/td][td]将更多角色机制赋予道具。如：构筑物生成在一起、经验需求、魅惑几率、宠物伤害、地图大小、道具/武器价格。[/td][/tr]
+[tr][td]更多角色效果[/td][td]关[/td][td]将更多角色机制赋予道具。如：构筑物生成在一起、经验需求、魅惑几率、宠物伤害、地图大小、道具/武器价格，以及“用某类伤害命中敌人时”的触发条件。[/td][/tr]
 [tr][td]全部角色效果 (BETA)[/td][td]关[/td][td]进一步加入角色机制中的极端效果（如：窃取商品、升级得武器栏、商店定向出售）与代价（如：一击必死、移动时无法攻击、进入商店摧毁武器、无法回血、武器限制等）。代价越大，数值越高。带设定值型效果的道具视为独特。[/td][/tr]
 [tr][td]更多双面效果[/td][td]关[/td][td]为纯增益/纯代价效果强制增加对立面。如：-材料掉落、+刷新价格、-武器栏、-敌人血量、-敌人伤害、触发时失去材料。[/td][/tr]
 [/table]

@@ -33,6 +33,7 @@ const C_DANGER = Color(0.92, 0.38, 0.44)
 # [配置字段, 名称 key, 说明 key]
 const CONTENT_SWITCHES = [
 	["cfg_items", "AA_UI_ITEMS", "AA_UI_ITEMS_DESC"],
+	["cfg_starting_items", "AA_UI_STARTING_ITEMS", "AA_UI_STARTING_ITEMS_DESC"],
 	["cfg_characters", "AA_UI_CHARACTERS", "AA_UI_CHARACTERS_DESC"],
 	["cfg_weapons", "AA_UI_WEAPONS", "AA_UI_WEAPONS_DESC"],
 	["cfg_rename", "AA_UI_RENAME", "AA_UI_RENAME_DESC"],

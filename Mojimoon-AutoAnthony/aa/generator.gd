@@ -1037,11 +1037,16 @@ func _generate_item_once(item, force_special: bool) -> Dictionary:
 		var b = carry
 		if i < n:
 			b += max(budget, 2.0) * shares[i] / total_share
+		# 次要属性（击退、范围）只拿一部分预算，余下的留给后面的属性行
+		var held = 0.0
+		if s != primary and Catalog.MINOR_POSITIVE_STATS.has(s):
+			held = b * (1.0 - Catalog.MINOR_POSITIVE_STATS[s])
+			b -= held
 		var v = _round_to_unit(b / Catalog.stat_w(s), s)
 		var cap = _line_cap(s, false)
 		if v > cap:
 			v = cap
-		carry = max(0.0, b - v * Catalog.stat_w(s))
+		carry = max(0.0, b - v * Catalog.stat_w(s)) + held
 		stat_lines.push_back(_stat_effect(s, v))
 		if v * Catalog.stat_w(s) > main_line.value:
 			main_line = {"value": v * Catalog.stat_w(s), "adj": _adj(Catalog.ADJ_BY_STAT.get(s, Catalog.ADJ_MECHANIC))}
@@ -2291,6 +2296,8 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 		var tw = {}
 		for t in Catalog.TRIGGERS:
 			if t in banned_triggers:
+				continue
+			if Catalog.HIT_STATS.has(t) and not cfg.get("char_effects", false):
 				continue
 			var legal_t = _legal_payloads(t, negative)
 			if legal_t.empty() or (fixed_payload != "" and not fixed_payload in legal_t):

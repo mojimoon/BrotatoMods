@@ -134,6 +134,9 @@ func _trigger_text(colored: bool) -> String:
 			if Catalog.FIRST_HIT_STATS.has(trigger):
 				var k = "AA_T_FIRST_HIT_TYPED" if param <= 1 else "AA_T_FIRST_HIT_TYPED_EVERY"
 				t = tr(k).replace("{0}", str(param)).replace("{1}", tr(Catalog.FIRST_HIT_STATS[trigger].to_upper()))
+			elif Catalog.HIT_STATS.has(trigger):
+				var kh = "AA_T_HIT_TYPED" if param <= 1 else "AA_T_HIT_TYPED_EVERY"
+				t = tr(kh).replace("{0}", str(param)).replace("{1}", tr(Catalog.HIT_STATS[trigger].to_upper()))
 			elif trigger.begins_with("hit_above_") or trigger.begins_with("hit_below_"):
 				var base = "AA_T_HIT_ABOVE" if trigger.begins_with("hit_above_") else "AA_T_HIT_BELOW"
 				var k2 = base if param <= 1 else base + "_EVERY"

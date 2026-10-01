@@ -748,11 +748,11 @@ func test_50_all_translation_keys_exist() -> void:
 		var k = line.split(",")[0].replace("\"", "")
 		keys[k] = true
 	f.close()
-	for k in ["AA_T_FIRST_HIT_TYPED", "AA_T_FIRST_HIT_TYPED_EVERY", "AA_T_HIT_ABOVE", "AA_T_HIT_ABOVE_EVERY", "AA_T_HIT_BELOW", "AA_T_HIT_BELOW_EVERY", "AA_P_VULN"]:
+	for k in ["AA_T_FIRST_HIT_TYPED", "AA_T_FIRST_HIT_TYPED_EVERY", "AA_T_HIT_ABOVE", "AA_T_HIT_ABOVE_EVERY", "AA_T_HIT_BELOW", "AA_T_HIT_BELOW_EVERY", "AA_T_HIT_TYPED", "AA_T_HIT_TYPED_EVERY", "AA_P_VULN"]:
 		_check(keys.has(k), "text key " + k)
 	for t in Catalog.TRIGGERS:
 		# 带参数的扳机（限定伤害类型的首次命中、命中高 / 低血敌人）共用一条带占位符的文本
-		if not t in ["kill", "gold", "interval"] and not Catalog.FIRST_HIT_STATS.has(t) and not t.begins_with("hit_above_") and not t.begins_with("hit_below_"):
+		if not t in ["kill", "gold", "interval"] and not Catalog.FIRST_HIT_STATS.has(t) and not Catalog.HIT_STATS.has(t) and not t.begins_with("hit_above_") and not t.begins_with("hit_below_"):
 			_check(keys.has("AA_T_" + t.to_upper()), "trigger text for " + t)
 		for param in [1, 3]:
 			var txt = TriggerEffect.make({"trigger": t, "param": param, "payload": "gold", "value": 1}).get_text(0, false)
@@ -3393,7 +3393,7 @@ func test_114_tag_bindings() -> void:
 	for x in missing.slice(0, min(10, missing.size()) - 1) if not missing.empty() else []:
 		print("AUDIT   " + x)
 	_check(missing.empty(), "every generated effect carries its bound tags")
-	for k in ["dodge/", "gold/", "first_hit_elemental/", "ignite/", "crit_kill/"]:
+	for k in ["dodge/", "gold/", "first_hit_", "ignite/", "crit_kill/"]:
 		var found = false
 		for w in checked:
 			if w.begins_with(k):
@@ -3685,3 +3685,69 @@ func test_119_class_bonus_and_value_tweaks() -> void:
 	var p2 = WeaponService.init_ranged_stats(pistol.stats, 0, false, pa)
 	_check(abs(p2.crit_chance - p0.crit_chance) < 0.001 and p2.piercing == p0.piercing, "class bonus removed cleanly")
 	m.on_menu_reset()
+
+
+# 击退 / 范围是次要正面属性；重组初始道具（选项）；"用[]伤害命中敌人时"扳机（更多角色效果）
+func test_120_minor_stats_starting_items_typed_hits() -> void:
+	# 1) 击退单价提高，击退 / 范围行的数值与价值占比都下降
+	_check(Catalog.stat_w("knockback") >= 1.4, "knockback is worth more per point")
+	var kb = []
+	var minor_share = []
+	var g0 = Generator.new(_cfg(), 1)
+	for sd in range(1, 11):
+		var plan = _gen(sd)
+		for id in plan.items:
+			var total = 0.0
+			var minor = 0.0
+			for e in plan.items[id].effects:
+				if g0.is_plain_stat(e) and e.value > 0 and Catalog.STATS.has(e.key):
+					var v = e.value * Catalog.stat_w(e.key)
+					total += v
+					if Catalog.MINOR_POSITIVE_STATS.has(e.key):
+						minor += v
+					if e.key == "knockback":
+						kb.push_back(e.value)
+			if minor > 0 and total > minor:
+				minor_share.push_back(minor / total)
+	kb.sort()
+	minor_share.sort()
+	var kb_med = kb[kb.size() / 2] if not kb.empty() else 0
+	var share_med = minor_share[minor_share.size() / 2] if not minor_share.empty() else 0.0
+	print("AUDIT knockback values median %d max %d (n=%d); minor-stat value share median %.2f (n=%d)" % [kb_med, kb.back() if not kb.empty() else 0, kb.size(), share_med, minor_share.size()])
+	_check(kb_med <= 6, "knockback lines are small (median %d)" % kb_med)
+	_check(share_med < 0.4, "knockback / range take a minor share of mixed items (%.2f)" % share_med)
+	# 2) 重组初始道具：技术法师的炮台默认保持原版，开启选项后也重组，开局持有的炮台换成生成版本
+	_setup_player("character_technomage")
+	rd.add_starting_items_and_weapons()
+	m.cfg_starting_items = true
+	m.start_new_run()
+	_check(m.plan.items.has("item_turret"), "starting items option: turret reassembled")
+	for it in rd.players_data[0].items:
+		if it.my_id == "item_turret":
+			_eq(_texts(it.effects), _texts(_item("item_turret").effects), "owned starting turret matches the shop turret")
+	m.on_menu_reset()
+	m.cfg_starting_items = false
+	_check(not m.get_cfg().get("starting_items", true), "starting items option off by default")
+	# 3) 每次以某类伤害命中：只在"更多角色效果"开启时出现；文本、匹配、潜水员原效果不再原样搬运
+	var cfg = _cfg()
+	var counts = {true: 0, false: 0}
+	var samples = []
+	for on in [true, false]:
+		cfg.char_effects = on
+		for sd in range(1, 21):
+			var plan = Generator.new(cfg, sd).generate(isvc.items, isvc.characters, [], [])
+			for id in plan.items:
+				for e in plan.items[id].effects:
+					if e is TriggerEffect and Catalog.HIT_STATS.has(e.trigger):
+						counts[on] += 1
+						if samples.size() < 6:
+							samples.push_back(e.get_text(0, false))
+						_check(e.get_text(0, false).find("AA_") == -1 and e.get_text(0, false).find("{") == -1, "typed hit text: " + e.get_text(0, false))
+					if e.custom_key == "enemy_percent_damage_taken" and e.value >= 300:
+						_check(false, "diver's +300% vulnerability is not copied verbatim")
+	print("AUDIT typed-hit clauses on=%d off=%d: %s" % [counts[true], counts[false], str(samples)])
+	_check(counts[true] > 0, "typed-hit triggers appear with more character effects")
+	_eq(counts[false], 0, "typed-hit triggers absent without more character effects")
+	var info = {"hp_pct": 80.0, "first_any": false, "first_stats": [], "stats": ["stat_ranged_damage"]}
+	_check(Runtime._matches("hit_ranged", "hit_enemy", info), "ranged hit matches hit_ranged")
+	_check(not Runtime._matches("hit_melee", "hit_enemy", info), "ranged hit does not match hit_melee")

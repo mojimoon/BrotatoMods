@@ -53,7 +53,7 @@ func on_hurt(hitbox: Hitbox) -> void:
 	var p: int = from.player_index
 	var info = {
 		"hp_pct": 100.0 * _parent.current_stats.health / max(1.0, float(_parent.max_stats.health)),
-		"first_any": false, "first_stats": [],
+		"first_any": false, "first_stats": [], "stats": [],
 	}
 	if not _first_done.has(p):
 		_first_done[p] = true
@@ -61,6 +61,7 @@ func on_hurt(hitbox: Hitbox) -> void:
 	var seen = _first_stats.get(p, {})
 	for s in hitbox.scaling_stats:
 		var h = s[0]
+		info.stats.push_back(Keys.hash_to_string.get(h, ""))
 		if not seen.has(h):
 			seen[h] = true
 			info.first_stats.push_back(Keys.hash_to_string.get(h, ""))

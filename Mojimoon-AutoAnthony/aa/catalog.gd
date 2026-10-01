@@ -75,6 +75,9 @@ const STATS = {
 	"consumable_heal": {"w": 5.2, "unit": 1, "pct": false, "ref": 0.0},
 }
 
+# 次要正面属性：作为属性行（非核心属性）时只分到通常份额的这一比例，余下预算交给其他属性行
+const MINOR_POSITIVE_STATS = {"knockback": 0.5, "stat_range": 0.65, "pickup_range": 0.5}
+
 # 可作为"对随机敌人造成 X% 属性伤害"缩放源的属性
 const DAMAGE_SCALING_STATS = [
 	"stat_max_hp", "stat_armor", "stat_luck", "stat_melee_damage", "stat_ranged_damage",
@@ -149,22 +152,34 @@ const TRIGGERS = {
 	"hit_above_75": {"kind": "event", "e": 120.0, "timing": 0.5, "gate": "every", "w": 0.06},
 	"hit_above_90": {"kind": "event", "e": 100.0, "timing": 0.5, "gate": "every", "w": 0.04},
 	"hit_below_50": {"kind": "event", "e": 70.0, "timing": 0.5, "gate": "every", "w": 0.06},
+	# 每次用某类伤害命中敌人（潜水员"被远程伤害命中的敌人受到伤害提高"）：只在"更多角色效果"开启时出现
+	"hit_melee": {"kind": "event", "e": 150.0, "timing": 0.5, "gate": "every", "w": 0.05},
+	"hit_ranged": {"kind": "event", "e": 150.0, "timing": 0.5, "gate": "every", "w": 0.05},
+	"hit_elemental": {"kind": "event", "e": 150.0, "timing": 0.5, "gate": "every", "w": 0.05},
+	"hit_engineering": {"kind": "event", "e": 150.0, "timing": 0.5, "gate": "every", "w": 0.05},
 }
 
 # 实验性扳机（低权重）
 const EXPERIMENTAL_TRIGGERS = [
 	"crate", "explode", "crit", "ignite", "first_hit", "first_hit_melee", "first_hit_ranged", "first_hit_elemental",
-	"first_hit_engineering", "hit_above_50", "hit_above_75", "hit_above_90", "hit_below_50"
+	"first_hit_engineering", "hit_above_50", "hit_above_75", "hit_above_90", "hit_below_50",
+	"hit_melee", "hit_ranged", "hit_elemental", "hit_engineering",
 ]
 # 有目标敌人的扳机：可以挂"使该敌人受到的伤害提高"载荷
 const ENEMY_TARGET_TRIGGERS = [
 	"crit", "ignite", "first_hit", "first_hit_melee", "first_hit_ranged", "first_hit_elemental", "first_hit_engineering",
-	"hit_above_50", "hit_above_75", "hit_above_90", "hit_below_50"
+	"hit_above_50", "hit_above_75", "hit_above_90", "hit_below_50",
+	"hit_melee", "hit_ranged", "hit_elemental", "hit_engineering",
 ]
 # 限定伤害类型的首次命中 -> 伤害缩放属性
 const FIRST_HIT_STATS = {
 	"first_hit_melee": "stat_melee_damage", "first_hit_ranged": "stat_ranged_damage",
 	"first_hit_elemental": "stat_elemental_damage", "first_hit_engineering": "stat_engineering",
+}
+# 限定伤害类型的每次命中 -> 伤害缩放属性（"更多角色效果"选项的扳机）
+const HIT_STATS = {
+	"hit_melee": "stat_melee_damage", "hit_ranged": "stat_ranged_damage",
+	"hit_elemental": "stat_elemental_damage", "hit_engineering": "stat_engineering",
 }
 # 连锁深度上限（"A 触发 B、B 触发 C、C 触发 D"）；延迟生成的爆炸也携带深度
 const MAX_CHAIN_DEPTH = 3
@@ -236,6 +251,10 @@ const LEGAL = {
 	"hit_above_75": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
 	"hit_above_90": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
 	"hit_below_50": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
+	"hit_melee": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
+	"hit_ranged": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
+	"hit_elemental": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
+	"hit_engineering": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
 }
 
 # ============================================================
@@ -279,6 +298,10 @@ const FREE_LEGAL = {
 	"hit_above_75": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
 	"hit_above_90": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
 	"hit_below_50": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
+	"hit_melee": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
+	"hit_ranged": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
+	"hit_elemental": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
+	"hit_engineering": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
 }
 # 战斗中实时读取、可"本波获得"的机制 key（其余求和型机制只能永久获得）
 const GRANT_TEMP_KEYS = [
@@ -382,6 +405,7 @@ const CHAR_MECHANIC_BANNED = [
 	"stronger_elites_on_kill", "charm_on_hit", "map_size", "weapon_scaling_stats", "convert_bonus_gold",
 	"additional_weapon_effects", "tier_iv_weapon_effects", "tier_i_weapon_effects", "unique_weapon_effects",
 	"poisoned_fruit", "upgraded_baits", "die_in_one_hit", "boosted_wanted_item_tag", "max_turret_count", "trees_start_wave",
+	"enemy_percent_damage_taken",
 ]
 # 角色效果（整局持有）的总价值估计找不到时的默认值
 const CHARACTER_BUDGET_DEFAULT = 60.0
@@ -439,6 +463,8 @@ const ADJ_BY_TRIGGER = {
 	"first_hit_engineering": ["AA_ADJ_EAGER", "AA_ADJ_CURIOUS"],
 	"hit_above_50": ["AA_ADJ_PREDATORY", "AA_ADJ_EAGER"], "hit_above_75": ["AA_ADJ_PREDATORY", "AA_ADJ_EAGER"],
 	"hit_above_90": ["AA_ADJ_PREDATORY", "AA_ADJ_EAGER"], "hit_below_50": ["AA_ADJ_EXECUTING", "AA_ADJ_DEADLY"],
+	"hit_melee": ["AA_ADJ_FIERCE", "AA_ADJ_KEEN"], "hit_ranged": ["AA_ADJ_KEEN", "AA_ADJ_FIERCE"],
+	"hit_elemental": ["AA_ADJ_SCORCHING", "AA_ADJ_BLAZING"], "hit_engineering": ["AA_ADJ_CURIOUS", "AA_ADJ_KEEN"],
 }
 const ADJ_MECHANIC = ["AA_ADJ_ODD", "AA_ADJ_STRANGE", "AA_ADJ_CURIOUS", "AA_ADJ_ANCIENT"]
 const ADJ_SCALING = ["AA_ADJ_RESONANT", "AA_ADJ_SYNERGIC"]
@@ -627,6 +653,8 @@ const TAG_BINDINGS = {
 	"trigger:explode": ["explosive"], "trigger:crit": ["stat_crit_chance"], "trigger:ignite": ["stat_elemental_damage"],
 	"trigger:first_hit_melee": ["stat_melee_damage"], "trigger:first_hit_ranged": ["stat_ranged_damage"],
 	"trigger:first_hit_elemental": ["stat_elemental_damage"], "trigger:first_hit_engineering": ["stat_engineering"],
+	"trigger:hit_melee": ["stat_melee_damage"], "trigger:hit_ranged": ["stat_ranged_damage"],
+	"trigger:hit_elemental": ["stat_elemental_damage"], "trigger:hit_engineering": ["stat_engineering"],
 	"mech:pierce_on_crit": ["stat_crit_chance"], "mech:giant_crit_damage": ["stat_crit_chance"],
 	"mech:structures_can_crit": ["structure", "stat_crit_chance"],
 	"mech:burning_spread": ["stat_elemental_damage"], "mech:burning_cooldown_reduction": ["stat_elemental_damage"],

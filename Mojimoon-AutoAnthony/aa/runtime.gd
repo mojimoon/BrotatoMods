@@ -145,6 +145,8 @@ static func _matches(trigger: String, event: String, info) -> bool:
 			return info.hp_pct >= float(trigger.get_slice("_", 2))
 		if trigger.begins_with("hit_below_"):
 			return info.hp_pct <= float(trigger.get_slice("_", 2))
+		if Catalog.HIT_STATS.has(trigger):
+			return Catalog.HIT_STATS[trigger] in info.get("stats", [])
 		return false
 	if event == "first_hit":
 		if info == null:

@@ -25,6 +25,7 @@ var cfg_items: bool = true
 var cfg_characters: bool = false
 var cfg_weapons: bool = false
 var cfg_char_effects: bool = false	# 更多角色效果
+var cfg_starting_items: bool = false	# 重组初始道具（本局角色的初始道具也参与重组）
 var cfg_all_char_effects: bool = false	# 全部角色效果（BETA）
 var cfg_more_double: bool = false	# 更多双面效果
 var cfg_rename: bool = true			# 重组名称
@@ -134,6 +135,7 @@ static func get_mod() -> Node:
 func get_cfg() -> Dictionary:
 	return {
 		"items": cfg_items,
+		"starting_items": cfg_starting_items,
 		"characters": cfg_characters,
 		"weapons": cfg_weapons,
 		"char_effects": cfg_char_effects,
@@ -182,6 +184,7 @@ func _load_settings() -> void:
 func apply_settings(d: Dictionary) -> void:
 	enabled = bool(d.get("enabled", true))
 	cfg_items = bool(d.get("items", true))
+	cfg_starting_items = bool(d.get("starting_items", false))
 	cfg_characters = bool(d.get("characters", false))
 	cfg_weapons = bool(d.get("weapons", false))
 	cfg_char_effects = bool(d.get("char_effects", false))
@@ -341,7 +344,9 @@ func _activate(state: Dictionary) -> void:
 	var gen = Generator.new(state.cfg, int(state.seed))
 	# 本局玩家角色的初始道具（角色效果里的初始 / 诅咒初始道具，以及开局可选的道具，例如驯兽师的四只宠物）
 	# 本局不重组：初始道具与商店里的同 ID 道具一致，背包合并显示、存档（原版按 ID 缓存序列化）、独特限制都保持正确
-	gen.run_excluded_ids = starting_item_ids(chars)
+	#（"重组初始道具"选项开启时照常重组：开局已持有的初始道具由 _materialize_owned 换成生成版本，同 ID 仍一致）
+	if not bool(state.cfg.get("starting_items", false)):
+		gen.run_excluded_ids = starting_item_ids(chars)
 	# 本局所有玩家角色的偏好词条：重组后 T1–T3 每个稀有度都保证有带这些词条的道具
 	for ch in chars:
 		for t in ch.wanted_tags:
