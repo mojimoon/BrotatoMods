@@ -13,27 +13,28 @@ const SETTINGS_PATH = "user://Mojimoon-OneItemToRuleThemAllv2/settings.json"
 # ============================================================
 # 总开关：关闭时不做任何替换（设置保留）。
 var enabled: bool = true
-# 玩家选中的目标物品 my_id 列表（String）。空 = 不替换。
+# 商店替换池（my_id 列表，String）。"同商店"模式的箱子也使用它。空 = 不替换。
 var target_item_ids: Array = []
 # 弹窗"是否诅咒"全局开关：为 true 时所有替换物都被诅咒。
 var force_cursed: bool = false
 # A-B-A-B 轮流计数器，跨所有 hook 全局递增（不持久化，每局重置）。
 var replace_counter: int = 0
 
-# ---------- 传奇箱子 ----------
-# 传奇箱子替换模式
-enum LegendaryMode { NONE, UNIFIED, SEQUENTIAL, ONCE }
+# ---------- 箱子 / T4 箱子 ----------
+# 两者各有一个替换模式和一个专用替换池
+enum Mode { NONE, SHOP, SEQUENTIAL, ONCE }
 # NONE       不替换
-# UNIFIED    统一替换：使用常规替换池
-# SEQUENTIAL 顺序替换：使用传奇箱子专用池，A-B-A-B 轮流
-# ONCE       单次替换：使用传奇箱子专用池，每个物品只替换一次，用完后自然随机生成
-var legendary_mode: int = LegendaryMode.NONE
-# 传奇箱子专用替换池（my_id 列表），仅 SEQUENTIAL / ONCE 使用
+# SHOP       同商店：使用商店替换池
+# SEQUENTIAL 独立替换：使用专用池，A-B-A-B 轮流
+# ONCE       单次替换：使用专用池，每个物品只替换一次，用完后自然随机生成
+var crate_mode: int = Mode.SHOP
+var crate_item_ids: Array = []
+var crate_counter: int = 0
+var legendary_mode: int = Mode.NONE
 var legendary_item_ids: Array = []
-# 传奇箱子专用计数器（不持久化，每局重置）
 var legendary_counter: int = 0
 
-# ---------- 替换选项（弹窗内 checkbox 配置，默认值）----------
+# ---------- 商店替换选项（弹窗内 chip 配置，默认值）----------
 var cfg_replace_starting: bool = false
 var cfg_replace_shop: bool = true
 var cfg_replace_shop_first: bool = false	# MOJI_SHOP_ALWAYS_APPEAR：每次商店刷新固定替换一个槽位（跳过 guaranteed items）
@@ -43,7 +44,6 @@ var cfg_replace_shop_once: bool = false	# MOJI_SHOP_ONCE_PER_WAVE：每波商店
 # 每波销售一次：player_index -> { "wave": int, "queue": Array（本波尚未出现的物品 id）}
 # 不持久化，每局重置
 var _shop_once_state: Dictionary = {}
-var cfg_replace_crate: bool = true
 
 
 func _init() -> void:
@@ -62,8 +62,8 @@ func _ready() -> void:
 # ============================================================
 # 设置持久化（JSON，存 user://，不使用 ModConfig）
 # ============================================================
-func _save_settings() -> void:
-	var data: Dictionary = {
+func _settings_dict() -> Dictionary:
+	return {
 		"version": VERSION,
 		"enabled": enabled,
 		"target_item_ids": target_item_ids,
@@ -72,10 +72,42 @@ func _save_settings() -> void:
 		"cfg_replace_shop": cfg_replace_shop,
 		"cfg_replace_shop_first": cfg_replace_shop_first,
 		"cfg_replace_shop_once": cfg_replace_shop_once,
-		"cfg_replace_crate": cfg_replace_crate,
+		"crate_mode": crate_mode,
+		"crate_item_ids": crate_item_ids,
 		"legendary_mode": legendary_mode,
 		"legendary_item_ids": legendary_item_ids
 	}
+
+
+# 逐字段读取，缺失字段用默认值
+func _apply_settings(data: Dictionary) -> void:
+	enabled = bool(data.get("enabled", true))
+	target_item_ids = _id_list(data.get("target_item_ids", []))
+	force_cursed = bool(data.get("force_cursed", false))
+	cfg_replace_starting = bool(data.get("cfg_replace_starting", false))
+	cfg_replace_shop = bool(data.get("cfg_replace_shop", true))
+	cfg_replace_shop_first = bool(data.get("cfg_replace_shop_first", false))
+	cfg_replace_shop_once = bool(data.get("cfg_replace_shop_once", false))
+	crate_mode = _clamp_mode(data.get("crate_mode", Mode.SHOP))
+	crate_item_ids = _id_list(data.get("crate_item_ids", []))
+	legendary_mode = _clamp_mode(data.get("legendary_mode", Mode.NONE))
+	legendary_item_ids = _id_list(data.get("legendary_item_ids", []))
+
+
+static func _clamp_mode(value) -> int:
+	return int(clamp(int(value), Mode.NONE, Mode.ONCE))
+
+
+static func _id_list(value) -> Array:
+	var ids: Array = []
+	if value is Array:
+		for v in value:
+			if v is String:
+				ids.push_back(v)
+	return ids
+
+
+func _save_settings() -> void:
 	var dir = Directory.new()
 	var dir_path = SETTINGS_PATH.get_base_dir()
 	if not dir.dir_exists(dir_path):
@@ -85,7 +117,7 @@ func _save_settings() -> void:
 	if err != OK:
 		ModLoaderLog.error("Failed to save settings: " + str(err), MOD_ID)
 		return
-	file.store_string(JSON.print(data, "\t"))
+	file.store_string(JSON.print(_settings_dict(), "\t"))
 	file.close()
 
 
@@ -101,24 +133,32 @@ func _load_settings() -> void:
 	file.close()
 
 	var parse_result: JSONParseResult = JSON.parse(text)
-	if parse_result.error != OK:
+	if parse_result.error != OK or not parse_result.result is Dictionary:
 		ModLoaderLog.error("Settings JSON parse error: " + parse_result.error_string, MOD_ID)
 		return
-	var data: Dictionary = parse_result.result
+	_apply_settings(parse_result.result)
+	ModLoaderLog.info("Settings loaded: %d shop targets, %d crate targets, %d T4 crate targets" % [target_item_ids.size(), crate_item_ids.size(), legendary_item_ids.size()], MOD_ID)
 
-	# 逐字段读取，缺失字段用默认值
-	enabled = bool(data.get("enabled", true))
-	target_item_ids = data.get("target_item_ids", [])
-	force_cursed = bool(data.get("force_cursed", false))
-	cfg_replace_starting = bool(data.get("cfg_replace_starting", false))
-	cfg_replace_shop = bool(data.get("cfg_replace_shop", true))
-	cfg_replace_shop_first = bool(data.get("cfg_replace_shop_first", false))
-	cfg_replace_shop_once = bool(data.get("cfg_replace_shop_once", false))
-	cfg_replace_crate = bool(data.get("cfg_replace_crate", true))
-	legendary_item_ids = data.get("legendary_item_ids", [])
-	legendary_mode = int(clamp(int(data.get("legendary_mode", LegendaryMode.NONE)), LegendaryMode.NONE, LegendaryMode.ONCE))
-	ModLoaderLog.info("Settings loaded: %d targets, %d legendary targets, legendary mode %d" % [target_item_ids.size(), legendary_item_ids.size(), legendary_mode], MOD_ID)
 
+# 导出 / 导入设置：分享码 = "OITRTA1:" + Base64(JSON)，字段与本地设置文件相同
+const SHARE_PREFIX = "OITRTA1:"
+
+
+func export_settings_code() -> String:
+	return SHARE_PREFIX + Marshalls.utf8_to_base64(JSON.print(_settings_dict()))
+
+
+# 成功返回 true；无法识别的文本不改动任何设置
+func import_settings_code(code: String) -> bool:
+	code = code.strip_edges()
+	if not code.begins_with(SHARE_PREFIX):
+		return false
+	var parsed = JSON.parse(Marshalls.base64_to_utf8(code.substr(SHARE_PREFIX.length())))
+	if parsed.error != OK or not parsed.result is Dictionary or not parsed.result.has("target_item_ids"):
+		return false
+	_apply_settings(parsed.result)
+	_save_settings()
+	return true
 
 
 # ============================================================
@@ -244,32 +284,50 @@ func get_replacement(orig_item, player_index: int):
 	return _make_replacement(target_id, orig_item, player_index)
 
 
-# 传奇箱子替换，按 legendary_mode 分派。不替换时原样返回。
+# 箱子 / 战利品替换，按 crate_mode 分派。不替换时原样返回。
+func get_crate_replacement(orig_item, player_index: int):
+	return _mode_replacement(crate_mode, crate_item_ids, "crate_counter", orig_item, player_index)
+
+
+# T4 箱子替换，按 legendary_mode 分派。不替换时原样返回。
 func get_legendary_replacement(orig_item, player_index: int):
+	return _mode_replacement(legendary_mode, legendary_item_ids, "legendary_counter", orig_item, player_index)
+
+
+func _mode_replacement(mode: int, ids: Array, counter_prop: String, orig_item, player_index: int):
 	if not enabled:
 		return orig_item
-	if legendary_mode == LegendaryMode.UNIFIED:
+	if mode == Mode.SHOP:
 		return get_replacement(orig_item, player_index)
-	if not has_legendary_replacement():
+	var counter: int = get(counter_prop)
+	if not _mode_has_replacement(mode, ids, counter):
 		return orig_item
 
 	var target_id: String
-	if legendary_mode == LegendaryMode.SEQUENTIAL:
-		target_id = legendary_item_ids[legendary_counter % legendary_item_ids.size()]
+	if mode == Mode.SEQUENTIAL:
+		target_id = ids[counter % ids.size()]
 	else:	# ONCE
-		target_id = legendary_item_ids[legendary_counter]
-	legendary_counter += 1
+		target_id = ids[counter]
+	set(counter_prop, counter + 1)
 	return _make_replacement(target_id, orig_item, player_index)
 
 
-# 传奇箱子是否可能被替换（供扩展脚本做早退判断）
+# 箱子 / T4 箱子是否可能被替换（供扩展脚本做早退判断）
+func has_crate_replacement() -> bool:
+	return _mode_has_replacement(crate_mode, crate_item_ids, crate_counter)
+
+
 func has_legendary_replacement() -> bool:
-	if legendary_mode == LegendaryMode.UNIFIED:
+	return _mode_has_replacement(legendary_mode, legendary_item_ids, legendary_counter)
+
+
+func _mode_has_replacement(mode: int, ids: Array, counter: int) -> bool:
+	if mode == Mode.SHOP:
 		return not target_item_ids.empty()
-	if legendary_mode == LegendaryMode.SEQUENTIAL:
-		return not legendary_item_ids.empty()
-	if legendary_mode == LegendaryMode.ONCE:
-		return legendary_counter < legendary_item_ids.size()
+	if mode == Mode.SEQUENTIAL:
+		return not ids.empty()
+	if mode == Mode.ONCE:
+		return counter < ids.size()
 	return false
 
 
@@ -328,6 +386,7 @@ func _curse_item(item_data, player_index: int):
 func reset_counter() -> void:
 	_shop_once_state.clear()
 	replace_counter = 0
+	crate_counter = 0
 	legendary_counter = 0
 
 

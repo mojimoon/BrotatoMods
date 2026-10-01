@@ -204,6 +204,7 @@ Content creators on Bilibili have already come up with plenty of fun combos (vid
 - [Loud + Gentle Alien](https://www.bilibili.com/video/BV1XHhZ6wEwJ/): more enemies, more materials; more materials, more enemies
 - [Jack + Candy Bag](https://www.bilibili.com/video/BV1jeag6kEDy/): snowball your stats and grab red items for free
 - [Demon + Potato](https://www.bilibili.com/video/BV1VDhb6SEbd/): just stats
+- [Cryptid + Tree](https://www.bilibili.com/video/BV1vUaZ6qEAC/): survival and economy is all you need
 
 Got a fun combo of your own? Post a video or share it in the comments!
 
@@ -267,6 +268,7 @@ Content creators on Bilibili have already come up with plenty of fun combos (vid
 [*][url=https://www.bilibili.com/video/BV1XHhZ6wEwJ/]Loud + Gentle Alien[/url]: more enemies, more materials; more materials, more enemies
 [*][url=https://www.bilibili.com/video/BV1jeag6kEDy/]Jack + Candy Bag[/url]: snowball your stats and grab red items for free
 [*][url=https://www.bilibili.com/video/BV1VDhb6SEbd/]Demon + Potato[/url]: just stats
+[*][url=https://www.bilibili.com/video/BV1vUaZ6qEAC/]Cryptid + Tree[/url]: survival and economy is all you need
 [/list]
 
 Got a fun combo of your own? Post a video or share it in the comments!
@@ -334,6 +336,7 @@ B 站 UP 主们已经做了很多有趣的组合，欢迎参考：
 - [大嗓门 + 外星绅士](https://www.bilibili.com/video/BV1XHhZ6wEwJ/)：怪物越多经济越多，经济越多怪物越多
 - [杰克 + 糖果袋](https://www.bilibili.com/video/BV1jeag6kEDy/)：滚雪球还能白嫖红色道具
 - [恶魔 + 土豆](https://www.bilibili.com/video/BV1VDhb6SEbd/)：纯粹的数值
+- [神秘生物 + 树](https://www.bilibili.com/video/BV1vUaZ6qEAC/)：生存经济两手抓
 
 你也有好玩的组合？欢迎发视频或分享到评论区！
 
@@ -397,6 +400,7 @@ B 站 UP 主们已经做了很多有趣的组合，欢迎参考：
 [*][url=https://www.bilibili.com/video/BV1XHhZ6wEwJ/]大嗓门 + 外星绅士[/url]：怪物越多经济越多，经济越多怪物越多
 [*][url=https://www.bilibili.com/video/BV1jeag6kEDy/]杰克 + 糖果袋[/url]：滚雪球还能白嫖红色道具
 [*][url=https://www.bilibili.com/video/BV1VDhb6SEbd/]恶魔 + 土豆[/url]：纯粹的数值
+[*][url=https://www.bilibili.com/video/BV1vUaZ6qEAC/]神秘生物 + 树[/url]：生存经济两手抓
 [/list]
 
 你也有好玩的组合？欢迎发视频或分享到评论区！

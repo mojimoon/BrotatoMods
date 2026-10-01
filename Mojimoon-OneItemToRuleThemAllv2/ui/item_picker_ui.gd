@@ -2,11 +2,12 @@ extends Control
 
 # 物品选择弹窗。布局（自上而下）：
 #   标题栏：标题 + 关闭
-#   选项卡片：总开关 / 替换对象（起始 / 商店 / 商店通常销售 / 箱子）/ 诅咒开关
-#   通用替换池卡片：说明（随替换对象变化）+ 已选物品（带序号）+ 清空
-#   T4 箱子池卡片：四种模式 + 模式说明 + 独立替换池（仅独立/单次模式显示）
+#   选项卡片：总开关 / 诅咒开关 / 导入 · 导出设置
+#   三张并排的替换池卡片：
+#     商店：替换对象（起始物品 / 所有商店物品 / 商店通常销售 / 每波销售一次）+ 说明 + 商店替换池
+#     箱子 / T4 箱子：四种模式（禁用 / 同商店 / 独立 / 单次）+ 模式说明 + 独立替换池（仅独立/单次模式显示）
 #   全部物品卡片：搜索 + 物品网格（点击添加到"当前替换池"）
-# 两个替换池通过点击卡片切换"当前替换池"，当前池高亮边框，网格中已在当前池的物品带同色描边。
+# 三个替换池通过点击卡片切换"当前替换池"，当前池高亮边框，网格中已在当前池的物品带同色描边。
 # 样式参考 cave-modtools（base_theme + StyleBoxFlat 圆角卡片 / 强调色按钮）。
 # 稀有度底色由 InventoryElement.set_element 自动调用 update_background_color 实现。
 
@@ -17,21 +18,25 @@ const FONT_NORMAL = preload("res://resources/fonts/actual/base/font_26.tres")
 const FONT_SMALL = preload("res://resources/fonts/actual/base/font_22.tres")
 const FONT_BADGE = preload("res://resources/fonts/actual/base/font_very_smallest_text.tres")
 
-const PANEL_SIZE = Vector2(1280, 1000)
+const PANEL_SIZE = Vector2(1840, 1000)
 # 物品图标尺寸（原版 InventoryElement 默认 96x96）
 const EL_SCALE = 0.625
 const EL_SIZE = 60.0
 const EL_SEP = 6
+# 替换池卡片里已选物品区域的高度：两行
+const POOL_HEIGHT = EL_SIZE * 2 + EL_SEP + 4
 
-const POOL_REGULAR = 0
-const POOL_LEGENDARY = 1
+const POOL_SHOP = 0
+const POOL_CRATE = 1
+const POOL_LEGENDARY = 2
+const POOLS = [POOL_SHOP, POOL_CRATE, POOL_LEGENDARY]
 
-const MODE_KEYS = ["MOJI_LEG_NONE", "MOJI_LEG_UNIFIED", "MOJI_LEG_SEQUENTIAL", "MOJI_LEG_ONCE"]
-const MODE_DESC_KEYS = ["MOJI_LEG_NONE_DESC", "MOJI_LEG_UNIFIED_DESC", "MOJI_LEG_SEQUENTIAL_DESC", "MOJI_LEG_ONCE_DESC"]
-# [配置字段, 翻译 key]
+const MODE_KEYS = ["MOJI_MODE_NONE", "MOJI_MODE_SHOP", "MOJI_MODE_SEQUENTIAL", "MOJI_MODE_ONCE"]
+const CRATE_DESC_KEYS = ["MOJI_CRATE_NONE_DESC", "MOJI_CRATE_SHOP_DESC", "MOJI_CRATE_SEQUENTIAL_DESC", "MOJI_CRATE_ONCE_DESC"]
+const LEGENDARY_DESC_KEYS = ["MOJI_LEG_NONE_DESC", "MOJI_LEG_SHOP_DESC", "MOJI_LEG_SEQUENTIAL_DESC", "MOJI_LEG_ONCE_DESC"]
+# [配置字段, 翻译 key]：商店卡片里的替换对象
 const OPTIONS = [
 	["cfg_replace_starting", "MOJI_REPLACE_STARTING"],
-	["cfg_replace_crate", "MOJI_REPLACE_CRATE"],
 	["cfg_replace_shop", "MOJI_REPLACE_SHOP"],
 	["cfg_replace_shop_first", "MOJI_SHOP_ALWAYS_APPEAR"],
 	["cfg_replace_shop_once", "MOJI_SHOP_ONCE_PER_WAVE"],
@@ -48,7 +53,8 @@ const C_BG_CARD = Color(0.11, 0.13, 0.18, 0.95)
 const C_BG_CHIP = Color(0.13, 0.16, 0.22, 0.95)
 const C_BORDER = Color(0.28, 0.33, 0.42)
 const C_ACCENT_OPTION = Color(0.40, 0.72, 1.0)
-const C_ACCENT_REGULAR = Color(0.30, 0.85, 0.55)
+const C_ACCENT_SHOP = Color(0.30, 0.85, 0.55)
+const C_ACCENT_CRATE = Color(1.0, 0.72, 0.30)
 const C_ACCENT_LEGENDARY = Color(1.0, 0.45, 0.40)
 const C_ACCENT_CURSE = Color(0.72, 0.52, 0.95)
 const C_DANGER = Color(0.92, 0.38, 0.44)
@@ -61,21 +67,24 @@ var _base_stylebox: StyleBoxFlat
 var _option_chips: Dictionary = {}	# 配置字段 -> Button
 var _enable_switch: CheckButton
 var _curse_switch: CheckButton
-var _mode_buttons: Array = []
-var _mode_desc: Label
-var _regular_desc: Label
+var _status: Label
+# 按 POOL_* 索引（商店池没有模式按钮，对应位置为空数组）
+var _mode_buttons: Array = [[], [], []]
+# 商店：替换对象说明；箱子 / T4 箱子：模式说明
+var _descs: Array = [null, null, null]
 # 总开关关闭时变暗的区域
 var _dimmable: Array = []
 # 缩小后的开关图标（原图 100x50 太大）
 var _switch_icons: Dictionary = {}
 
 # 按 POOL_* 索引
-var _pool_cards: Array = [null, null]
-var _pool_rows: Array = [null, null]
-var _pool_counts: Array = [null, null]
-var _pool_clear_btns: Array = [null, null]
-var _legendary_pool_box: Control
-var _active_pool: int = POOL_REGULAR
+var _pool_cards: Array = [null, null, null]
+var _pool_scrolls: Array = [null, null, null]
+var _pool_rows: Array = [null, null, null]
+var _pool_empty: Array = [null, null, null]
+var _pool_counts: Array = [null, null, null]
+var _pool_clear_btns: Array = [null, null, null]
+var _active_pool: int = POOL_SHOP
 
 var _add_target_label: Label
 var _search: LineEdit
@@ -83,6 +92,9 @@ var _avail_scroll: ScrollContainer
 var _avail_grid: GridContainer
 # 每个可选物品：{ "id", "key"（搜索用小写名称）, "wrapper", "marker" }
 var _avail_entries: Array = []
+
+# 剪贴板（测试时用 test_clipboard 代替系统剪贴板）
+var test_clipboard = null
 
 
 func _ready() -> void:
@@ -98,8 +110,11 @@ func _ready() -> void:
 	_set_radius(_base_stylebox, 4)
 
 	_build_ui()
-	if _is_legendary_pool_visible() and _mod.target_item_ids.empty() and not _mod.legendary_item_ids.empty():
-		_active_pool = POOL_LEGENDARY
+	if _get_pool(POOL_SHOP).empty():
+		for pool in [POOL_CRATE, POOL_LEGENDARY]:
+			if _has_own_pool(pool) and not _get_pool(pool).empty():
+				_active_pool = pool
+				break
 	_refresh_all()
 	set_process_unhandled_input(true)
 
@@ -112,12 +127,12 @@ func _input(event: InputEvent) -> void:
 	_select_pool_at(get_global_mouse_position())
 
 
-# 把 point（画布全局坐标）所在卡片设为当前替换池；T4 箱子池仅在独立/单次模式下可选
+# 把 point（画布全局坐标）所在卡片设为当前替换池；箱子 / T4 箱子仅在独立/单次模式下可选
 func _select_pool_at(point: Vector2) -> void:
 	var pool = _pool_at(point)
 	if pool == -1:
 		return
-	if pool == POOL_LEGENDARY and not _is_legendary_pool_visible():
+	if not _has_own_pool(pool):
 		return
 	if _active_pool != pool:
 		_active_pool = pool
@@ -126,7 +141,7 @@ func _select_pool_at(point: Vector2) -> void:
 
 # 返回 point 所在的替换池卡片，不在任何卡片内返回 -1
 func _pool_at(point: Vector2) -> int:
-	for pool in [POOL_REGULAR, POOL_LEGENDARY]:
+	for pool in POOLS:
 		var card: Control = _pool_cards[pool]
 		if card != null and card.is_visible_in_tree() and card.get_global_rect().has_point(point):
 			return pool
@@ -166,8 +181,14 @@ func _build_ui() -> void:
 
 	_build_header(root)
 	_build_options_card(root)
-	_build_regular_card(root)
-	_build_legendary_card(root)
+
+	var pools = HBoxContainer.new()
+	pools.add_constant_override("separation", 12)
+	root.add_child(pools)
+	_build_shop_card(pools)
+	_build_mode_card(pools, POOL_CRATE)
+	_build_mode_card(pools, POOL_LEGENDARY)
+
 	_build_available_card(root)
 
 	var footer = _label(tr("MOJI_HINT"), FONT_SMALL, C_TEXT_DIM)
@@ -196,36 +217,15 @@ func _build_options_card(parent: Control) -> void:
 	var card = _card(parent)
 	card.add_stylebox_override("panel", _card_style(C_BORDER, false))
 
-	var vbox = VBoxContainer.new()
-	vbox.add_constant_override("separation", 8)
-	card.add_child(vbox)
+	var row = HBoxContainer.new()
+	row.add_constant_override("separation", 16)
+	card.add_child(row)
 
-	# 第一行：选项 + 总开关
-	var head = HBoxContainer.new()
-	head.add_constant_override("separation", 10)
-	vbox.add_child(head)
-	head.add_child(_label(tr("MOJI_OPTIONS"), FONT_NORMAL, C_TEXT))
-	head.add_child(_spacer())
+	row.add_child(_label(tr("MOJI_OPTIONS"), FONT_NORMAL, C_TEXT))
+
 	_enable_switch = _switch(tr("MOJI_ENABLE"), _mod.enabled)
 	_enable_switch.connect("toggled", self, "_on_enable_toggled")
-	head.add_child(_enable_switch)
-
-	# 第二行：替换对象 + 诅咒开关
-	var row = HBoxContainer.new()
-	row.add_constant_override("separation", 8)
-	vbox.add_child(row)
-	_dimmable.push_back(row)
-
-	row.add_child(_label(tr("MOJI_WHAT_TO_REPLACE"), FONT_SMALL, C_TEXT_DIM))
-	for opt in OPTIONS:
-		var chip = _button(tr(opt[1]), FONT_SMALL)
-		chip.toggle_mode = true
-		chip.pressed = bool(_mod.get(opt[0]))
-		chip.connect("toggled", self, "_on_option_toggled", [opt[0]])
-		row.add_child(chip)
-		_option_chips[opt[0]] = chip
-
-	row.add_child(_spacer())
+	row.add_child(_enable_switch)
 
 	var dlc_active = ProgressData.is_dlc_available_and_active("abyssal_terrors")
 	var curse_text = tr("MOJI_CURSE")
@@ -236,65 +236,108 @@ func _build_options_card(parent: Control) -> void:
 	_curse_switch.connect("toggled", self, "_on_cursed_toggled")
 	row.add_child(_curse_switch)
 
+	row.add_child(_spacer())
 
-func _build_regular_card(parent: Control) -> void:
-	var card = _card(parent)
-	_pool_cards[POOL_REGULAR] = card
-	_dimmable.push_back(card)
+	_status = _label("", FONT_SMALL, C_TEXT_DIM)
+	row.add_child(_status)
 
-	var vbox = VBoxContainer.new()
-	vbox.add_constant_override("separation", 8)
-	card.add_child(vbox)
-
-	var head = HBoxContainer.new()
-	head.add_constant_override("separation", 10)
-	vbox.add_child(head)
-	head.add_child(_label(tr("MOJI_POOL_REGULAR"), FONT_NORMAL, C_ACCENT_REGULAR))
-	_add_pool_count_and_clear(head, POOL_REGULAR)
-
-	_regular_desc = _label("", FONT_SMALL, C_TEXT_DIM)
-	_regular_desc.autowrap = true
-	vbox.add_child(_regular_desc)
-
-	vbox.add_child(_pool_row(POOL_REGULAR))
+	var import_btn = _button(tr("MOJI_IMPORT"), FONT_SMALL)
+	_apply_action_style(import_btn, C_ACCENT_OPTION)
+	import_btn.connect("pressed", self, "_on_import_pressed")
+	row.add_child(import_btn)
+	var export_btn = _button(tr("MOJI_EXPORT"), FONT_SMALL)
+	_apply_action_style(export_btn, C_ACCENT_OPTION)
+	export_btn.connect("pressed", self, "_on_export_pressed")
+	row.add_child(export_btn)
 
 
-func _build_legendary_card(parent: Control) -> void:
-	var card = _card(parent)
-	_pool_cards[POOL_LEGENDARY] = card
-	_dimmable.push_back(card)
+func _build_shop_card(parent: Control) -> void:
+	var vbox = _pool_card(parent, POOL_SHOP)
 
-	var vbox = VBoxContainer.new()
-	vbox.add_constant_override("separation", 8)
-	card.add_child(vbox)
+	# 替换对象：两列 chip
+	var chips = GridContainer.new()
+	chips.columns = 2
+	chips.add_constant_override("hseparation", 6)
+	chips.add_constant_override("vseparation", 6)
+	vbox.add_child(chips)
+	for opt in OPTIONS:
+		var chip = _button(tr(opt[1]), FONT_SMALL)
+		chip.toggle_mode = true
+		chip.clip_text = true
+		chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		chip.pressed = bool(_mod.get(opt[0]))
+		chip.connect("toggled", self, "_on_option_toggled", [opt[0]])
+		chips.add_child(chip)
+		_option_chips[opt[0]] = chip
 
-	var head = HBoxContainer.new()
-	head.add_constant_override("separation", 10)
-	vbox.add_child(head)
-	head.add_child(_label(tr("MOJI_LEGENDARY"), FONT_NORMAL, C_ACCENT_LEGENDARY))
+	_add_desc_and_pool(vbox, POOL_SHOP)
 
-	# 四种模式：分段按钮（ButtonGroup 保证单选）
+
+# 箱子 / T4 箱子：四种模式 + 说明 + 独立替换池
+func _build_mode_card(parent: Control, pool: int) -> void:
+	var vbox = _pool_card(parent, pool)
+
+	# 分段按钮（ButtonGroup 保证单选）
 	var modes = HBoxContainer.new()
 	modes.add_constant_override("separation", 4)
-	head.add_child(modes)
+	vbox.add_child(modes)
 	var group = ButtonGroup.new()
 	for i in MODE_KEYS.size():
 		var btn = _button(tr(MODE_KEYS[i]), FONT_SMALL)
 		btn.toggle_mode = true
+		btn.clip_text = true
 		btn.group = group
-		btn.pressed = i == _mod.legendary_mode
-		btn.connect("pressed", self, "_on_mode_pressed", [i])
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn.pressed = i == _get_mode(pool)
+		btn.connect("pressed", self, "_on_mode_pressed", [pool, i])
 		modes.add_child(btn)
-		_mode_buttons.push_back(btn)
+		_mode_buttons[pool].push_back(btn)
 
-	_add_pool_count_and_clear(head, POOL_LEGENDARY)
+	_add_desc_and_pool(vbox, pool)
 
-	_mode_desc = _label("", FONT_SMALL, C_TEXT_DIM)
-	_mode_desc.autowrap = true
-	vbox.add_child(_mode_desc)
 
-	_legendary_pool_box = _pool_row(POOL_LEGENDARY)
-	vbox.add_child(_legendary_pool_box)
+# 创建一张替换池卡片，返回其内部 VBox；标题行含已选数量和清空按钮
+func _pool_card(parent: Control, pool: int) -> VBoxContainer:
+	var card = _card(parent)
+	_pool_cards[pool] = card
+	_dimmable.push_back(card)
+
+	var vbox = VBoxContainer.new()
+	vbox.add_constant_override("separation", 8)
+	card.add_child(vbox)
+
+	var head = HBoxContainer.new()
+	head.add_constant_override("separation", 10)
+	vbox.add_child(head)
+	head.add_child(_label(_pool_title(pool), FONT_NORMAL, _pool_accent(pool)))
+	head.add_child(_spacer())
+	var count = _label("", FONT_SMALL, C_TEXT_DIM)
+	head.add_child(count)
+	_pool_counts[pool] = count
+
+	var clear_btn = _button(tr("MOJI_CLEAR"), FONT_SMALL)
+	_apply_action_style(clear_btn, C_DANGER)
+	clear_btn.connect("pressed", self, "_on_clear_pressed", [pool])
+	head.add_child(clear_btn)
+	_pool_clear_btns[pool] = clear_btn
+	return vbox
+
+
+func _add_desc_and_pool(vbox: VBoxContainer, pool: int) -> void:
+	var desc = _label("", FONT_SMALL, C_TEXT_DIM)
+	desc.autowrap = true
+	vbox.add_child(desc)
+	_descs[pool] = desc
+
+	var empty = _label(tr("MOJI_EMPTY_POOL"), FONT_SMALL, C_TEXT_DIM)
+	empty.autowrap = true
+	empty.rect_min_size = Vector2(0, POOL_HEIGHT)
+	empty.valign = Label.VALIGN_CENTER
+	vbox.add_child(empty)
+	_pool_empty[pool] = empty
+
+	vbox.add_child(_pool_grid(pool))
+	vbox.add_child(_spacer_v())
 
 
 func _build_available_card(parent: Control) -> void:
@@ -311,7 +354,7 @@ func _build_available_card(parent: Control) -> void:
 	head.add_constant_override("separation", 14)
 	vbox.add_child(head)
 	head.add_child(_label(tr("MOJI_ALL_ITEMS"), FONT_NORMAL, C_TEXT))
-	_add_target_label = _label("", FONT_SMALL, C_ACCENT_REGULAR)
+	_add_target_label = _label("", FONT_SMALL, C_ACCENT_SHOP)
 	head.add_child(_add_target_label)
 	head.add_child(_spacer())
 
@@ -346,31 +389,21 @@ func _build_available_card(parent: Control) -> void:
 	_populate_available()
 
 
-# 卡片头部右侧：已选数量 + 清空按钮
-func _add_pool_count_and_clear(head: HBoxContainer, pool: int) -> void:
-	head.add_child(_spacer())
-	var count = _label("", FONT_SMALL, C_TEXT_DIM)
-	head.add_child(count)
-	_pool_counts[pool] = count
-
-	var clear_btn = _button(tr("MOJI_CLEAR"), FONT_SMALL)
-	_apply_action_style(clear_btn, C_DANGER)
-	clear_btn.connect("pressed", self, "_on_clear_pressed", [pool])
-	head.add_child(clear_btn)
-	_pool_clear_btns[pool] = clear_btn
-
-
-# 单行横向滚动的已选物品列表
-func _pool_row(pool: int) -> ScrollContainer:
+# 已选物品网格：固定两行高度，超出纵向滚动；列数随宽度自适应
+func _pool_grid(pool: int) -> ScrollContainer:
 	var scroll = ScrollContainer.new()
-	scroll.rect_min_size = Vector2(0, EL_SIZE + 18)
+	scroll.rect_min_size = Vector2(0, POOL_HEIGHT)
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.scroll_vertical_enabled = false
+	scroll.scroll_horizontal_enabled = false
+	scroll.connect("resized", self, "_fit_pool_columns", [pool])
+	_pool_scrolls[pool] = scroll
 
-	var row = HBoxContainer.new()
-	row.add_constant_override("separation", EL_SEP)
-	scroll.add_child(row)
-	_pool_rows[pool] = row
+	var grid = GridContainer.new()
+	grid.columns = 8
+	grid.add_constant_override("hseparation", EL_SEP)
+	grid.add_constant_override("vseparation", EL_SEP)
+	scroll.add_child(grid)
+	_pool_rows[pool] = grid
 	return scroll
 
 
@@ -378,34 +411,63 @@ func _pool_row(pool: int) -> ScrollContainer:
 # 数据 / 刷新
 # ============================================================
 func _get_pool(pool: int) -> Array:
-	return _mod.legendary_item_ids if pool == POOL_LEGENDARY else _mod.target_item_ids
+	if pool == POOL_CRATE:
+		return _mod.crate_item_ids
+	if pool == POOL_LEGENDARY:
+		return _mod.legendary_item_ids
+	return _mod.target_item_ids
+
+
+func _get_mode(pool: int) -> int:
+	return _mod.crate_mode if pool == POOL_CRATE else _mod.legendary_mode
+
+
+func _set_mode(pool: int, mode: int) -> void:
+	if pool == POOL_CRATE:
+		_mod.crate_mode = mode
+	else:
+		_mod.legendary_mode = mode
 
 
 func _pool_accent(pool: int) -> Color:
-	return C_ACCENT_LEGENDARY if pool == POOL_LEGENDARY else C_ACCENT_REGULAR
+	if pool == POOL_CRATE:
+		return C_ACCENT_CRATE
+	if pool == POOL_LEGENDARY:
+		return C_ACCENT_LEGENDARY
+	return C_ACCENT_SHOP
 
 
 func _pool_title(pool: int) -> String:
-	return tr("MOJI_LEGENDARY") if pool == POOL_LEGENDARY else tr("MOJI_POOL_REGULAR")
+	if pool == POOL_CRATE:
+		return tr("MOJI_CRATE")
+	if pool == POOL_LEGENDARY:
+		return tr("MOJI_LEGENDARY")
+	return tr("MOJI_POOL_SHOP")
 
 
-func _is_legendary_pool_visible() -> bool:
-	return _mod.legendary_mode == ModMain.LegendaryMode.SEQUENTIAL or _mod.legendary_mode == ModMain.LegendaryMode.ONCE
+# 该池是否有可编辑的已选物品列表：商店池始终有；箱子 / T4 箱子仅独立 / 单次模式
+func _has_own_pool(pool: int) -> bool:
+	if pool == POOL_SHOP:
+		return true
+	var mode = _get_mode(pool)
+	return mode == ModMain.Mode.SEQUENTIAL or mode == ModMain.Mode.ONCE
 
 
 func _refresh_all() -> void:
 	_refresh_option_styles()
 	_refresh_enabled()
-	_refresh_legendary_mode()
-	_refresh_pool(POOL_REGULAR)
-	_refresh_pool(POOL_LEGENDARY)
+	for pool in [POOL_CRATE, POOL_LEGENDARY]:
+		_refresh_mode(pool)
+	for pool in POOLS:
+		_refresh_pool(pool)
+	_refresh_active_pool()
 
 
 func _refresh_option_styles() -> void:
 	for path in _option_chips:
 		var chip: Button = _option_chips[path]
 		_apply_chip_style(chip, chip.pressed, C_ACCENT_OPTION)
-	_refresh_regular_desc()
+	_refresh_shop_desc()
 
 
 # 总开关关闭时其余区域变暗（仍可编辑）
@@ -415,13 +477,11 @@ func _refresh_enabled() -> void:
 		c.modulate = m
 
 
-# 通用替换池说明：按已启用的替换对象拼接
-func _refresh_regular_desc() -> void:
+# 商店说明：按已启用的替换对象拼接
+func _refresh_shop_desc() -> void:
 	var nouns: Array = []
 	if _mod.cfg_replace_starting:
 		nouns.push_back(tr("MOJI_NOUN_STARTING"))
-	if _mod.cfg_replace_crate:
-		nouns.push_back(tr("MOJI_NOUN_CRATE"))
 	if _mod.cfg_replace_shop:
 		nouns.push_back(tr("MOJI_NOUN_SHOP"))
 
@@ -446,35 +506,38 @@ func _refresh_regular_desc() -> void:
 		if text != "" and not _is_cjk():
 			text += " "
 		text += p
-	_regular_desc.text = text
+	_descs[POOL_SHOP].text = text
 
 
-func _refresh_legendary_mode() -> void:
-	var mode: int = _mod.legendary_mode
-	for i in _mode_buttons.size():
-		_apply_chip_style(_mode_buttons[i], i == mode, C_ACCENT_LEGENDARY)
-	_refresh_mode_desc()
+# 箱子 / T4 箱子：模式按钮高亮 + 说明 + 专用池的显隐
+func _refresh_mode(pool: int) -> void:
+	var mode: int = _get_mode(pool)
+	var buttons: Array = _mode_buttons[pool]
+	for i in buttons.size():
+		_apply_chip_style(buttons[i], i == mode, _pool_accent(pool), 6)
+	_refresh_mode_desc(pool)
 
-	var pool_visible = _is_legendary_pool_visible()
-	_legendary_pool_box.visible = pool_visible
-	_pool_counts[POOL_LEGENDARY].visible = pool_visible
-	_pool_clear_btns[POOL_LEGENDARY].visible = pool_visible
-	if not pool_visible and _active_pool == POOL_LEGENDARY:
-		_active_pool = POOL_REGULAR
-	_refresh_active_pool()
+	var has_pool = _has_own_pool(pool)
+	_pool_scrolls[pool].visible = has_pool and not _get_pool(pool).empty()
+	_pool_empty[pool].visible = has_pool and _get_pool(pool).empty()
+	_pool_counts[pool].visible = has_pool
+	_pool_clear_btns[pool].visible = has_pool
+	if not has_pool and _active_pool == pool:
+		_active_pool = POOL_SHOP
 
 
-func _refresh_mode_desc() -> void:
-	var mode: int = _mod.legendary_mode
-	var text = tr(MODE_DESC_KEYS[mode])
-	if mode == ModMain.LegendaryMode.ONCE:
-		text = text % _mod.legendary_item_ids.size()
-	_mode_desc.text = text
+func _refresh_mode_desc(pool: int) -> void:
+	var mode: int = _get_mode(pool)
+	var keys = CRATE_DESC_KEYS if pool == POOL_CRATE else LEGENDARY_DESC_KEYS
+	var text = tr(keys[mode])
+	if mode == ModMain.Mode.ONCE:
+		text = text % _get_pool(pool).size()
+	_descs[pool].text = text
 
 
 # 当前替换池：卡片高亮 + "点击添加到"提示 + 网格描边
 func _refresh_active_pool() -> void:
-	for pool in [POOL_REGULAR, POOL_LEGENDARY]:
+	for pool in POOLS:
 		var active = pool == _active_pool
 		_pool_cards[pool].add_stylebox_override("panel", _card_style(_pool_accent(pool) if active else C_BORDER, active))
 
@@ -491,22 +554,18 @@ func _refresh_active_pool() -> void:
 
 
 func _refresh_pool(pool: int) -> void:
-	var row: HBoxContainer = _pool_rows[pool]
+	var row: GridContainer = _pool_rows[pool]
 	for c in row.get_children():
 		row.remove_child(c)
 		c.queue_free()
 
 	var ids = _get_pool(pool)
 	_pool_counts[pool].text = tr("MOJI_SELECTED") % ids.size()
-	if pool == POOL_LEGENDARY:
-		_refresh_mode_desc()
-
-	if ids.empty():
-		var empty = _label(tr("MOJI_EMPTY_POOL"), FONT_SMALL, C_TEXT_DIM)
-		empty.rect_min_size = Vector2(0, EL_SIZE)
-		empty.valign = Label.VALIGN_CENTER
-		row.add_child(empty)
-		return
+	if pool != POOL_SHOP:
+		_refresh_mode(pool)
+	else:
+		_pool_scrolls[pool].visible = not ids.empty()
+		_pool_empty[pool].visible = ids.empty()
 
 	for i in ids.size():
 		var item_data = ItemService.get_element_safe(ItemService.items, ids[i])
@@ -573,6 +632,14 @@ func _fit_available_columns() -> void:
 	_avail_grid.columns = int(max(1, floor((width + EL_SEP) / (EL_SIZE + EL_SEP))))
 
 
+func _fit_pool_columns(pool: int) -> void:
+	var grid = _pool_rows[pool]
+	if grid == null:
+		return
+	var width: float = _pool_scrolls[pool].rect_size.x - 16.0
+	grid.columns = int(max(1, floor((width + EL_SEP) / (EL_SIZE + EL_SEP))))
+
+
 # ============================================================
 # 信号回调
 # 注意：InventoryElement 发射 element_pressed 期间不能释放它，刷新一律 call_deferred。
@@ -602,13 +669,14 @@ func _on_clear_pressed(pool: int) -> void:
 	_refresh_active_pool()
 
 
-func _on_mode_pressed(mode: int) -> void:
-	_mod.legendary_mode = mode
+func _on_mode_pressed(pool: int, mode: int) -> void:
+	_set_mode(pool, mode)
 	_mod._save_settings()
-	# 切到带专用池的模式时，自动把"当前替换池"切到传奇箱子
-	if _is_legendary_pool_visible():
-		_active_pool = POOL_LEGENDARY
-	_refresh_legendary_mode()
+	# 切到带专用池的模式时，自动把"当前替换池"切到该卡片
+	if _has_own_pool(pool):
+		_active_pool = pool
+	_refresh_mode(pool)
+	_refresh_active_pool()
 
 
 # 所有商店物品 / 商店通常销售 / 每波销售一次 互斥
@@ -633,8 +701,8 @@ func _on_cursed_toggled(pressed: bool) -> void:
 	_mod.force_cursed = pressed
 	_mod._save_settings()
 	_refresh_option_styles()
-	_refresh_pool(POOL_REGULAR)
-	_refresh_pool(POOL_LEGENDARY)
+	for pool in POOLS:
+		_refresh_pool(pool)
 
 
 func _on_search_changed(text: String) -> void:
@@ -642,6 +710,40 @@ func _on_search_changed(text: String) -> void:
 	for entry in _avail_entries:
 		entry["wrapper"].visible = query == "" or entry["key"].find(query) != -1
 	_avail_scroll.scroll_vertical = 0
+
+
+func _clipboard_get() -> String:
+	return test_clipboard if test_clipboard != null else OS.clipboard
+
+
+func _clipboard_set(text: String) -> void:
+	if test_clipboard != null:
+		test_clipboard = text
+	else:
+		OS.clipboard = text
+
+
+func _on_export_pressed() -> void:
+	_clipboard_set(_mod.export_settings_code())
+	_status.text = tr("MOJI_EXPORTED")
+
+
+func _on_import_pressed() -> void:
+	if not _mod.import_settings_code(_clipboard_get()):
+		_status.text = tr("MOJI_IMPORT_FAILED")
+		return
+	if not ProgressData.is_dlc_available_and_active("abyssal_terrors"):
+		_mod.force_cursed = false
+	_enable_switch.set_pressed_no_signal(_mod.enabled)
+	_curse_switch.set_pressed_no_signal(_mod.force_cursed)
+	for opt in OPTIONS:
+		_option_chips[opt[0]].set_pressed_no_signal(bool(_mod.get(opt[0])))
+	for pool in [POOL_CRATE, POOL_LEGENDARY]:
+		_mode_buttons[pool][_get_mode(pool)].set_pressed_no_signal(true)
+	if not _has_own_pool(_active_pool):
+		_active_pool = POOL_SHOP
+	_refresh_all()
+	_status.text = tr("MOJI_IMPORTED")
 
 
 func _on_close_pressed() -> void:
@@ -689,13 +791,13 @@ func _card(parent: Control) -> PanelContainer:
 
 
 # 开关类按钮：开启时强调色描边 + 暗色强调底，关闭时中性灰
-func _apply_chip_style(btn: Button, on: bool, accent: Color) -> void:
+func _apply_chip_style(btn: Button, on: bool, accent: Color, margin_h: float = 12.0) -> void:
 	var bg = accent.darkened(0.62) if on else C_BG_CHIP
 	var border = accent if on else C_BORDER
 	var font_color = C_TEXT if on else C_TEXT_DIM
-	var normal = _style(bg, border, 6, 2 if on else 1, 12, 4)
-	var hover = _style(bg.lightened(0.08), border.lightened(0.15), 6, 2 if on else 1, 12, 4)
-	var disabled = _style(Color(bg.r, bg.g, bg.b, 0.5), Color(border.r, border.g, border.b, 0.5), 6, 1, 12, 4)
+	var normal = _style(bg, border, 6, 2 if on else 1, margin_h, 4)
+	var hover = _style(bg.lightened(0.08), border.lightened(0.15), 6, 2 if on else 1, margin_h, 4)
+	var disabled = _style(Color(bg.r, bg.g, bg.b, 0.5), Color(border.r, border.g, border.b, 0.5), 6, 1, margin_h, 4)
 	btn.add_stylebox_override("normal", normal)
 	btn.add_stylebox_override("pressed", normal)
 	btn.add_stylebox_override("hover", hover)
@@ -792,6 +894,13 @@ func _is_cjk() -> bool:
 func _spacer() -> Control:
 	var c = Control.new()
 	c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return c
+
+
+func _spacer_v() -> Control:
+	var c = Control.new()
+	c.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return c
 

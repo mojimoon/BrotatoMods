@@ -1,7 +1,7 @@
 {
     "name": "OneItemToRuleThemAllv2",
     "namespace": "Mojimoon",
-    "version_number": "1.0.3",
+    "version_number": "2.1.0",
     "description": "将游戏生成的物品（起始/商店/箱子/传奇箱子）替换为目标物品。支持多目标 A-B-A-B 轮流替换、诅咒开关与原物品诅咒继承。进入游戏前在武器/难度选择界面右上角按钮配置。Replace all in-game items (starting/shop/crate/legendary crate) with target items. Supports A-B-A-B rotation, curse toggle and curse inheritance.",
     "website_url": "",
     "dependencies": [],
@@ -9,8 +9,8 @@
         "godot": {
             "incompatibilities": [],
             "authors": ["Mojimoon"],
-            "compatible_mod_loader_version": ["3.0.0"],
-            "compatible_game_version": ["0.6.1.6"],
+            "compatible_mod_loader_version": ["6.3.0"],
+            "compatible_game_version": ["1.1.X.X"],
             "optional_dependencies": []
         }
     }

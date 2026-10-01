@@ -3,8 +3,8 @@ extends "res://singletons/item_service.gd"
 # 替换商店 / 箱子 / 传奇箱子 / 战利品 物品为目标物品。
 # - 商店（三选一）：cfg_replace_shop 替换所有 item 位；cfg_replace_shop_first 每次刷新替换一个；
 #   cfg_replace_shop_once 每波依次放出所选物品各一次（均不影响锁住的物品）
-# - 箱子：普通箱子受 cfg_replace_crate 控制；传奇箱子按 legendary_mode 分派（见 mod_main.get_legendary_replacement）
-# - 战利品（藏宝图等）：归入 cfg_replace_crate 控制
+# - 箱子：普通箱子按 crate_mode、T4 箱子按 legendary_mode 分派（见 mod_main.get_crate_replacement / get_legendary_replacement）
+# - 战利品（藏宝图等）：归入箱子（crate_mode）
 # 诅咒传递 + A-B-A-B 轮流由 mod 节点的 get_replacement 处理。
 
 const ModMain = preload("res://mods-unpacked/Mojimoon-OneItemToRuleThemAllv2/mod_main.gd")
@@ -67,17 +67,13 @@ func process_item_box(consumable_data, wave: int, player_index: int):
 	var is_legendary: bool = consumable_data != null and consumable_data.my_id_hash == Keys.consumable_legendary_item_box_hash
 	if is_legendary:
 		return m.get_legendary_replacement(item, player_index)
-	if m.cfg_replace_crate:
-		return m.get_replacement(item, player_index)
-	return item
+	return m.get_crate_replacement(item, player_index)
 
 
 # 战利品 / 藏宝图
 func get_rand_item_for_wave(wave: int, player_index: int):
 	var item = .get_rand_item_for_wave(wave, player_index)
 	var m = ModMain._get_mod()
-	if m == null or m.target_item_ids.empty():
+	if m == null or not item is ItemData:
 		return item
-	if m.cfg_replace_crate and item is ItemData:
-		return m.get_replacement(item, player_index)
-	return item
+	return m.get_crate_replacement(item, player_index)
