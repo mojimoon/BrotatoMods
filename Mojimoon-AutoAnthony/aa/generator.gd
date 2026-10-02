@@ -844,6 +844,24 @@ func _pick_stat(neg: bool, exclude: Array = [], allowed = null) -> String:
 	return s if s != null else "stat_max_hp"
 
 
+# 伤害类型：近战 : 远程 : 元素 : 工程 = 2 : 2 : 2 : 1，偏向想要的词条；
+# 传入已抽到的缩放属性时，只在它是伤害类型时重新分配（伤害 / 爆炸载荷）
+func _pick_dmg_type(current: String = "") -> String:
+	if current != "" and not Catalog.DMG_TYPES.has(current):
+		return current
+	var w = {}
+	for s in Catalog.DMG_TYPES:
+		w[s] = Catalog.DMG_TYPES[s] * (Catalog.WANTED_BIAS if s in wanted_bias else 1.0)
+	return _pick_weighted(w)
+
+
+func _wanted_dmg_type() -> bool:
+	for s in Catalog.DMG_TYPES:
+		if s in wanted_bias:
+			return true
+	return false
+
+
 # 属性带有偏好的功能性词条（knockback / explosive / pickup / consumable）
 func _stat_has_wanted_tag(s: String) -> bool:
 	return Catalog.STAT_EXTRA_TAGS.has(s) and Catalog.STAT_EXTRA_TAGS[s] in wanted_bias
@@ -1307,6 +1325,7 @@ func _tags_for(effects: Array) -> Array:
 				add.push_back(Catalog.TRIGGER_TAGS.get(e.trigger, ""))
 				add.push_back(Catalog.PAYLOAD_TAGS.get(e.payload, ""))
 				add += Catalog.tags_for_binding("trigger:" + e.trigger)
+				add.push_back(e.dmg_type)
 				add += Catalog.tags_for_binding("payload:" + e.payload)
 				if e.grant != null and is_scaling(e.grant):
 					add += Catalog.tags_for_binding("counter:" + e.grant.stat_scaled)
@@ -2332,14 +2351,14 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 		for t in Catalog.TRIGGERS:
 			if t in banned_triggers:
 				continue
-			if Catalog.HIT_STATS.has(t) and not cfg.get("char_effects", false):
+			if t == "hit_typed" and not cfg.get("char_effects", false):
 				continue
 			var legal_t = _legal_payloads(t, negative)
 			if legal_t.empty() or (fixed_payload != "" and not fixed_payload in legal_t):
 				continue
 			tw[t] = (Catalog.TRIGGERS[t].w + Catalog.NATIVE_PRIOR_STRENGTH * log(1.0 + trigger_prior[t]) / 2.0) \
 				/ (1.0 + Catalog.REPEAT_PENALTY_TRIGGER * used_trigger.get(t, 0))
-			if not negative and _binding_wanted("trigger:" + t, Catalog.TRIGGER_TAGS.get(t, "")):
+			if not negative and (_binding_wanted("trigger:" + t, Catalog.TRIGGER_TAGS.get(t, "")) 					or (t in Catalog.TYPED_TRIGGERS and _wanted_dmg_type())):
 				tw[t] *= Catalog.WANTED_BIAS
 		trigger = _pick_weighted(tw)
 	if trigger == null:
@@ -2363,6 +2382,8 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 	var t = Catalog.TRIGGERS[trigger]
 	if trigger == "interval":
 		c.param = Catalog.INTERVAL_CHOICES[rng.randi() % Catalog.INTERVAL_CHOICES.size()]
+	if trigger in Catalog.TYPED_TRIGGERS:
+		c.dmg_type = _pick_dmg_type()
 
 	match payload:
 		"temp_stat", "timed_stat":
@@ -2407,11 +2428,11 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 			if mode == "perm" and Valuation.raw_rate(trigger, 1, 100) > 1.5:
 				c.cap = 1 + rng.randi() % 3
 		"damage":
-			c.stat = _pick_stat(false, [], Catalog.DAMAGE_SCALING_STATS)
+			c.stat = _pick_dmg_type(_pick_stat(false, [], Catalog.DAMAGE_SCALING_STATS))
 			# 单次伤害可以较小：高频扳机更应该频繁触发，而不是攒很多次打一下
 			c.value = [25, 50, 75, 100, 150][rng.randi() % 5]
 		"explode":
-			c.stat = _pick_stat(false, [], Catalog.DAMAGE_SCALING_STATS)
+			c.stat = _pick_dmg_type(_pick_stat(false, [], Catalog.DAMAGE_SCALING_STATS))
 			c.value = [25, 50, 75, 100][rng.randi() % 4]
 		"vuln":
 			c.value = 5
@@ -2477,7 +2498,11 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 	else:
 		# 预算不足：按扳机的门控方式降低频率
 		var ratio = budget / unit_v
-		if t.gate == "every" and ratio >= 0.1 and rng.randf() < Catalog.CHANCE_GATE_ON_EVERY:
+		# 作用于目标敌人的效果只用单次 / 几率（"每 N 个敌人"中只有第 N 个被作用，不直观）
+		var chance_only = payload in Catalog.TARGET_PAYLOADS
+		if t.gate == "every" and (chance_only or (ratio >= 0.1 and rng.randf() < Catalog.CHANCE_GATE_ON_EVERY)):
+			if ratio < 0.05:
+				return {}
 			c.chance = int(clamp(round(ratio * 20.0) * 5, 5, 100))
 		elif t.gate == "every":
 			c.param = int(max(1, ceil(1.0 / ratio)))

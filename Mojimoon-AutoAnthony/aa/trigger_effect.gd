@@ -5,7 +5,8 @@ extends Effect
 # 运行时由 aa/runtime.gd 扫描玩家持有的道具 / 角色 / 武器上的本效果并统一派发。
 #
 #   trigger  触发扳机 id（见 catalog.TRIGGERS）
-#   param    每 N 次（kill / gold）或间隔秒数（interval）
+#   param    每 N 次（gate = every 的扳机）或间隔秒数（interval）
+#   dmg_type 限定伤害类型的扳机（TYPED_TRIGGERS）的伤害缩放属性
 #   chance   每次触发的几率（%）
 #   payload  载荷 id（见 catalog.PAYLOADS）
 #   stat     属性 key（属性类载荷）或伤害缩放属性（damage / explode）
@@ -21,6 +22,7 @@ export(int) var param := 1
 export(int) var chance := 100
 export(String) var payload := ""
 export(String) var stat := ""
+export(String) var dmg_type := ""
 export(int) var value2 := 0
 export(int) var cap := 0
 # 受到伤害时清空本条款累积的本波属性（原版水晶）
@@ -29,6 +31,8 @@ export(bool) var reset := false
 export(Resource) var grant = null
 export(String) var grant_mode := "temp"
 export(float) var grant_unit := 0.0
+# 商店扳机的计次（每 N 次刷新 / 购买）
+var shop_count := 0
 
 
 static func get_id() -> String:
@@ -46,6 +50,7 @@ static func make(c: Dictionary) -> Effect:
 	e.chance = int(c.get("chance", 100))
 	e.payload = c.payload
 	e.stat = c.get("stat", "")
+	e.dmg_type = c.get("dmg_type", "")
 	e.value = int(c.value)
 	e.value2 = int(c.get("value2", 0))
 	e.cap = int(c.get("cap", 0))
@@ -63,7 +68,7 @@ static func make(c: Dictionary) -> Effect:
 func to_clause() -> Dictionary:
 	return {
 		"trigger": trigger, "param": param, "chance": chance, "payload": payload,
-		"stat": stat, "value": value, "value2": value2, "cap": cap, "reset": reset,
+		"stat": stat, "dmg_type": dmg_type, "value": value, "value2": value2, "cap": cap, "reset": reset,
 		"grant_mode": grant_mode, "grant_unit": grant_unit,
 	}
 
@@ -127,40 +132,23 @@ func get_text(_player_index: int, colored: bool = true) -> String:
 	return s + _cap_text()
 
 
-func _trigger_text(colored: bool) -> String:
-	var t: String
-	match trigger:
-		"kill":
-			t = tr("AA_T_KILL") if param <= 1 else tr("AA_T_KILL_EVERY").replace("{0}", str(param))
-		"gold":
-			t = tr("AA_T_GOLD") if param <= 1 else tr("AA_T_GOLD_EVERY").replace("{0}", str(param))
-		"crit_kill":
-			t = tr("AA_T_CRIT_KILL") if param <= 1 else tr("AA_T_CRIT_KILL_EVERY").replace("{0}", str(param))
-		"burning_kill":
-			t = tr("AA_T_BURNING_KILL") if param <= 1 else tr("AA_T_BURNING_KILL_EVERY").replace("{0}", str(param))
-		"steps":
-			t = tr("AA_T_STEPS") if param <= 1 else tr("AA_T_STEPS_EVERY").replace("{0}", str(param))
-		"interval":
-			t = tr("AA_T_INTERVAL").replace("{0}", str(param))
-		"explode", "crit", "ignite", "first_hit", "cursed_kill":
-			t = tr("AA_T_" + trigger.to_upper()) if param <= 1 else tr("AA_T_" + trigger.to_upper() + "_EVERY").replace("{0}", str(param))
-		_:
-			if Catalog.FIRST_HIT_STATS.has(trigger):
-				var k = "AA_T_FIRST_HIT_TYPED" if param <= 1 else "AA_T_FIRST_HIT_TYPED_EVERY"
-				t = tr(k).replace("{0}", str(param)).replace("{1}", tr(Catalog.FIRST_HIT_STATS[trigger].to_upper()))
-			elif Catalog.HIT_STATS.has(trigger):
-				var kh = "AA_T_HIT_TYPED" if param <= 1 else "AA_T_HIT_TYPED_EVERY"
-				t = tr(kh).replace("{0}", str(param)).replace("{1}", tr(Catalog.HIT_STATS[trigger].to_upper()))
-			elif trigger.begins_with("hit_above_") or trigger.begins_with("hit_below_"):
-				var base = "AA_T_HIT_ABOVE" if trigger.begins_with("hit_above_") else "AA_T_HIT_BELOW"
-				var k2 = base if param <= 1 else base + "_EVERY"
-				t = tr(k2).replace("{0}", str(param)).replace("{1}", trigger.get_slice("_", 2))
-			elif trigger == "buy_stat":
-				# 条件属性 = 效果属性（同原版雪球）
-				t = tr("AA_T_BUY_STAT").replace("{1}", tr(stat.to_upper()))
-			else:
-				t = tr("AA_T_" + trigger.to_upper())
-	return t
+# 通用模板：单次 AA_T_X、计次 AA_T_X_EVERY（{0} = 次数），几率由 AA_FMT_CHANCE 包裹；{1} = 伤害类型 / 生命百分比 / 属性
+func _trigger_text(_colored: bool) -> String:
+	if trigger == "interval":
+		return tr("AA_T_INTERVAL").replace("{0}", str(param))
+	var base = "AA_T_" + trigger.to_upper()
+	var arg = ""
+	if trigger in Catalog.TYPED_TRIGGERS:
+		arg = tr(dmg_type.to_upper())
+	elif trigger.begins_with("hit_above_") or trigger.begins_with("hit_below_"):
+		base = "AA_T_HIT_ABOVE" if trigger.begins_with("hit_above_") else "AA_T_HIT_BELOW"
+		arg = trigger.get_slice("_", 2)
+	elif trigger == "buy_stat":
+		# 条件属性 = 效果属性（同原版雪球）
+		arg = tr(stat.to_upper())
+	if param > 1 and Catalog.TRIGGERS[trigger].gate == "every":
+		base += "_EVERY"
+	return tr(base).replace("{0}", str(param)).replace("{1}", arg)
 
 
 func _payload_text(colored: bool) -> String:
@@ -234,6 +222,7 @@ func serialize() -> Dictionary:
 	s.chance = chance
 	s.payload = payload
 	s.stat = stat
+	s.dmg_type = dmg_type
 	s.value2 = value2
 	s.cap = cap
 	s.reset = reset
@@ -250,6 +239,11 @@ func deserialize_and_merge(s: Dictionary) -> void:
 	chance = int(s.get("chance", 100))
 	payload = str(s.get("payload", ""))
 	stat = str(s.get("stat", ""))
+	dmg_type = str(s.get("dmg_type", ""))
+	# 旧版本的"首次 / 每次以某类伤害命中"扳机按伤害类型各占一个 id
+	if Catalog.LEGACY_TYPED_TRIGGERS.has(trigger):
+		dmg_type = Catalog.LEGACY_TYPED_TRIGGERS[trigger][1]
+		trigger = Catalog.LEGACY_TYPED_TRIGGERS[trigger][0]
 	value2 = int(s.get("value2", 0))
 	cap = int(s.get("cap", 0))
 	reset = bool(s.get("reset", false))

@@ -107,7 +107,7 @@ func fire(event: String, player_index: int, pos = null, chain_depth: int = -1, t
 	_depth += 1
 	for en in entries[player_index]:
 		var e = en.effect
-		if not _matches(e.trigger, event, info):
+		if not _matches(e.trigger, event, info, e.dmg_type):
 			continue
 		if e.cap > 0 and en.fired >= e.cap:
 			continue
@@ -137,7 +137,7 @@ func fire(event: String, player_index: int, pos = null, chain_depth: int = -1, t
 
 # 事件与扳机的对应：命中事件（hit_enemy）按命中前的生命百分比分发到"命中高 / 低血敌人"；
 # 首次命中事件按"对该敌人首次命中 / 首次某类伤害命中"分发
-static func _matches(trigger: String, event: String, info) -> bool:
+static func _matches(trigger: String, event: String, info, dmg_type: String = "") -> bool:
 	if event == "hit_enemy":
 		if info == null:
 			return false
@@ -145,17 +145,19 @@ static func _matches(trigger: String, event: String, info) -> bool:
 			return info.hp_pct >= float(trigger.get_slice("_", 2))
 		if trigger.begins_with("hit_below_"):
 			return info.hp_pct <= float(trigger.get_slice("_", 2))
-		if Catalog.HIT_STATS.has(trigger):
-			return Catalog.HIT_STATS[trigger] in info.get("stats", [])
+		if trigger == "hit_typed":
+			return dmg_type in info.get("stats", [])
 		return false
 	if event == "first_hit":
 		if info == null:
 			return false
 		if trigger == "first_hit":
 			return info.get("first_any", false)
-		if Catalog.FIRST_HIT_STATS.has(trigger):
-			return Catalog.FIRST_HIT_STATS[trigger] in info.get("first_stats", [])
+		if trigger == "first_hit_typed":
+			return dmg_type in info.get("first_stats", [])
 		return false
+	if event == "kill_typed":
+		return trigger == event and info != null and dmg_type in info.get("stats", [])
 	return trigger == event
 
 
@@ -444,7 +446,8 @@ func _slow(e, target) -> void:
 
 # 掉落水果（果篮）：与原版敌人掉落消耗品相同的对象池与拾取信号
 func _drop_fruit(count: int, pos) -> void:
-	if main == null or not is_instance_valid(main) or pos == null:
+	# 清场（波次结束）后掉落的消耗品不会被吸取，跳过
+	if main == null or not is_instance_valid(main) or pos == null or main._cleaning_up:
 		return
 	for _i in max(0, count):
 		var data = ItemService.get_consumable_for_tier(Tier.COMMON)

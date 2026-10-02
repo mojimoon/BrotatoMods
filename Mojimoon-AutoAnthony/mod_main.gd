@@ -680,6 +680,12 @@ func fire_shop(event: String, player_index: int, item = null) -> void:
 				continue
 			if event == "buy_stat" and not _item_raises(item, e.stat):
 				continue
+			# 每 N 次刷新 / 购买（ponytail: 计数不存档，读档后从 0 开始）
+			if e.param > 1:
+				e.shop_count += 1
+				if e.shop_count < e.param:
+					continue
+				e.shop_count = 0
 			if e.chance < 100 and randf() * 100.0 >= e.chance:
 				continue
 			match e.payload:

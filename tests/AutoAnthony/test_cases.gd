@@ -374,7 +374,9 @@ func test_12_value_audit() -> void:
 	_check(p10 > 0.5, "p10 value/budget not too low (%.2f)" % p10)
 	_check(p90 < 1.7, "p90 value/budget not too high (%.2f)" % p90)
 	_check(trig_count.size() >= 12, "most triggers occur (%d)" % trig_count.size())
-	_check(pay_count.size() == Catalog.PAYLOADS.size(), "all payloads occur (%d)" % pay_count.size())
+	# 点燃 / 减速只挂在少数有目标敌人的扳机上，单个种子里可能不出现：由 test_128 在 30 个种子上检查
+	for p in Catalog.PAYLOADS:
+		_check(pay_count.has(p) or p in ["ignite", "slow"], "payload occurs: " + p)
 
 
 func test_13_native_ratio_keeps_items() -> void:
@@ -756,10 +758,10 @@ func test_50_all_translation_keys_exist() -> void:
 		_check(keys.has(k), "text key " + k)
 	for t in Catalog.TRIGGERS:
 		# 带参数的扳机（限定伤害类型的首次命中、命中高 / 低血敌人）共用一条带占位符的文本
-		if not t in ["kill", "gold", "interval"] and not Catalog.FIRST_HIT_STATS.has(t) and not Catalog.HIT_STATS.has(t) and not t.begins_with("hit_above_") and not t.begins_with("hit_below_"):
+		if not t in ["kill", "gold", "interval"] and not t.begins_with("hit_above_") and not t.begins_with("hit_below_"):
 			_check(keys.has("AA_T_" + t.to_upper()), "trigger text for " + t)
 		for param in [1, 3]:
-			var txt = TriggerEffect.make({"trigger": t, "param": param, "payload": "gold", "value": 1}).get_text(0, false)
+			var txt = TriggerEffect.make({"trigger": t, "param": param, "payload": "gold", "value": 1, "dmg_type": "stat_melee_damage", "stat": "stat_armor"}).get_text(0, false)
 			_check(txt.find("AA_") == -1 and txt.find("{") == -1, "rendered trigger text for %s: %s" % [t, txt])
 	var adjs = Catalog.ADJ_MECHANIC + Catalog.ADJ_SCALING + Catalog.ADJ_GAIN_MOD + Catalog.ADJ_GRANT
 	for s in Catalog.ADJ_BY_STAT:
@@ -2324,7 +2326,7 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 		if Catalog.TRIGGERS[t].kind == "shop":
 			continue
 		var payload = "temp_stat" if Catalog.TRIGGERS[t].kind == "state" else "gold"
-		var c = {"trigger": t, "payload": payload, "value": 1, "stat": "stat_luck"}
+		var c = {"trigger": t, "payload": payload, "value": 1, "stat": "stat_luck", "dmg_type": "stat_elemental_damage"}
 		if t == "interval":
 			c.param = 1
 		trig_effects.push_back(TriggerEffect.make(c))
@@ -2476,6 +2478,8 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 		en_h.current_stats.health = 2
 		beh.on_hurt(hb)
 		hb.free()
+		# 用某类伤害击杀：致命一击取最后一次命中的伤害类型
+		var _kh = en_h.take_damage(999999, TakeDamageArgs.new(0))
 	yield(_wait_frames(2), "completed")
 	var fired = {}
 	for en in rt.entries[0]:
@@ -3768,7 +3772,7 @@ func test_120_minor_stats_starting_items_typed_hits() -> void:
 			var plan = Generator.new(cfg, sd).generate(isvc.items, isvc.characters, [], [])
 			for id in plan.items:
 				for e in plan.items[id].effects:
-					if e is TriggerEffect and Catalog.HIT_STATS.has(e.trigger):
+					if e is TriggerEffect and e.trigger == "hit_typed":
 						counts[on] += 1
 						if samples.size() < 6:
 							samples.push_back(e.get_text(0, false))
@@ -3779,8 +3783,8 @@ func test_120_minor_stats_starting_items_typed_hits() -> void:
 	_check(counts[true] > 0, "typed-hit triggers appear with more character effects")
 	_eq(counts[false], 0, "typed-hit triggers absent without more character effects")
 	var info = {"hp_pct": 80.0, "first_any": false, "first_stats": [], "stats": ["stat_ranged_damage"]}
-	_check(Runtime._matches("hit_ranged", "hit_enemy", info), "ranged hit matches hit_ranged")
-	_check(not Runtime._matches("hit_melee", "hit_enemy", info), "ranged hit does not match hit_melee")
+	_check(Runtime._matches("hit_typed", "hit_enemy", info, "stat_ranged_damage"), "ranged hit matches ranged hit_typed")
+	_check(not Runtime._matches("hit_typed", "hit_enemy", info, "stat_melee_damage"), "ranged hit does not match melee hit_typed")
 
 
 # 反馈的 bug（真实战斗模拟）：
@@ -4110,7 +4114,7 @@ func test_128_remaining_native_triggers() -> void:
 	for t in 4:
 		for mech in gen.mechanics_by_tier[t]:
 			var k = mech.effect.custom_key if mech.effect.custom_key != "" else mech.effect.key
-			_check(not k in ["burn_chance", "remove_speed", "enemy_fruit_drops", "gain_stat_for_equipped_item_with_stat"],
+			_check(not k in ["burn_chance", "remove_speed", "gain_stat_for_equipped_item_with_stat"],
 				"decomposed native trigger not copied: " + k)
 	_eq(Catalog.TRIGGERS["cursed_kill"].e, 25.0, "cursed kills estimated at 1/4 of kills")
 	var seen = {}
@@ -4210,3 +4214,109 @@ func test_129_no_preload_of_game_resources() -> void:
 			f = da.get_next()
 	_check(n > 10, "scanned mod scripts (%d)" % n)
 	_check(bad.empty(), "no preload of game resources: " + str(bad))
+
+
+# 通用门控：gate = every 的扳机都能单次 / 几率 / 每 N 次；作用于目标敌人的载荷不计次；
+# 限定伤害类型的扳机统一为一个 id + dmg_type 字段（近战 : 远程 : 元素 : 工程 = 2 : 2 : 2 : 1），旧 id 读档迁移；
+# 商店扳机计次；"用某类伤害击杀"；水果不会在波末掉落
+func test_130_trigger_templates() -> void:
+	var counted = {}
+	var typed = {}
+	var dmg_stats = {}
+	for sd in range(1, 41):
+		var plan = _gen(sd)
+		for id in plan.items:
+			for e in plan.items[id].effects:
+				if not e is TriggerEffect:
+					continue
+				if e.param > 1 and e.trigger != "interval":
+					counted[e.trigger] = true
+					_check(Catalog.TRIGGERS[e.trigger].gate == "every", "counted only on gate-every triggers: " + e.trigger)
+					_check(not e.payload in Catalog.TARGET_PAYLOADS, "target payload not counted: " + e.get_text(0, false))
+				if e.trigger in Catalog.TYPED_TRIGGERS:
+					_check(Catalog.DMG_TYPES.has(e.dmg_type), "typed trigger has a damage type: " + e.trigger)
+					typed[e.dmg_type] = typed.get(e.dmg_type, 0) + 1
+				else:
+					_eq(e.dmg_type, "", "untyped trigger has no damage type")
+				if e.payload in ["damage", "explode"] and Catalog.DMG_TYPES.has(e.stat):
+					dmg_stats[e.stat] = dmg_stats.get(e.stat, 0) + 1
+				var txt = e.get_text(0, false)
+				_check(txt.find("AA_") == -1 and txt.find("{") == -1, "text: " + txt)
+				if e.payload == "fruit":
+					_check(not e.trigger in ["wave_end", "wave_start", "half_wave", "interval"], "no fruit outside of combat events: " + e.trigger)
+	print("AUDIT counted triggers %s; typed damage types %s; damage/explode types %s" % [str(counted.keys()), str(typed), str(dmg_stats)])
+	for t in ["dodge", "consumable", "hit", "reroll", "buy"]:
+		_check(counted.has(t), "count gate now used on " + t)
+	_check(typed.get("stat_engineering", 0) > 0 and typed.get("stat_engineering", 0) < typed.get("stat_melee_damage", 0), "engineering rarer than melee")
+	for tbl in [Catalog.LEGAL, Catalog.FREE_LEGAL]:
+		_check(not "fruit" in tbl.wave_end and not "fruit" in tbl.wave_start, "no fruit at wave start / end")
+	# 旧存档的扳机 id
+	var old = TriggerEffect.make({"trigger": "first_hit", "payload": "gold", "value": 1}).serialize()
+	old.trigger = "hit_ranged"
+	old.erase("dmg_type")
+	var migrated = TriggerEffect.new()
+	migrated.deserialize_and_merge(old)
+	_eq(migrated.trigger, "hit_typed", "legacy typed trigger id migrated")
+	_eq(migrated.dmg_type, "stat_ranged_damage", "legacy damage type migrated")
+	_check(migrated.get_text(0, false).find("AA_") == -1, "migrated text: " + migrated.get_text(0, false))
+	# 用某类伤害击杀
+	_check(Runtime._matches("kill_typed", "kill_typed", {"stats": ["stat_melee_damage"]}, "stat_melee_damage"), "melee kill matches")
+	_check(not Runtime._matches("kill_typed", "kill_typed", {"stats": ["stat_ranged_damage"]}, "stat_melee_damage"), "ranged kill does not match melee")
+	# 商店计次：每刷新 3 次商店
+	m.start_new_run()
+	var holder = _item("item_potato").duplicate()
+	holder.effects = [TriggerEffect.make({"trigger": "reroll", "param": 3, "payload": "perm_stat", "stat": "stat_armor", "value": 1})]
+	rd.add_item(holder, 0)
+	var a0 = rd.get_player_effects(0)[Keys.stat_armor_hash]
+	for i in 7:
+		m.fire_shop("reroll", 0)
+	_eq(rd.get_player_effects(0)[Keys.stat_armor_hash], a0 + 2, "every 3 rerolls: 7 rerolls give +2")
+	rd.remove_item(holder, 0)
+	m.on_menu_reset()
+
+
+# 掉落水果：真实战斗中大量掉落、全部可拾取（拾取触发"捡起消耗品时"）、对象池复用、清场后不再掉落
+func test_131_fruit_drops_in_battle() -> void:
+	m.start_new_run()
+	var holder = _item("item_potato").duplicate()
+	holder.effects = [TriggerEffect.make({"trigger": "consumable", "payload": "gold", "value": 1})]
+	rd.add_item(holder, 0)
+	rd.current_wave = 1
+	TempStats.reset()
+	var _e = tree.change_scene("res://main.tscn")
+	yield(_wait_frames(10), "completed")
+	var main = tree.current_scene
+	var rt = main.get_node_or_null("AutoAnthonyRuntime") if main != null else null
+	_check(rt != null, "runtime in battle")
+	if rt == null:
+		return
+	var player = main._players[0]
+	player.disable_hurtbox()
+	main._wave_timer.start(600)
+	var fruit = TriggerEffect.make({"trigger": "kill", "payload": "fruit", "value": 3})
+	# 掉在玩家附近的水果可能被直接吸取：场上新增 + 已拾取（每个 +1 材料）= 掉落总数
+	for round_i in 2:
+		var n0 = main._consumables.size()
+		var g0 = rd.get_player_gold(0)
+		for i in 10:
+			rt.execute(fruit, 0, player.global_position + Vector2(30 * i, 0), false)
+		yield(_wait_physics(4), "completed")
+		var dropped = main._consumables.slice(n0, main._consumables.size() - 1) if main._consumables.size() > n0 else []
+		_eq(dropped.size() + rd.get_player_gold(0) - g0, 30, "round %d: 10 fires x 3 fruits dropped" % round_i)
+		var ok = true
+		for c in dropped:
+			ok = ok and is_instance_valid(c) and c.consumable_data != null and not c.already_picked_up and c.is_inside_tree()
+		_check(ok, "dropped fruits are live consumables")
+		for c in dropped:
+			main.on_consumable_picked_up(c, 0)
+		yield(_wait_frames(2), "completed")
+		_eq(rd.get_player_gold(0), g0 + 30, "round %d: picking each fruit fires the consumable trigger" % round_i)
+		_eq(main._consumables.size(), n0, "round %d: picked fruits leave the field (back to the pool)" % round_i)
+	main._cleaning_up = true
+	var n1 = main._consumables.size()
+	rt.execute(fruit, 0, player.global_position, false)
+	yield(_wait_frames(3), "completed")
+	_eq(main._consumables.size(), n1, "no fruit dropped while the wave is being cleaned up")
+	rt.revert_all_grants()
+	rd.remove_item(holder, 0)
+	m.on_menu_reset()

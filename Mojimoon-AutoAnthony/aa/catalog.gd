@@ -105,14 +105,15 @@ const EXPLOSION_TARGETS = 2.5	# 爆炸平均命中数
 #   kind: event（事件）/ state（持续状态）/ shop（商店阶段事件）
 #   e: 每波期望次数（state 为在场率）
 #   timing: 临时属性叠层的时间系数（波开始时触发 = 整波生效）
-#   gate: none / every（每 N 次）/ chance（几率）
+#   gate: every = 通用门控（单次 / 几率 / 每 N 次，字符串 AA_T_X + AA_T_X_EVERY）；chance = 单次 / 几率（治疗频率不稳定、箱子太少，不计次）；
+#         none = 只有单次（每波次数固定的扳机）
 #   w: 基础出现权重（与原版先验相加）
 # ------------------------------------------------------------
 const TRIGGERS = {
 	"kill": {"kind": "event", "e": 100.0, "timing": 0.5, "gate": "every", "w": 1.0},
-	"hit": {"kind": "event", "e": 8.0, "timing": 0.5, "gate": "chance", "w": 1.0},
-	"dodge": {"kind": "event", "e": 4.0, "timing": 0.5, "gate": "chance", "w": 1.0},
-	"consumable": {"kind": "event", "e": 7.0, "timing": 0.5, "gate": "chance", "w": 1.0},
+	"hit": {"kind": "event", "e": 8.0, "timing": 0.5, "gate": "every", "w": 1.0},
+	"dodge": {"kind": "event", "e": 4.0, "timing": 0.5, "gate": "every", "w": 1.0},
+	"consumable": {"kind": "event", "e": 7.0, "timing": 0.5, "gate": "every", "w": 1.0},
 	"gold": {"kind": "event", "e": 100.0, "timing": 0.5, "gate": "every", "w": 0.6},
 	"heal": {"kind": "event", "e": 16.0, "timing": 0.5, "gate": "chance", "w": 0.4},
 	"level_up": {"kind": "event", "e": 1.3, "timing": 0.5, "gate": "none", "w": 0.9},
@@ -123,7 +124,7 @@ const TRIGGERS = {
 	"moving": {"kind": "state", "e": 0.75, "timing": 1.0, "gate": "none", "w": 1.0},
 	"low_hp": {"kind": "state", "e": 0.15, "timing": 1.0, "gate": "none", "w": 0.5},
 	"full_hp": {"kind": "state", "e": 0.45, "timing": 1.0, "gate": "none", "w": 0.4},
-	"reroll": {"kind": "shop", "e": 3.0, "timing": 0.0, "gate": "chance", "w": 0.5},
+	"reroll": {"kind": "shop", "e": 3.0, "timing": 0.0, "gate": "every", "w": 0.5},
 	# 暴击击杀（触手、狩猎奖杯）/ 击杀燃烧中的敌人（鬼火）：击杀的子集，频率取决于构筑；绑定暴击 / 元素词条
 	"crit_kill": {"kind": "event", "e": 30.0, "timing": 0.5, "gate": "every", "w": 0.7},
 	"burning_kill": {"kind": "event", "e": 25.0, "timing": 0.5, "gate": "every", "w": 0.3},
@@ -131,7 +132,7 @@ const TRIGGERS = {
 	"steps": {"kind": "event", "e": 90.0, "timing": 0.5, "gate": "every", "w": 0.3},
 	# 波次进行到一半时（赛博格）
 	"half_wave": {"kind": "event", "e": 1.0, "timing": 0.5, "gate": "none", "w": 0.3},
-	"buy": {"kind": "shop", "e": 3.0, "timing": 0.0, "gate": "chance", "w": 0.2},
+	"buy": {"kind": "shop", "e": 3.0, "timing": 0.0, "gate": "every", "w": 0.2},
 	# ---- 实验性扳机（低权重）----
 	# 拾取箱子（原版袋子）
 	"crate": {"kind": "event", "e": 0.8, "timing": 0.5, "gate": "chance", "w": 0.2},
@@ -141,51 +142,48 @@ const TRIGGERS = {
 	"crit": {"kind": "event", "e": 80.0, "timing": 0.5, "gate": "every", "w": 0.3},
 	# 点燃敌人（敌人开始燃烧；原版以燃烧结算为准）
 	"ignite": {"kind": "event", "e": 25.0, "timing": 0.5, "gate": "every", "w": 0.15},
-	# 首次命中某个敌人（冰块、潜水员的"首次命中时"）；可限定伤害类型（按命中的伤害缩放属性）
-	"first_hit": {"kind": "event", "e": 120.0, "timing": 0.5, "gate": "every", "w": 0.1},
-	"first_hit_melee": {"kind": "event", "e": 70.0, "timing": 0.5, "gate": "every", "w": 0.04},
-	"first_hit_ranged": {"kind": "event", "e": 70.0, "timing": 0.5, "gate": "every", "w": 0.04},
-	"first_hit_elemental": {"kind": "event", "e": 70.0, "timing": 0.5, "gate": "every", "w": 0.04},
-	"first_hit_engineering": {"kind": "event", "e": 70.0, "timing": 0.5, "gate": "every", "w": 0.04},
+	# 首次命中某个敌人（冰块、潜水员的"首次命中时"）；_typed = 限定伤害类型（条款的 dmg_type 字段，按命中的伤害缩放属性）
+	# 一局通常只用一种伤害类型：限定类型与不限定的期望次数相同
+	"first_hit": {"kind": "event", "e": 110.0, "timing": 0.5, "gate": "every", "w": 0.1},
+	"first_hit_typed": {"kind": "event", "e": 110.0, "timing": 0.5, "gate": "every", "w": 0.16},
 	# 命中生命值高于 / 低于 X% 的敌人（小鱼、原版"对高 / 低血敌人增伤"）：每次命中都计，按命中次数高估
 	"hit_above_50": {"kind": "event", "e": 150.0, "timing": 0.5, "gate": "every", "w": 0.06},
 	"hit_above_75": {"kind": "event", "e": 120.0, "timing": 0.5, "gate": "every", "w": 0.06},
 	"hit_above_90": {"kind": "event", "e": 100.0, "timing": 0.5, "gate": "every", "w": 0.04},
 	"hit_below_50": {"kind": "event", "e": 70.0, "timing": 0.5, "gate": "every", "w": 0.06},
 	# 每次用某类伤害命中敌人（潜水员"被远程伤害命中的敌人受到伤害提高"）：只在"更多角色效果"开启时出现
-	"hit_melee": {"kind": "event", "e": 150.0, "timing": 0.5, "gate": "every", "w": 0.05},
-	"hit_ranged": {"kind": "event", "e": 150.0, "timing": 0.5, "gate": "every", "w": 0.05},
-	"hit_elemental": {"kind": "event", "e": 150.0, "timing": 0.5, "gate": "every", "w": 0.05},
-	"hit_engineering": {"kind": "event", "e": 150.0, "timing": 0.5, "gate": "every", "w": 0.05},
+	"hit_typed": {"kind": "event", "e": 150.0, "timing": 0.5, "gate": "every", "w": 0.2},
+	# 用某类伤害击杀敌人（致命一击的伤害缩放属性；燃烧致死算元素）：同上，与击杀相同
+	"kill_typed": {"kind": "event", "e": 100.0, "timing": 0.5, "gate": "every", "w": 0.3},
 	# 击杀被诅咒的敌人（黑旗）：只在有诅咒时出现被诅咒的敌人，按每波约 5 个估计
 	"cursed_kill": {"kind": "event", "e": 25.0, "timing": 0.5, "gate": "every", "w": 0.05},
 	# 砍倒树木（口袋工厂）：每波约 3 棵
-	"tree_kill": {"kind": "event", "e": 3.0, "timing": 0.5, "gate": "chance", "w": 0.1},
+	"tree_kill": {"kind": "event", "e": 3.0, "timing": 0.5, "gate": "every", "w": 0.1},
 	# 获得提升 [属性] 的道具（雪球）：商店阶段，条件属性 = 效果属性；每波约 0.5 件
 	"buy_stat": {"kind": "shop", "e": 0.5, "timing": 0.0, "gate": "none", "w": 0.03},
 }
 
 # 实验性扳机（低权重）
 const EXPERIMENTAL_TRIGGERS = [
-	"crate", "explode", "crit", "ignite", "first_hit", "first_hit_melee", "first_hit_ranged", "first_hit_elemental",
-	"first_hit_engineering", "hit_above_50", "hit_above_75", "hit_above_90", "hit_below_50",
-	"hit_melee", "hit_ranged", "hit_elemental", "hit_engineering",
+	"crate", "explode", "crit", "ignite", "first_hit", "first_hit_typed", "hit_above_50", "hit_above_75", "hit_above_90",
+	"hit_below_50", "hit_typed",
 ]
 # 有目标敌人的扳机：可以挂"使该敌人受到的伤害提高"载荷
+# 作用于目标敌人的载荷：门控只用单次 / 几率
+const TARGET_PAYLOADS = ["vuln", "hp_dmg", "ignite", "slow"]
 const ENEMY_TARGET_TRIGGERS = [
-	"crit", "ignite", "first_hit", "first_hit_melee", "first_hit_ranged", "first_hit_elemental", "first_hit_engineering",
-	"hit_above_50", "hit_above_75", "hit_above_90", "hit_below_50",
-	"hit_melee", "hit_ranged", "hit_elemental", "hit_engineering",
+	"crit", "ignite", "first_hit", "first_hit_typed", "hit_above_50", "hit_above_75", "hit_above_90", "hit_below_50", "hit_typed",
 ]
-# 限定伤害类型的首次命中 -> 伤害缩放属性
-const FIRST_HIT_STATS = {
-	"first_hit_melee": "stat_melee_damage", "first_hit_ranged": "stat_ranged_damage",
-	"first_hit_elemental": "stat_elemental_damage", "first_hit_engineering": "stat_engineering",
-}
-# 限定伤害类型的每次命中 -> 伤害缩放属性（"更多角色效果"选项的扳机）
-const HIT_STATS = {
-	"hit_melee": "stat_melee_damage", "hit_ranged": "stat_ranged_damage",
-	"hit_elemental": "stat_elemental_damage", "hit_engineering": "stat_engineering",
+# 限定伤害类型的扳机（条款的 dmg_type 字段）；hit_typed 只在"更多角色效果"开启时出现
+const TYPED_TRIGGERS = ["first_hit_typed", "hit_typed", "kill_typed"]
+# 伤害类型及其抽取权重（近战 : 远程 : 元素 : 工程 = 2 : 2 : 2 : 1）；伤害 / 爆炸载荷的缩放属性落在伤害类型上时同样按此分配
+const DMG_TYPES = {"stat_melee_damage": 2.0, "stat_ranged_damage": 2.0, "stat_elemental_damage": 2.0, "stat_engineering": 1.0}
+# 旧存档的扳机 id -> [新 id, 伤害类型]
+const LEGACY_TYPED_TRIGGERS = {
+	"first_hit_melee": ["first_hit_typed", "stat_melee_damage"], "first_hit_ranged": ["first_hit_typed", "stat_ranged_damage"],
+	"first_hit_elemental": ["first_hit_typed", "stat_elemental_damage"], "first_hit_engineering": ["first_hit_typed", "stat_engineering"],
+	"hit_melee": ["hit_typed", "stat_melee_damage"], "hit_ranged": ["hit_typed", "stat_ranged_damage"],
+	"hit_elemental": ["hit_typed", "stat_elemental_damage"], "hit_engineering": ["hit_typed", "stat_engineering"],
 }
 # 连锁深度上限（"A 触发 B、B 触发 C、C 触发 D"）；延迟生成的爆炸也携带深度
 const MAX_CHAIN_DEPTH = 3
@@ -246,6 +244,7 @@ const PAYLOADS = {
 # 拾取材料可以挂材料（直接加到材料数，不生成掉落物，不会循环；原版金属探测器）；波末 / 波初没有敌人和伤害意义的载荷被排除。
 const LEGAL = {
 	"kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "fruit"],
+	"kill_typed": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "fruit"],
 	"hit": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode"],
 	"dodge": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode"],
 	"consumable": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats"],
@@ -271,18 +270,12 @@ const LEGAL = {
 	"crit": ["temp_stat", "timed_stat", "heal", "gold", "damage", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
 	"ignite": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
 	"first_hit": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
-	"first_hit_melee": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
-	"first_hit_ranged": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
-	"first_hit_elemental": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
-	"first_hit_engineering": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
+	"first_hit_typed": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
 	"hit_above_50": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
 	"hit_above_75": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
 	"hit_above_90": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
 	"hit_below_50": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
-	"hit_melee": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
-	"hit_ranged": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
-	"hit_elemental": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
-	"hit_engineering": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
+	"hit_typed": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
 	"cursed_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "fruit"],
 	"tree_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "fruit"],
 	"buy_stat": ["perm_stat"],
@@ -296,6 +289,7 @@ const LEGAL = {
 # ============================================================
 const FREE_LEGAL = {
 	"kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "fruit"],
+	"kill_typed": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "fruit"],
 	"hit": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
 	"dodge": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
 	"consumable": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
@@ -321,18 +315,12 @@ const FREE_LEGAL = {
 	"crit": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
 	"ignite": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
 	"first_hit": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
-	"first_hit_melee": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
-	"first_hit_ranged": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
-	"first_hit_elemental": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
-	"first_hit_engineering": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
+	"first_hit_typed": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
 	"hit_above_50": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
 	"hit_above_75": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
 	"hit_above_90": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
 	"hit_below_50": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
-	"hit_melee": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
-	"hit_ranged": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
-	"hit_elemental": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
-	"hit_engineering": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
+	"hit_typed": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
 	"cursed_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "fruit"],
 	"tree_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "fruit"],
 	"buy_stat": ["perm_stat"],
@@ -397,12 +385,10 @@ const NATIVE_TRIGGER_MAP = {
 	# 害怕的香肠 / 丑牙：命中时点燃 / 减速（"命中敌人"类扳机，按命中高血敌人计）
 	"burn_chance": ["hit_above_50", "ignite"],
 	"remove_speed": ["hit_above_50", "slow"],
-	# 果篮：敌人掉落水果
-	"enemy_fruit_drops": ["kill", "fruit"],
 	# 雪球：获得提升 [属性] 的道具时 +[属性]
 	"gain_stat_for_equipped_item_with_stat": ["buy_stat", "perm_stat"],
 	# 冰块：首次被元素伤害命中时受伤加成（只认道具来源；潜水员的同类效果是角色身份）
-	"enemy_percent_damage_taken": ["first_hit_elemental", "vuln"],
+	"enemy_percent_damage_taken": ["first_hit_typed", "vuln"],
 }
 # 原版先验在组合权重中的强度
 const NATIVE_PRIOR_STRENGTH = 0.6
@@ -510,13 +496,11 @@ const ADJ_BY_TRIGGER = {
 	"reroll": ["AA_ADJ_FICKLE", "AA_ADJ_GAMBLING"], "buy": ["AA_ADJ_THRIFTY", "AA_ADJ_SHOPAHOLIC"],
 	"crate": ["AA_ADJ_GREEDY", "AA_ADJ_CURIOUS"], "explode": ["AA_ADJ_BLAZING", "AA_ADJ_FIERCE"],
 	"crit": ["AA_ADJ_DEADLY", "AA_ADJ_KEEN"], "ignite": ["AA_ADJ_BLAZING", "AA_ADJ_SCORCHING"],
-	"first_hit": ["AA_ADJ_EAGER", "AA_ADJ_KEEN"], "first_hit_melee": ["AA_ADJ_EAGER", "AA_ADJ_FIERCE"],
-	"first_hit_ranged": ["AA_ADJ_EAGER", "AA_ADJ_KEEN"], "first_hit_elemental": ["AA_ADJ_EAGER", "AA_ADJ_SCORCHING"],
-	"first_hit_engineering": ["AA_ADJ_EAGER", "AA_ADJ_CURIOUS"],
+	"first_hit": ["AA_ADJ_EAGER", "AA_ADJ_KEEN"], "first_hit_typed": ["AA_ADJ_EAGER", "AA_ADJ_FIERCE"],
+	"kill_typed": ["AA_ADJ_FIERCE", "AA_ADJ_KEEN"],
 	"hit_above_50": ["AA_ADJ_PREDATORY", "AA_ADJ_EAGER"], "hit_above_75": ["AA_ADJ_PREDATORY", "AA_ADJ_EAGER"],
 	"hit_above_90": ["AA_ADJ_PREDATORY", "AA_ADJ_EAGER"], "hit_below_50": ["AA_ADJ_EXECUTING", "AA_ADJ_DEADLY"],
-	"hit_melee": ["AA_ADJ_FIERCE", "AA_ADJ_KEEN"], "hit_ranged": ["AA_ADJ_KEEN", "AA_ADJ_FIERCE"],
-	"hit_elemental": ["AA_ADJ_SCORCHING", "AA_ADJ_BLAZING"], "hit_engineering": ["AA_ADJ_CURIOUS", "AA_ADJ_KEEN"],
+	"hit_typed": ["AA_ADJ_FIERCE", "AA_ADJ_KEEN"],
 	"cursed_kill": ["AA_ADJ_HUNTING", "AA_ADJ_DEADLY"],
 	"tree_kill": ["AA_ADJ_WANDERING", "AA_ADJ_CURIOUS"], "buy_stat": ["AA_ADJ_GROWING", "AA_ADJ_AMBITIOUS"],
 }
@@ -705,10 +689,6 @@ const TAG_BINDINGS = {
 	"counter:materials": ["economy"],
 	"payload:explode": ["explosive"], "payload:gold": ["economy"], "payload:xp": ["xp_gain"],
 	"trigger:explode": ["explosive"], "trigger:crit": ["stat_crit_chance"], "trigger:ignite": ["stat_elemental_damage"],
-	"trigger:first_hit_melee": ["stat_melee_damage"], "trigger:first_hit_ranged": ["stat_ranged_damage"],
-	"trigger:first_hit_elemental": ["stat_elemental_damage"], "trigger:first_hit_engineering": ["stat_engineering"],
-	"trigger:hit_melee": ["stat_melee_damage"], "trigger:hit_ranged": ["stat_ranged_damage"],
-	"trigger:hit_elemental": ["stat_elemental_damage"], "trigger:hit_engineering": ["stat_engineering"],
 	"trigger:cursed_kill": ["stat_curse"], "payload:hp_dmg": ["stat_percent_damage"],
 	"trigger:tree_kill": ["exploration"], "payload:ignite": ["stat_elemental_damage"], "payload:slow": ["less_enemy_speed"],
 	"payload:fruit": ["consumable"],

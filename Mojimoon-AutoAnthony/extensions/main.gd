@@ -4,6 +4,7 @@ extends "res://main.gd"
 
 const AAMain = preload("res://mods-unpacked/Mojimoon-AutoAnthony/mod_main.gd")
 const AARuntime = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/runtime.gd")
+const AABehavior = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/enemy_behavior.gd")
 
 var _aa_runtime = null
 
@@ -49,8 +50,16 @@ func _on_enemy_died(enemy: Enemy, args: Entity.DieArgs) -> void:
 		for player in _get_live_players():
 			killers.push_back(player.player_index)
 	var cursed = _aa_is_cursed(enemy)
+	# 致命一击的伤害类型：燃烧致死算元素，否则取最后一次命中的伤害缩放属性
+	var kill_info = {"stats": ["stat_elemental_damage"] if args.is_burning else []}
+	if not args.is_burning:
+		var b = AABehavior.find_on(enemy)
+		if b != null:
+			kill_info.stats = b.last_stats
 	for p in killers:
 		rt.fire("kill", p, pos)
+		if not kill_info.stats.empty():
+			rt.fire("kill_typed", p, pos, -1, null, kill_info)
 		if burning:
 			rt.fire("burning_kill", p, pos)
 		if cursed:
