@@ -1,6 +1,6 @@
 # 默认设置下的全部重组道具
 
-由测试在每次运行结束时自动生成（`test_cases.gd` 的 `_write_items_table`）。默认设置：重组道具、重组名称开启，其余选项关闭，平均数值 100%、浮动范围 125%、触发效果 150%，保留原版道具 0%；种子 42。
+由测试在每次运行结束时自动生成（`test_base.gd` 的 `_write_items_table`）。默认设置：重组道具、重组名称开启，其余选项关闭，平均数值 100%、浮动范围 125%、触发效果 150%，保留原版道具 0%；种子 42。
 
 共 235 件：T1 62、T2 67、T3 67、T4 39。锚定道具（望远镜、诱饵、口袋工厂、美西螈、鱼钩等）保持原版，不在表内。
 
@@ -39,8 +39,8 @@
 | T1 | 精准软糖狂战士 | 15 | +1 远程伤害<br>站立不动时-6%闪避 | stat_ranged_damage | 核心 |
 | T1 | 修补匠的头部创伤 | 25 | +5 工程学<br>-7 %攻击速度 | stat_engineering | 核心 |
 | T1 | 野蛮的刺猬 | 25 | +3 近战伤害<br>-2 %攻击速度 | stat_melee_damage |  |
-| T1 | 远古头盔 | 18 | 地雷每12秒生成一次，并对一个区域造成21（+100%）伤害<br>-3 %速度 | explosive, structure |  |
-| T1 | 古怪的注射剂 | 15 | +1 工程学<br>生成1台炮塔，造成18（+80%）伤害<br>敌袭结束后+1%敌人速度 | stat_engineering, structure |  |
+| T1 | 远古头盔 | 18 | 地雷每12秒生成一次，并对一个区域造成10（+100%）伤害<br>-3 %速度 | explosive, structure |  |
+| T1 | 古怪的注射剂 | 15 | +1 工程学<br>生成1台炮塔，造成10（+80%）伤害<br>敌袭结束后+1%敌人速度 | stat_engineering, structure |  |
 | T1 | 鹰眼精神异常 | 20 | +1 远程伤害<br>移动时，每永久持有12%速度会+1生命再生 [+0]<br>每永久持有20元素伤害会-1生命再生 [+0] | stat_ranged_damage, stat_speed, stat_hp_regeneration |  |
 | T1 | 囤积的果冻 | 15 | 拾取材料时有20%概率+5范围，持续3秒<br>拾取材料时有20%概率-1%暴击率，持续3秒<br>-1 %闪避 | stat_range, pickup |  |
 | T1 | 远古地雷 | 15 | +1 工程学<br>使用中世纪类武器时+30范围<br>-5 范围 | stat_engineering, stat_range |  |
@@ -75,7 +75,7 @@
 | T2 | 风暴鱿鱼宝宝 | 35 | +2 元素伤害<br>移动时，每4构筑物会+3元素伤害 [+0] | stat_elemental_damage, structure |  |
 | T2 | 弹力旗帜 | 50 | +19击退<br>+6 幸运<br>-2 元素伤害 | knockback, stat_luck |  |
 | T2 | 远视的黑带 | 50 | +1 工程学<br>+10 范围<br>+1 远程伤害<br>捡起消耗品时+1%暴击率。每波最大值：+1<br>捡起消耗品时-1生命再生。每波最大值：-1<br>%速度的修改减少15% | stat_engineering, stat_range, stat_ranged_damage, stat_crit_chance, consumable |  |
-| T2 | 奇异的焰蜥蜴 | 55 | +3 最大生命值<br>生成一只Bonk狗宠物，会造成45（+60%）伤害。它每5秒钟会进行一次冲刺攻击，在范围内造成32（+40%）爆炸伤害<br>下场敌袭期间+20 %敌人速度 | stat_max_hp, explosive, pet |  |
+| T2 | 奇异的焰蜥蜴 | 55 | +3 最大生命值<br>生成一只Bonk狗宠物，会造成10（+60%）伤害。它每5秒钟会进行一次冲刺攻击，在范围内造成8（+40%）爆炸伤害<br>下场敌袭期间+20 %敌人速度 | stat_max_hp, explosive, pet |  |
 | T2 | 奥术眼罩 | 48 | +8 元素伤害<br>闪避时+3%敌人速度，直至敌袭结束 | stat_elemental_damage, stat_dodge | 核心 |
 | T2 | 共鸣血蛭 | 40 | +9 %攻击速度<br>+2 生命再生<br>每永久持有1%闪避会+1幸运 [+0]<br>-15 %伤害 | stat_attack_speed, stat_hp_regeneration, stat_luck, stat_dodge |  |
 | T2 | 精准骨骰 | 40 | +1 远程伤害<br>移动时%攻击速度的修改增加5%<br>-1 近战伤害 | stat_ranged_damage, stat_attack_speed |  |
@@ -87,15 +87,15 @@
 | T2 | 离奇的芹菜茶 | 40 | 生成一个焰蜥蜴宠物，造成1（+1%）伤害。每4秒钟，向所有方向发射燃烧的投射物，每发造成1（+1%）伤害。被这些攻击命中的敌人会受到5x3（+50%）燃烧伤害<br>每永久持有4%速度会-5范围 [-6] | pet |  |
 | T2 | 离奇的机械黄蜂 | 55 | +1 远程伤害<br>在箱子中有+1%的几率发现额外的机械黄蜂<br>-1 护甲 | stat_ranged_damage |  |
 | T2 | 扎根齿轮 | 40 | 拾取范围+20%<br>站立不动时，每持有一异种I级别物品有+2%速度[+0]<br>下场敌袭一开始会出现特殊敌人 | pickup, stand_still, stat_speed |  |
-| T2 | 远古指南针 | 40 | +1 工程学<br>+5 %暴击率<br>使用音乐类武器时+20%暴击率<br>每持有一异种IV级别物品有-3%速度[+0] | stat_engineering, stat_crit_chance |  |
+| T2 | 远古指南针 | 40 | +1 工程学<br>+5 %暴击率<br>使用音乐类武器时+20%暴击率<br>每持有一异种IV级别物品有-3%速度[-3] | stat_engineering, stat_crit_chance |  |
 | T2 | 远足的珊瑚 | 40 | 每前进1步，有15%概率恢复1点生命值<br>-1 %生命窃取 | stat_speed |  |
-| T2 | 远古赛博球 | 40 | 生成一只Bonk狗宠物，会造成45（+60%）伤害。它每5秒钟会进行一次冲刺攻击，在范围内造成32（+40%）爆炸伤害<br>捡起消耗品时+3%敌人伤害，直至敌袭结束。每波最大值：+45 | explosive, pet, consumable |  |
-| T2 | 回响的独眼虫 | 40 | +1 护甲<br>目前每一棵存活的树木有+1最大生命值[+3] | stat_armor, stat_max_hp |  |
+| T2 | 远古赛博球 | 40 | 生成一只Bonk狗宠物，会造成10（+60%）伤害。它每5秒钟会进行一次冲刺攻击，在范围内造成8（+40%）爆炸伤害<br>捡起消耗品时+3%敌人伤害，直至敌袭结束。每波最大值：+45 | explosive, pet, consumable |  |
+| T2 | 回响的独眼虫 | 40 | +1 护甲<br>目前每一棵存活的树木有+1最大生命值[+0] | stat_armor, stat_max_hp |  |
 | T2 | 精炼的危险的兔子 | 40 | +3 生命再生<br>最大生命值的修改增加10%<br>-1 护甲 | stat_hp_regeneration, stat_max_hp |  |
 | T2 | 寄生的腐肉 | 60 | +6 %生命窃取<br>受到伤害时恢复6点生命值<br>受到伤害时有90%概率-1远程伤害，直至敌袭结束 | stat_lifesteal |  |
 | T2 | 灵巧的蛾医生 | 45 | +6 %闪避<br>拾取箱子时永久获得“+3%敌人掉落的材料”<br>移动时-3远程伤害 | stat_dodge, exploration |  |
 | T2 | 奇异的能量手环 | 45 | +3 %攻击速度<br>离开商店时，锁定的道具和武器有7%的几率受到诅咒 | stat_attack_speed, lock |  |
-| T2 | 灵巧的海盗眼罩  | 35 | +4 %闪避<br>+10 收获<br>站立不动时，每永久持有6击退会+5%速度 [+0]<br>每4近战伤害会-5范围 [-43] | stat_dodge, stat_harvesting, stand_still, knockback, stat_speed |  |
+| T2 | 灵巧的海盗眼罩  | 35 | +4 %闪避<br>+10 收获<br>站立不动时，每永久持有6击退会+5%速度 [+0]<br>每4近战伤害会-5范围 [+0] | stat_dodge, stat_harvesting, stand_still, knockback, stat_speed |  |
 | T2 | 远古眼部手术 | 50 | +3 %暴击率<br>敌袭开始时+11%材料（在第20波敌袭后结束）<br>-5 获得%经验 | stat_crit_chance |  |
 | T2 | 锐利的果篮 | 40 | +2 工程学<br>用元素伤害杀死敌人时，有35%概率爆炸，造成相当于75%生命再生的伤害<br>-2 远程伤害 | stat_engineering, explosive, stat_elemental_damage, stat_hp_regeneration |  |
 | T2 | 躁动燃料箱 | 65 | +2 远程伤害<br>+1 护甲<br>移动时+30范围<br>移动时-11%速度 | stat_ranged_damage, stat_armor, stat_range |  |
@@ -105,23 +105,23 @@
 | T2 | 神圣的干肉条 | 60 | +1 远程伤害<br>治疗时有80%概率对随机1名敌人造成相当于150%范围的伤害 | stat_ranged_damage, stat_range |  |
 | T2 | 吸血鬼的皮革背心 | 35 | +3 %生命窃取<br>每5秒恢复2点生命值<br>-2 护甲 | stat_lifesteal |  |
 | T2 | 凶猛的小青蛙 | 40 | +6 %伤害<br>下场敌袭期间+15 %敌人速度 | stat_percent_damage | 核心 |
-| T2 | 回响的肌肉小子 | 55 | +5 %闪避<br>每1%速度会+1%攻击速度 [+31] | stat_dodge, stat_attack_speed, stat_speed |  |
+| T2 | 回响的肌肉小子 | 55 | +5 %闪避<br>每1%速度会+1%攻击速度 [+5] | stat_dodge, stat_attack_speed, stat_speed |  |
 | T2 | 共鸣鱼饵  | 40 | 每永久持有2护甲会+1工程学 [+0]<br>-4 %闪避 | stat_engineering, stat_armor |  |
 | T2 | 古怪的精湛技艺 | 50 | +3 近战伤害<br>使用工具类武器时+50%攻击速度<br>-10 %速度 | stat_melee_damage, stat_attack_speed |  |
 | T2 | 远古勋章 | 55 | +7击退<br>燃烧速度提高9%<br>-3 %伤害 | knockback, stat_elemental_damage |  |
-| T2 | 离奇的金属探测器 | 45 | +4 %暴击率<br>生成一个布雷机器人构筑物，发射子弹造成30（+100%）伤害。同时每5生成一个地雷，在范围内造成30（+100%）伤害 | stat_crit_chance, pet, structure |  |
+| T2 | 离奇的金属探测器 | 45 | +4 %暴击率<br>生成一个布雷机器人构筑物，发射子弹造成10（+100%）伤害。同时每5生成一个地雷，在范围内造成10（+100%）伤害 | stat_crit_chance, pet, structure |  |
 | T2 | 破晓金属板 | 40 | 下场敌袭期间+120 获得%经验<br>下场敌袭期间-14 最大生命值 | xp_gain |  |
 | T2 | 共鸣导弹 | 35 | +1 工程学<br>+3 %暴击率<br>持有每一异种武器+1远程伤害 [+0] | stat_engineering, stat_crit_chance, stat_ranged_damage |  |
 | T2 | 睿智的护垫 | 48 | +62 获得%经验<br>-25 范围 | xp_gain | 核心 |
 | T2 | 善变的珍珠 | 48 | +1 工程学<br>刷新商店时永久获得“生命再生的修改增加5%”（每波最多3次） | stat_engineering, stat_hp_regeneration |  |
-| T2 | 厚重的猪猪存钱罐 | 40 | +6 最大生命值<br>刷新商店时，永久获得“每8近战伤害会+1%暴击率 [+4]”（每波最多1次）<br>-3 %速度 | stat_max_hp, stat_melee_damage, stat_crit_chance |  |
+| T2 | 厚重的猪猪存钱罐 | 40 | +6 最大生命值<br>刷新商店时，永久获得“每8近战伤害会+1%暴击率 [+0]”（每波最多1次）<br>-3 %速度 | stat_max_hp, stat_melee_damage, stat_crit_chance |  |
 | T2 | 黄昏一堆书 | 50 | +8 收获<br>敌袭结束时获得20个材料 | stat_harvesting, economy |  |
 | T2 | 夺命的南瓜 | 40 | +3 %暴击率<br>使用爆炸类武器时+10%伤害<br>-1 生命再生 | stat_crit_chance, stat_percent_damage |  |
 | T2 | 吸血鬼的回收装置 | 60 | +5 %生命窃取<br>刷新商店时+1最大生命值。每波最大值：+1<br>刷新商店时+3%敌人伤害。每波最大值：+3<br>闪避时-3%攻击速度，直至敌袭结束 | stat_lifesteal, stat_max_hp |  |
 | T2 | 远足的强化钢 | 40 | +2 最大生命值<br>每前进15步，+1%伤害。每波最大值：+3 | stat_max_hp, stat_percent_damage, stat_speed |  |
 | T2 | 精巧的反击 | 40 | +3 工程学<br>刷新商店时+5范围。每波最大值：+5 | stat_engineering, stat_range |  |
 | T2 | 精巧的仪式 | 30 | +5 工程学<br>闪避时获得12经验<br>下场敌袭期间-14 最大生命值 | stat_engineering, stat_dodge, xp_gain |  |
-| T2 | 狂乱的盐水 | 50 | +25 %攻击速度<br>每2%速度会-1%伤害 [-15] | stat_attack_speed | 核心 |
+| T2 | 狂乱的盐水 | 50 | +25 %攻击速度<br>每2%速度会-1%伤害 [-2] | stat_attack_speed | 核心 |
 | T2 | 回响的瞄准镜 | 30 | +3 %暴击率<br>每永久持有2护甲会+1生命再生 [+0]<br>敌袭结束后+3%敌人生命值 | stat_crit_chance, stat_hp_regeneration, stat_armor |  |
 | T2 | 锋利的阴影药水 | 55 | +8 %伤害<br>+15 %构建物的攻击速度 | stat_percent_damage, structure |  |
 | T2 | 急切的小型弹匣 | 40 | 敌人在首次被元素伤害命中时，有70%概率+1%攻击速度，持续6秒 | stat_attack_speed, stat_elemental_damage |  |
@@ -145,7 +145,7 @@
 | T3 | 远古链球 | 85 | +2 %速度<br>在每一波敌袭中会抵消受到的攻击伤害<br>-5 近战伤害 | stat_speed |  |
 | T3 | 睿智的头巾 | 70 | +36 获得%经验<br>对头目和精英怪造成+17%伤害<br>敌袭开始时，永久获得“每3构筑物会+1工程学 [+0]”<br>-10 %攻击速度 | xp_gain, stat_percent_damage, structure, stat_engineering |  |
 | T3 | 离奇的藤壶 | 70 | +3 工程学<br>+15%敌人掉落的材料 | stat_engineering |  |
-| T3 | 结实的路障 | 65 | +7 最大生命值<br>每持有一异种IV级别物品有+2护甲[+0] | stat_max_hp, stat_armor |  |
+| T3 | 结实的路障 | 65 | +7 最大生命值<br>每持有一异种IV级别物品有+2护甲[+2] | stat_max_hp, stat_armor |  |
 | T3 | 共鸣豆老师 | 70 | +7 最大生命值<br>每永久持有1远程伤害会+1%伤害 [+0]<br>-4 远程伤害 | stat_max_hp, stat_percent_damage, stat_ranged_damage |  |
 | T3 | 灼烧的黑旗 | 80 | +1 %生命窃取<br>每杀死4个燃烧的敌人，+1%闪避。每波最大值：+2<br>+5 诅咒<br>-2 工程学 | stat_lifesteal, stat_dodge, stat_elemental_damage, stat_curse |  |
 | T3 | 愈合的献血 | 65 | +5 生命再生<br>在下场敌袭中会出现4个额外的战利品外星人<br>移动时-3工程学 | stat_hp_regeneration, economy |  |
@@ -153,12 +153,12 @@
 | T3 | 生机蜡烛 | 70 | +3 生命再生<br>对燃烧目标造成非属性来源的+60%伤害<br>升级时有+27%概率立即吸收掉落的材料，直至敌袭结束<br>-6 %伤害 | stat_hp_regeneration, stat_elemental_damage, pickup |  |
 | T3 | 锋利的糖果袋 | 75 | +7 %伤害<br>捡起消耗品时获得6经验<br>每受到2次伤害，-1%速度，直至敌袭结束 | stat_percent_damage, consumable, xp_gain |  |
 | T3 | 狂乱的变色龙 | 70 | +38 %攻击速度<br>-13 %伤害 | stat_attack_speed | 核心 |
-| T3 | 远古三叶草 | 100 | +4 元素伤害<br>生成1台发射贯通弹的炮塔，造成33（+125%）伤害<br>对头目和精英怪造成+15%伤害<br>-7 工程学 | stat_elemental_damage, structure, stat_percent_damage |  |
+| T3 | 远古三叶草 | 100 | +4 元素伤害<br>生成1台发射贯通弹的炮塔，造成20（+125%）伤害<br>对头目和精英怪造成+15%伤害<br>-7 工程学 | stat_elemental_damage, structure, stat_percent_damage |  |
 | T3 | 回响的线圈 | 60 | +7 最大生命值<br>每持有1件武器+4%伤害 [+0]<br>敌袭开始时永久获得“-2 %道具价格”<br>-10 %攻击速度 | stat_max_hp, stat_percent_damage, economy |  |
 | T3 | 增幅社区支持 | 65 | +8 最大生命值<br>护甲的修改增加50%<br>捡起消耗品时+5%敌人伤害，直至敌袭结束 | stat_max_hp, stat_armor, consumable |  |
 | T3 | 丰满的王冠 | 85 | +3 最大生命值<br>敌袭结束时获得33经验<br>敌袭结束时+1幸运 | stat_max_hp, xp_gain, stat_luck |  |
 | T3 | 奇异的水晶 | 65 | +1 最大生命值<br>使用精准类武器时+15%攻击速度 | stat_max_hp, stat_attack_speed |  |
-| T3 | 回响的小精灵 | 55 | +4 %闪避<br>+1 生命再生<br>每损失6%生命值，有+1%闪避[+6] | stat_dodge, stat_hp_regeneration |  |
+| T3 | 回响的小精灵 | 55 | +4 %闪避<br>+1 生命再生<br>每损失6%生命值，有+1%闪避[+5] | stat_dodge, stat_hp_regeneration |  |
 | T3 | 远古鳍 | 75 | +1 远程伤害<br>+5 范围<br>使用原始类武器时+20%攻击速度<br>每前进5步，爆炸，造成相当于50%元素伤害的伤害 | stat_ranged_damage, stat_range, stat_attack_speed, explosive, stat_speed, stat_elemental_damage |  |
 | T3 | 离奇的炒饭 | 55 | 对燃烧目标造成非属性来源的+40%伤害<br>-5 范围 | stat_elemental_damage |  |
 | T3 | 精炼的冰冻的心 | 75 | +2 最大生命值<br>%伤害的修改增加33%<br>敌袭结束后+1%敌人速度 | stat_max_hp, stat_percent_damage |  |
@@ -211,12 +211,12 @@
 | T4 | 迅捷斗篷 | 90 | +15 %速度<br>每前进1步，有45%概率对头目和精英怪造成+1%伤害，直至敌袭结束<br>-50 范围 | stat_speed, stat_percent_damage |  |
 | T4 | 幻影执照 | 100 | +18 %闪避<br>-5 %生命窃取 | stat_dodge |  |
 | T4 | 愈合的Esty的沙发 | 100 | +13 生命再生<br>升级时+12最大生命值，直至敌袭结束<br>升级时-8%生命窃取，直至敌袭结束 | stat_hp_regeneration, stat_max_hp |  |
-| T4 | 共鸣吞吞怪之帽 | 110 | +10 范围<br>每损失2%生命值，有+1%速度[+19]<br>-8 %伤害 | stat_range, stat_speed |  |
+| T4 | 共鸣吞吞怪之帽 | 110 | +10 范围<br>每损失2%生命值，有+1%速度[+16]<br>-8 %伤害 | stat_range, stat_speed |  |
 | T4 | 致命外骨骼 | 100 | +14 %暴击率<br>+20 范围<br>+2 工程学<br>每拾取2个材料，永久获得“有+1%概率立即吸收掉落的材料”（每波最多20次）<br>-5 远程伤害 | stat_crit_chance, stat_range, stat_engineering, pickup |  |
 | T4 | 复仇爆裂弹 | 110 | +8 %闪避<br>受到伤害时最大生命值的修改增加5%，直至敌袭结束<br>-10 %攻击速度 | stat_dodge, stat_max_hp |  |
 | T4 | 野蛮的另一个胃 | 100 | +2 远程伤害<br>+13 近战伤害<br>+15 范围<br>+4 %攻击速度<br>捡起消耗品时+1%伤害。每波最大值：+9<br>捡起消耗品时-1%闪避。每波最大值：-9<br>下场敌袭以1点生命值开始 | stat_ranged_damage, stat_melee_damage, stat_range, stat_attack_speed, stat_percent_damage, consumable |  |
 | T4 | 轻盈焦点 | 100 | +4 最大生命值<br>闪避时有15%概率你的投射物获得+1次反弹，直至敌袭结束<br>受到伤害时-4%攻击速度，直至敌袭结束。每波最大值：-40 | stat_max_hp, stat_dodge |  |
-| T4 | 远古巨型带 | 110 | 生成1台发射爆破弹的炮塔，造成41（+150%）范围伤害<br>-11 %伤害 | structure |  |
+| T4 | 远古巨型带 | 110 | 生成1台发射爆破弹的炮塔，造成25（+150%）范围伤害<br>-11 %伤害 | structure |  |
 | T4 | 远古地精 | 100 | +10 %伤害<br>持有每一异种武器+6%攻击速度 [+0]<br>-7 最大生命值 | stat_percent_damage |  |
 | T4 | 厚重的希腊火 | 100 | +5 最大生命值<br>每击杀2个被诅咒的敌人，获得1个材料<br>+5 诅咒 | stat_max_hp, economy, stat_curse |  |
 | T4 | 增幅Grind的魔法绿叶 | 90 | +20 获得%经验<br>+2 护甲<br>最大生命值的修改增加50%<br>-13 幸运 | xp_gain, stat_armor, stat_max_hp |  |
@@ -228,7 +228,7 @@
 | T4 | 回响的幸运硬币 | 110 | +29 %伤害<br>每永久持有1%闪避会+1工程学 [+0]<br>敌袭结束后+5%敌人速度 | stat_percent_damage, stat_engineering, stat_dodge |  |
 | T4 | 急切的猛犸 | 100 | +11 %伤害<br>+19 %攻击速度<br>+28 幸运<br>命中生命值高于50%的敌人时，造成敌人当前生命值的7%以作为奖励伤害（头目和精英怪的0.7%）<br>杀死敌人时有60%概率-1%闪避，直至敌袭结束 | stat_percent_damage, stat_attack_speed, stat_luck |  |
 | T4 | 古怪的急救包 | 105 | +17 最大生命值<br>将时间倒回，将当前波次减少1（生效后此条效果消失） | stat_max_hp |  |
-| T4 | 回响的夜视镜 | 90 | +10 %速度<br>每1%速度会+2%暴击率 [+62]<br>-5 护甲 | stat_speed, stat_crit_chance |  |
+| T4 | 回响的夜视镜 | 90 | +10 %速度<br>每1%速度会+2%暴击率 [+10]<br>-5 护甲 | stat_speed, stat_crit_chance |  |
 | T4 | 修补匠的章鱼 | 105 | +25 工程学<br>+3 元素伤害<br>+2 %攻击速度<br>捡起消耗品时，每4远程伤害会+3幸运 [+0]，直至敌袭结束<br>-7 最大生命值 | stat_engineering, stat_elemental_damage, stat_attack_speed, consumable, stat_ranged_damage, stat_luck |  |
 | T4 | 奇异的熊猫 | 100 | 将时间倒回，将当前波次减少1（生效后此条效果消失）<br>-11 %伤害 | （无） |  |
 | T4 | 愈合的土豆 | 110 | +6 最大生命值<br>+9 生命再生<br>持有每一异种武器-3%攻击速度 [+0] | stat_max_hp, stat_hp_regeneration |  |
@@ -236,7 +236,7 @@
 | T4 | 掠食者的Retromation的连帽衫 | 105 | +10 最大生命值<br>杀死敌人时有25%概率掉落1个水果<br>下场敌袭以1点生命值开始 | stat_max_hp, consumable |  |
 | T4 | 离奇的跳弹 | 110 | +3 %生命窃取<br>你的投射物获得+1次反弹<br>-5 远程伤害 | stat_lifesteal |  |
 | T4 | 美味的机械臂 | 110 | 使用消耗品恢复+5HP<br>+9击退<br>+2 %生命窃取<br>每杀死3个敌人，获得1个材料<br>捡起消耗品时-2%生命窃取，直至敌袭结束。每波最大值：-20 | consumable, knockback, stat_lifesteal, economy |  |
-| T4 | 回响的替罪羔羊 | 110 | +34 %伤害<br>每损失1%生命值，有+1%闪避[+38]<br>%攻击速度的修改减少50% | stat_percent_damage, stat_dodge |  |
+| T4 | 回响的替罪羔羊 | 110 | +34 %伤害<br>每损失1%生命值，有+1%闪避[+33]<br>%攻击速度的修改减少50% | stat_percent_damage, stat_dodge |  |
 | T4 | 精炼的海贝壳 | 110 | +15 近战伤害<br>远程伤害的修改增加50% | stat_melee_damage, stat_ranged_damage |  |
 | T4 | 丰满的Sifd的圣物 | 100 | +14 最大生命值<br>以暴击杀死敌人时，获得1个材料 | stat_max_hp, economy, stat_crit_chance |  |
 | T4 | 凶猛的蜘蛛 | 90 | +2 %速度<br>+1 护甲<br>引发爆炸时恢复3点生命值 | stat_speed, stat_armor, explosive |  |
