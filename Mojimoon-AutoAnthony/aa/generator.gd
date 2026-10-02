@@ -1323,6 +1323,11 @@ func _tags_for(effects: Array) -> Array:
 		elif e.has_meta("aa_tags") and e.get_meta("aa_value") > 0:
 			add += e.get_meta("aa_tags")
 			add += Catalog.tags_for_binding("mech:" + (e.custom_key if e.custom_key != "" else e.key))
+		# 武器伤害随某属性缩放（冰冻之心、钉子）、武器类型加成：对应属性也是词条
+		if e.custom_key == "weapon_scaling_stats" and e.value > 0 and Catalog.STATS.has(e.key):
+			add.push_back(e.key)
+		if e.get_script() == load("res://effects/items/class_bonus_effect.gd") and e.value > 0 and Catalog.STATS.has(e.stat_displayed_name):
+			add.push_back(e.stat_displayed_name)
 		# 功能性词条（与正负无关，原版角色按它们筛选）：+诅咒、敌人数量增减
 		if e.key in Catalog.PRESERVED_NATIVE_KEYS and e.value > 0:
 			add.push_back(e.key)
@@ -1332,6 +1337,9 @@ func _tags_for(effects: Array) -> Array:
 		if e.key == "enemy_speed" and e.value < 0 and not e is TriggerEffect:
 			add.push_back("less_enemy_speed")
 		for t in add:
+			# 爆炸伤害 / 范围、消耗品回复、拾取范围不是原版词条，原版用 explosive / consumable / pickup（已在上面加上）
+			if Catalog.STAT_EXTRA_TAGS.get(t, t) != t:
+				continue
 			if t != "" and not t in tags:
 				tags.push_back(t)
 	return tags
