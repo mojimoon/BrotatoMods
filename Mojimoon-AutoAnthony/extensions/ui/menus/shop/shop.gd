@@ -17,9 +17,9 @@ func _on_RerollButton_pressed(player_index: int) -> void:
 
 
 func buy_item(item_data: ItemData, player_index: int) -> void:
-	var snap = _aa_snapshot(["duplicate_item"])
+	var taken = _aa_take_duplicates(player_index)
 	.buy_item(item_data, player_index)
-	_aa_restore(snap)
+	_aa_apply_duplicates(taken, item_data, player_index)
 	var m = AAMain.get_mod()
 	if m != null:
 		m.fire_shop("buy", player_index)
@@ -104,6 +104,64 @@ func _aa_restore(snap: Array) -> void:
 		var lost = entry[2] - RunData.get_nb_item(it.my_id_hash, p, false)
 		for _i in max(0, lost):
 			_aa_add_without(it, p, entry[3])
+
+
+# 复制购买的道具（镜子效果）出现在重组道具上时由这里处理，不交给原版：原版对每个持有者 ID 按"复制份数"循环，
+# 每份都按 ID 找一件持有者并整件移除；份数 > 1（重组按预算缩放、诅咒）时找不到持有者，对空值调用而闪退。
+# 这里先把这些条目从效果列表里取出（原版只处理原版镜子），之后放回，再按份数复制购买的道具，持有者只失去这一条效果。
+# 效果列表按持有者 ID 合并存储（[ID, 份数之和]），同 ID 的多件持有者一起生效，与原版多面镜子相同
+func _aa_take_duplicates(p: int) -> Array:
+	var arr: Array = RunData.get_player_effect(Keys.duplicate_item_hash, p)
+	var taken = []
+	for entry in arr.duplicate():
+		var holders = []
+		for it in RunData.get_player_items(p):
+			if it.my_id_hash != entry[0]:
+				continue
+			if it.my_id_hash == Keys.item_mirror_hash and not _aa_generated(it):
+				continue
+			for e in it.effects:
+				if e.custom_key == "duplicate_item":
+					holders.push_back([it, e.value])
+					break
+		if holders.empty():
+			continue
+		taken.push_back([entry[0], entry[1], holders])
+		arr.erase(entry)
+	return taken
+
+
+func _aa_apply_duplicates(taken: Array, item_data: ItemData, p: int) -> void:
+	var arr: Array = RunData.get_player_effect(Keys.duplicate_item_hash, p)
+	# 放回（购买的道具本身也可能带同 ID 的复制效果，已由原版加入列表：合并）
+	for t in taken:
+		var merged = false
+		for entry in arr:
+			if entry[0] == t[0]:
+				entry[1] += t[1]
+				merged = true
+				break
+		if not merged:
+			arr.push_back([t[0], t[1]])
+	var changed = false
+	for t in taken:
+		var count = int(min(t[1], RunData.get_remaining_max_nb_item(item_data, p)))
+		if count <= 0:
+			continue
+		for _i in count:
+			RunData.add_item(item_data, p)
+		# 依次消耗持有者，直到覆盖复制份数
+		var covered = 0
+		for h in t[2]:
+			if covered >= count:
+				break
+			_aa_replace_without(h[0], p, ["duplicate_item"])
+			covered += max(1, h[1])
+		changed = true
+	if changed:
+		var gear = _get_gear_container(p)
+		if gear != null:
+			gear.set_items_data(RunData.get_player_items(p))
 
 
 func _aa_replace_without(it, p: int, keys: Array) -> void:

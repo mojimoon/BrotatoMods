@@ -3828,3 +3828,110 @@ func test_122_feedback_crit_kill_and_state_max_hp() -> void:
 	main._cleaning_up = true
 	rt.revert_all_grants()
 	m.on_menu_reset()
+
+
+# 反馈：持有"复制购买的道具"（镜子效果）的重组道具时购买道具闪退
+func test_123_mirror_like_holders_in_shop() -> void:
+	# 生成池里的复制效果数值
+	var vals = {}
+	for sd in range(1, 31):
+		var plan = _gen(sd)
+		for id in plan.items:
+			for e in plan.items[id].effects:
+				if e.custom_key == "duplicate_item":
+					vals[e.value] = vals.get(e.value, 0) + 1
+					_eq(e.key, id, "duplicate_item keyed to its holder " + id)
+	print("AUDIT duplicate_item values in generated pools: %s" % str(vals))
+	_setup_player("character_well_rounded")
+	var fist = isvc.get_element_safe(isvc.weapons, "weapon_fist_1")
+	var _w = rd.add_weapon(fist, 0)
+	var gen = Generator.new(_cfg(), 1)
+	gen._collect_priors(isvc.items, isvc.characters, isvc.weapons)
+	m.start_new_run()
+	rd.add_gold(500, 0)
+	var _e = tree.change_scene("res://ui/menus/shop/shop.tscn")
+	for i in 6:
+		yield(tree, "idle_frame")
+	var shop = tree.current_scene
+	# (a) 复制 2 份的持有者：购买一件，得到 1 + 2 件，持有者保留但失去该效果
+	var holder = _item("item_helmet").duplicate()
+	var dup = gen._mechanic_copy(_find_mech(gen, "duplicate_item"), -1.0, "item_helmet")
+	dup.value = 2
+	holder.effects = [dup]
+	rd.add_item(holder, 0)
+	shop.buy_item(_item("item_bat"), 0)
+	_eq(rd.get_nb_item(Keys.generate_hash("item_bat"), 0, false), 3, "x2 holder: bought 1 + duplicated 2")
+	_eq(rd.get_nb_item(Keys.generate_hash("item_helmet"), 0, false), 1, "x2 holder kept")
+	shop.buy_item(_item("item_bat"), 0)
+	_eq(rd.get_nb_item(Keys.generate_hash("item_bat"), 0, false), 4, "next purchase is a normal purchase")
+	# (b) 购买与持有者同 ID 的道具（重组道具本身带复制效果，例如重组后的镜子）
+	var mirror = _item("item_mirror")
+	var own = null
+	for e in mirror.effects:
+		if e.custom_key == "duplicate_item":
+			own = e
+	var holder2 = _item("item_cake").duplicate()
+	var dup2 = gen._mechanic_copy(_find_mech(gen, "duplicate_item"), -1.0, "item_cake")
+	holder2.effects = [dup2]
+	rd.add_item(holder2, 0)
+	var cake_shop = _item("item_cake").duplicate()
+	cake_shop.effects = [dup2.duplicate()]
+	shop.buy_item(cake_shop, 0)
+	var cakes = rd.get_nb_item(Keys.generate_hash("item_cake"), 0, false)
+	var dup_left = rd.get_player_effect(Keys.duplicate_item_hash, 0).size()
+	print("AUDIT buying the holder's own id: %d cakes, %d duplicate effects left" % [cakes, dup_left])
+	_eq(cakes, 3, "own-id purchase: holder + bought + 1 copy")
+	shop.buy_item(_item("item_bat"), 0)
+	for i in 4:
+		yield(tree, "idle_frame")
+	_check(true, "no crash after buying again")
+	m.on_menu_reset()
+
+
+# 金鱼（刷新时升档）/ 沙漏（倒流）效果在重组道具上：数值分布、两件同 ID 持有者
+func test_124_goldfish_hourglass_holders() -> void:
+	var vals = {}
+	for sd in range(1, 31):
+		var plan = _gen(sd)
+		for id in plan.items:
+			for e in plan.items[id].effects:
+				if e.custom_key == "increase_tier_on_reroll" or e.key == "item_hourglass":
+					var k = (e.custom_key if e.custom_key != "" else e.key) + "=" + str(e.value)
+					vals[k] = vals.get(k, 0) + 1
+	print("AUDIT goldfish / hourglass values in generated pools: %s" % str(vals))
+	_setup_player("character_well_rounded")
+	var fist = isvc.get_element_safe(isvc.weapons, "weapon_fist_1")
+	var _w = rd.add_weapon(fist, 0)
+	var gen = Generator.new(_cfg(), 1)
+	gen._collect_priors(isvc.items, isvc.characters, isvc.weapons)
+	m.start_new_run()
+	for i in 2:
+		var fish = _item("item_cake").duplicate()
+		fish.effects = [gen._mechanic_copy(_find_mech(gen, "increase_tier_on_reroll"), -1.0, "item_cake")]
+		rd.add_item(fish, 0)
+	for i in 2:
+		var glass = _item("item_potato").duplicate()
+		glass.effects = [gen._mechanic_copy(_find_mech(gen, "item_hourglass"), -1.0, "item_potato")]
+		rd.add_item(glass, 0)
+	rd.current_wave = 6
+	rd.add_gold(500, 0)
+	var _e = tree.change_scene("res://ui/menus/shop/shop.tscn")
+	for i in 6:
+		yield(tree, "idle_frame")
+	var shop = tree.current_scene
+	var fish_fx = []
+	for r in 3:
+		shop._on_RerollButton_pressed(0)
+		var n = 0
+		for it in rd.get_player_items(0):
+			if it.my_id == "item_cake" and not it.effects.empty():
+				n += 1
+		fish_fx.push_back(n)
+	print("AUDIT two goldfish-like holders, holders with the effect after each reroll: %s" % str(fish_fx))
+	_eq(fish_fx, [1, 0, 0], "each reroll consumes one goldfish-like holder")
+	_eq(rd.get_player_effect(Keys.increase_tier_on_reroll_hash, 0).size(), 0, "no goldfish effect left")
+	shop._on_GoButton_pressed(0)
+	_eq(rd.current_wave, 5, "two hourglass-like holders rewind two waves (6 -> 7 -> 5)")
+	for i in 6:
+		yield(tree, "idle_frame")
+	m.on_menu_reset()
