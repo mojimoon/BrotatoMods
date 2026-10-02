@@ -1315,9 +1315,10 @@ func _find_mech(gen, key: String):
 func test_85_id_bound_effects_are_adapted() -> void:
 	var gen = Generator.new(_cfg(), 1)
 	gen._collect_priors(isvc.items, isvc.characters, isvc.weapons)
-	for key in ["duplicate_item", "increase_tier_on_reroll", "item_hourglass", "extra_item_in_crate", "remove_speed",
+	# 丑牙（减速）与害怕的香肠（点燃）已拆解为触发条款，不再作为机制
+	for key in ["duplicate_item", "increase_tier_on_reroll", "item_hourglass", "extra_item_in_crate",
 			"number_of_enemies", "curse_locked_items", "items_price", "reroll_price", "recycling_gains", "harvesting_growth",
-			"gain_pct_gold_start_wave", "loot_alien_chance", "tree_turrets", "burn_chance", "hp_start_next_wave"]:
+			"gain_pct_gold_start_wave", "loot_alien_chance", "tree_turrets", "hp_start_next_wave"]:
 		_check(_find_mech(gen, key) != null, "mechanic available: " + key)
 	for t in 4:
 		for mech in gen.mechanics_by_tier[t]:
@@ -2289,7 +2290,7 @@ func _enemies_hp(main) -> int:
 func _battle_snapshot(main) -> String:
 	var p = main._players[0]
 	return JSON.print([rd.get_player_effects(0), TempStats.player_stats[0], rd.get_player_gold(0), rd.get_player_xp(0), rd.get_player_level(0),
-		p.current_stats.health, p.max_stats.health, _enemies_hp(main), main._entity_spawner.get_all_enemies(false).size()])
+		p.current_stats.health, p.max_stats.health, _enemies_hp(main), main._entity_spawner.get_all_enemies(false).size(), main._consumables.size()])
 
 
 func _wait_enemy(main):
@@ -2401,6 +2402,17 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 		var _cbi = cb.init(en_cursed)
 		var _kcur = en_cursed.take_damage(999999, TakeDamageArgs.new(0))
 		yield(_wait_frames(2), "completed")
+	# 砍倒树木：按原版刷树队列生成一棵树并击倒
+	main._entity_spawner.queue_to_spawn_trees.push_back([EntityType.NEUTRAL, load("res://entities/units/neutral/tree.tscn"), player.global_position + Vector2(150, 0)])
+	for i in 40:
+		if not main._entity_spawner.neutrals.empty():
+			break
+		yield(tree.create_timer(0.1), "timeout")
+	_check(not main._entity_spawner.neutrals.empty(), "a tree spawned")
+	if not main._entity_spawner.neutrals.empty():
+		var tr0 = main._entity_spawner.neutrals[0]
+		var _kt = tr0.take_damage(999999, TakeDamageArgs.new(0))
+		yield(_wait_frames(3), "completed")
 	# 拾取材料（原版生成的材料节点）
 	main.spawn_gold(1.0, player.global_position, 0)
 	yield(_wait_frames(2), "completed")
@@ -2595,20 +2607,27 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 		player.current_stats.health = max(1, player.max_stats.health / 2)
 		# 伤害 / 爆炸看敌人总生命，敌人同时生成 / 死亡会干扰比较：最多重试 3 次
 		var changed = false
-		for attempt in (3 if e.payload in ["damage", "explode", "hp_dmg"] else 1):
+		for attempt in (3 if e.payload in ["damage", "explode", "hp_dmg", "projectiles", "ignite", "slow"] else 1):
 			var tgt = yield(_wait_enemy(main), "completed")
 			var before = _battle_snapshot(main)
 			var hp_before = _enemy_hp_map(main)
 			var tb = AAEB.find_on(tgt) if tgt != null and is_instance_valid(tgt) else null
 			var vuln_before = tb._vuln_total if tb != null else 0
+			var speed_before = tgt.current_stats.speed if tgt != null and is_instance_valid(tgt) else 0
 			rt.execute(e, 0, tgt.global_position if tgt != null and is_instance_valid(tgt) else null, false, null, tgt if tgt != null and is_instance_valid(tgt) else null)
 			# 爆炸由 WeaponService 延迟生成，命中需要几帧
-			yield(_wait_physics(12 if e.payload == "explode" else 4), "completed")
+			# 爆炸 / 投射物由 WeaponService 延迟生成，命中需要时间；燃烧第一跳约 1 秒
+			var waits = {"explode": 12, "projectiles": 60, "ignite": 75}
+			yield(_wait_physics(waits.get(e.payload, 4)), "completed")
 			if e.payload == "vuln":
 				if tb != null and is_instance_valid(tb) and tb._vuln_total > vuln_before:
 					changed = true
 					break
-			elif e.payload in ["damage", "explode", "hp_dmg"]:
+			elif e.payload == "slow":
+				if tgt != null and is_instance_valid(tgt) and (tgt.dead or tgt.current_stats.speed < speed_before):
+					changed = true
+					break
+			elif e.payload in ["damage", "explode", "hp_dmg", "projectiles", "ignite"]:
 				if _any_enemy_hurt(main, hp_before):
 					changed = true
 					break
@@ -4083,3 +4102,78 @@ func test_127_more_native_triggers() -> void:
 	m.on_menu_reset()
 
 
+# 剩余拆解：投射物（婴儿胡子 / 外星之眼）、点燃（害怕的香肠）、减速（丑牙）、掉落水果（果篮）；
+# 新扳机：砍倒树木（口袋工厂）、获得提升 [属性] 的道具（雪球）；击杀被诅咒的敌人附带 +5 诅咒
+func test_128_remaining_native_triggers() -> void:
+	var gen = Generator.new(_cfg(), 1)
+	gen._collect_priors(isvc.items, isvc.characters, isvc.weapons)
+	for t in 4:
+		for mech in gen.mechanics_by_tier[t]:
+			var k = mech.effect.custom_key if mech.effect.custom_key != "" else mech.effect.key
+			_check(not k in ["projectiles_on_death", "alien_eyes", "burn_chance", "remove_speed", "enemy_fruit_drops", "gain_stat_for_equipped_item_with_stat"],
+				"decomposed native trigger not copied: " + k)
+	_eq(Catalog.TRIGGERS["cursed_kill"].e, 25.0, "cursed kills estimated at 1/4 of kills")
+	var seen = {}
+	var samples = []
+	var curse_ok = 0
+	for sd in range(1, 31):
+		var plan = _gen(sd)
+		for id in plan.items:
+			var has_ck = false
+			var curse = 0
+			for e in plan.items[id].effects:
+				if e.key == "stat_curse" and not e is TriggerEffect:
+					curse += e.value
+				if not e is TriggerEffect:
+					continue
+				var k = ""
+				if e.payload in ["projectiles", "ignite", "slow", "fruit"]:
+					k = e.payload
+				elif e.trigger in ["tree_kill", "buy_stat"]:
+					k = e.trigger
+				if e.trigger == "cursed_kill" and e.value > 0:
+					has_ck = true
+				if k == "":
+					continue
+				seen[k] = seen.get(k, 0) + 1
+				var txt = e.get_text(0, false)
+				if samples.size() < 12:
+					samples.push_back(txt)
+				_check(txt.find("AA_") == -1 and txt.find("{") == -1, "text: " + txt)
+				if e.payload in ["ignite", "slow"]:
+					_check(e.trigger in Catalog.ENEMY_TARGET_TRIGGERS, e.payload + " only on triggers with a target: " + e.trigger)
+				if e.trigger == "buy_stat":
+					_eq(e.payload, "perm_stat", "item-with-stat trigger grants the same stat")
+			if has_ck:
+				_check(curse >= Catalog.CURSED_KILL_CURSE, "cursed-kill item carries +%d curse (%s)" % [Catalog.CURSED_KILL_CURSE, id])
+				if curse >= Catalog.CURSED_KILL_CURSE:
+					curse_ok += 1
+	print("AUDIT remaining native shapes over 30 seeds: %s, cursed-kill items with curse %d; %s" % [str(seen), curse_ok, str(samples)])
+	for k in ["projectiles", "ignite", "slow", "fruit", "tree_kill", "buy_stat"]:
+		_check(seen.get(k, 0) > 0, k + " appears in generated pools")
+	# 商店：获得提升该属性的道具时
+	m.start_new_run()
+	var holder = _item("item_potato").duplicate()
+	holder.effects = [TriggerEffect.make({"trigger": "buy_stat", "payload": "perm_stat", "stat": "stat_elemental_damage", "value": 2}),
+		TriggerEffect.make({"trigger": "buy", "payload": "rand_stats", "value": 3})]
+	rd.add_item(holder, 0)
+	var h = Keys.stat_elemental_damage_hash
+	var before = rd.get_player_effects(0)[h]
+	var elem_item = _item("item_potato").duplicate()
+	elem_item.effects = [gen._stat_effect("stat_elemental_damage", 1)]
+	var other = _item("item_potato").duplicate()
+	other.effects = [gen._stat_effect("stat_armor", 1)]
+	m.fire_shop("buy_stat", 0, other)
+	_eq(rd.get_player_effects(0)[h], before, "item without the stat does not trigger")
+	m.fire_shop("buy_stat", 0, elem_item)
+	_eq(rd.get_player_effects(0)[h], before + 2, "item with the stat triggers")
+	var tot0 = 0
+	for s in Catalog.STATS:
+		tot0 += int(rd.get_player_effects(0).get(Keys.generate_hash(s), 0))
+	m.fire_shop("buy", 0)
+	var tot1 = 0
+	for s in Catalog.STATS:
+		tot1 += int(rd.get_player_effects(0).get(Keys.generate_hash(s), 0))
+	_eq(tot1 - tot0, 3, "random primary stats work in the shop")
+	rd.remove_item(holder, 0)
+	m.on_menu_reset()

@@ -24,6 +24,8 @@ var _depth := 0
 var _explosion_effect = null
 var _explode_args = null
 var _damage_args = null
+var _proj_origin: Node2D = null
+const PROJECTILE_STATS = preload("res://items/all/alien_eyes/alien_eyes_stats.tres")
 # 计步（与原版徒步旅行者一致：移动时长 × 2 / 移动动画时长）
 var _steps: Array = [0.0, 0.0, 0.0, 0.0]
 
@@ -323,6 +325,14 @@ func _execute_inner(e, player_index: int, pos, show: bool, en, target) -> void:
 			_vuln(e, target)
 		"hp_dmg":
 			_hp_damage(e, player_index, target)
+		"projectiles":
+			_projectiles(e, player_index, pos)
+		"ignite":
+			_ignite(e, player_index, target)
+		"slow":
+			_slow(e, target)
+		"fruit":
+			call_deferred("_drop_fruit", e.value, pos if pos != null else _player_pos(player_index))
 		"rand_stats":
 			# 糖果袋：每点随机分配到一项主要属性
 			for _i in max(0, e.value):
@@ -406,6 +416,78 @@ func _explode(e, player_index: int, pos) -> void:
 	# 爆炸延迟生成：记下当前连锁深度，"引发爆炸时"扳机从这里继续计数
 	args.set_meta("aa_depth", _depth)
 	WeaponService.call_deferred("explode", _explosion_effect, args)
+
+
+func _player_pos(player_index: int):
+	var p = _get_player(player_index)
+	return p.global_position if p != null else null
+
+
+# 发射投射物（婴儿胡子 / 外星之眼）：有位置时从该位置（死亡的敌人等）向四周发射，否则环绕玩家；每个造成 [属性] 的 Y%
+func _projectiles(e, player_index: int, pos) -> void:
+	var player = _get_player(player_index)
+	if player == null or main == null or not is_instance_valid(main) or e.value <= 0:
+		return
+	var origin = player
+	if pos != null:
+		if _proj_origin == null or not is_instance_valid(_proj_origin):
+			_proj_origin = Node2D.new()
+			add_child(_proj_origin)
+		_proj_origin.global_position = pos
+		origin = _proj_origin
+	var base = PROJECTILE_STATS.duplicate()
+	base.damage = 1
+	base.scaling_stats = [[Keys.generate_hash(e.stat), max(1, e.value2) / 100.0]]
+	var stats = WeaponService.init_ranged_stats(base, player_index, true)
+	var n = int(e.value)
+	var offset = randf() * TAU
+	for i in n:
+		var args = WeaponServiceSpawnProjectileArgs.new()
+		args.from_player_index = player_index
+		var _p = WeaponService.manage_special_spawn_projectile(origin, stats, offset + TAU * i / n, false, main._entity_spawner, player, args)
+
+
+# 点燃目标（害怕的香肠）：3 跳 × X（+100% 元素伤害）
+func _ignite(e, player_index: int, target) -> void:
+	if target == null or not is_instance_valid(target) or target.dead:
+		return
+	var player = _get_player(player_index)
+	var bd = BurningData.new()
+	bd.chance = 1.0
+	bd.damage = int(max(1, e.value))
+	bd.duration = Catalog.IGNITE_TICKS
+	bd.scaling_stats = [[Keys.stat_elemental_damage_hash, 1.0]]
+	bd.from = player
+	target.apply_burning(bd)
+
+
+# 减速目标（丑牙）：每次降低最大速度的 X%，最多降到 (1 - 4X%)
+func _slow(e, target) -> void:
+	if target == null or not is_instance_valid(target) or target.dead or not "current_stats" in target:
+		return
+	var floor_speed = target.max_stats.speed * (1.0 - min(0.9, 4.0 * e.value / 100.0))
+	if target.current_stats.speed > floor_speed:
+		target.current_stats.speed = max(floor_speed, target.current_stats.speed - target.max_stats.speed * e.value / 100.0)
+
+
+# 掉落水果（果篮）：与原版敌人掉落消耗品相同的对象池与拾取信号
+func _drop_fruit(count: int, pos) -> void:
+	if main == null or not is_instance_valid(main) or pos == null:
+		return
+	for _i in max(0, count):
+		var data = ItemService.get_consumable_for_tier(Tier.COMMON)
+		if data == null:
+			return
+		var consumable = main.get_node_from_pool(main._consumable_pool_id, main._consumables_container)
+		if consumable == null:
+			consumable = main.consumable_scene.instance()
+			main._consumables_container.add_child(consumable)
+			var _err = consumable.connect("picked_up", main, "on_consumable_picked_up")
+		consumable.already_picked_up = false
+		consumable.consumable_data = data
+		consumable.set_texture(data.icon)
+		consumable.drop(pos, 0, ZoneService.get_rand_pos_in_area(pos, rand_range(50, 100), 0))
+		main._consumables.push_back(consumable)
 
 
 # 按目标敌人当前生命值的 X% 造成伤害（同巨型带 / 希腊火：头目和精英按原版的 1/10，无尽模式同样折减）

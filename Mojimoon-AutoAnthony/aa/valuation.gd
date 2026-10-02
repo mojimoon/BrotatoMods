@@ -94,6 +94,16 @@ static func main_value(c: Dictionary, perm_mult: float) -> float:
 			return unit * avg_stack(trigger, param, chance, cap, bool(c.get("reset", false)))
 		"explode":
 			return Catalog.DMG_W * Catalog.EXPLOSION_TARGETS * damage_per_proc(stat, int(v)) * fires_per_wave(trigger, param, chance, cap)
+		"projectiles":
+			return Catalog.DMG_W * Catalog.PROJECTILE_HIT_RATE * damage_per_proc(stat, int(c.get("value2", 50))) * v * fires_per_wave(trigger, param, chance, cap)
+		"ignite":
+			# 每跳 X + 100% 元素伤害（元素参考值），共 3 跳
+			var tick = v + Catalog.STATS["stat_elemental_damage"].ref
+			return Catalog.DMG_W * Catalog.IGNITE_TICKS * tick * fires_per_wave(trigger, param, chance, cap)
+		"slow":
+			return Catalog.SLOW_W * v * fires_per_wave(trigger, param, chance, cap)
+		"fruit":
+			return Catalog.FRUIT_W * v * fires_per_wave(trigger, param, chance, cap)
 		"hp_dmg":
 			return Catalog.HP_DMG_W * v * fires_per_wave(trigger, param, chance, cap)
 		"rand_stats":

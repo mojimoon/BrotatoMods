@@ -1065,6 +1065,7 @@ func _generate_item_once(item, force_special: bool) -> Dictionary:
 		item_banned_heal = false
 	# 原版的书写顺序：正面属性在前，触发 / 机制随后，负面在最后
 	var ordered = stat_lines + effects + _preserved_lines(item) + downsides
+	_add_cursed_kill_curse(ordered)
 	pos_cat = ""
 	neg_cat = ""
 	anchor_stat = ""
@@ -1078,6 +1079,18 @@ func _generate_item_once(item, force_special: bool) -> Dictionary:
 		"budget": budget_total,
 		"class": cls,
 	}
+
+
+# "击杀被诅咒的敌人时"需要有被诅咒的敌人：同原版黑旗，道具附带 +X 诅咒（已有诅咒行时不重复）
+func _add_cursed_kill_curse(effects: Array) -> void:
+	var has_trigger = false
+	for e in effects:
+		if e is TriggerEffect and e.trigger == "cursed_kill" and e.value > 0:
+			has_trigger = true
+		elif e.key == "stat_curse" and e.custom_key == "" and not e is TriggerEffect:
+			return
+	if has_trigger:
+		effects.push_back(_stat_effect("stat_curse", Catalog.CURSED_KILL_CURSE))
 
 
 # 原道具上保留的原版行（catalog.PRESERVED_NATIVE_KEYS），复制一份
@@ -2152,6 +2165,9 @@ func _next_wave_side(comp: float, perm_mult: float, exclude: Array) -> Dictionar
 # 属性类触发条款的同扳机负面条款：同扳机、同门控、同载荷方式，属性换成敌人属性（50%，数值为正）
 # 或自身其他属性（数值为负）；负面折算后的补偿约为正面价值的 30–60%
 func _make_pair(c: Dictionary, perm_mult: float) -> Dictionary:
+	# "获得提升 [属性] 的道具时"的条件属性就是效果属性，不配负面半边
+	if c.trigger == "buy_stat":
+		return {}
 	var cv = Valuation.clause_value(c, perm_mult)
 	if cv <= 0.0:
 		return {}
@@ -2402,6 +2418,17 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 			c.value2 = [2, 3, 4, 5][rng.randi() % 4]
 		"hp_dmg":
 			c.value = 1
+		"projectiles":
+			# 数量随预算增加；每个造成 [属性] 的 Y% 伤害
+			c.stat = _pick_stat(false, [], Catalog.DAMAGE_SCALING_STATS)
+			c.value = 2
+			c.value2 = [25, 50, 75, 100][rng.randi() % 4]
+		"ignite":
+			c.value = 1
+		"slow":
+			c.value = 1
+		"fruit":
+			c.value = 1
 		"rand_stats":
 			c.value = 1
 			if Valuation.raw_rate(trigger, 1, 100) > 1.5:
@@ -2446,6 +2473,8 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 			c.value = int(min(c.value * k, 50))
 		elif payload == "hp_dmg":
 			c.value = int(min(c.value * k, Catalog.HP_DMG_MAX))
+		elif payload == "slow":
+			c.value = int(min(c.value * k, Catalog.SLOW_MAX))
 		elif payload == "xp":
 			c.value = int(c.value * k)
 		else:
@@ -2502,6 +2531,14 @@ func _amount_cap(c: Dictionary, trigger: String) -> int:
 			return 8 if rate <= 1.5 else 2
 		"hp_dmg":
 			return Catalog.HP_DMG_MAX
+		"projectiles":
+			return 8 if rate <= 3 else 3
+		"ignite":
+			return 10 if rate <= 3 else 4
+		"slow":
+			return Catalog.SLOW_MAX
+		"fruit":
+			return 3 if rate <= 3 else 1
 		"timed_stat":
 			return 20 if rate <= 2.0 else 8
 		"heal":

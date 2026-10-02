@@ -23,6 +23,7 @@ func buy_item(item_data: ItemData, player_index: int) -> void:
 	var m = AAMain.get_mod()
 	if m != null:
 		m.fire_shop("buy", player_index)
+		m.fire_shop("buy_stat", player_index, item_data)
 	# 重组道具可能带有沙漏的"倒流"效果：购买后刷新"下一波"按钮上的波数
 	update_go_next_button_text()
 	# 重组道具可能改变武器栏数量：原版只在武器列表变化时刷新"武器 (n/上限)"标签

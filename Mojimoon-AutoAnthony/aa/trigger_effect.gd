@@ -155,6 +155,9 @@ func _trigger_text(colored: bool) -> String:
 				var base = "AA_T_HIT_ABOVE" if trigger.begins_with("hit_above_") else "AA_T_HIT_BELOW"
 				var k2 = base if param <= 1 else base + "_EVERY"
 				t = tr(k2).replace("{0}", str(param)).replace("{1}", trigger.get_slice("_", 2))
+			elif trigger == "buy_stat":
+				# 条件属性 = 效果属性（同原版雪球）
+				t = tr("AA_T_BUY_STAT").replace("{1}", tr(stat.to_upper()))
 			else:
 				t = tr("AA_T_" + trigger.to_upper())
 	return t
@@ -191,6 +194,14 @@ func _payload_text(colored: bool) -> String:
 			# 原版的百分比写法：头目和精英为 1/10（巨型带 10% / 1%）
 			var boss = str(stepify(value / 10.0, 0.1)).trim_suffix(".0") + "%"
 			return tr("AA_P_HP_DMG").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", boss)
+		"projectiles":
+			return tr("AA_P_PROJECTILES").replace("{0}", _col(str(value), good, colored)).replace("{1}", str(value2) + "%").replace("{2}", stat_name)
+		"ignite":
+			return tr("AA_P_IGNITE").replace("{0}", _col(str(value), good, colored)).replace("{1}", str(Catalog.IGNITE_TICKS))
+		"slow":
+			return tr("AA_P_SLOW").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", str(int(min(90, value * 4))) + "%")
+		"fruit":
+			return tr("AA_P_FRUIT_1" if value == 1 else "AA_P_FRUIT").replace("{0}", _col(str(value), good, colored))
 		"rand_stats":
 			return tr("AA_P_RAND_STATS_1" if value == 1 else "AA_P_RAND_STATS").replace("{0}", _col(str(value), good, colored))
 		"vuln":

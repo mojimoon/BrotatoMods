@@ -57,6 +57,21 @@ func _on_enemy_died(enemy: Enemy, args: Entity.DieArgs) -> void:
 			rt.fire("cursed_kill", p, pos)
 
 
+# 砍倒树木（口袋工厂同一入口）
+func _on_neutral_died(neutral: Neutral, args: Entity.DieArgs) -> void:
+	var counts = not _cleaning_up
+	var pos = neutral.global_position
+	._on_neutral_died(neutral, args)
+	var rt = _aa_rt()
+	if rt == null or not counts:
+		return
+	if args.killed_by_player_index >= 0:
+		rt.fire("tree_kill", args.killed_by_player_index, pos)
+	else:
+		for player in _get_live_players():
+			rt.fire("tree_kill", player.player_index, pos)
+
+
 # 被诅咒的敌人（DLC 的诅咒效果行为，与黑旗"击杀被诅咒的敌人"同一判断）
 static func _aa_is_cursed(enemy) -> bool:
 	if not is_instance_valid(enemy) or not "effect_behaviors" in enemy or enemy.effect_behaviors == null:
