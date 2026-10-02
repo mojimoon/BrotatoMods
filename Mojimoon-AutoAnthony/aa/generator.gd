@@ -181,10 +181,14 @@ func _ensure_min_lines(item, r: Dictionary) -> void:
 	r.main_stats = main_stats(effects)
 
 
-# 带"设定值 / 列表"型角色效果的道具（catalog.BETA_UNIQUE_KEYS）：设为独特
+# 带"设定值 / 列表"型角色效果（catalog.BETA_UNIQUE_KEYS）或叠加有技术问题的原版独特效果（UNIQUE_MECHANIC_*）的道具：设为独特
 static func has_unique_effect(effects: Array) -> bool:
 	for e in effects:
 		if e.key in Catalog.BETA_UNIQUE_KEYS or e.custom_key in Catalog.BETA_UNIQUE_KEYS:
+			return true
+		if e.key in Catalog.UNIQUE_MECHANIC_KEYS or e.custom_key in Catalog.UNIQUE_MECHANIC_KEYS:
+			return true
+		if e.get_script() != null and e.get_script().resource_path in Catalog.UNIQUE_MECHANIC_SCRIPTS:
 			return true
 	return false
 

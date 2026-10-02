@@ -70,12 +70,12 @@
 | T1 | 被眷顾的奇怪的食物 | 25 | +11 幸运 | stat_luck |  |
 | T1 | 复仇奇怪的幽灵 | 20 | +5 范围<br>受到伤害时（50%几率）：本波 +1%暴击率（每波最多 30 次）<br>受到伤害时（50%几率）：本波 -1%攻击速度（每波最多 30 次）<br>受到伤害时（80%几率）：本波 +1%敌人伤害（每波最多 10 次） | stat_range, stat_crit_chance |  |
 | T1 | 锋利的哨子 | 20 | +8 %伤害<br>持有每一异种武器-5范围 [+0] | stat_percent_damage |  |
-| T2 | 鹰眼酸液 | 30 | +1 远程伤害<br>消耗品会在4秒内持续为你治疗，而非瞬间治疗 | stat_ranged_damage, consumable |  |
+| T2 | 鹰眼酸液 | 30 | +1 远程伤害<br>消耗品会在4秒内持续为你治疗，而非瞬间治疗 | stat_ranged_damage, consumable | 独特 |
 | T2 | 收成异形眼球 | 60 | +17 收获<br>持有每一异种武器-5幸运 [+0] | stat_harvesting | 核心 |
 | T2 | 奇异的鱿鱼宝宝 | 35 | +2 元素伤害<br>商店免费刷新+1次<br>-4 工程学 | stat_elemental_damage, economy |  |
 | T2 | 弹力旗帜 | 50 | +19击退<br>+6 幸运<br>-2 元素伤害 | knockback, stat_luck |  |
 | T2 | 远视的黑带 | 50 | +1 工程学<br>+10 范围<br>+1 远程伤害<br>拾取消耗品时：永久 +1%暴击率（每波最多 1 次）<br>拾取消耗品时：永久 -1生命再生（每波最多 1 次）<br>%速度的修改减少15% | stat_engineering, stat_range, stat_ranged_damage, stat_crit_chance, consumable |  |
-| T2 | 厚重的焰蜥蜴 | 55 | +6 最大生命值<br>你的构筑物可以暴击<br>下场敌袭期间+20 %敌人速度 | stat_max_hp, structure, stat_crit_chance |  |
+| T2 | 厚重的焰蜥蜴 | 55 | +6 最大生命值<br>你的构筑物可以暴击<br>下场敌袭期间+20 %敌人速度 | stat_max_hp, structure, stat_crit_chance | 独特 |
 | T2 | 奥术眼罩 | 48 | +8 元素伤害<br>闪避时：本波 +3%敌人速度 | stat_elemental_damage, stat_dodge | 核心 |
 | T2 | 共鸣血蛭 | 40 | +9 %攻击速度<br>+2 生命再生<br>每永久持有1%闪避会+1幸运 [+0]<br>-15 %伤害 | stat_attack_speed, stat_hp_regeneration, stat_luck, stat_dodge |  |
 | T2 | 精准骨骰 | 40 | +1 远程伤害<br>静止时：获得「%攻击速度的修改增加25%」<br>-1 近战伤害 | stat_ranged_damage, stand_still, stat_attack_speed |  |
@@ -109,7 +109,7 @@
 | T2 | 共鸣鱼饵  | 40 | 每永久持有2护甲会+1工程学 [+0]<br>-4 %闪避 | stat_engineering, stat_armor |  |
 | T2 | 古怪的精湛技艺 | 50 | +3 近战伤害<br>使用工具类武器时+50%攻击速度<br>-10 %速度 | stat_melee_damage, stat_attack_speed |  |
 | T2 | 远古勋章 | 55 | +7击退<br>敌袭开始时+12%材料（在第20波敌袭后结束）<br>-3 %伤害 | knockback |  |
-| T2 | 恶毒的金属探测器 | 45 | +12 %暴击率<br>你的构筑物可以暴击 | stat_crit_chance, structure |  |
+| T2 | 恶毒的金属探测器 | 45 | +12 %暴击率<br>你的构筑物可以暴击 | stat_crit_chance, structure | 独特 |
 | T2 | 破晓金属板 | 40 | 下场敌袭期间+120 获得%经验<br>下场敌袭期间-14 最大生命值 | xp_gain |  |
 | T2 | 共鸣导弹 | 35 | +1 工程学<br>+3 %暴击率<br>持有每一异种武器+1远程伤害 [+0] | stat_engineering, stat_crit_chance, stat_ranged_damage |  |
 | T2 | 睿智的护垫 | 48 | +62 获得%经验<br>-25 范围 | xp_gain | 核心 |
@@ -153,7 +153,7 @@
 | T3 | 生机蜡烛 | 70 | +3 生命再生<br>对燃烧目标造成非属性来源的+60%伤害<br>升级时：本波获得「+5%敌人掉落的材料」<br>-6 %伤害 | stat_hp_regeneration, stat_elemental_damage |  |
 | T3 | 精炼的糖果袋 | 75 | %生命窃取的修改增加20%<br>使用精准类武器时+10%暴击率<br>受到伤害时（60%几率）：本波 -1%速度 | stat_lifesteal, stat_crit_chance |  |
 | T3 | 狂乱的变色龙 | 70 | +38 %攻击速度<br>-13 %伤害 | stat_attack_speed | 核心 |
-| T3 | 风暴三叶草 | 100 | +5 元素伤害<br>敌袭结束时，收获提高7%<br>闪避上限为70%<br>-5 护甲 | stat_elemental_damage, stat_harvesting |  |
+| T3 | 风暴三叶草 | 100 | +5 元素伤害<br>敌袭结束时，收获提高7%<br>闪避上限为70%<br>-5 护甲 | stat_elemental_damage, stat_harvesting | 独特 |
 | T3 | 回响的线圈 | 60 | +8 最大生命值<br>每持有1件武器+4%伤害 [+0]<br>每波开始时：永久获得「燃烧速度提高2%」<br>-10 %攻击速度 | stat_max_hp, stat_percent_damage, stat_elemental_damage |  |
 | T3 | 增幅社区支持 | 65 | +8 最大生命值<br>护甲的修改增加50%<br>拾取消耗品时：本波 +5%敌人伤害 | stat_max_hp, stat_armor, consumable |  |
 | T3 | 丰满的王冠 | 85 | +3 最大生命值<br>每波开始时：获得 33 经验<br>每波结束时：永久 +1幸运 | stat_max_hp, xp_gain, stat_luck |  |

@@ -801,6 +801,16 @@ const BETA_UNIQUE_KEYS = [
 	"min_weapon_tier", "max_melee_weapons", "max_ranged_weapons", "remove_shop_items", "weapon_slot_upgrades",
 	"all_weapons_count_for_sets", "guaranteed_shop_items",
 ]
+# 原版独特道具上、多份叠加会出技术问题的效果：带这些效果的重组道具设为独特
+#   覆盖写入（多份不叠加，卖掉一份会恢复旧值）：击退光环（灯笼）、闪避上限（幽灵服）、消耗品持续回复（干肉条）、锁定武器（结）
+#   只取一份 / 开关型（第二份无作用，或作为代价时白给预算）：生命 / 速度上限（手铐 / 镣铐）、最小攻击间隔（链球）、
+#   每第 X 发投射物（海贝壳，按 X 互相覆盖）、构筑物可暴击（一堆书）、一击砍树（伐木工人衬衫）
+const UNIQUE_MECHANIC_KEYS = [
+	"knockback_aura", "dodge_cap", "consumable_heal_over_time", "lock_current_weapons", "hp_cap", "speed_cap",
+	"minimum_weapon_cooldowns", "modify_every_x_projectile", "structures_can_crit", "one_shot_trees",
+]
+# 同上，按效果脚本识别：搜刮虫虫（刷怪器每个玩家只记录一只，多只追同一个目标）
+const UNIQUE_MECHANIC_SCRIPTS = ["res://effects/items/lootworm_effect.gd"]
 
 # ============================================================
 # 更多双面效果（选项）：常规池里只以正面 / 只以负面出现的效果，加入它们的对立面

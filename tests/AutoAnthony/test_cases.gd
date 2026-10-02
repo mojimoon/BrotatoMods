@@ -3935,3 +3935,32 @@ func test_124_goldfish_hourglass_holders() -> void:
 	for i in 6:
 		yield(tree, "idle_frame")
 	m.on_menu_reset()
+
+
+# 叠加有技术问题的原版独特效果：带这些效果的重组道具设为独特
+func test_125_unique_mechanics() -> void:
+	var seen = {}
+	var n_unique = 0
+	for sd in range(1, 21):
+		var plan = _gen(sd)
+		for id in plan.items:
+			var p = plan.items[id]
+			var hit = ""
+			for e in p.effects:
+				if e.key in Catalog.UNIQUE_MECHANIC_KEYS or e.custom_key in Catalog.UNIQUE_MECHANIC_KEYS:
+					hit = e.key if e.key in Catalog.UNIQUE_MECHANIC_KEYS else e.custom_key
+				elif e.get_script().resource_path in Catalog.UNIQUE_MECHANIC_SCRIPTS:
+					hit = e.get_script().resource_path.get_file()
+			if hit != "":
+				seen[hit] = seen.get(hit, 0) + 1
+				_check(p.unique, "%s with %s is unique" % [id, hit])
+			if p.unique:
+				n_unique += 1
+	print("AUDIT unique-mechanic effects over 20 seeds: %s; unique items %d" % [str(seen), n_unique])
+	_check(seen.size() >= 6, "most unique mechanics show up (%d)" % seen.size())
+	# 开局后道具资源的上限
+	m.start_new_run()
+	for id in m.plan.items:
+		if m.plan.items[id].unique:
+			_eq(_item(id).max_nb, 1, id + " max_nb 1 in run")
+	m.on_menu_reset()
