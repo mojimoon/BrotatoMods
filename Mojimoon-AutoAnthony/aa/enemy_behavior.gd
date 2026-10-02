@@ -10,7 +10,7 @@ const NODE_NAME = "AutoAnthonyEnemyBehavior"
 var _first_done: Dictionary = {}		# player_index -> true
 var _first_stats: Dictionary = {}		# player_index -> {stat_hash: true}
 var _burn_seen := false
-var _vulns: Array = []			# [百分比, 剩余秒数]
+var _vulns: Dictionary = {}		# 来源 -> [百分比, 剩余秒数]
 var _vuln_total := 0
 
 
@@ -86,17 +86,24 @@ func _process(delta: float) -> void:
 		_burn_seen = false
 	if _vulns.empty():
 		return
-	var i = _vulns.size() - 1
-	while i >= 0:
-		_vulns[i][1] -= delta
-		if _vulns[i][1] <= 0.0:
-			_vuln_total -= _vulns[i][0]
-			_vulns.remove(i)
-		i -= 1
+	for src in _vulns.keys():
+		var v = _vulns[src]
+		v[1] -= delta
+		if v[1] <= 0.0:
+			_vuln_total -= v[0]
+			_vulns.erase(src)
 
 
-func add_vuln(pct: int, seconds: float) -> void:
-	_vulns.push_back([pct, seconds])
+# 与原版受伤加成（冰块、鲁特琴）相同的规则：同一来源不叠层，取较大数值并刷新持续时间；不同来源相加
+func add_vuln(pct: int, seconds: float, source: int = 0) -> void:
+	if _vulns.has(source):
+		var v = _vulns[source]
+		if pct > v[0]:
+			_vuln_total += pct - v[0]
+			v[0] = pct
+		v[1] = max(v[1], seconds)
+		return
+	_vulns[source] = [pct, seconds]
 	_vuln_total += pct
 
 

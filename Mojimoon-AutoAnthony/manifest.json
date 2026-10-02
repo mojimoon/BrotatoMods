@@ -1,7 +1,7 @@
 {
     "name": "AutoAnthony",
     "namespace": "Mojimoon",
-    "version_number": "1.0.7",
+    "version_number": "1.0.8",
     "description": "土豆兄弟：东尼算法 Brotato: Auto-Anthonyology — 每局把道具（可选：角色、武器）拆成组件，按同等价值随机重组；任何触发条件都能驱动任何效果。Every run, items (optionally characters and weapons) are broken into components and reassembled at equal value; any trigger can drive any effect.",
     "website_url": "",
     "dependencies": [],

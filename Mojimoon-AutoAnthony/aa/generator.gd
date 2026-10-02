@@ -1231,6 +1231,10 @@ func _adapt_to_holder(e, holder_id: String) -> void:
 	if k in Catalog.HOLDER_KEYED:
 		e.key = holder_id
 		e.key_hash = Keys.generate_hash(holder_id)
+	elif k == "enemy_percent_damage_taken" and "source_id" in e:
+		# 受伤加成（冰块）：来源改为持有者，不同道具的同类效果可以相加（原版同一来源不叠层）
+		e.source_id = holder_id
+		e.source_id_hash = Keys.generate_hash(holder_id)
 	elif k == "extra_item_in_crate" and e.key != "random":
 		# 珍珠：箱子里额外出现"这件道具自己"
 		e.key = holder_id

@@ -3964,3 +3964,42 @@ func test_125_unique_mechanics() -> void:
 		if m.plan.items[id].unique:
 			_eq(_item(id).max_nb, 1, id + " max_nb 1 in run")
 	m.on_menu_reset()
+
+
+# 易伤：本 mod 的"使该敌人受到的伤害提高"与原版规则一致（同一来源不叠层，不同来源相加）；
+# 搬运的冰块效果来源改为持有者；潜水员的远程命中易伤不再搬运
+func test_126_vulnerability_stacking() -> void:
+	var b = load(MOD_DIR + "aa/enemy_behavior.gd").new()
+	var c1 = {"trigger": "hit_above_50", "payload": "vuln", "value": 15, "value2": 3}
+	var c2 = {"trigger": "crit", "payload": "vuln", "value": 20, "value2": 2}
+	var s1 = hash(JSON.print(TriggerEffect.make(c1).to_clause()))
+	var s2 = hash(JSON.print(TriggerEffect.make(c2).to_clause()))
+	for i in 10:
+		b.add_vuln(15, 3.0, s1)
+	_eq(b.get_bonus_damage(null, 0), 15, "same clause does not stack")
+	b.add_vuln(20, 2.0, s2)
+	_eq(b.get_bonus_damage(null, 0), 35, "different clauses add up")
+	b._process(2.5)
+	_eq(b.get_bonus_damage(null, 0), 15, "shorter one expired")
+	b.add_vuln(15, 3.0, s1)
+	b._process(2.0)
+	_eq(b.get_bonus_damage(null, 0), 15, "re-hit refreshes the duration")
+	b._process(1.5)
+	_eq(b.get_bonus_damage(null, 0), 0, "all expired")
+	b.free()
+	var gen = Generator.new(_cfg(), 1)
+	gen._collect_priors(isvc.items, isvc.characters, isvc.weapons)
+	var sources = {}
+	var ice = null
+	for t in 4:
+		for mech in gen.mechanics_by_tier[t]:
+			if mech.effect.custom_key == "enemy_percent_damage_taken":
+				sources[mech.source] = true
+				if mech.source == "item_ice_cube":
+					ice = mech
+	_check(not sources.has("character_diver"), "diver's ranged-hit vulnerability is not transferred")
+	_check(ice != null, "ice cube vulnerability still combines")
+	if ice != null:
+		var e = gen._mechanic_copy(ice, -1.0, "item_potato")
+		_eq(e.source_id, "item_potato", "copied vulnerability uses the holder as its source")
+		_eq(ice.effect.source_id, "item_ice_cube", "native ice cube effect untouched")

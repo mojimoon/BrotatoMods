@@ -407,7 +407,8 @@ func _vuln(e, target) -> void:
 		return
 	var b = AAEnemyBehavior.find_on(target)
 	if b != null:
-		b.add_vuln(e.value, float(max(1, e.value2)))
+		# 来源 = 条款内容：同一道具（同 ID 的多件）的同一条款不叠层，不同道具 / 不同条款相加
+		b.add_vuln(e.value, float(max(1, e.value2)), hash(JSON.print(e.to_clause())))
 
 
 func _get_player(player_index: int):
