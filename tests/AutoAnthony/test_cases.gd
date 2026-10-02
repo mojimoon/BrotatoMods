@@ -4217,7 +4217,7 @@ func test_129_no_preload_of_game_resources() -> void:
 
 
 # 通用门控：gate = every 的扳机都能单次 / 几率 / 每 N 次；作用于目标敌人的载荷不计次；
-# 限定伤害类型的扳机统一为一个 id + dmg_type 字段（近战 : 远程 : 元素 : 工程 = 2 : 2 : 2 : 1），旧 id 读档迁移；
+# 限定伤害类型的扳机统一为一个 id + dmg_type 字段（近战 : 远程 : 元素 : 工程 = 2 : 2 : 2 : 1）；
 # 商店扳机计次；"用某类伤害击杀"；水果不会在波末掉落
 func test_130_trigger_templates() -> void:
 	var counted = {}
@@ -4250,15 +4250,6 @@ func test_130_trigger_templates() -> void:
 	_check(typed.get("stat_engineering", 0) > 0 and typed.get("stat_engineering", 0) < typed.get("stat_melee_damage", 0), "engineering rarer than melee")
 	for tbl in [Catalog.LEGAL, Catalog.FREE_LEGAL]:
 		_check(not "fruit" in tbl.wave_end and not "fruit" in tbl.wave_start, "no fruit at wave start / end")
-	# 旧存档的扳机 id
-	var old = TriggerEffect.make({"trigger": "first_hit", "payload": "gold", "value": 1}).serialize()
-	old.trigger = "hit_ranged"
-	old.erase("dmg_type")
-	var migrated = TriggerEffect.new()
-	migrated.deserialize_and_merge(old)
-	_eq(migrated.trigger, "hit_typed", "legacy typed trigger id migrated")
-	_eq(migrated.dmg_type, "stat_ranged_damage", "legacy damage type migrated")
-	_check(migrated.get_text(0, false).find("AA_") == -1, "migrated text: " + migrated.get_text(0, false))
 	# 用某类伤害击杀
 	_check(Runtime._matches("kill_typed", "kill_typed", {"stats": ["stat_melee_damage"]}, "stat_melee_damage"), "melee kill matches")
 	_check(not Runtime._matches("kill_typed", "kill_typed", {"stats": ["stat_ranged_damage"]}, "stat_melee_damage"), "ranged kill does not match melee")

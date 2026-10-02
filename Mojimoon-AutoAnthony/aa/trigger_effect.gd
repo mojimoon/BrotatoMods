@@ -240,10 +240,6 @@ func deserialize_and_merge(s: Dictionary) -> void:
 	payload = str(s.get("payload", ""))
 	stat = str(s.get("stat", ""))
 	dmg_type = str(s.get("dmg_type", ""))
-	# 旧版本的"首次 / 每次以某类伤害命中"扳机按伤害类型各占一个 id
-	if Catalog.LEGACY_TYPED_TRIGGERS.has(trigger):
-		dmg_type = Catalog.LEGACY_TYPED_TRIGGERS[trigger][1]
-		trigger = Catalog.LEGACY_TYPED_TRIGGERS[trigger][0]
 	value2 = int(s.get("value2", 0))
 	cap = int(s.get("cap", 0))
 	reset = bool(s.get("reset", false))

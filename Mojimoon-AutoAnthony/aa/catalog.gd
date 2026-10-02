@@ -178,13 +178,6 @@ const ENEMY_TARGET_TRIGGERS = [
 const TYPED_TRIGGERS = ["first_hit_typed", "hit_typed", "kill_typed"]
 # 伤害类型及其抽取权重（近战 : 远程 : 元素 : 工程 = 2 : 2 : 2 : 1）；伤害 / 爆炸载荷的缩放属性落在伤害类型上时同样按此分配
 const DMG_TYPES = {"stat_melee_damage": 2.0, "stat_ranged_damage": 2.0, "stat_elemental_damage": 2.0, "stat_engineering": 1.0}
-# 旧存档的扳机 id -> [新 id, 伤害类型]
-const LEGACY_TYPED_TRIGGERS = {
-	"first_hit_melee": ["first_hit_typed", "stat_melee_damage"], "first_hit_ranged": ["first_hit_typed", "stat_ranged_damage"],
-	"first_hit_elemental": ["first_hit_typed", "stat_elemental_damage"], "first_hit_engineering": ["first_hit_typed", "stat_engineering"],
-	"hit_melee": ["hit_typed", "stat_melee_damage"], "hit_ranged": ["hit_typed", "stat_ranged_damage"],
-	"hit_elemental": ["hit_typed", "stat_elemental_damage"], "hit_engineering": ["hit_typed", "stat_engineering"],
-}
 # 连锁深度上限（"A 触发 B、B 触发 C、C 触发 D"）；延迟生成的爆炸也携带深度
 const MAX_CHAIN_DEPTH = 3
 # 单条条款每秒最多触发次数（防止连锁在同一时刻刷屏）
