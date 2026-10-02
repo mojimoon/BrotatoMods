@@ -109,8 +109,11 @@ func _signed(v: int) -> String:
 	return ("+" if v >= 0 else "") + str(v)
 
 
+# 句式按语言（AA_FMT / AA_FMT_CHANCE，同原版）：中日韩、土耳其语"触发 + 效果"，其余语言"效果 + 触发"
 func get_text(_player_index: int, colored: bool = true) -> String:
-	return tr(_trigger_text(colored)) + tr("AA_SEP") + _payload_text(colored) + _cap_text()
+	var k = "AA_FMT" if chance >= 100 else "AA_FMT_CHANCE"
+	var s = tr(k).replace("{t}", _trigger_text(colored)).replace("{p}", _payload_text(colored)) 		.replace("{c}", _col(str(chance) + "%", true, colored))
+	return s + _cap_text()
 
 
 func _trigger_text(colored: bool) -> String:
@@ -143,8 +146,6 @@ func _trigger_text(colored: bool) -> String:
 				t = tr(k2).replace("{0}", str(param)).replace("{1}", trigger.get_slice("_", 2))
 			else:
 				t = tr("AA_T_" + trigger.to_upper())
-	if chance < 100:
-		t += tr("AA_CHANCE").replace("{0}", _col(str(chance) + "%", true, colored))
 	return t
 
 
@@ -196,7 +197,11 @@ func scaled_grant():
 func _cap_text() -> String:
 	var t = ""
 	if cap > 0:
-		t += tr("AA_CAP").replace("{0}", str(cap))
+		# 属性类效果写每波可获得的总量（原版"每波最大值：+8"），其余写次数
+		if payload in ["temp_stat", "perm_stat"]:
+			t += tr("AA_CAP_STAT").replace("{0}", _signed(value * cap))
+		else:
+			t += tr("AA_CAP").replace("{0}", str(cap))
 	if reset:
 		t += tr("AA_RESET_ON_HIT")
 	return t

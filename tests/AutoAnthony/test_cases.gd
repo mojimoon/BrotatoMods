@@ -3342,7 +3342,7 @@ func test_113_more_double_sided() -> void:
 	m.start_new_run()
 	var main_rt = load(MOD_DIR + "aa/runtime.gd").new()
 	var te = TriggerEffect.make({"trigger": "kill", "payload": "gold", "value": -5})
-	_check(te.get_text(0, false).find("5") >= 0 and te.get_text(0, false).find("-5") == -1, "lose gold text: " + te.get_text(0, false))
+	_check(te.get_text(0, false).find("5") >= 0 and te.get_text(0, false).find("--") == -1, "lose gold text: " + te.get_text(0, false))
 	rd.add_gold(3 - rd.get_player_gold(0), 0)
 	main_rt.execute(te, 0, null, false)
 	_eq(rd.get_player_gold(0), 0, "losing materials stops at 0")
@@ -3601,9 +3601,9 @@ func test_117_all_locales_translated() -> void:
 	# 运行时切换语言后能取到对应文本
 	var prev = TranslationServer.get_locale()
 	TranslationServer.set_locale("de")
-	_eq(tr("AA_T_LEVEL_UP"), "Beim Levelaufstieg", "German text at runtime")
+	_eq(tr("AA_T_LEVEL_UP"), " beim Levelaufstieg", "German text at runtime")
 	TranslationServer.set_locale("ja")
-	_eq(tr("AA_T_STILL"), "静止中", "Japanese text at runtime")
+	_eq(tr("AA_T_STILL"), "静止中は", "Japanese text at runtime")
 	TranslationServer.set_locale(prev)
 
 
@@ -4078,3 +4078,5 @@ func test_127_more_native_triggers() -> void:
 	_eq(after - before, 6, "6 points split between primary stats")
 	rt.queue_free()
 	m.on_menu_reset()
+
+
