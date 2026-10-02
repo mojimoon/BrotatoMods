@@ -157,6 +157,8 @@ const TRIGGERS = {
 	"hit_ranged": {"kind": "event", "e": 150.0, "timing": 0.5, "gate": "every", "w": 0.05},
 	"hit_elemental": {"kind": "event", "e": 150.0, "timing": 0.5, "gate": "every", "w": 0.05},
 	"hit_engineering": {"kind": "event", "e": 150.0, "timing": 0.5, "gate": "every", "w": 0.05},
+	# 击杀被诅咒的敌人（黑旗）：只在有诅咒时出现被诅咒的敌人，按每波约 5 个估计
+	"cursed_kill": {"kind": "event", "e": 5.0, "timing": 0.5, "gate": "every", "w": 0.05},
 }
 
 # 实验性扳机（低权重）
@@ -188,6 +190,11 @@ const MAX_FIRES_PER_SECOND = 20
 # 受伤加成载荷的估值：同时被伤害的敌人约 8 个，持续时间超过约 4 秒不再增值
 const VULN_CONCURRENT_TARGETS = 8.0
 const VULN_MAX_USEFUL_SECONDS = 4.0
+# 按当前生命值伤害：每 1%、每次触发的价值（巨型带：暴击约 80 次 / 波、10% ≈ 62 反推）；单次上限 10%（同原版）
+const HP_DMG_W = 0.08
+const HP_DMG_MAX = 10
+# 随机主属性：每点、每次触发的永久价值（糖果袋：每波 8 点、T3 估值 26.4 反推）
+const RAND_STAT_W = 0.85
 
 # 实际受击次数（用于"受伤时清空"条款的估值）
 const REAL_HITS_PER_WAVE = 7.0
@@ -211,50 +218,55 @@ const PAYLOADS = {
 	"grant": {"w": 2.0},
 	# 使该敌人受到的伤害提高 X%，持续 N 秒（原版冰块 / 潜水员的效果；只用于有目标敌人的扳机）
 	"vuln": {"w": 0.5},
+	# 按该敌人当前生命值的 X% 造成伤害（头目和精英为 X/10%）：巨型带（暴击时）、希腊火（燃烧时）；只用于有目标敌人的扳机
+	"hp_dmg": {"w": 0.4},
+	# 将 X 点属性点随机分配到主要属性上（糖果袋，永久）
+	"rand_stats": {"w": 0.1},
 }
 
 # 合法组合：触发扳机 -> 允许的载荷
-# 排除规则：状态扳机只挂临时属性；商店扳机只挂永久效果；回血扳机不挂回血（避免自激循环），
-# 拾取材料不挂材料；波末 / 波初没有敌人和伤害意义的载荷被排除。
+# 排除规则：状态扳机只挂临时属性；商店扳机只挂永久效果；回血扳机不挂回血（避免自激循环）；
+# 拾取材料可以挂材料（直接加到材料数，不生成掉落物，不会循环；原版金属探测器）；波末 / 波初没有敌人和伤害意义的载荷被排除。
 const LEGAL = {
-	"kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode"],
+	"kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats"],
 	"hit": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode"],
 	"dodge": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode"],
-	"consumable": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode"],
-	"gold": ["temp_stat", "timed_stat", "heal", "xp", "damage", "explode"],
+	"consumable": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats"],
+	"gold": ["temp_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode"],
 	"heal": ["temp_stat", "timed_stat", "gold", "damage", "explode"],
-	"level_up": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "damage", "explode"],
+	"level_up": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "damage", "explode", "rand_stats"],
 	# 每波开始时"本波 +X 属性 / 本波获得"= 整波持有，与直接写在道具上无异：不生成
-	"wave_start": ["perm_stat", "gold"],
-	"wave_end": ["perm_stat", "gold", "xp"],
+	"wave_start": ["perm_stat", "gold", "rand_stats"],
+	"wave_end": ["perm_stat", "gold", "xp", "rand_stats"],
 	"interval": ["temp_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode"],
 	"still": ["temp_stat"],
 	"moving": ["temp_stat"],
 	"low_hp": ["temp_stat"],
 	"full_hp": ["temp_stat"],
-	"reroll": ["perm_stat", "gold"],
-	"buy": ["perm_stat", "gold"],
-	"crit_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode"],
-	"burning_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode"],
-	"steps": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp"],
-	"half_wave": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold"],
-	"crate": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp"],
+	"reroll": ["perm_stat", "gold", "rand_stats"],
+	"buy": ["perm_stat", "gold", "rand_stats"],
+	"crit_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats"],
+	"burning_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats"],
+	"steps": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "rand_stats"],
+	"half_wave": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "rand_stats"],
+	"crate": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "rand_stats"],
 	"explode": ["temp_stat", "timed_stat", "heal", "gold", "damage"],
-	"crit": ["temp_stat", "timed_stat", "heal", "gold", "damage", "vuln"],
-	"ignite": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
-	"first_hit": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
-	"first_hit_melee": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
-	"first_hit_ranged": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
-	"first_hit_elemental": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
-	"first_hit_engineering": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
-	"hit_above_50": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
-	"hit_above_75": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
-	"hit_above_90": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
-	"hit_below_50": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
-	"hit_melee": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
-	"hit_ranged": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
-	"hit_elemental": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
-	"hit_engineering": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln"],
+	"crit": ["temp_stat", "timed_stat", "heal", "gold", "damage", "vuln", "hp_dmg"],
+	"ignite": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg"],
+	"first_hit": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg"],
+	"first_hit_melee": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg"],
+	"first_hit_ranged": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg"],
+	"first_hit_elemental": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg"],
+	"first_hit_engineering": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg"],
+	"hit_above_50": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg"],
+	"hit_above_75": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg"],
+	"hit_above_90": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg"],
+	"hit_below_50": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg"],
+	"hit_melee": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg"],
+	"hit_ranged": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg"],
+	"hit_elemental": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg"],
+	"hit_engineering": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg"],
+	"cursed_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats"],
 }
 
 # ============================================================
@@ -264,44 +276,45 @@ const LEGAL = {
 #     永久获得：只允许求和型数值效果（存档安全）；商店扳机、波末只能永久获得
 # ============================================================
 const FREE_LEGAL = {
-	"kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant"],
-	"hit": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant"],
-	"dodge": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant"],
-	"consumable": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant"],
-	"gold": ["temp_stat", "perm_stat", "timed_stat", "heal", "xp", "damage", "explode", "grant"],
-	"heal": ["temp_stat", "perm_stat", "timed_stat", "gold", "xp", "damage", "explode", "grant"],
-	"level_up": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "damage", "explode", "grant"],
-	"wave_start": ["perm_stat", "timed_stat", "gold", "xp", "grant"],
-	"wave_end": ["perm_stat", "gold", "xp", "grant"],
-	"interval": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant"],
+	"kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
+	"hit": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
+	"dodge": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
+	"consumable": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
+	"gold": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
+	"heal": ["temp_stat", "perm_stat", "timed_stat", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
+	"level_up": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "damage", "explode", "grant", "rand_stats"],
+	"wave_start": ["perm_stat", "timed_stat", "gold", "xp", "grant", "rand_stats"],
+	"wave_end": ["perm_stat", "gold", "xp", "grant", "rand_stats"],
+	"interval": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
 	"still": ["temp_stat", "grant"],
 	"moving": ["temp_stat", "grant"],
 	"low_hp": ["temp_stat", "grant"],
 	"full_hp": ["temp_stat", "grant"],
-	"reroll": ["perm_stat", "gold", "grant"],
-	"buy": ["perm_stat", "gold", "grant"],
-	"crit_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant"],
-	"burning_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant"],
-	"steps": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant"],
-	"half_wave": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant"],
-	"crate": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant"],
+	"reroll": ["perm_stat", "gold", "grant", "rand_stats"],
+	"buy": ["perm_stat", "gold", "grant", "rand_stats"],
+	"crit_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
+	"burning_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
+	"steps": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
+	"half_wave": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
+	"crate": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
 	# 爆炸不挂爆炸（自激循环）；暴击不挂爆炸（爆炸可以暴击，形成循环）
-	"explode": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "grant"],
-	"crit": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "grant", "vuln"],
-	"ignite": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
-	"first_hit": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
-	"first_hit_melee": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
-	"first_hit_ranged": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
-	"first_hit_elemental": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
-	"first_hit_engineering": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
-	"hit_above_50": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
-	"hit_above_75": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
-	"hit_above_90": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
-	"hit_below_50": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
-	"hit_melee": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
-	"hit_ranged": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
-	"hit_elemental": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
-	"hit_engineering": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln"],
+	"explode": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "grant", "rand_stats"],
+	"crit": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "grant", "vuln", "hp_dmg", "rand_stats"],
+	"ignite": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats"],
+	"first_hit": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats"],
+	"first_hit_melee": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats"],
+	"first_hit_ranged": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats"],
+	"first_hit_elemental": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats"],
+	"first_hit_engineering": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats"],
+	"hit_above_50": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats"],
+	"hit_above_75": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats"],
+	"hit_above_90": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats"],
+	"hit_below_50": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats"],
+	"hit_melee": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats"],
+	"hit_ranged": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats"],
+	"hit_elemental": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats"],
+	"hit_engineering": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats"],
+	"cursed_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
 }
 # 战斗中实时读取、可"本波获得"的机制 key（其余求和型机制只能永久获得）
 const GRANT_TEMP_KEYS = [
@@ -351,6 +364,17 @@ const NATIVE_TRIGGER_MAP = {
 	"effect_gain_stat_every_killed_enemies": ["kill", "perm_stat"],
 	# 袋子：拾取箱子时获得材料
 	"item_box_gold": ["crate", "gold"],
+	# 金属探测器：拾取材料时几率使其价值翻倍（= 几率 +1 材料）
+	"chance_double_gold": ["gold", "gold"],
+	# 巨型带 / 希腊火：暴击 / 燃烧时按敌人当前生命值造成伤害
+	"giant_crit_damage": ["crit", "hp_dmg"],
+	"burning_enemy_hp_percent_damage": ["ignite", "hp_dmg"],
+	# 糖果袋：每波结束时随机主属性
+	"gain_random_primary_stats_on_go_to_next_wave": ["wave_end", "rand_stats"],
+	# 黑旗：击杀被诅咒的敌人时获得材料
+	"gold_on_cursed_enemy_kill": ["cursed_kill", "gold"],
+	# 冰块：首次被元素伤害命中时受伤加成（只认道具来源；潜水员的同类效果是角色身份）
+	"enemy_percent_damage_taken": ["first_hit_elemental", "vuln"],
 }
 # 原版先验在组合权重中的强度
 const NATIVE_PRIOR_STRENGTH = 0.6
@@ -465,6 +489,7 @@ const ADJ_BY_TRIGGER = {
 	"hit_above_90": ["AA_ADJ_PREDATORY", "AA_ADJ_EAGER"], "hit_below_50": ["AA_ADJ_EXECUTING", "AA_ADJ_DEADLY"],
 	"hit_melee": ["AA_ADJ_FIERCE", "AA_ADJ_KEEN"], "hit_ranged": ["AA_ADJ_KEEN", "AA_ADJ_FIERCE"],
 	"hit_elemental": ["AA_ADJ_SCORCHING", "AA_ADJ_BLAZING"], "hit_engineering": ["AA_ADJ_CURIOUS", "AA_ADJ_KEEN"],
+	"cursed_kill": ["AA_ADJ_HUNTING", "AA_ADJ_DEADLY"],
 }
 const ADJ_MECHANIC = ["AA_ADJ_ODD", "AA_ADJ_STRANGE", "AA_ADJ_CURIOUS", "AA_ADJ_ANCIENT"]
 const ADJ_SCALING = ["AA_ADJ_RESONANT", "AA_ADJ_SYNERGIC"]
@@ -521,7 +546,7 @@ const STAT_CATEGORY = {
 	"consumable_heal": "S", "stat_speed": "S",
 	"stat_luck": "E", "stat_harvesting": "E", "xp_gain": "E", "pickup_range": "E",
 }
-const PAYLOAD_CATEGORY = {"heal": "S", "gold": "E", "xp": "E", "damage": "A", "explode": "A", "vuln": "A"}
+const PAYLOAD_CATEGORY = {"heal": "S", "gold": "E", "xp": "E", "damage": "A", "explode": "A", "vuln": "A", "hp_dmg": "A"}
 const CATEGORY_CLASSES = ["AA", "AS", "AE", "A-", "SA", "SS", "SE", "S-", "EA", "ES", "EE", "E-"]
 
 # 原版的非属性词条（角色的"想要词条"会用到）
@@ -655,6 +680,7 @@ const TAG_BINDINGS = {
 	"trigger:first_hit_elemental": ["stat_elemental_damage"], "trigger:first_hit_engineering": ["stat_engineering"],
 	"trigger:hit_melee": ["stat_melee_damage"], "trigger:hit_ranged": ["stat_ranged_damage"],
 	"trigger:hit_elemental": ["stat_elemental_damage"], "trigger:hit_engineering": ["stat_engineering"],
+	"trigger:cursed_kill": ["stat_curse"], "payload:hp_dmg": ["stat_percent_damage"],
 	"mech:pierce_on_crit": ["stat_crit_chance"], "mech:giant_crit_damage": ["stat_crit_chance"],
 	"mech:structures_can_crit": ["structure", "stat_crit_chance"],
 	"mech:burning_spread": ["stat_elemental_damage"], "mech:burning_cooldown_reduction": ["stat_elemental_damage"],

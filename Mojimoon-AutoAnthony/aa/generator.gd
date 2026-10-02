@@ -431,6 +431,9 @@ func is_plain_stat(e) -> bool:
 func native_trigger_of(e):
 	var k = e.custom_key if e.custom_key != "" else e.key
 	if Catalog.NATIVE_TRIGGER_MAP.has(k):
+		# 受伤加成只拆解道具上的（冰块）；潜水员的同类效果是角色身份
+		if k == "enemy_percent_damage_taken" and not ("source_id" in e and e.source_id.begins_with("item_")):
+			return null
 		return Catalog.NATIVE_TRIGGER_MAP[k]
 	var id = e.get_id() if e.has_method("get_id") else ""
 	if id == "weapon_gain_stat_every_killed_enemies":
@@ -2397,9 +2400,15 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 		"vuln":
 			c.value = 5
 			c.value2 = [2, 3, 4, 5][rng.randi() % 4]
+		"hp_dmg":
+			c.value = 1
+		"rand_stats":
+			c.value = 1
+			if Valuation.raw_rate(trigger, 1, 100) > 1.5:
+				c.cap = 1 + rng.randi() % 3
 
 	# 高频扳机上的永久效果：先按预算定每波上限（2..10），再把频率调到上限的约两倍（多数波次能触发满）
-	var is_perm = payload == "perm_stat" or (payload == "grant" and c.get("grant_mode", "") == "perm")
+	var is_perm = payload in ["perm_stat", "rand_stats"] or (payload == "grant" and c.get("grant_mode", "") == "perm")
 	if is_perm and not negative and Valuation.raw_rate(trigger, 1, 100) > 1.5:
 		c.cap = 1
 		var per_fire = abs(Valuation.clause_value(c, perm_mult))
@@ -2435,6 +2444,8 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 			c.value = int(min(c.value * k, 400))
 		elif payload == "vuln":
 			c.value = int(min(c.value * k, 50))
+		elif payload == "hp_dmg":
+			c.value = int(min(c.value * k, Catalog.HP_DMG_MAX))
 		elif payload == "xp":
 			c.value = int(c.value * k)
 		else:
@@ -2458,7 +2469,7 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 		else:
 			return {}
 		# 永久属性 / 永久获得在高频扳机上再用每波上限收口
-		if (payload == "perm_stat" or (payload == "grant" and c.grant_mode == "perm")) and c.cap > 1:
+		if (payload in ["perm_stat", "rand_stats"] or (payload == "grant" and c.grant_mode == "perm")) and c.cap > 1:
 			var per_fire = abs(Valuation.clause_value(c, perm_mult)) / max(0.01, Valuation.fires_per_wave(trigger, c.param, c.chance, c.cap))
 			c.cap = int(clamp(floor(budget / max(0.01, per_fire)), 1, c.cap))
 
@@ -2487,13 +2498,18 @@ func _amount_cap(c: Dictionary, trigger: String) -> int:
 			return 5 if rate <= 10 else 2
 		"perm_stat":
 			return 6 if rate <= 1.5 else 2
+		"rand_stats":
+			return 8 if rate <= 1.5 else 2
+		"hp_dmg":
+			return Catalog.HP_DMG_MAX
 		"timed_stat":
 			return 20 if rate <= 2.0 else 8
 		"heal":
 			return 6
 		"gold":
 			# 稀有扳机（拾取箱子：原版袋子 +15 材料）允许较大的单次数值
-			return 30 if rate <= 1.5 else (10 if rate <= 3 else 3)
+			# 每波几次的扳机（击杀被诅咒的敌人约 5 次）也允许到 10
+			return 30 if rate <= 1.5 else (10 if rate <= 6 else 3)
 		"xp":
 			return 20
 		"damage", "explode":

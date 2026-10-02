@@ -321,6 +321,13 @@ func _execute_inner(e, player_index: int, pos, show: bool, en, target) -> void:
 			_explode(e, player_index, pos)
 		"vuln":
 			_vuln(e, target)
+		"hp_dmg":
+			_hp_damage(e, player_index, target)
+		"rand_stats":
+			# 糖果袋：每点随机分配到一项主要属性
+			for _i in max(0, e.value):
+				RunData.add_stat(RunData.get_random_primary_stats(), 1, player_index)
+			LinkedStats.reset_player(player_index)
 
 
 func _on_timed_stat_timeout(serial: int, h: int, value: int, player_index: int) -> void:
@@ -399,6 +406,19 @@ func _explode(e, player_index: int, pos) -> void:
 	# 爆炸延迟生成：记下当前连锁深度，"引发爆炸时"扳机从这里继续计数
 	args.set_meta("aa_depth", _depth)
 	WeaponService.call_deferred("explode", _explosion_effect, args)
+
+
+# 按目标敌人当前生命值的 X% 造成伤害（同巨型带 / 希腊火：头目和精英按原版的 1/10，无尽模式同样折减）
+func _hp_damage(e, player_index: int, target) -> void:
+	if target == null or not is_instance_valid(target) or target.dead or target.current_stats.health <= 0:
+		return
+	var factor = target._get_health_effect_percent_factor() if target.has_method("_get_health_effect_percent_factor") else 100.0
+	var endless = max(1.0, RunData.get_endless_factor() * 0.2)
+	var dmg = int(max(1, target.current_stats.health * (e.value / factor) / endless))
+	var args = TakeDamageArgs.new(player_index)
+	args.armor_applied = false
+	args.dodgeable = false
+	var _r = target.take_damage(dmg, args)
 
 
 # 使目标敌人受到的伤害提高（挂在敌人身上的本 mod 效果行为节点）

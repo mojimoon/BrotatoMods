@@ -48,10 +48,23 @@ func _on_enemy_died(enemy: Enemy, args: Entity.DieArgs) -> void:
 	if killers.empty():
 		for player in _get_live_players():
 			killers.push_back(player.player_index)
+	var cursed = _aa_is_cursed(enemy)
 	for p in killers:
 		rt.fire("kill", p, pos)
 		if burning:
 			rt.fire("burning_kill", p, pos)
+		if cursed:
+			rt.fire("cursed_kill", p, pos)
+
+
+# 被诅咒的敌人（DLC 的诅咒效果行为，与黑旗"击杀被诅咒的敌人"同一判断）
+static func _aa_is_cursed(enemy) -> bool:
+	if not is_instance_valid(enemy) or not "effect_behaviors" in enemy or enemy.effect_behaviors == null:
+		return false
+	for b in enemy.effect_behaviors.get_children():
+		if b.get_script() != null and b.get_script().resource_path.ends_with("curse_enemy_effect_behavior.gd"):
+			return true
+	return false
 
 
 # 暴击 / 暴击击杀：原版在敌人受伤信号里带有是否暴击（致死时死亡尚未执行，见下）

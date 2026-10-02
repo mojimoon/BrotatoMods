@@ -256,9 +256,8 @@ func test_02_catalog_consistency() -> void:
 			_eq(Catalog.LEGAL[t], ["temp_stat"], "state trigger %s only drives temp stats" % t)
 		if Catalog.TRIGGERS[t].kind == "shop":
 			for p in Catalog.LEGAL[t]:
-				_check(p in ["perm_stat", "gold"], "shop trigger %s payload %s is shop-safe" % [t, p])
+				_check(p in ["perm_stat", "gold", "rand_stats"], "shop trigger %s payload %s is shop-safe" % [t, p])
 	_check(not "heal" in Catalog.LEGAL["heal"], "no heal->heal loop")
-	_check(not "gold" in Catalog.LEGAL["gold"], "no gold->gold loop")
 	for k in Catalog.NATIVE_TRIGGER_MAP:
 		var pair = Catalog.NATIVE_TRIGGER_MAP[k]
 		_check(pair[1] in Catalog.LEGAL[pair[0]], "native combo %s is legal in the generic system" % k)
@@ -438,7 +437,7 @@ func test_15_every_native_combo_is_reachable() -> void:
 		var gen = Generator.new(_cfg(), s)
 		gen._collect_priors(isvc.items, isvc.characters, isvc.weapons)
 		gen.rng.seed = s
-		for i in 50:
+		for i in 80:
 			var c = gen.gen_clause(30.0, 6.0, false)
 			if not c.empty():
 				seen[c.trigger + "/" + c.payload] = true
@@ -1498,11 +1497,10 @@ func test_89_grant_texts_serialization_and_modes() -> void:
 				_check(e.payload in Catalog.LEGAL[e.trigger], "free triggers off -> classic legal table")
 	for t in Catalog.FREE_LEGAL:
 		_check(not ("heal" in Catalog.FREE_LEGAL[t] and t == "heal"), "no heal loop")
-		_check(not ("gold" in Catalog.FREE_LEGAL[t] and t == "gold"), "no gold loop")
 		_check(not ("xp" in Catalog.FREE_LEGAL[t] and t == "level_up"), "no xp/level loop")
 		if Catalog.TRIGGERS[t].kind == "shop":
 			for p in Catalog.FREE_LEGAL[t]:
-				_check(p in ["perm_stat", "gold", "grant"], "shop trigger payload is shop-safe")
+				_check(p in ["perm_stat", "gold", "grant", "rand_stats"], "shop trigger payload is shop-safe")
 
 
 func test_89b_shop_grant() -> void:
@@ -1851,7 +1849,8 @@ func test_96_no_item_limits() -> void:
 	var lifted = 0
 	for pair in limited:
 		if m.plan.items.has(pair[0].my_id):
-			_eq(pair[0].max_nb, -1, pair[0].my_id + " limit lifted")
+			# 带叠加有技术问题的效果的重组道具是独特的（catalog.UNIQUE_MECHANIC_*）
+			_eq(pair[0].max_nb, 1 if m.plan.items[pair[0].my_id].unique else -1, pair[0].my_id + " limit lifted")
 			lifted += 1
 	_check(lifted > 5, "limits lifted on reassembled items (%d)" % lifted)
 	m.on_menu_reset()
@@ -2391,6 +2390,14 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 		yield(_wait_frames(2), "completed")
 		if is_instance_valid(en1):
 			main._on_enemy_took_damage(en1, 999999, Vector2.ZERO, true, false, false, false, TakeDamageArgs.new(0), 0, false)
+	# 击杀被诅咒的敌人：挂上原版 DLC 的诅咒效果行为
+	var en_cursed = yield(_wait_enemy(main), "completed")
+	if en_cursed != null:
+		var cb = load("res://dlcs/dlc_1/effect_behaviors/enemy/curse_enemy_effect_behavior.gd").new()
+		en_cursed.effect_behaviors.add_child(cb)
+		var _cbi = cb.init(en_cursed)
+		var _kcur = en_cursed.take_damage(999999, TakeDamageArgs.new(0))
+		yield(_wait_frames(2), "completed")
 	# 拾取材料（原版生成的材料节点）
 	main.spawn_gold(1.0, player.global_position, 0)
 	yield(_wait_frames(2), "completed")
@@ -2585,7 +2592,7 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 		player.current_stats.health = max(1, player.max_stats.health / 2)
 		# 伤害 / 爆炸看敌人总生命，敌人同时生成 / 死亡会干扰比较：最多重试 3 次
 		var changed = false
-		for attempt in (3 if e.payload in ["damage", "explode"] else 1):
+		for attempt in (3 if e.payload in ["damage", "explode", "hp_dmg"] else 1):
 			var tgt = yield(_wait_enemy(main), "completed")
 			var before = _battle_snapshot(main)
 			var hp_before = _enemy_hp_map(main)
@@ -2598,7 +2605,7 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 				if tb != null and is_instance_valid(tb) and tb._vuln_total > vuln_before:
 					changed = true
 					break
-			elif e.payload in ["damage", "explode"]:
+			elif e.payload in ["damage", "explode", "hp_dmg"]:
 				if _any_enemy_hurt(main, hp_before):
 					changed = true
 					break
@@ -3998,8 +4005,76 @@ func test_126_vulnerability_stacking() -> void:
 				if mech.source == "item_ice_cube":
 					ice = mech
 	_check(not sources.has("character_diver"), "diver's ranged-hit vulnerability is not transferred")
-	_check(ice != null, "ice cube vulnerability still combines")
+	# 冰块现在拆解为"首次被元素伤害命中时 → 受伤加成"；搬运规则仍用于其他道具上的同类效果
+	_check(ice == null, "ice cube vulnerability is decomposed into a trigger clause")
+	for e in _item("item_ice_cube").effects if not m.is_generated(_item("item_ice_cube")) else []:
+		if e.custom_key == "enemy_percent_damage_taken":
+			ice = {"effect": e, "value": 10.0, "scalar": false, "down": false, "source": "item_ice_cube"}
 	if ice != null:
 		var e = gen._mechanic_copy(ice, -1.0, "item_potato")
 		_eq(e.source_id, "item_potato", "copied vulnerability uses the holder as its source")
 		_eq(ice.effect.source_id, "item_ice_cube", "native ice cube effect untouched")
+
+
+# 拆解更多原版触发型效果：冰块、金属探测器、巨型带、希腊火、糖果袋、黑旗；新载荷"按当前生命值伤害""随机主属性"、新扳机"击杀被诅咒的敌人"
+func test_127_more_native_triggers() -> void:
+	var gen = Generator.new(_cfg(), 1)
+	gen._collect_priors(isvc.items, isvc.characters, isvc.weapons)
+	var gone = ["enemy_percent_damage_taken", "chance_double_gold", "giant_crit_damage", "burning_enemy_hp_percent_damage",
+		"gain_random_primary_stats_on_go_to_next_wave", "gold_on_cursed_enemy_kill"]
+	for t in 4:
+		for mech in gen.mechanics_by_tier[t]:
+			var k = mech.effect.custom_key if mech.effect.custom_key != "" else mech.effect.key
+			_check(not k in gone, "decomposed native trigger not copied as a mechanic: " + k)
+	for p in ["hp_dmg", "rand_stats"]:
+		_check(gen.payload_prior.get(p, 0.0) > 0.0, "native prior for payload " + p)
+	_check(gen.trigger_prior.get("cursed_kill", 0.0) > 0.0, "native prior for cursed_kill")
+	var diver = isvc.get_element_safe(isvc.characters, "character_diver")
+	for e in diver.effects:
+		if e.custom_key == "enemy_percent_damage_taken":
+			_eq(gen.native_trigger_of(e), null, "diver's vulnerability stays a character effect")
+	var seen = {}
+	var samples = []
+	for sd in range(1, 31):
+		var plan = _gen(sd)
+		for id in plan.items:
+			for e in plan.items[id].effects:
+				if not e is TriggerEffect:
+					continue
+				var k = ""
+				if e.payload in ["hp_dmg", "rand_stats"]:
+					k = e.payload
+				elif e.trigger == "cursed_kill":
+					k = "cursed_kill"
+				if k == "":
+					continue
+				seen[k] = seen.get(k, 0) + 1
+				var t = e.get_text(0, false)
+				if samples.size() < 9:
+					samples.push_back(t)
+				_check(t.find("AA_") == -1 and t.find("{") == -1, "text: " + t)
+				if e.payload == "hp_dmg":
+					_check(e.trigger in Catalog.ENEMY_TARGET_TRIGGERS, "hp damage only on triggers with a target: " + e.trigger)
+					_check(e.value >= 1 and e.value <= Catalog.HP_DMG_MAX, "hp damage within 1..%d (%d)" % [Catalog.HP_DMG_MAX, e.value])
+	print("AUDIT new trigger shapes over 30 seeds: %s %s" % [str(seen), str(samples)])
+	for k in ["hp_dmg", "rand_stats"]:
+		_check(seen.get(k, 0) > 0, k + " appears in generated pools")
+	# 估值：原版巨型带 / 糖果袋折算
+	var belt = Valuation.clause_value({"trigger": "crit", "payload": "hp_dmg", "value": 10, "param": 1, "chance": 100, "cap": 0}, Catalog.PERM_MULT[3])
+	var bag = Valuation.clause_value({"trigger": "wave_end", "payload": "rand_stats", "value": 8, "param": 1, "chance": 100, "cap": 0}, Catalog.PERM_MULT[2])
+	print("AUDIT giant-belt-like clause %.1f, candy-bag-like clause %.1f" % [belt, bag])
+	_check(belt > 40 and belt < 90, "giant-belt-like valued near the native item")
+	_check(bag > 15 and bag < 40, "candy-bag-like valued near the native item")
+	# 运行时：随机主属性
+	m.start_new_run()
+	var rt = _make_runtime([])
+	var before = 0
+	for s in Catalog.STATS:
+		before += int(rd.get_player_effects(0)[Keys.generate_hash(s)]) if rd.get_player_effects(0).has(Keys.generate_hash(s)) else 0
+	rt.execute(TriggerEffect.make({"trigger": "wave_end", "payload": "rand_stats", "value": 6}), 0, null, false)
+	var after = 0
+	for s in Catalog.STATS:
+		after += int(rd.get_player_effects(0)[Keys.generate_hash(s)]) if rd.get_player_effects(0).has(Keys.generate_hash(s)) else 0
+	_eq(after - before, 6, "6 points split between primary stats")
+	rt.queue_free()
+	m.on_menu_reset()

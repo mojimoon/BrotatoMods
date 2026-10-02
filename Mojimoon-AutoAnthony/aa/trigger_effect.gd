@@ -128,7 +128,7 @@ func _trigger_text(colored: bool) -> String:
 			t = tr("AA_T_STEPS") if param <= 1 else tr("AA_T_STEPS_EVERY").replace("{0}", str(param))
 		"interval":
 			t = tr("AA_T_INTERVAL").replace("{0}", str(param))
-		"explode", "crit", "ignite", "first_hit":
+		"explode", "crit", "ignite", "first_hit", "cursed_kill":
 			t = tr("AA_T_" + trigger.to_upper()) if param <= 1 else tr("AA_T_" + trigger.to_upper() + "_EVERY").replace("{0}", str(param))
 		_:
 			if Catalog.FIRST_HIT_STATS.has(trigger):
@@ -175,6 +175,12 @@ func _payload_text(colored: bool) -> String:
 			return tr(k).replace("{0}", inner)
 		"explode":
 			return tr("AA_P_EXPLODE").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", stat_name)
+		"hp_dmg":
+			# 原版的百分比写法：头目和精英为 1/10（巨型带 10% / 1%）
+			var boss = str(stepify(value / 10.0, 0.1)).trim_suffix(".0") + "%"
+			return tr("AA_P_HP_DMG").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", boss)
+		"rand_stats":
+			return tr("AA_P_RAND_STATS").replace("{0}", _col(str(value), good, colored))
 		"vuln":
 			return tr("AA_P_VULN").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", str(value2))
 	return ""

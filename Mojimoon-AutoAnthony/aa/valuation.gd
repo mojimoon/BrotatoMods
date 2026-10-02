@@ -94,6 +94,10 @@ static func main_value(c: Dictionary, perm_mult: float) -> float:
 			return unit * avg_stack(trigger, param, chance, cap, bool(c.get("reset", false)))
 		"explode":
 			return Catalog.DMG_W * Catalog.EXPLOSION_TARGETS * damage_per_proc(stat, int(v)) * fires_per_wave(trigger, param, chance, cap)
+		"hp_dmg":
+			return Catalog.HP_DMG_W * v * fires_per_wave(trigger, param, chance, cap)
+		"rand_stats":
+			return Catalog.RAND_STAT_W * v * fires_per_wave(trigger, param, chance, cap) * perm_mult * _capped_perm(cap)
 		"vuln":
 			# 使该敌人受到的伤害 +X%，持续 N 秒 ≈ 对"被覆盖的那部分敌人"+X% 伤害；覆盖率 = 触发次数 × 有效持续 / (波长 × 同时受伤敌人数)
 			var cover = clamp(fires_per_wave(trigger, param, chance, cap) * min(v2, Catalog.VULN_MAX_USEFUL_SECONDS) \
