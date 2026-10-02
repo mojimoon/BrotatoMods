@@ -2374,6 +2374,8 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 	dodge_args.bypass_invincibility = true
 	var _d = player.take_damage(3, dodge_args)
 	yield(_wait_frames(2), "completed")
+	# 受击后的无敌计时结束时原版会重新启用受击判定：停掉计时器，否则低血时会被敌人打死（偶发）
+	player._invincibility_timer.stop()
 	player.disable_hurtbox()
 	# 低血
 	player.current_stats.health = 1
@@ -2384,6 +2386,7 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 	# 回血（原版的回血信号）
 	RunData.emit_signal("healing_effect", 3, 0, Keys.empty_hash)
 	yield(_wait_frames(2), "completed")
+	player.current_stats.health = player.max_stats.health
 	# 升级
 	rd.add_xp(int(rd.get_next_level_xp_needed(0)) + 1, 0)
 	yield(_wait_frames(2), "completed")
@@ -4311,3 +4314,27 @@ func test_131_fruit_drops_in_battle() -> void:
 	rt.revert_all_grants()
 	rd.remove_item(holder, 0)
 	m.on_menu_reset()
+
+
+# 消耗品持续治疗（干肉条）：绿色文本但实际是代价，带消耗品词条
+func test_132_consumable_heal_over_time_is_downside() -> void:
+	var jerky = _item("item_jerky")
+	var hot = null
+	for e in jerky.effects:
+		if e.key == "consumable_heal_over_time":
+			hot = e
+	_check(hot != null, "jerky has heal over time")
+	if hot == null:
+		return
+	_check(Catalog.is_downside_mechanic(hot), "heal over time is a downside")
+	var gen = Generator.new(_cfg(), 1)
+	_check("consumable" in gen._tags_for([hot]), "heal over time carries the consumable tag")
+	var n = 0
+	for sd in range(1, 41):
+		var plan = _gen(sd)
+		for id in plan.items:
+			for e in plan.items[id].effects:
+				if e.key == "consumable_heal_over_time":
+					n += 1
+					_check("consumable" in plan.items[id].tags, id + " with heal over time has the consumable tag")
+	print("AUDIT heal-over-time lines over 40 seeds: %d" % n)

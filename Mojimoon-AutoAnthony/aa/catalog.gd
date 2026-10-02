@@ -415,6 +415,8 @@ const SCALAR_EXTRA_KEYS = [
 # 固定机制中的负面效果（当作代价使用）：key -> 哪种符号是坏的
 #   1 = 正值不利（敌人更强、价格更高、诅咒……），-1 = 负值不利（下波开局少血），0 = 总是不利
 const DOWNSIDE_SIGN = {
+	# 消耗品在 X 秒内持续治疗：文本是绿色，实际是代价（干肉条靠它换来高额属性）
+	"consumable_heal_over_time": 0,
 	"hp_start_next_wave": -1, "hp_start_wave": -1, "lose_hp_per_second": 1, "extra_elite_next_wave_chance": 1,
 	"enemy_health": 1, "enemy_damage": 1, "enemy_speed": 1, "items_price": 1, "reroll_price": 1,
 	"speed_cap": 0, "hp_cap": 0, "lock_current_weapons": 0, "extra_enemies_next_wave": 0, "number_of_enemies": -1,

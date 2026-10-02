@@ -1374,6 +1374,9 @@ func _tags_for(effects: Array) -> Array:
 		# 功能性词条（与正负无关，原版角色按它们筛选）：+诅咒、敌人数量增减
 		if e.key in Catalog.PRESERVED_NATIVE_KEYS and e.value > 0:
 			add.push_back(e.key)
+		# 消耗品持续治疗（代价）：带消耗品词条（原版干肉条）
+		if e.key == "consumable_heal_over_time" and e.value > 0:
+			add.push_back("consumable")
 		if e.key == "number_of_enemies" and e.value != 0:
 			add.push_back("more_enemies" if e.value > 0 else "less_enemies")
 		# 敌人速度降低（蜗牛、丑牙）：老人想要 less_enemy_speed
