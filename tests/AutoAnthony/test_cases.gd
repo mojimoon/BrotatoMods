@@ -77,7 +77,9 @@ const ITEMS_TABLE_PATH = "res://mods/tests/AutoAnthony/ITEMS.md"
 
 func _write_items_table() -> void:
 	var prev = TranslationServer.get_locale()
-	TranslationServer.set_locale("zh")
+	# 默认输出简体中文；AA_ITEMS_LOCALE / AA_ITEMS_OUT 可输出其他语言到指定路径（核对文本用）
+	var loc = OS.get_environment("AA_ITEMS_LOCALE")
+	TranslationServer.set_locale(loc if loc != "" else "zh")
 	var gen = Generator.new(_cfg(), ITEMS_TABLE_SEED)
 	var plan = gen.generate(m.native_only(isvc.items), m.native_only(isvc.characters), [], [])
 	var strip = RegEx.new()
@@ -114,10 +116,11 @@ func _write_items_table() -> void:
 	out += "| 稀有度 | 道具 | 价格 | 效果 | 词条 | 备注 |\n| --- | --- | --- | --- | --- | --- |\n"
 	out += PoolStringArray(lines).join("\n") + "\n"
 	var f = File.new()
-	if f.open(ITEMS_TABLE_PATH, File.WRITE) == OK:
+	var out_path = OS.get_environment("AA_ITEMS_OUT") if loc != "" and OS.get_environment("AA_ITEMS_OUT") != "" else ITEMS_TABLE_PATH
+	if f.open(out_path, File.WRITE) == OK:
 		f.store_string(out)
 		f.close()
-		print("items table: ", ProjectSettings.globalize_path(ITEMS_TABLE_PATH), " (", entries.size(), " items)")
+		print("items table: ", ProjectSettings.globalize_path(out_path), " (", entries.size(), " items)")
 	else:
 		printerr("FAIL could not write ", ITEMS_TABLE_PATH)
 	TranslationServer.set_locale(prev)

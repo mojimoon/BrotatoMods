@@ -112,7 +112,18 @@ func _signed(v: int) -> String:
 # 句式按语言（AA_FMT / AA_FMT_CHANCE，同原版）：中日韩、土耳其语"触发 + 效果"，其余语言"效果 + 触发"
 func get_text(_player_index: int, colored: bool = true) -> String:
 	var k = "AA_FMT" if chance >= 100 else "AA_FMT_CHANCE"
-	var s = tr(k).replace("{t}", _trigger_text(colored)).replace("{p}", _payload_text(colored)) 		.replace("{c}", _col(str(chance) + "%", true, colored))
+	# 获得效果：内层是一整句原版效果文本，效果在前的语言改为"触发：效果"（{T} = 首字母大写的触发）
+	if payload == "grant":
+		k = "AA_FMT_GRANT" if chance >= 100 else "AA_FMT_GRANT_CHANCE"
+	var t = _trigger_text(colored)
+	# 短条件直接接效果（"移动时+5%速度"）；获得的是计数型效果（"每2构筑物会……"）时补上长条件的分隔符，避免两个"每"连读
+	var sep = tr("AA_LONG_SEP").strip_edges() if tr("AA_LONG_SEP") != "AA_LONG_SEP" else ""
+	if sep != "" and payload == "grant" and grant != null and grant.get_script() != null 			and grant.get_script().resource_path.ends_with("gain_stat_for_every_stat_effect.gd") and not t.ends_with(sep):
+		t += sep
+	var tc = t.lstrip(" ,")
+	if tc.length() > 0:
+		tc = tc.substr(0, 1).to_upper() + tc.substr(1)
+	var s = tr(k).replace("{T}", tc).replace("{t}", t).replace("{p}", _payload_text(colored)) 		.replace("{c}", _col(str(chance) + "%", true, colored))
 	return s + _cap_text()
 
 
@@ -181,7 +192,7 @@ func _payload_text(colored: bool) -> String:
 			var boss = str(stepify(value / 10.0, 0.1)).trim_suffix(".0") + "%"
 			return tr("AA_P_HP_DMG").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", boss)
 		"rand_stats":
-			return tr("AA_P_RAND_STATS").replace("{0}", _col(str(value), good, colored))
+			return tr("AA_P_RAND_STATS_1" if value == 1 else "AA_P_RAND_STATS").replace("{0}", _col(str(value), good, colored))
 		"vuln":
 			return tr("AA_P_VULN").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", str(value2))
 	return ""
@@ -201,7 +212,7 @@ func _cap_text() -> String:
 		if payload in ["temp_stat", "perm_stat"]:
 			t += tr("AA_CAP_STAT").replace("{0}", _signed(value * cap))
 		else:
-			t += tr("AA_CAP").replace("{0}", str(cap))
+			t += tr("AA_CAP_1") if cap == 1 else tr("AA_CAP").replace("{0}", str(cap))
 	if reset:
 		t += tr("AA_RESET_ON_HIT")
 	return t
