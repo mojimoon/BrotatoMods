@@ -5,7 +5,8 @@ extends Effect
 # 运行时由 aa/runtime.gd 扫描玩家持有的道具 / 角色 / 武器上的本效果并统一派发。
 #
 #   trigger  触发扳机 id（见 catalog.TRIGGERS）
-#   param    每 N 次（kill / gold）或间隔秒数（interval）
+#   param    每 N 次（gate = every 的扳机）或间隔秒数（interval）
+#   dmg_type 限定伤害类型的扳机（TYPED_TRIGGERS）的伤害缩放属性
 #   chance   每次触发的几率（%）
 #   payload  载荷 id（见 catalog.PAYLOADS）
 #   stat     属性 key（属性类载荷）或伤害缩放属性（damage / explode）
@@ -21,6 +22,7 @@ export(int) var param := 1
 export(int) var chance := 100
 export(String) var payload := ""
 export(String) var stat := ""
+export(String) var dmg_type := ""
 export(int) var value2 := 0
 export(int) var cap := 0
 # 受到伤害时清空本条款累积的本波属性（原版水晶）
@@ -29,6 +31,8 @@ export(bool) var reset := false
 export(Resource) var grant = null
 export(String) var grant_mode := "temp"
 export(float) var grant_unit := 0.0
+# 商店扳机的计次（每 N 次刷新 / 购买）
+var shop_count := 0
 
 
 static func get_id() -> String:
@@ -46,6 +50,7 @@ static func make(c: Dictionary) -> Effect:
 	e.chance = int(c.get("chance", 100))
 	e.payload = c.payload
 	e.stat = c.get("stat", "")
+	e.dmg_type = c.get("dmg_type", "")
 	e.value = int(c.value)
 	e.value2 = int(c.get("value2", 0))
 	e.cap = int(c.get("cap", 0))
@@ -63,7 +68,7 @@ static func make(c: Dictionary) -> Effect:
 func to_clause() -> Dictionary:
 	return {
 		"trigger": trigger, "param": param, "chance": chance, "payload": payload,
-		"stat": stat, "value": value, "value2": value2, "cap": cap, "reset": reset,
+		"stat": stat, "dmg_type": dmg_type, "value": value, "value2": value2, "cap": cap, "reset": reset,
 		"grant_mode": grant_mode, "grant_unit": grant_unit,
 	}
 
@@ -109,43 +114,41 @@ func _signed(v: int) -> String:
 	return ("+" if v >= 0 else "") + str(v)
 
 
+# 句式按语言（AA_FMT / AA_FMT_CHANCE，同原版）：中日韩、土耳其语"触发 + 效果"，其余语言"效果 + 触发"
 func get_text(_player_index: int, colored: bool = true) -> String:
-	return tr(_trigger_text(colored)) + tr("AA_SEP") + _payload_text(colored) + _cap_text()
+	var k = "AA_FMT" if chance >= 100 else "AA_FMT_CHANCE"
+	# 获得效果：内层是一整句原版效果文本，效果在前的语言改为"触发：效果"（{T} = 首字母大写的触发）
+	if payload == "grant":
+		k = "AA_FMT_GRANT" if chance >= 100 else "AA_FMT_GRANT_CHANCE"
+	var t = _trigger_text(colored)
+	# 短条件直接接效果（"移动时+5%速度"）；获得的是计数型效果（"每2构筑物会……"）时补上长条件的分隔符，避免两个"每"连读
+	var sep = tr("AA_LONG_SEP").strip_edges() if tr("AA_LONG_SEP") != "AA_LONG_SEP" else ""
+	if sep != "" and payload == "grant" and grant != null and grant.get_script() != null 			and grant.get_script().resource_path.ends_with("gain_stat_for_every_stat_effect.gd") and not t.ends_with(sep):
+		t += sep
+	var tc = t.lstrip(" ,")
+	if tc.length() > 0:
+		tc = tc.substr(0, 1).to_upper() + tc.substr(1)
+	var s = tr(k).replace("{T}", tc).replace("{t}", t).replace("{p}", _payload_text(colored)) 		.replace("{c}", _col(str(chance) + "%", true, colored))
+	return s + _cap_text()
 
 
-func _trigger_text(colored: bool) -> String:
-	var t: String
-	match trigger:
-		"kill":
-			t = tr("AA_T_KILL") if param <= 1 else tr("AA_T_KILL_EVERY").replace("{0}", str(param))
-		"gold":
-			t = tr("AA_T_GOLD") if param <= 1 else tr("AA_T_GOLD_EVERY").replace("{0}", str(param))
-		"crit_kill":
-			t = tr("AA_T_CRIT_KILL") if param <= 1 else tr("AA_T_CRIT_KILL_EVERY").replace("{0}", str(param))
-		"burning_kill":
-			t = tr("AA_T_BURNING_KILL") if param <= 1 else tr("AA_T_BURNING_KILL_EVERY").replace("{0}", str(param))
-		"steps":
-			t = tr("AA_T_STEPS") if param <= 1 else tr("AA_T_STEPS_EVERY").replace("{0}", str(param))
-		"interval":
-			t = tr("AA_T_INTERVAL").replace("{0}", str(param))
-		"explode", "crit", "ignite", "first_hit":
-			t = tr("AA_T_" + trigger.to_upper()) if param <= 1 else tr("AA_T_" + trigger.to_upper() + "_EVERY").replace("{0}", str(param))
-		_:
-			if Catalog.FIRST_HIT_STATS.has(trigger):
-				var k = "AA_T_FIRST_HIT_TYPED" if param <= 1 else "AA_T_FIRST_HIT_TYPED_EVERY"
-				t = tr(k).replace("{0}", str(param)).replace("{1}", tr(Catalog.FIRST_HIT_STATS[trigger].to_upper()))
-			elif Catalog.HIT_STATS.has(trigger):
-				var kh = "AA_T_HIT_TYPED" if param <= 1 else "AA_T_HIT_TYPED_EVERY"
-				t = tr(kh).replace("{0}", str(param)).replace("{1}", tr(Catalog.HIT_STATS[trigger].to_upper()))
-			elif trigger.begins_with("hit_above_") or trigger.begins_with("hit_below_"):
-				var base = "AA_T_HIT_ABOVE" if trigger.begins_with("hit_above_") else "AA_T_HIT_BELOW"
-				var k2 = base if param <= 1 else base + "_EVERY"
-				t = tr(k2).replace("{0}", str(param)).replace("{1}", trigger.get_slice("_", 2))
-			else:
-				t = tr("AA_T_" + trigger.to_upper())
-	if chance < 100:
-		t += tr("AA_CHANCE").replace("{0}", _col(str(chance) + "%", true, colored))
-	return t
+# 通用模板：单次 AA_T_X、计次 AA_T_X_EVERY（{0} = 次数），几率由 AA_FMT_CHANCE 包裹；{1} = 伤害类型 / 生命百分比 / 属性
+func _trigger_text(_colored: bool) -> String:
+	if trigger == "interval":
+		return tr("AA_T_INTERVAL").replace("{0}", str(param))
+	var base = "AA_T_" + trigger.to_upper()
+	var arg = ""
+	if trigger in Catalog.TYPED_TRIGGERS:
+		arg = tr(dmg_type.to_upper())
+	elif trigger.begins_with("hit_above_") or trigger.begins_with("hit_below_"):
+		base = "AA_T_HIT_ABOVE" if trigger.begins_with("hit_above_") else "AA_T_HIT_BELOW"
+		arg = trigger.get_slice("_", 2)
+	elif trigger == "buy_stat":
+		# 条件属性 = 效果属性（同原版雪球）
+		arg = tr(stat.to_upper())
+	if param > 1 and Catalog.TRIGGERS[trigger].gate == "every":
+		base += "_EVERY"
+	return tr(base).replace("{0}", str(param)).replace("{1}", arg)
 
 
 func _payload_text(colored: bool) -> String:
@@ -175,6 +178,18 @@ func _payload_text(colored: bool) -> String:
 			return tr(k).replace("{0}", inner)
 		"explode":
 			return tr("AA_P_EXPLODE").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", stat_name)
+		"hp_dmg":
+			# 原版的百分比写法：头目和精英为 1/10（巨型带 10% / 1%）
+			var boss = str(stepify(value / 10.0, 0.1)).trim_suffix(".0") + "%"
+			return tr("AA_P_HP_DMG").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", boss)
+		"ignite":
+			return tr("AA_P_IGNITE").replace("{0}", _col(str(value), good, colored)).replace("{1}", str(Catalog.IGNITE_TICKS))
+		"slow":
+			return tr("AA_P_SLOW").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", str(int(min(90, value * 4))) + "%")
+		"fruit":
+			return tr("AA_P_FRUIT_1" if value == 1 else "AA_P_FRUIT").replace("{0}", _col(str(value), good, colored))
+		"rand_stats":
+			return tr("AA_P_RAND_STATS_1" if value == 1 else "AA_P_RAND_STATS").replace("{0}", _col(str(value), good, colored))
 		"vuln":
 			return tr("AA_P_VULN").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", str(value2))
 	return ""
@@ -190,7 +205,11 @@ func scaled_grant():
 func _cap_text() -> String:
 	var t = ""
 	if cap > 0:
-		t += tr("AA_CAP").replace("{0}", str(cap))
+		# 属性类效果写每波可获得的总量（原版"每波最大值：+8"），其余写次数
+		if payload in ["temp_stat", "perm_stat"]:
+			t += tr("AA_CAP_STAT").replace("{0}", _signed(value * cap))
+		else:
+			t += tr("AA_CAP_1") if cap == 1 else tr("AA_CAP").replace("{0}", str(cap))
 	if reset:
 		t += tr("AA_RESET_ON_HIT")
 	return t
@@ -203,6 +222,7 @@ func serialize() -> Dictionary:
 	s.chance = chance
 	s.payload = payload
 	s.stat = stat
+	s.dmg_type = dmg_type
 	s.value2 = value2
 	s.cap = cap
 	s.reset = reset
@@ -219,6 +239,7 @@ func deserialize_and_merge(s: Dictionary) -> void:
 	chance = int(s.get("chance", 100))
 	payload = str(s.get("payload", ""))
 	stat = str(s.get("stat", ""))
+	dmg_type = str(s.get("dmg_type", ""))
 	value2 = int(s.get("value2", 0))
 	cap = int(s.get("cap", 0))
 	reset = bool(s.get("reset", false))

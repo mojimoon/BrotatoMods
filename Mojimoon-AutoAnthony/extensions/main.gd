@@ -4,6 +4,7 @@ extends "res://main.gd"
 
 const AAMain = preload("res://mods-unpacked/Mojimoon-AutoAnthony/mod_main.gd")
 const AARuntime = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/runtime.gd")
+const AABehavior = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/enemy_behavior.gd")
 
 var _aa_runtime = null
 
@@ -48,10 +49,46 @@ func _on_enemy_died(enemy: Enemy, args: Entity.DieArgs) -> void:
 	if killers.empty():
 		for player in _get_live_players():
 			killers.push_back(player.player_index)
+	var cursed = _aa_is_cursed(enemy)
+	# 致命一击的伤害类型：燃烧致死算元素，否则取最后一次命中的伤害缩放属性
+	var kill_info = {"stats": ["stat_elemental_damage"] if args.is_burning else []}
+	if not args.is_burning:
+		var b = AABehavior.find_on(enemy)
+		if b != null:
+			kill_info.stats = b.last_stats
 	for p in killers:
 		rt.fire("kill", p, pos)
+		if not kill_info.stats.empty():
+			rt.fire("kill_typed", p, pos, -1, null, kill_info)
 		if burning:
 			rt.fire("burning_kill", p, pos)
+		if cursed:
+			rt.fire("cursed_kill", p, pos)
+
+
+# 砍倒树木（口袋工厂同一入口）
+func _on_neutral_died(neutral: Neutral, args: Entity.DieArgs) -> void:
+	var counts = not _cleaning_up
+	var pos = neutral.global_position
+	._on_neutral_died(neutral, args)
+	var rt = _aa_rt()
+	if rt == null or not counts:
+		return
+	if args.killed_by_player_index >= 0:
+		rt.fire("tree_kill", args.killed_by_player_index, pos)
+	else:
+		for player in _get_live_players():
+			rt.fire("tree_kill", player.player_index, pos)
+
+
+# 被诅咒的敌人（DLC 的诅咒效果行为，与黑旗"击杀被诅咒的敌人"同一判断）
+static func _aa_is_cursed(enemy) -> bool:
+	if not is_instance_valid(enemy) or not "effect_behaviors" in enemy or enemy.effect_behaviors == null:
+		return false
+	for b in enemy.effect_behaviors.get_children():
+		if b.get_script() != null and b.get_script().resource_path.ends_with("curse_enemy_effect_behavior.gd"):
+			return true
+	return false
 
 
 # 暴击 / 暴击击杀：原版在敌人受伤信号里带有是否暴击（致死时死亡尚未执行，见下）

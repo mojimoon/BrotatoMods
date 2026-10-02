@@ -107,7 +107,7 @@ func fire(event: String, player_index: int, pos = null, chain_depth: int = -1, t
 	_depth += 1
 	for en in entries[player_index]:
 		var e = en.effect
-		if not _matches(e.trigger, event, info):
+		if not _matches(e.trigger, event, info, e.dmg_type):
 			continue
 		if e.cap > 0 and en.fired >= e.cap:
 			continue
@@ -137,7 +137,7 @@ func fire(event: String, player_index: int, pos = null, chain_depth: int = -1, t
 
 # 事件与扳机的对应：命中事件（hit_enemy）按命中前的生命百分比分发到"命中高 / 低血敌人"；
 # 首次命中事件按"对该敌人首次命中 / 首次某类伤害命中"分发
-static func _matches(trigger: String, event: String, info) -> bool:
+static func _matches(trigger: String, event: String, info, dmg_type: String = "") -> bool:
 	if event == "hit_enemy":
 		if info == null:
 			return false
@@ -145,17 +145,19 @@ static func _matches(trigger: String, event: String, info) -> bool:
 			return info.hp_pct >= float(trigger.get_slice("_", 2))
 		if trigger.begins_with("hit_below_"):
 			return info.hp_pct <= float(trigger.get_slice("_", 2))
-		if Catalog.HIT_STATS.has(trigger):
-			return Catalog.HIT_STATS[trigger] in info.get("stats", [])
+		if trigger == "hit_typed":
+			return dmg_type in info.get("stats", [])
 		return false
 	if event == "first_hit":
 		if info == null:
 			return false
 		if trigger == "first_hit":
 			return info.get("first_any", false)
-		if Catalog.FIRST_HIT_STATS.has(trigger):
-			return Catalog.FIRST_HIT_STATS[trigger] in info.get("first_stats", [])
+		if trigger == "first_hit_typed":
+			return dmg_type in info.get("first_stats", [])
 		return false
+	if event == "kill_typed":
+		return trigger == event and info != null and dmg_type in info.get("stats", [])
 	return trigger == event
 
 
@@ -321,6 +323,19 @@ func _execute_inner(e, player_index: int, pos, show: bool, en, target) -> void:
 			_explode(e, player_index, pos)
 		"vuln":
 			_vuln(e, target)
+		"hp_dmg":
+			_hp_damage(e, player_index, target)
+		"ignite":
+			_ignite(e, player_index, target)
+		"slow":
+			_slow(e, target)
+		"fruit":
+			call_deferred("_drop_fruit", e.value, pos if pos != null else _player_pos(player_index))
+		"rand_stats":
+			# 糖果袋：每点随机分配到一项主要属性
+			for _i in max(0, e.value):
+				RunData.add_stat(RunData.get_random_primary_stats(), 1, player_index)
+			LinkedStats.reset_player(player_index)
 
 
 func _on_timed_stat_timeout(serial: int, h: int, value: int, player_index: int) -> void:
@@ -399,6 +414,68 @@ func _explode(e, player_index: int, pos) -> void:
 	# 爆炸延迟生成：记下当前连锁深度，"引发爆炸时"扳机从这里继续计数
 	args.set_meta("aa_depth", _depth)
 	WeaponService.call_deferred("explode", _explosion_effect, args)
+
+
+func _player_pos(player_index: int):
+	var p = _get_player(player_index)
+	return p.global_position if p != null else null
+
+
+# 点燃目标（害怕的香肠）：3 跳 × X（+100% 元素伤害）
+func _ignite(e, player_index: int, target) -> void:
+	if target == null or not is_instance_valid(target) or target.dead:
+		return
+	var player = _get_player(player_index)
+	var bd = BurningData.new()
+	bd.chance = 1.0
+	bd.damage = int(max(1, e.value))
+	bd.duration = Catalog.IGNITE_TICKS
+	bd.scaling_stats = [[Keys.stat_elemental_damage_hash, 1.0]]
+	bd.from = player
+	target.apply_burning(bd)
+
+
+# 减速目标（丑牙）：每次降低最大速度的 X%，最多降到 (1 - 4X%)
+func _slow(e, target) -> void:
+	if target == null or not is_instance_valid(target) or target.dead or not "current_stats" in target:
+		return
+	var floor_speed = target.max_stats.speed * (1.0 - min(0.9, 4.0 * e.value / 100.0))
+	if target.current_stats.speed > floor_speed:
+		target.current_stats.speed = max(floor_speed, target.current_stats.speed - target.max_stats.speed * e.value / 100.0)
+
+
+# 掉落水果（果篮）：与原版敌人掉落消耗品相同的对象池与拾取信号
+func _drop_fruit(count: int, pos) -> void:
+	# 清场（波次结束）后掉落的消耗品不会被吸取，跳过
+	if main == null or not is_instance_valid(main) or pos == null or main._cleaning_up:
+		return
+	for _i in max(0, count):
+		var data = ItemService.get_consumable_for_tier(Tier.COMMON)
+		if data == null:
+			return
+		var consumable = main.get_node_from_pool(main._consumable_pool_id, main._consumables_container)
+		if consumable == null:
+			consumable = main.consumable_scene.instance()
+			main._consumables_container.add_child(consumable)
+			var _err = consumable.connect("picked_up", main, "on_consumable_picked_up")
+		consumable.already_picked_up = false
+		consumable.consumable_data = data
+		consumable.set_texture(data.icon)
+		consumable.drop(pos, 0, ZoneService.get_rand_pos_in_area(pos, rand_range(50, 100), 0))
+		main._consumables.push_back(consumable)
+
+
+# 按目标敌人当前生命值的 X% 造成伤害（同巨型带 / 希腊火：头目和精英按原版的 1/10，无尽模式同样折减）
+func _hp_damage(e, player_index: int, target) -> void:
+	if target == null or not is_instance_valid(target) or target.dead or target.current_stats.health <= 0:
+		return
+	var factor = target._get_health_effect_percent_factor() if target.has_method("_get_health_effect_percent_factor") else 100.0
+	var endless = max(1.0, RunData.get_endless_factor() * 0.2)
+	var dmg = int(max(1, target.current_stats.health * (e.value / factor) / endless))
+	var args = TakeDamageArgs.new(player_index)
+	args.armor_applied = false
+	args.dodgeable = false
+	var _r = target.take_damage(dmg, args)
 
 
 # 使目标敌人受到的伤害提高（挂在敌人身上的本 mod 效果行为节点）

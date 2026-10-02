@@ -9,6 +9,7 @@ const NODE_NAME = "AutoAnthonyEnemyBehavior"
 
 var _first_done: Dictionary = {}		# player_index -> true
 var _first_stats: Dictionary = {}		# player_index -> {stat_hash: true}
+var last_stats: Array = []		# 最近一次命中的伤害缩放属性（"用某类伤害击杀"取致命一击）
 var _burn_seen := false
 var _vulns: Dictionary = {}		# 来源 -> [百分比, 剩余秒数]
 var _vuln_total := 0
@@ -66,6 +67,7 @@ func on_hurt(hitbox: Hitbox) -> void:
 			seen[h] = true
 			info.first_stats.push_back(Keys.hash_to_string.get(h, ""))
 	_first_stats[p] = seen
+	last_stats = info.stats
 	var pos = _parent.global_position
 	if info.first_any or not info.first_stats.empty():
 		rt.fire("first_hit", p, pos, -1, _parent, info)

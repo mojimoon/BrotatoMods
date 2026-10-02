@@ -666,7 +666,8 @@ func _repair_item(it) -> void:
 # ============================================================
 # 商店阶段扳机（刷新 / 购买）：只允许永久属性与材料
 # ============================================================
-func fire_shop(event: String, player_index: int) -> void:
+# item：本次获得的道具（"获得提升 [属性] 的道具时"按道具上的正面属性行匹配，同原版雪球）
+func fire_shop(event: String, player_index: int, item = null) -> void:
 	if active_state == null:
 		return
 	var rd = _autoload("RunData")
@@ -677,6 +678,14 @@ func fire_shop(event: String, player_index: int) -> void:
 		for e in src.effects:
 			if not e is TriggerEffect or e.trigger != event:
 				continue
+			if event == "buy_stat" and not _item_raises(item, e.stat):
+				continue
+			# 每 N 次刷新 / 购买（ponytail: 计数不存档，读档后从 0 开始）
+			if e.param > 1:
+				e.shop_count += 1
+				if e.shop_count < e.param:
+					continue
+				e.shop_count = 0
 			if e.chance < 100 and randf() * 100.0 >= e.chance:
 				continue
 			match e.payload:
@@ -691,6 +700,19 @@ func fire_shop(event: String, player_index: int) -> void:
 						LinkedStats.reset_player(player_index)
 				"gold":
 					rd.add_gold(e.value, player_index)
+				"rand_stats":
+					for _i in max(0, e.value):
+						rd.add_stat(rd.get_random_primary_stats(), 1, player_index)
+					LinkedStats.reset_player(player_index)
+
+
+static func _item_raises(item, stat: String) -> bool:
+	if item == null or stat == "":
+		return false
+	for e in item.effects:
+		if e.key == stat and e.custom_key == "" and e.value > 0 and not e is TriggerEffect:
+			return true
+	return false
 
 
 # ============================================================

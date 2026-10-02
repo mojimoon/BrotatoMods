@@ -431,6 +431,9 @@ func is_plain_stat(e) -> bool:
 func native_trigger_of(e):
 	var k = e.custom_key if e.custom_key != "" else e.key
 	if Catalog.NATIVE_TRIGGER_MAP.has(k):
+		# 受伤加成只拆解道具上的（冰块）；潜水员的同类效果是角色身份
+		if k == "enemy_percent_damage_taken" and not ("source_id" in e and e.source_id.begins_with("item_")):
+			return null
 		return Catalog.NATIVE_TRIGGER_MAP[k]
 	var id = e.get_id() if e.has_method("get_id") else ""
 	if id == "weapon_gain_stat_every_killed_enemies":
@@ -841,6 +844,24 @@ func _pick_stat(neg: bool, exclude: Array = [], allowed = null) -> String:
 	return s if s != null else "stat_max_hp"
 
 
+# 伤害类型：近战 : 远程 : 元素 : 工程 = 2 : 2 : 2 : 1，偏向想要的词条；
+# 传入已抽到的缩放属性时，只在它是伤害类型时重新分配（伤害 / 爆炸载荷）
+func _pick_dmg_type(current: String = "") -> String:
+	if current != "" and not Catalog.DMG_TYPES.has(current):
+		return current
+	var w = {}
+	for s in Catalog.DMG_TYPES:
+		w[s] = Catalog.DMG_TYPES[s] * (Catalog.WANTED_BIAS if s in wanted_bias else 1.0)
+	return _pick_weighted(w)
+
+
+func _wanted_dmg_type() -> bool:
+	for s in Catalog.DMG_TYPES:
+		if s in wanted_bias:
+			return true
+	return false
+
+
 # 属性带有偏好的功能性词条（knockback / explosive / pickup / consumable）
 func _stat_has_wanted_tag(s: String) -> bool:
 	return Catalog.STAT_EXTRA_TAGS.has(s) and Catalog.STAT_EXTRA_TAGS[s] in wanted_bias
@@ -1062,6 +1083,7 @@ func _generate_item_once(item, force_special: bool) -> Dictionary:
 		item_banned_heal = false
 	# 原版的书写顺序：正面属性在前，触发 / 机制随后，负面在最后
 	var ordered = stat_lines + effects + _preserved_lines(item) + downsides
+	_add_cursed_kill_curse(ordered)
 	pos_cat = ""
 	neg_cat = ""
 	anchor_stat = ""
@@ -1075,6 +1097,18 @@ func _generate_item_once(item, force_special: bool) -> Dictionary:
 		"budget": budget_total,
 		"class": cls,
 	}
+
+
+# "击杀被诅咒的敌人时"需要有被诅咒的敌人：同原版黑旗，道具附带 +X 诅咒（已有诅咒行时不重复）
+func _add_cursed_kill_curse(effects: Array) -> void:
+	var has_trigger = false
+	for e in effects:
+		if e is TriggerEffect and e.trigger == "cursed_kill" and e.value > 0:
+			has_trigger = true
+		elif e.key == "stat_curse" and e.custom_key == "" and not e is TriggerEffect:
+			return
+	if has_trigger:
+		effects.push_back(_stat_effect("stat_curse", Catalog.CURSED_KILL_CURSE))
 
 
 # 原道具上保留的原版行（catalog.PRESERVED_NATIVE_KEYS），复制一份
@@ -1291,6 +1325,7 @@ func _tags_for(effects: Array) -> Array:
 				add.push_back(Catalog.TRIGGER_TAGS.get(e.trigger, ""))
 				add.push_back(Catalog.PAYLOAD_TAGS.get(e.payload, ""))
 				add += Catalog.tags_for_binding("trigger:" + e.trigger)
+				add.push_back(e.dmg_type)
 				add += Catalog.tags_for_binding("payload:" + e.payload)
 				if e.grant != null and is_scaling(e.grant):
 					add += Catalog.tags_for_binding("counter:" + e.grant.stat_scaled)
@@ -1339,6 +1374,9 @@ func _tags_for(effects: Array) -> Array:
 		# 功能性词条（与正负无关，原版角色按它们筛选）：+诅咒、敌人数量增减
 		if e.key in Catalog.PRESERVED_NATIVE_KEYS and e.value > 0:
 			add.push_back(e.key)
+		# 消耗品持续治疗（代价）：带消耗品词条（原版干肉条）
+		if e.key == "consumable_heal_over_time" and e.value > 0:
+			add.push_back("consumable")
 		if e.key == "number_of_enemies" and e.value != 0:
 			add.push_back("more_enemies" if e.value > 0 else "less_enemies")
 		# 敌人速度降低（蜗牛、丑牙）：老人想要 less_enemy_speed
@@ -2149,6 +2187,9 @@ func _next_wave_side(comp: float, perm_mult: float, exclude: Array) -> Dictionar
 # 属性类触发条款的同扳机负面条款：同扳机、同门控、同载荷方式，属性换成敌人属性（50%，数值为正）
 # 或自身其他属性（数值为负）；负面折算后的补偿约为正面价值的 30–60%
 func _make_pair(c: Dictionary, perm_mult: float) -> Dictionary:
+	# "获得提升 [属性] 的道具时"的条件属性就是效果属性，不配负面半边
+	if c.trigger == "buy_stat":
+		return {}
 	var cv = Valuation.clause_value(c, perm_mult)
 	if cv <= 0.0:
 		return {}
@@ -2313,14 +2354,14 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 		for t in Catalog.TRIGGERS:
 			if t in banned_triggers:
 				continue
-			if Catalog.HIT_STATS.has(t) and not cfg.get("char_effects", false):
+			if t == "hit_typed" and not cfg.get("char_effects", false):
 				continue
 			var legal_t = _legal_payloads(t, negative)
 			if legal_t.empty() or (fixed_payload != "" and not fixed_payload in legal_t):
 				continue
 			tw[t] = (Catalog.TRIGGERS[t].w + Catalog.NATIVE_PRIOR_STRENGTH * log(1.0 + trigger_prior[t]) / 2.0) \
 				/ (1.0 + Catalog.REPEAT_PENALTY_TRIGGER * used_trigger.get(t, 0))
-			if not negative and _binding_wanted("trigger:" + t, Catalog.TRIGGER_TAGS.get(t, "")):
+			if not negative and (_binding_wanted("trigger:" + t, Catalog.TRIGGER_TAGS.get(t, "")) 					or (t in Catalog.TYPED_TRIGGERS and _wanted_dmg_type())):
 				tw[t] *= Catalog.WANTED_BIAS
 		trigger = _pick_weighted(tw)
 	if trigger == null:
@@ -2344,6 +2385,8 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 	var t = Catalog.TRIGGERS[trigger]
 	if trigger == "interval":
 		c.param = Catalog.INTERVAL_CHOICES[rng.randi() % Catalog.INTERVAL_CHOICES.size()]
+	if trigger in Catalog.TYPED_TRIGGERS:
+		c.dmg_type = _pick_dmg_type()
 
 	match payload:
 		"temp_stat", "timed_stat":
@@ -2388,18 +2431,30 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 			if mode == "perm" and Valuation.raw_rate(trigger, 1, 100) > 1.5:
 				c.cap = 1 + rng.randi() % 3
 		"damage":
-			c.stat = _pick_stat(false, [], Catalog.DAMAGE_SCALING_STATS)
+			c.stat = _pick_dmg_type(_pick_stat(false, [], Catalog.DAMAGE_SCALING_STATS))
 			# 单次伤害可以较小：高频扳机更应该频繁触发，而不是攒很多次打一下
 			c.value = [25, 50, 75, 100, 150][rng.randi() % 5]
 		"explode":
-			c.stat = _pick_stat(false, [], Catalog.DAMAGE_SCALING_STATS)
+			c.stat = _pick_dmg_type(_pick_stat(false, [], Catalog.DAMAGE_SCALING_STATS))
 			c.value = [25, 50, 75, 100][rng.randi() % 4]
 		"vuln":
 			c.value = 5
 			c.value2 = [2, 3, 4, 5][rng.randi() % 4]
+		"hp_dmg":
+			c.value = 1
+		"ignite":
+			c.value = 1
+		"slow":
+			c.value = 1
+		"fruit":
+			c.value = 1
+		"rand_stats":
+			c.value = 1
+			if Valuation.raw_rate(trigger, 1, 100) > 1.5:
+				c.cap = 1 + rng.randi() % 3
 
 	# 高频扳机上的永久效果：先按预算定每波上限（2..10），再把频率调到上限的约两倍（多数波次能触发满）
-	var is_perm = payload == "perm_stat" or (payload == "grant" and c.get("grant_mode", "") == "perm")
+	var is_perm = payload in ["perm_stat", "rand_stats"] or (payload == "grant" and c.get("grant_mode", "") == "perm")
 	if is_perm and not negative and Valuation.raw_rate(trigger, 1, 100) > 1.5:
 		c.cap = 1
 		var per_fire = abs(Valuation.clause_value(c, perm_mult))
@@ -2435,6 +2490,10 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 			c.value = int(min(c.value * k, 400))
 		elif payload == "vuln":
 			c.value = int(min(c.value * k, 50))
+		elif payload == "hp_dmg":
+			c.value = int(min(c.value * k, Catalog.HP_DMG_MAX))
+		elif payload == "slow":
+			c.value = int(min(c.value * k, Catalog.SLOW_MAX))
 		elif payload == "xp":
 			c.value = int(c.value * k)
 		else:
@@ -2442,7 +2501,11 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 	else:
 		# 预算不足：按扳机的门控方式降低频率
 		var ratio = budget / unit_v
-		if t.gate == "every" and ratio >= 0.1 and rng.randf() < Catalog.CHANCE_GATE_ON_EVERY:
+		# 作用于目标敌人的效果只用单次 / 几率（"每 N 个敌人"中只有第 N 个被作用，不直观）
+		var chance_only = payload in Catalog.TARGET_PAYLOADS
+		if t.gate == "every" and (chance_only or (ratio >= 0.1 and rng.randf() < Catalog.CHANCE_GATE_ON_EVERY)):
+			if ratio < 0.05:
+				return {}
 			c.chance = int(clamp(round(ratio * 20.0) * 5, 5, 100))
 		elif t.gate == "every":
 			c.param = int(max(1, ceil(1.0 / ratio)))
@@ -2458,7 +2521,7 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 		else:
 			return {}
 		# 永久属性 / 永久获得在高频扳机上再用每波上限收口
-		if (payload == "perm_stat" or (payload == "grant" and c.grant_mode == "perm")) and c.cap > 1:
+		if (payload in ["perm_stat", "rand_stats"] or (payload == "grant" and c.grant_mode == "perm")) and c.cap > 1:
 			var per_fire = abs(Valuation.clause_value(c, perm_mult)) / max(0.01, Valuation.fires_per_wave(trigger, c.param, c.chance, c.cap))
 			c.cap = int(clamp(floor(budget / max(0.01, per_fire)), 1, c.cap))
 
@@ -2487,13 +2550,24 @@ func _amount_cap(c: Dictionary, trigger: String) -> int:
 			return 5 if rate <= 10 else 2
 		"perm_stat":
 			return 6 if rate <= 1.5 else 2
+		"rand_stats":
+			return 8 if rate <= 1.5 else 2
+		"hp_dmg":
+			return Catalog.HP_DMG_MAX
+		"ignite":
+			return 10 if rate <= 3 else 4
+		"slow":
+			return Catalog.SLOW_MAX
+		"fruit":
+			return 3 if rate <= 3 else 1
 		"timed_stat":
 			return 20 if rate <= 2.0 else 8
 		"heal":
 			return 6
 		"gold":
 			# 稀有扳机（拾取箱子：原版袋子 +15 材料）允许较大的单次数值
-			return 30 if rate <= 1.5 else (10 if rate <= 3 else 3)
+			# 每波几次的扳机（击杀被诅咒的敌人约 5 次）也允许到 10
+			return 30 if rate <= 1.5 else (10 if rate <= 6 else 3)
 		"xp":
 			return 20
 		"damage", "explode":

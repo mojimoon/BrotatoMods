@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
 # AutoAnthony 无头测试
-# 用法（Git Bash）：bash mods/tests/AutoAnthony/run_tests.sh
+# 用法（Git Bash）：bash mods/tests/AutoAnthony/run_tests.sh [core|audit|battle|all|core,battle]
+#   core（默认）：每次改动都跑的逻辑测试；battle：真实战斗场景；audit：价值 / 分布统计审计
+#   AA_ONLY=<名字片段> 只跑名字含该片段的测试
 #
 # - 在反编译的游戏工程（本仓库的上一级目录）里运行，使用真实的 ItemService / RunData / ModLoader
 # - 先把 mods/<MOD> 同步到 mods-unpacked/<MOD>（编辑器模式下 ModLoader 只加载这里的 mod）
 # - APPDATA 指向临时目录：user:// 与真实存档、ModLoader 配置完全隔离
 # - 测试文件在 mods/tests 下，不会被打包进 mod
 set -u
+AA_KEEP_LOG=${AA_KEEP_LOG:-}
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 PROJECT=$(cd "$HERE/../../.." && pwd)
 MOD=Mojimoon-AutoAnthony
+SUITE=${1:-core}
 GODOT=${GODOT:-/d/env/godot_3.7-dev1/Godot_v3.7-dev1_win64.exe}
 
 if [ ! -f "$PROJECT/project.godot" ]; then
@@ -30,7 +34,7 @@ LOG="$SANDBOX/test.log"
 trap '[ -n "$AA_KEEP_LOG" ] && cp "$LOG" "$AA_KEEP_LOG"; rm -rf "$SANDBOX"' EXIT
 
 cd "$PROJECT"
-APPDATA=$(cygpath -w "$SANDBOX") AA_TEST=1 timeout 600 "$GODOT" --no-window --audio-driver Dummy --path . \
+APPDATA=$(cygpath -w "$SANDBOX") AA_TEST=1 AA_SUITE="$SUITE" timeout 900 "$GODOT" --no-window --audio-driver Dummy --path . \
 	-s "res://mods/tests/AutoAnthony/run_aa.gd" > "$LOG" 2>&1
 STATUS=$?
 
@@ -53,7 +57,7 @@ ERRORS=$(awk '
 	}
 ' "$LOG")
 
-grep -E "^(  ran |FAIL |[0-9]+ checks|ALL TESTS PASSED|user dir|Refusing|Mod node|AUDIT|items table)" "$LOG"
+grep -E "^(suite |  ran |FAIL |[0-9]+ checks|ALL TESTS PASSED|user dir|Refusing|Mod node|AUDIT|items table)" "$LOG"
 if [ -n "$ERRORS" ]; then
 	echo
 	echo "Script errors from the mod or tests:"
