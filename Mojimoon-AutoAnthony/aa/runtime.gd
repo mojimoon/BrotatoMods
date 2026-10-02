@@ -161,11 +161,13 @@ static func _matches(trigger: String, event: String, info) -> bool:
 
 # "受伤时清空"：撤销该条款本波累积的临时属性
 func _reset_on_hit(player_index: int) -> void:
+	var hp_before = _max_hp(player_index)
 	for en in entries[player_index]:
 		var e = en.effect
 		if e.reset and en.get("stack", 0) != 0:
 			TempStats.remove_stat(Keys.generate_hash(e.stat), en.stack, player_index)
 			en.stack = 0
+	_sync_lost_max_hp(player_index, hp_before)
 
 
 # 玩家的原版 took_damage 信号：闪避或实际受到伤害时转发
@@ -238,6 +240,12 @@ func _state_holds(trigger: String, player) -> bool:
 
 
 func _set_state(player_index: int, en: Dictionary, on: bool) -> void:
+	var hp_before = _max_hp(player_index)
+	_set_state_inner(player_index, en, on)
+	_sync_lost_max_hp(player_index, hp_before)
+
+
+func _set_state_inner(player_index: int, en: Dictionary, on: bool) -> void:
 	en.active = on
 	var e = en.effect
 	if e.payload == "grant":
@@ -264,6 +272,12 @@ func _set_state(player_index: int, en: Dictionary, on: bool) -> void:
 # 载荷
 # ============================================================
 func execute(e, player_index: int, pos, show: bool = true, en = null, target = null) -> void:
+	var hp_before = _max_hp(player_index)
+	_execute_inner(e, player_index, pos, show, en, target)
+	_sync_lost_max_hp(player_index, hp_before)
+
+
+func _execute_inner(e, player_index: int, pos, show: bool, en, target) -> void:
 	var h = Keys.generate_hash(e.stat) if e.stat != "" else Keys.empty_hash
 	match e.payload:
 		"grant":
@@ -313,7 +327,27 @@ func _on_timed_stat_timeout(serial: int, h: int, value: int, player_index: int) 
 	# 波次结束时 TempStats 已整体清空，旧波的计时器不能再扣减
 	if serial != _wave_serial or not is_inside_tree():
 		return
+	var hp_before = _max_hp(player_index)
 	TempStats.remove_stat(h, value, player_index)
+	_sync_lost_max_hp(player_index, hp_before)
+
+
+# 最大生命的临时变化：原版降低最大生命时不压低当前生命、升高时把差值加到当前生命（player.update_player_stats），
+# 状态型 / 限时 / 本波效果反复开关时当前生命会不断上涨（"移动时 -2 最大生命"走停一次回 2 点，满血时超出上限）。
+# 本 mod 的效果降低最大生命时，当前生命 = min(当前生命, 降低后的最大生命)
+func _max_hp(player_index: int) -> int:
+	return RunData.get_player_max_health(player_index)
+
+
+func _sync_lost_max_hp(player_index: int, before: int) -> void:
+	var now = _max_hp(player_index)
+	if now >= before:
+		return
+	var player = _get_player(player_index)
+	if player == null or player.dead or player.current_stats.health <= now:
+		return
+	player.current_stats.health = now
+	player.emit_signal("health_updated", player, player.current_stats.health, player.max_stats.health)
 
 
 func _scaled_damage(e, player_index: int) -> int:
@@ -389,9 +423,11 @@ func _get_player(player_index: int):
 
 # "本波获得"的效果：撤销
 func _revert_grants(player_index: int, en: Dictionary) -> void:
+	var hp_before = _max_hp(player_index)
 	for g in en.granted:
 		g.unapply(player_index)
 	en.granted = []
+	_sync_lost_max_hp(player_index, hp_before)
 
 
 func _refresh(player_index: int) -> void:

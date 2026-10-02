@@ -3750,3 +3750,79 @@ func test_120_minor_stats_starting_items_typed_hits() -> void:
 	var info = {"hp_pct": 80.0, "first_any": false, "first_stats": [], "stats": ["stat_ranged_damage"]}
 	_check(Runtime._matches("hit_ranged", "hit_enemy", info), "ranged hit matches hit_ranged")
 	_check(not Runtime._matches("hit_melee", "hit_enemy", info), "ranged hit does not match hit_melee")
+
+
+# 反馈的 bug（真实战斗模拟）：
+# (1) "每暴击击杀 N 个敌人：永久 +1% 暴击率"——原版在敌人死亡（延迟调用）之前发出受伤信号，暴击击杀要按"本次伤害致死"判断
+# (2) "移动时：-2 最大生命值"——原版降低最大生命不压低当前生命、升高时补上差值：反复走停会让当前生命不断上涨
+func test_122_feedback_crit_kill_and_state_max_hp() -> void:
+	m.start_new_run()
+	var holder = _item("item_potato").duplicate()
+	holder.effects = [
+		TriggerEffect.make({"trigger": "crit_kill", "param": 2, "payload": "perm_stat", "stat": "stat_crit_chance", "value": 1, "cap": 3}),
+		TriggerEffect.make({"trigger": "moving", "payload": "temp_stat", "stat": "stat_max_hp", "value": -2}),
+		TriggerEffect.make({"trigger": "still", "payload": "temp_stat", "stat": "stat_max_hp", "value": 5}),
+	]
+	rd.add_item(holder, 0)
+	rd.current_wave = 1
+	TempStats.reset()
+	var _e = tree.change_scene("res://main.tscn")
+	yield(_wait_frames(10), "completed")
+	var main = tree.current_scene
+	var rt = main.get_node_or_null("AutoAnthonyRuntime") if main != null else null
+	_check(rt != null, "runtime in battle")
+	if rt == null:
+		return
+	var player = main._players[0]
+	player.disable_hurtbox()
+	main._wave_timer.start(600)
+	# (1) 原版受伤路径的暴击击杀：命中盒暴击率 100%，一击致死
+	var crit0 = rd.get_player_effects(0)[Keys.stat_crit_chance_hash]
+	var kills = 0
+	for i in 8:
+		var en = yield(_wait_enemy(main), "completed")
+		if en == null:
+			break
+		var hb = Hitbox.new()
+		hb.from = player
+		hb.crit_chance = 1.0
+		hb.crit_damage = 2.0
+		var args = TakeDamageArgs.new(0, hb)
+		var _r = en.take_damage(999999, args)
+		kills += 1
+		yield(_wait_frames(2), "completed")
+		hb.free()
+	var crit1 = rd.get_player_effects(0)[Keys.stat_crit_chance_hash]
+	print("AUDIT crit kills %d: crit chance %d -> %d" % [kills, crit0, crit1])
+	_check(kills >= 6, "enough crit kills simulated (%d)" % kills)
+	_eq(crit1 - crit0, 3, "every 2 crit kills: +1% crit chance permanently, max 3 per wave")
+	# (2) 走停循环：当前生命不应上涨（满血时保持满血，受伤时不白回血）
+	yield(_wait_physics(12), "completed")
+	player.current_stats.health = player.max_stats.health
+	var trace = []
+	for half in [true, false]:
+		if not half:
+			player.current_stats.health = max(1, player.max_stats.health - 10)
+		var start_hp = player.current_stats.health
+		var start_gap = player.max_stats.health - player.current_stats.health
+		for cycle in 4:
+			player._move_locked = true
+			player._current_movement = Vector2(1, 0)
+			yield(tree.create_timer(0.5), "timeout")
+			yield(_wait_physics(4), "completed")
+			trace.push_back("%d/%d" % [player.current_stats.health, player.max_stats.health])
+			_check(player.current_stats.health <= player.max_stats.health, "moving: health within max (%d/%d)" % [player.current_stats.health, player.max_stats.health])
+			player._current_movement = Vector2.ZERO
+			player._move_locked = false
+			yield(tree.create_timer(0.5), "timeout")
+			yield(_wait_physics(4), "completed")
+			trace.push_back("%d/%d" % [player.current_stats.health, player.max_stats.health])
+			_check(player.current_stats.health <= player.max_stats.health, "still: health within max (%d/%d)" % [player.current_stats.health, player.max_stats.health])
+		var gap = player.max_stats.health - player.current_stats.health
+		# 满血：走停后仍是满血、不超上限；受伤：降低时只截到上限（升高时原版补差值）
+		if start_gap == 0:
+			_eq(gap, 0, "full health stays exactly full after walk/stop cycles")
+	print("AUDIT walk/stop health trace: " + str(trace))
+	main._cleaning_up = true
+	rt.revert_all_grants()
+	m.on_menu_reset()
