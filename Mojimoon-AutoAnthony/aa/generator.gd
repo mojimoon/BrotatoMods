@@ -2418,11 +2418,6 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 			c.value2 = [2, 3, 4, 5][rng.randi() % 4]
 		"hp_dmg":
 			c.value = 1
-		"projectiles":
-			# 数量随预算增加；每个造成 [属性] 的 Y% 伤害
-			c.stat = _pick_stat(false, [], Catalog.DAMAGE_SCALING_STATS)
-			c.value = 2
-			c.value2 = [25, 50, 75, 100][rng.randi() % 4]
 		"ignite":
 			c.value = 1
 		"slow":
@@ -2531,8 +2526,6 @@ func _amount_cap(c: Dictionary, trigger: String) -> int:
 			return 8 if rate <= 1.5 else 2
 		"hp_dmg":
 			return Catalog.HP_DMG_MAX
-		"projectiles":
-			return 8 if rate <= 3 else 3
 		"ignite":
 			return 10 if rate <= 3 else 4
 		"slow":

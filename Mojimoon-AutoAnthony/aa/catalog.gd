@@ -199,8 +199,7 @@ const HP_DMG_W = 0.08
 const HP_DMG_MAX = 10
 # 随机主属性：每点、每次触发的永久价值（糖果袋：每波 8 点、T3 估值 26.4 反推）
 const RAND_STAT_W = 0.85
-# 投射物：命中率折算；点燃：3 跳燃烧、元素伤害参考值；减速：每 1%、每次触发（丑牙 5% / 命中约 150 次 / 估值 12.6 反推）；水果：每个
-const PROJECTILE_HIT_RATE = 0.6
+# 点燃：3 跳燃烧、元素伤害参考值；减速：每 1%、每次触发（丑牙 5% / 命中约 150 次 / 估值 12.6 反推）；水果：每个
 const IGNITE_TICKS = 3
 const SLOW_W = 0.017
 const SLOW_MAX = 10
@@ -234,8 +233,6 @@ const PAYLOADS = {
 	"hp_dmg": {"w": 0.4},
 	# 将 X 点属性点随机分配到主要属性上（糖果袋，永久）
 	"rand_stats": {"w": 0.1},
-	# 发射 X 个投射物（婴儿胡子：死亡敌人处；外星之眼：环绕玩家），每个造成 [属性] 的 Y% 伤害
-	"projectiles": {"w": 0.3},
 	# 点燃该敌人（害怕的香肠）：3 次 × X（+100% 元素伤害）燃烧伤害
 	"ignite": {"w": 0.4},
 	# 降低该敌人速度 X%，最多 4X%（丑牙）
@@ -248,46 +245,46 @@ const PAYLOADS = {
 # 排除规则：状态扳机只挂临时属性；商店扳机只挂永久效果；回血扳机不挂回血（避免自激循环）；
 # 拾取材料可以挂材料（直接加到材料数，不生成掉落物，不会循环；原版金属探测器）；波末 / 波初没有敌人和伤害意义的载荷被排除。
 const LEGAL = {
-	"kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "projectiles", "fruit"],
-	"hit": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "projectiles"],
-	"dodge": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "projectiles"],
-	"consumable": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "projectiles"],
-	"gold": ["temp_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "projectiles"],
-	"heal": ["temp_stat", "timed_stat", "gold", "damage", "explode", "projectiles"],
-	"level_up": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "damage", "explode", "rand_stats", "projectiles"],
+	"kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "fruit"],
+	"hit": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode"],
+	"dodge": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode"],
+	"consumable": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats"],
+	"gold": ["temp_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode"],
+	"heal": ["temp_stat", "timed_stat", "gold", "damage", "explode"],
+	"level_up": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "damage", "explode", "rand_stats"],
 	# 每波开始时"本波 +X 属性 / 本波获得"= 整波持有，与直接写在道具上无异：不生成
 	"wave_start": ["perm_stat", "gold", "rand_stats"],
 	"wave_end": ["perm_stat", "gold", "xp", "rand_stats"],
-	"interval": ["temp_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "projectiles"],
+	"interval": ["temp_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode"],
 	"still": ["temp_stat"],
 	"moving": ["temp_stat"],
 	"low_hp": ["temp_stat"],
 	"full_hp": ["temp_stat"],
 	"reroll": ["perm_stat", "gold", "rand_stats"],
 	"buy": ["perm_stat", "gold", "rand_stats"],
-	"crit_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "projectiles", "fruit"],
-	"burning_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "projectiles", "fruit"],
+	"crit_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "fruit"],
+	"burning_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "fruit"],
 	"steps": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "rand_stats"],
 	"half_wave": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "rand_stats"],
 	"crate": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "rand_stats"],
-	"explode": ["temp_stat", "timed_stat", "heal", "gold", "damage", "projectiles"],
-	"crit": ["temp_stat", "timed_stat", "heal", "gold", "damage", "vuln", "hp_dmg", "projectiles", "ignite", "slow", "fruit"],
-	"ignite": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "projectiles", "ignite", "slow", "fruit"],
-	"first_hit": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "projectiles", "ignite", "slow", "fruit"],
-	"first_hit_melee": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "projectiles", "ignite", "slow", "fruit"],
-	"first_hit_ranged": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "projectiles", "ignite", "slow", "fruit"],
-	"first_hit_elemental": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "projectiles", "ignite", "slow", "fruit"],
-	"first_hit_engineering": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "projectiles", "ignite", "slow", "fruit"],
-	"hit_above_50": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "projectiles", "ignite", "slow", "fruit"],
-	"hit_above_75": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "projectiles", "ignite", "slow", "fruit"],
-	"hit_above_90": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "projectiles", "ignite", "slow", "fruit"],
-	"hit_below_50": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "projectiles", "ignite", "slow", "fruit"],
-	"hit_melee": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "projectiles", "ignite", "slow", "fruit"],
-	"hit_ranged": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "projectiles", "ignite", "slow", "fruit"],
-	"hit_elemental": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "projectiles", "ignite", "slow", "fruit"],
-	"hit_engineering": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "projectiles", "ignite", "slow", "fruit"],
-	"cursed_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "projectiles", "fruit"],
-	"tree_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "projectiles", "fruit"],
+	"explode": ["temp_stat", "timed_stat", "heal", "gold", "damage"],
+	"crit": ["temp_stat", "timed_stat", "heal", "gold", "damage", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
+	"ignite": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
+	"first_hit": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
+	"first_hit_melee": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
+	"first_hit_ranged": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
+	"first_hit_elemental": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
+	"first_hit_engineering": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
+	"hit_above_50": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
+	"hit_above_75": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
+	"hit_above_90": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
+	"hit_below_50": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
+	"hit_melee": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
+	"hit_ranged": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
+	"hit_elemental": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
+	"hit_engineering": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
+	"cursed_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "fruit"],
+	"tree_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "fruit"],
 	"buy_stat": ["perm_stat"],
 }
 
@@ -298,46 +295,46 @@ const LEGAL = {
 #     永久获得：只允许求和型数值效果（存档安全）；商店扳机、波末只能永久获得
 # ============================================================
 const FREE_LEGAL = {
-	"kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "projectiles", "fruit"],
-	"hit": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "projectiles"],
-	"dodge": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "projectiles"],
-	"consumable": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "projectiles"],
-	"gold": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "projectiles"],
-	"heal": ["temp_stat", "perm_stat", "timed_stat", "gold", "xp", "damage", "explode", "grant", "rand_stats", "projectiles"],
-	"level_up": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "damage", "explode", "grant", "rand_stats", "projectiles"],
+	"kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "fruit"],
+	"hit": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
+	"dodge": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
+	"consumable": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
+	"gold": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
+	"heal": ["temp_stat", "perm_stat", "timed_stat", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
+	"level_up": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "damage", "explode", "grant", "rand_stats"],
 	"wave_start": ["perm_stat", "timed_stat", "gold", "xp", "grant", "rand_stats"],
 	"wave_end": ["perm_stat", "gold", "xp", "grant", "rand_stats"],
-	"interval": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "projectiles"],
+	"interval": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
 	"still": ["temp_stat", "grant"],
 	"moving": ["temp_stat", "grant"],
 	"low_hp": ["temp_stat", "grant"],
 	"full_hp": ["temp_stat", "grant"],
 	"reroll": ["perm_stat", "gold", "grant", "rand_stats"],
 	"buy": ["perm_stat", "gold", "grant", "rand_stats"],
-	"crit_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "projectiles", "fruit"],
-	"burning_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "projectiles", "fruit"],
-	"steps": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "projectiles"],
-	"half_wave": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "projectiles"],
-	"crate": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "projectiles"],
+	"crit_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "fruit"],
+	"burning_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "fruit"],
+	"steps": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
+	"half_wave": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
+	"crate": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
 	# 爆炸不挂爆炸（自激循环）；暴击不挂爆炸（爆炸可以暴击，形成循环）
-	"explode": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "grant", "rand_stats", "projectiles"],
-	"crit": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "grant", "vuln", "hp_dmg", "rand_stats", "projectiles", "ignite", "slow", "fruit"],
-	"ignite": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "projectiles", "ignite", "slow", "fruit"],
-	"first_hit": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "projectiles", "ignite", "slow", "fruit"],
-	"first_hit_melee": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "projectiles", "ignite", "slow", "fruit"],
-	"first_hit_ranged": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "projectiles", "ignite", "slow", "fruit"],
-	"first_hit_elemental": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "projectiles", "ignite", "slow", "fruit"],
-	"first_hit_engineering": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "projectiles", "ignite", "slow", "fruit"],
-	"hit_above_50": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "projectiles", "ignite", "slow", "fruit"],
-	"hit_above_75": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "projectiles", "ignite", "slow", "fruit"],
-	"hit_above_90": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "projectiles", "ignite", "slow", "fruit"],
-	"hit_below_50": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "projectiles", "ignite", "slow", "fruit"],
-	"hit_melee": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "projectiles", "ignite", "slow", "fruit"],
-	"hit_ranged": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "projectiles", "ignite", "slow", "fruit"],
-	"hit_elemental": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "projectiles", "ignite", "slow", "fruit"],
-	"hit_engineering": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "projectiles", "ignite", "slow", "fruit"],
-	"cursed_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "projectiles", "fruit"],
-	"tree_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "projectiles", "fruit"],
+	"explode": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "grant", "rand_stats"],
+	"crit": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
+	"ignite": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
+	"first_hit": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
+	"first_hit_melee": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
+	"first_hit_ranged": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
+	"first_hit_elemental": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
+	"first_hit_engineering": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
+	"hit_above_50": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
+	"hit_above_75": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
+	"hit_above_90": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
+	"hit_below_50": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
+	"hit_melee": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
+	"hit_ranged": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
+	"hit_elemental": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
+	"hit_engineering": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
+	"cursed_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "fruit"],
+	"tree_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "fruit"],
 	"buy_stat": ["perm_stat"],
 }
 # 战斗中实时读取、可"本波获得"的机制 key（其余求和型机制只能永久获得）
@@ -397,9 +394,6 @@ const NATIVE_TRIGGER_MAP = {
 	"gain_random_primary_stats_on_go_to_next_wave": ["wave_end", "rand_stats"],
 	# 黑旗：击杀被诅咒的敌人时获得材料
 	"gold_on_cursed_enemy_kill": ["cursed_kill", "gold"],
-	# 婴儿胡子 / 外星之眼：敌人死亡 / 间隔时发射投射物
-	"projectiles_on_death": ["kill", "projectiles"],
-	"alien_eyes": ["interval", "projectiles"],
 	# 害怕的香肠 / 丑牙：命中时点燃 / 减速（"命中敌人"类扳机，按命中高血敌人计）
 	"burn_chance": ["hit_above_50", "ignite"],
 	"remove_speed": ["hit_above_50", "slow"],
@@ -581,8 +575,7 @@ const STAT_CATEGORY = {
 	"consumable_heal": "S", "stat_speed": "S",
 	"stat_luck": "E", "stat_harvesting": "E", "xp_gain": "E", "pickup_range": "E",
 }
-const PAYLOAD_CATEGORY = {"heal": "S", "gold": "E", "xp": "E", "damage": "A", "explode": "A", "vuln": "A", "hp_dmg": "A",
-	"projectiles": "A", "ignite": "A", "slow": "S", "fruit": "S"}
+const PAYLOAD_CATEGORY = {"heal": "S", "gold": "E", "xp": "E", "damage": "A", "explode": "A", "vuln": "A", "hp_dmg": "A", "ignite": "A", "slow": "S", "fruit": "S"}
 const CATEGORY_CLASSES = ["AA", "AS", "AE", "A-", "SA", "SS", "SE", "S-", "EA", "ES", "EE", "E-"]
 
 # 原版的非属性词条（角色的"想要词条"会用到）

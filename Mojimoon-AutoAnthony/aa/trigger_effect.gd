@@ -194,8 +194,6 @@ func _payload_text(colored: bool) -> String:
 			# 原版的百分比写法：头目和精英为 1/10（巨型带 10% / 1%）
 			var boss = str(stepify(value / 10.0, 0.1)).trim_suffix(".0") + "%"
 			return tr("AA_P_HP_DMG").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", boss)
-		"projectiles":
-			return tr("AA_P_PROJECTILES").replace("{0}", _col(str(value), good, colored)).replace("{1}", str(value2) + "%").replace("{2}", stat_name)
 		"ignite":
 			return tr("AA_P_IGNITE").replace("{0}", _col(str(value), good, colored)).replace("{1}", str(Catalog.IGNITE_TICKS))
 		"slow":

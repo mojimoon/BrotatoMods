@@ -2404,7 +2404,7 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 		yield(_wait_frames(2), "completed")
 	# 砍倒树木：按原版刷树队列生成一棵树并击倒
 	main._entity_spawner.queue_to_spawn_trees.push_back([EntityType.NEUTRAL, load("res://entities/units/neutral/tree.tscn"), player.global_position + Vector2(150, 0)])
-	for i in 40:
+	for i in 100:
 		if not main._entity_spawner.neutrals.empty():
 			break
 		yield(tree.create_timer(0.1), "timeout")
@@ -2607,7 +2607,7 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 		player.current_stats.health = max(1, player.max_stats.health / 2)
 		# 伤害 / 爆炸看敌人总生命，敌人同时生成 / 死亡会干扰比较：最多重试 3 次
 		var changed = false
-		for attempt in (3 if e.payload in ["damage", "explode", "hp_dmg", "projectiles", "ignite", "slow"] else 1):
+		for attempt in (3 if e.payload in ["damage", "explode", "hp_dmg", "ignite", "slow"] else 1):
 			var tgt = yield(_wait_enemy(main), "completed")
 			var before = _battle_snapshot(main)
 			var hp_before = _enemy_hp_map(main)
@@ -2616,8 +2616,8 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 			var speed_before = tgt.current_stats.speed if tgt != null and is_instance_valid(tgt) else 0
 			rt.execute(e, 0, tgt.global_position if tgt != null and is_instance_valid(tgt) else null, false, null, tgt if tgt != null and is_instance_valid(tgt) else null)
 			# 爆炸由 WeaponService 延迟生成，命中需要几帧
-			# 爆炸 / 投射物由 WeaponService 延迟生成，命中需要时间；燃烧第一跳约 1 秒
-			var waits = {"explode": 12, "projectiles": 60, "ignite": 75}
+			# 爆炸由 WeaponService 延迟生成，命中需要几帧；燃烧第一跳约 1 秒
+			var waits = {"explode": 12, "ignite": 75}
 			yield(_wait_physics(waits.get(e.payload, 4)), "completed")
 			if e.payload == "vuln":
 				if tb != null and is_instance_valid(tb) and tb._vuln_total > vuln_before:
@@ -2627,7 +2627,7 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 				if tgt != null and is_instance_valid(tgt) and (tgt.dead or tgt.current_stats.speed < speed_before):
 					changed = true
 					break
-			elif e.payload in ["damage", "explode", "hp_dmg", "projectiles", "ignite"]:
+			elif e.payload in ["damage", "explode", "hp_dmg", "ignite"]:
 				if _any_enemy_hurt(main, hp_before):
 					changed = true
 					break
@@ -4102,7 +4102,7 @@ func test_127_more_native_triggers() -> void:
 	m.on_menu_reset()
 
 
-# 剩余拆解：投射物（婴儿胡子 / 外星之眼）、点燃（害怕的香肠）、减速（丑牙）、掉落水果（果篮）；
+# 剩余拆解（发射投射物已删除，婴儿胡子 / 外星之眼仍作为机制搬运）：点燃（害怕的香肠）、减速（丑牙）、掉落水果（果篮）；
 # 新扳机：砍倒树木（口袋工厂）、获得提升 [属性] 的道具（雪球）；击杀被诅咒的敌人附带 +5 诅咒
 func test_128_remaining_native_triggers() -> void:
 	var gen = Generator.new(_cfg(), 1)
@@ -4110,7 +4110,7 @@ func test_128_remaining_native_triggers() -> void:
 	for t in 4:
 		for mech in gen.mechanics_by_tier[t]:
 			var k = mech.effect.custom_key if mech.effect.custom_key != "" else mech.effect.key
-			_check(not k in ["projectiles_on_death", "alien_eyes", "burn_chance", "remove_speed", "enemy_fruit_drops", "gain_stat_for_equipped_item_with_stat"],
+			_check(not k in ["burn_chance", "remove_speed", "enemy_fruit_drops", "gain_stat_for_equipped_item_with_stat"],
 				"decomposed native trigger not copied: " + k)
 	_eq(Catalog.TRIGGERS["cursed_kill"].e, 25.0, "cursed kills estimated at 1/4 of kills")
 	var seen = {}
@@ -4127,7 +4127,7 @@ func test_128_remaining_native_triggers() -> void:
 				if not e is TriggerEffect:
 					continue
 				var k = ""
-				if e.payload in ["projectiles", "ignite", "slow", "fruit"]:
+				if e.payload in ["ignite", "slow", "fruit"]:
 					k = e.payload
 				elif e.trigger in ["tree_kill", "buy_stat"]:
 					k = e.trigger
@@ -4149,7 +4149,7 @@ func test_128_remaining_native_triggers() -> void:
 				if curse >= Catalog.CURSED_KILL_CURSE:
 					curse_ok += 1
 	print("AUDIT remaining native shapes over 30 seeds: %s, cursed-kill items with curse %d; %s" % [str(seen), curse_ok, str(samples)])
-	for k in ["projectiles", "ignite", "slow", "fruit", "tree_kill", "buy_stat"]:
+	for k in ["ignite", "slow", "fruit", "tree_kill", "buy_stat"]:
 		_check(seen.get(k, 0) > 0, k + " appears in generated pools")
 	# 商店：获得提升该属性的道具时
 	m.start_new_run()
@@ -4177,3 +4177,36 @@ func test_128_remaining_native_triggers() -> void:
 	_eq(tot1 - tot0, 3, "random primary stats work in the shop")
 	rd.remove_item(holder, 0)
 	m.on_menu_reset()
+
+
+# 脚本加载阶段不预载游戏本体资源（preload 原版 .tres / 场景会在实际游戏启动时崩溃：mod 脚本先于部分资源加载）
+func test_129_no_preload_of_game_resources() -> void:
+	var dirs = [MOD_DIR]
+	var bad = []
+	var n = 0
+	while not dirs.empty():
+		var d = dirs.pop_back()
+		var da = Directory.new()
+		if da.open(d) != OK:
+			continue
+		da.list_dir_begin(true, true)
+		var f = da.get_next()
+		while f != "":
+			var path = d + f
+			if da.current_is_dir():
+				dirs.push_back(path + "/")
+			# 设置界面在菜单中按需加载（字体预载没有问题），只检查随 mod 初始化 / 脚本扩展加载的脚本
+			elif f.ends_with(".gd") and f != "settings_ui.gd":
+				n += 1
+				var fh = File.new()
+				fh.open(path, File.READ)
+				var text = fh.get_as_text()
+				fh.close()
+				var re = RegEx.new()
+				re.compile("preload\\(\"(res://[^\"]+)\"\\)")
+				for mt in re.search_all(text):
+					if not mt.get_string(1).begins_with("res://mods-unpacked/"):
+						bad.push_back(path.get_file() + ": " + mt.get_string(1))
+			f = da.get_next()
+	_check(n > 10, "scanned mod scripts (%d)" % n)
+	_check(bad.empty(), "no preload of game resources: " + str(bad))

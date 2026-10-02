@@ -24,8 +24,6 @@ var _depth := 0
 var _explosion_effect = null
 var _explode_args = null
 var _damage_args = null
-var _proj_origin: Node2D = null
-const PROJECTILE_STATS = preload("res://items/all/alien_eyes/alien_eyes_stats.tres")
 # 计步（与原版徒步旅行者一致：移动时长 × 2 / 移动动画时长）
 var _steps: Array = [0.0, 0.0, 0.0, 0.0]
 
@@ -325,8 +323,6 @@ func _execute_inner(e, player_index: int, pos, show: bool, en, target) -> void:
 			_vuln(e, target)
 		"hp_dmg":
 			_hp_damage(e, player_index, target)
-		"projectiles":
-			_projectiles(e, player_index, pos)
 		"ignite":
 			_ignite(e, player_index, target)
 		"slow":
@@ -421,30 +417,6 @@ func _explode(e, player_index: int, pos) -> void:
 func _player_pos(player_index: int):
 	var p = _get_player(player_index)
 	return p.global_position if p != null else null
-
-
-# 发射投射物（婴儿胡子 / 外星之眼）：有位置时从该位置（死亡的敌人等）向四周发射，否则环绕玩家；每个造成 [属性] 的 Y%
-func _projectiles(e, player_index: int, pos) -> void:
-	var player = _get_player(player_index)
-	if player == null or main == null or not is_instance_valid(main) or e.value <= 0:
-		return
-	var origin = player
-	if pos != null:
-		if _proj_origin == null or not is_instance_valid(_proj_origin):
-			_proj_origin = Node2D.new()
-			add_child(_proj_origin)
-		_proj_origin.global_position = pos
-		origin = _proj_origin
-	var base = PROJECTILE_STATS.duplicate()
-	base.damage = 1
-	base.scaling_stats = [[Keys.generate_hash(e.stat), max(1, e.value2) / 100.0]]
-	var stats = WeaponService.init_ranged_stats(base, player_index, true)
-	var n = int(e.value)
-	var offset = randf() * TAU
-	for i in n:
-		var args = WeaponServiceSpawnProjectileArgs.new()
-		args.from_player_index = player_index
-		var _p = WeaponService.manage_special_spawn_projectile(origin, stats, offset + TAU * i / n, false, main._entity_spawner, player, args)
 
 
 # 点燃目标（害怕的香肠）：3 跳 × X（+100% 元素伤害）
