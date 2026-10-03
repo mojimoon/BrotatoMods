@@ -36,13 +36,15 @@ const PERM_MULT_CHARACTER = 7.0
 const DOWNSIDE_DIVISOR = 2.5
 # 隐藏价值乘数（按稀有度）：用"真实频率"审计生成道具与原版纯属性道具的强度比 real，
 # real < 1 的档位乘以 1 / real 补齐，real >= 1 的保持不变。由测试 test_60 的审计结果标定。
-const HIDDEN_TIER_MULT = [1.0, 1.08, 1.08, 1.0]
+const HIDDEN_TIER_MULT = [1.0, 1.12, 1.08, 1.0]
 # 预算模型：同稀有度内 预算 = k × 价格（过原点的线性），k = 原版纯属性道具的净价值中位数 / 价格中位数
 # （T1–T4 约 0.40 / 0.35 / 0.38 / 0.56）。原版档内"价值 - 价格"几乎没有斜率（档内 R² 只有 0.07–0.33），
 # 任何档内曲线都是建模选择；旧的 价格^0.69 与正比模型对原版的拟合相同（R² 都是 0.918），而价格现在由本 mod 生成，
 # 用正比关系最直接：贵一倍的道具就强一倍。
 # 重组道具的价格：从同稀有度被重组道具的原版价格分布中有放回抽取（不是均匀分布；低于此值的占位价格不参与）
 const PRICE_POOL_MIN = 5
+# 不进入价格池的道具：金鱼（23）/ 休息的金鱼（30）的价格远低于同稀有度，会把重组道具的价格拉低
+const PRICE_POOL_EXCLUDED = ["item_goldfish", "item_goldfish_used"]
 # 机制估值修正：来源道具 / 机制 key -> 估值倍率（< 1 = 同样预算给出更高的数值）
 #   从升级中获得的属性 +X%（藤壶）；MultiTool 里评级偏低的特殊机制道具（花园 C、眼罩）
 const MECHANIC_VALUE_MULT = {"level_upgrades_modifications": 0.6, "item_garden": 0.75, "item_eyepatch": 0.8}
@@ -189,11 +191,11 @@ const VULN_CONCURRENT_TARGETS = 8.0
 const VULN_MAX_USEFUL_SECONDS = 4.0
 # 受伤加成固定持续 3 秒（同原版冰块）
 const VULN_SECONDS = 3
-# 按当前生命值伤害：每 1%、每次触发的价值（巨型带：暴击约 80 次 / 波、10% ≈ 62 反推）；单次上限 10%（同原版）
-const HP_DMG_W = 0.08
+# 按当前生命值伤害：每 1%、每次触发的价值（巨型带：暴击约 80 次 / 波、10% ≈ 62 反推，实测偏强再 ×2）；单次上限 10%（同原版）
+const HP_DMG_W = 0.16
 const HP_DMG_MAX = 10
-# 随机主属性：每点、每次触发的永久价值（糖果袋：每波 8 点、T3 估值 26.4 反推）
-const RAND_STAT_W = 0.85
+# 随机主属性：每点、每次触发的永久价值（糖果袋：每波 8 点、T3 估值 26.4 反推，实测偏强再 ×2）
+const RAND_STAT_W = 1.7
 # 点燃：3 跳燃烧、元素伤害参考值；减速：每 1%、每次触发（丑牙 5% / 命中约 150 次 / 估值 12.6 反推）；水果：每个
 const IGNITE_TICKS = 3
 const SLOW_W = 0.017
@@ -604,7 +606,6 @@ const COUNTER_REF = {
 # 成长型道具（原版石头皮肤、线圈、发电机、复古卫衣）：小概率生成，T2 及以上
 #   可选的 +[属性 A] 行（数值像副属性）+ 高转化率的"每有 [属性 A] 获得 [属性 B]" + 可选的代价，带限制 (X)
 #   B 只取 %伤害 / 攻速 / 最大生命（2 : 2 : 1）；A 取主 / 次要属性与诅咒
-#   转化率 = 常规计数估值的 GROWTH_CONVERSION_MULT 倍（原版这几件都是 1 : 1 或 1 : 2，明显高于常规算法）
 # ============================================================
 const GROWTH_ITEM_CHANCE = 0.06
 const GROWTH_TARGETS = {"stat_percent_damage": 2.0, "stat_attack_speed": 2.0, "stat_max_hp": 1.0}
@@ -614,7 +615,6 @@ const GROWTH_COUNTERS = [
 	"stat_range", "stat_armor", "stat_dodge", "stat_speed", "stat_luck", "stat_harvesting",
 	"xp_gain", "pickup_range", "knockback", "explosion_damage", "explosion_size", "consumable_heal", "stat_curse",
 ]
-const GROWTH_CONVERSION_MULT = 2.0
 const GROWTH_LINE_CHANCE = 0.5
 const GROWTH_LINE_SHARE = 0.2
 const GROWTH_CURSE_LINE = 4

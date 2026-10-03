@@ -692,7 +692,7 @@ func item_budget(item) -> float:
 func assign_prices(gen_items: Array) -> void:
 	var pools = [[], [], [], []]
 	for it in gen_items:
-		if it.value >= Catalog.PRICE_POOL_MIN:
+		if it.value >= Catalog.PRICE_POOL_MIN and not it.my_id in Catalog.PRICE_POOL_EXCLUDED:
 			pools[it.tier].push_back(it.value)
 	for t in 4:
 		pools[t].sort()
@@ -991,8 +991,8 @@ func _generate_growth_item(item) -> Dictionary:
 			var v = int(min(_round_to_unit(budget * share / Catalog.stat_w(a_stat), a_stat), _line_cap(a_stat, false)))
 			lines.push_back(_stat_effect(a_stat, v))
 			budget -= v * Catalog.stat_w(a_stat)
-	# 转化率：按常规估值的 GROWTH_CONVERSION_MULT 倍，取最接近的 (数值, 每 N)
-	var target = max(budget, 2.0) * Catalog.GROWTH_CONVERSION_MULT
+	# 转化率：按常规计数估值，取最接近预算的 (数值, 每 N)
+	var target = max(budget, 2.0)
 	var unit = Catalog.stat_unit(b_stat)
 	var best = {}
 	for k in range(1, 6):

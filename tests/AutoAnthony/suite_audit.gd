@@ -66,9 +66,9 @@ func test_12_value_audit() -> void:
 	_check(p10 > 0.5, "p10 value/budget not too low (%.2f)" % p10)
 	_check(p90 < 1.7, "p90 value/budget not too high (%.2f)" % p90)
 	_check(trig_count.size() >= 12, "most triggers occur (%d)" % trig_count.size())
-	# 点燃 / 减速只挂在少数有目标敌人的扳机上，单个种子里可能不出现：由 test_128 在 30 个种子上检查
+	# 点燃 / 减速 / 按生命值伤害只挂在少数有目标敌人的扳机上，单个种子里可能不出现：由 test_127 / 128 在多个种子上检查
 	for p in Catalog.PAYLOADS:
-		_check(pay_count.has(p) or p in ["ignite", "slow"], "payload occurs: " + p)
+		_check(pay_count.has(p) or p in ["ignite", "slow", "hp_dmg"], "payload occurs: " + p)
 	# 实验性扳机出现但保持少数（原 test_107）
 	var n_exp = 0
 	var n_all = 0
