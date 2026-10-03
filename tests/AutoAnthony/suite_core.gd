@@ -2289,6 +2289,7 @@ func test_134_growth_items() -> void:
 	var n = 0
 	var n_items = 0
 	var targets = {}
+	var counters = {}
 	var samples = []
 	for sd in range(1, 21):
 		var plan = _gen(sd)
@@ -2313,11 +2314,16 @@ func test_134_growth_items() -> void:
 			_check(Catalog.GROWTH_TARGETS.has(sc.key), id + " target stat is %damage / attack speed / max hp: " + sc.key)
 			_check(sc.stat_scaled in Catalog.GROWTH_COUNTERS and sc.stat_scaled != sc.key, id + " counter: " + sc.stat_scaled)
 			targets[sc.key] = targets.get(sc.key, 0) + 1
+			counters[sc.stat_scaled] = counters.get(sc.stat_scaled, 0) + 1
+			# +属性行只能是计数属性 A 本身（诅咒道具原有的 +诅咒行除外）
+			for e in p.effects:
+				if e.get_script() == load("res://items/global/effect.gd") and Catalog.STATS.has(e.key) and e.custom_key == "" and e.value > 0:
+					_eq(e.key, sc.stat_scaled, id + " plus line is the counted stat")
 			var txt = _texts(p.effects)
 			_check(txt.find("AA_") == -1 and txt.find("{") == -1, "text: " + txt)
 			if samples.size() < 8:
 				samples.push_back("T%d limit %d: %s" % [_item(id).tier + 1, lim, txt])
-	print("AUDIT growth items %d of %d (targets %s)" % [n, n_items, str(targets)])
+	print("AUDIT growth items %d of %d (targets %s; counters %s)" % [n, n_items, str(targets), str(counters)])
 	for t in samples:
 		print("AUDIT   " + t)
 	_check(n > 0 and n < n_items * 0.08, "growth items are rare but present")

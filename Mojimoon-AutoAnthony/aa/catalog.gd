@@ -602,7 +602,7 @@ const COUNTER_REF = {
 }
 # ============================================================
 # 成长型道具（原版石头皮肤、线圈、发电机、复古卫衣）：小概率生成，T2 及以上
-#   可选的 +属性行（数值像副属性）+ 高转化率的"每有 [属性 A] 获得 [属性 B]" + 可选的代价，带限制 (X)
+#   可选的 +[属性 A] 行（数值像副属性）+ 高转化率的"每有 [属性 A] 获得 [属性 B]" + 可选的代价，带限制 (X)
 #   B 只取 %伤害 / 攻速 / 最大生命（2 : 2 : 1）；A 取主 / 次要属性与诅咒
 #   转化率 = 常规计数估值的 GROWTH_CONVERSION_MULT 倍（原版这几件都是 1 : 1 或 1 : 2，明显高于常规算法）
 # ============================================================
@@ -617,6 +617,7 @@ const GROWTH_COUNTERS = [
 const GROWTH_CONVERSION_MULT = 2.0
 const GROWTH_LINE_CHANCE = 0.5
 const GROWTH_LINE_SHARE = 0.2
+const GROWTH_CURSE_LINE = 2
 const GROWTH_DOWNSIDE_CHANCE = 0.5
 # 限制 (X)：1 = 独特
 const GROWTH_LIMITS = {1: 3.0, 2: 2.0, 3: 1.0}

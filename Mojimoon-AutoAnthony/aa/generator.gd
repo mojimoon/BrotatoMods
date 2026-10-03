@@ -973,12 +973,17 @@ func _generate_growth_item(item) -> Dictionary:
 		downsides = dres.effects
 		budget += dres.got
 	var lines = []
-	if rng.randf() < Catalog.GROWTH_LINE_CHANCE:
-		# 数值像副属性；一半概率就是计数属性本身（线圈：+5 击退，每点击退 +1% 伤害）
-		var s = a_stat if Catalog.STATS.has(a_stat) and rng.randf() < 0.5 else _pick_stat(false, used + Catalog.SIDE_ONLY_STATS)
-		var v = int(min(_round_to_unit(budget * Catalog.GROWTH_LINE_SHARE / Catalog.stat_w(s), s), _line_cap(s, false)))
-		lines.push_back(_stat_effect(s, v))
-		budget -= v * Catalog.stat_w(s)
+	# T3 及以上至少两条效果：没有代价时 +[属性 A] 行必出（不交给 _ensure_min_lines 补别的属性）
+	var need_line = item.tier >= Catalog.MIN_LINES_TIER and downsides.empty()
+	if need_line or rng.randf() < Catalog.GROWTH_LINE_CHANCE:
+		# +属性行就是计数属性 A 本身（线圈：+5 击退，每点击退 +1% 伤害），数值像副属性
+		if a_stat == "stat_curse":
+			# 诅咒没有属性估值（原版诅咒道具的 +诅咒行），给一个小的固定值
+			lines.push_back(_stat_effect(a_stat, Catalog.GROWTH_CURSE_LINE))
+		else:
+			var v = int(min(_round_to_unit(budget * Catalog.GROWTH_LINE_SHARE / Catalog.stat_w(a_stat), a_stat), _line_cap(a_stat, false)))
+			lines.push_back(_stat_effect(a_stat, v))
+			budget -= v * Catalog.stat_w(a_stat)
 	# 转化率：按常规估值的 GROWTH_CONVERSION_MULT 倍，取最接近的 (数值, 每 N)
 	var target = max(budget, 2.0) * Catalog.GROWTH_CONVERSION_MULT
 	var unit = Catalog.stat_unit(b_stat)

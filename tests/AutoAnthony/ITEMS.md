@@ -77,7 +77,7 @@
 | T2 | 生机黑带 | 50 | +3 生命再生<br>-2 %速度 | stat_hp_regeneration |  |
 | T2 | 奇异的焰蜥蜴 | 55 | 生成1台燃烧炮塔，造成8x5（+33%）燃烧伤害<br>敌袭结束后+1%敌人速度 | structure |  |
 | T2 | 奥术眼罩 | 48 | +8 元素伤害<br>闪避时+3%敌人速度，直至敌袭结束 | stat_elemental_damage, stat_dodge | 核心 |
-| T2 | 共鸣血蛭 | 40 | +1 %生命窃取<br>每1消耗性治疗会+3%攻击速度 [+0] | stat_lifesteal, stat_attack_speed, consumable | 独特，成长型 |
+| T2 | 回响的血蛭 | 40 | 使用消耗品恢复+1HP<br>每2消耗性治疗会+5%攻击速度 [+0] | consumable, stat_attack_speed | 限制 (3)，成长型 |
 | T2 | 精炼的骨骰 | 40 | +9 %伤害<br>最大生命值的修改增加15% | stat_percent_damage, stat_max_hp |  |
 | T2 | 机械Bonk狗 | 55 | +8 工程学<br>-6 %闪避 | stat_engineering | 核心 |
 | T2 | 急切的布雷机器人 | 48 | +3 近战伤害<br>敌袭开始时获得13个材料 | stat_melee_damage, economy |  |
@@ -87,7 +87,7 @@
 | T2 | 奇异的芹菜茶 | 40 | 使用消耗品恢复+2HP<br>使用中世纪类武器时+55%伤害<br>-13 幸运 | consumable, stat_percent_damage |  |
 | T2 | 镀层机械黄蜂 | 55 | +4 护甲<br>敌袭结束后+3%敌人伤害 | stat_armor |  |
 | T2 | 古怪的齿轮 | 40 | 每3秒向周围发射6颗异形眼球，每颗眼球造成8（+50%）伤害<br>-1 %生命窃取 | （无） |  |
-| T2 | 回响的指南针 | 40 | +1 远程伤害<br>每6远程伤害会+5%攻击速度 [+0]<br>敌袭结束后+1%敌人速度 | stat_ranged_damage, stat_attack_speed | 限制 (3)，成长型 |
+| T2 | 回响的指南针 | 40 | +1 远程伤害<br>每永久持有6远程伤害会+5%攻击速度 [+0]<br>敌袭结束后+1%敌人速度 | stat_ranged_damage, stat_attack_speed | 独特，成长型 |
 | T2 | 厚重的珊瑚 | 40 | +6 最大生命值<br>%速度的修改减少33% | stat_max_hp |  |
 | T2 | 镀层赛博球 | 40 | +3 护甲<br>砍倒树木时恢复6点生命值 | stat_armor, exploration |  |
 | T2 | 囤积的独眼虫 | 40 | +10 范围<br>每拾取16个材料，+1%伤害。每波最大值：+2 | stat_range, stat_percent_damage, pickup |  |
@@ -176,7 +176,7 @@
 | T3 | 鹰眼护身符 | 70 | +4 远程伤害<br>-6 %速度 | stat_ranged_damage | 核心 |
 | T3 | 奇异的镜子 | 70 | +15 范围<br>+3 远程伤害<br>+4 元素伤害<br>生成1台发射贯通弹的炮塔，造成20（+125%）伤害<br>-12 %闪避 | stat_range, stat_ranged_damage, stat_elemental_damage, structure |  |
 | T3 | 远古老鼠 | 80 | +1 生命再生<br>+3 近战伤害<br>+5% 敌人<br>-5 %闪避 | stat_hp_regeneration, stat_melee_damage, more_enemies |  |
-| T3 | 共鸣钉子 | 60 | +10 %爆炸范围<br>每3%爆炸范围会+5%伤害 [+0] | explosive, stat_percent_damage | 限制 (2)，成长型 |
+| T3 | 共鸣钉子 | 60 | +10 %爆炸范围<br>每永久持有3%爆炸范围会+5%伤害 [+0] | explosive, stat_percent_damage | 限制 (3)，成长型 |
 | T3 | 耐心的孔雀 | 65 | +3 %伤害<br>敌袭结束时获得23个材料 | stat_percent_damage, economy |  |
 | T3 | 锐利的塑性炸药 | 70 | +25 %伤害<br>-7 最大生命值 | stat_percent_damage | 核心 |
 | T3 | 远古毒性补品 | 65 | +10 范围<br>使用重型类武器时+15伤害<br>每150材料会-1元素伤害 [+0] | stat_range |  |
@@ -202,7 +202,7 @@
 | T3 | 奥术士兵头盔 | 75 | +4 元素伤害<br>拾取范围+5%<br>移动时+9%暴击率<br>移动时+25%敌人伤害<br>捡起消耗品时-4幸运，直至敌袭结束。每波最大值：-80 | stat_elemental_damage, pickup, stat_crit_chance |  |
 | T3 | 奥术小麦 | 75 | +4 元素伤害<br>捡起消耗品时获得3个材料 | stat_elemental_damage, consumable, economy |  |
 | T3 | 结实的鬼火 | 55 | +7 最大生命值<br>生命值低于50%时+13生命再生<br>闪避时+5%敌人伤害，直至敌袭结束 | stat_max_hp, stat_hp_regeneration, stat_dodge |  |
-| T3 | 回响的翅膀 | 80 | +15 范围<br>每4幸运会+5%攻击速度 [+0] | stat_range, stat_attack_speed, stat_luck | 独特，成长型 |
+| T3 | 回响的翅膀 | 80 | +8 幸运<br>每永久持有4幸运会+5%攻击速度 [+0] | stat_luck, stat_attack_speed | 独特，成长型 |
 | T3 | 铁甲智慧 | 80 | +2 护甲<br>每持有一异种IV级别物品有+3%速度[+3] | stat_armor, stat_speed |  |
 | T4 | 奥术铁砧 | 100 | +8 元素伤害<br>敌袭开始时，永久获得“每8生命再生会+2最大生命值 [+0]”<br>-5 近战伤害 | stat_elemental_damage, stat_hp_regeneration, stat_max_hp |  |
 | T4 | 回响的灰烬 | 110 | +8 近战伤害<br>+5 最大生命值<br>每持有一异种I级别物品有+5幸运[+0]<br>下场敌袭以1点生命值开始 | stat_melee_damage, stat_max_hp, stat_luck |  |
@@ -226,7 +226,7 @@
 | T4 | 灵巧的克拉肯的眼睛 | 100 | +9 %闪避<br>刷新商店时，永久获得“每150材料会+1%速度 [+0]”（每波最多3次）<br>+15 诅咒<br>下场敌袭以1点生命值开始 | stat_dodge, economy, stat_speed, stat_curse |  |
 | T4 | 精炼的灯笼 | 110 | +2 远程伤害<br>+3 近战伤害<br>最大生命值的修改增加20%<br>移动时-5%生命窃取 | stat_ranged_damage, stat_melee_damage, stat_max_hp |  |
 | T4 | 迅捷幸运硬币 | 110 | +15 %速度<br>+1 武器栏<br>-15 %伤害 | stat_speed |  |
-| T4 | 回响的猛犸 | 100 | +7 %闪避<br>每1%闪避会+3%伤害 [+0]<br>杀死敌人时-1%攻击速度，直至敌袭结束。每波最大值：-30 | stat_dodge, stat_percent_damage | 限制 (3)，成长型 |
+| T4 | 共鸣猛犸 | 100 | +7 %闪避<br>每永久持有1%闪避会+3%伤害 [+0]<br>杀死敌人时-1%攻击速度，直至敌袭结束。每波最大值：-30 | stat_dodge, stat_percent_damage | 限制 (2)，成长型 |
 | T4 | 沉重的急救包 | 105 | +18 近战伤害<br>使用音乐类武器时+200％暴击伤害<br>-80 范围 | stat_melee_damage, stat_crit_chance |  |
 | T4 | 生机夜视镜 | 90 | +13 生命再生<br>+4 %攻击速度<br>%速度的修改增加50%<br>-24 %伤害 | stat_hp_regeneration, stat_attack_speed, stat_speed |  |
 | T4 | 修补匠的章鱼 | 105 | +8 工程学<br>+13 %伤害<br>+5 生命再生<br>%速度的修改增加50% | stat_engineering, stat_percent_damage, stat_hp_regeneration, stat_speed |  |
@@ -242,4 +242,4 @@
 | T4 | 处决蜘蛛 | 90 | +4 护甲<br>以暴击杀死敌人时，+3%速度，持续8秒 | stat_armor, stat_speed, stat_crit_chance |  |
 | T4 | 离奇的拷问 | 100 | +5 最大生命值<br>+3 生命再生<br>掉落+16%材料<br>-4 远程伤害 | stat_max_hp, stat_hp_regeneration, economy, pickup |  |
 | T4 | 耐心的爆炸炮塔 | 100 | +2 %闪避<br>+1 护甲<br>+1 %生命窃取<br>+2 %攻击速度<br>+2 最大生命值<br>敌袭结束时+3%速度<br>下场敌袭以1点生命值开始 | stat_dodge, stat_armor, stat_lifesteal, stat_attack_speed, stat_max_hp, stat_speed |  |
-| T4 | 共鸣野狼头盔 | 80 | +21 获得%经验<br>每永久持有1获得%经验会+1最大生命值 [+0]<br>杀死敌人时-1幸运，直至敌袭结束。每波最大值：-15 | xp_gain, stat_max_hp | 独特，成长型 |
+| T4 | 回响的野狼头盔 | 80 | +21 获得%经验<br>每永久持有1获得%经验会+1最大生命值 [+0]<br>杀死敌人时-1幸运，直至敌袭结束。每波最大值：-15 | xp_gain, stat_max_hp | 独特，成长型 |
