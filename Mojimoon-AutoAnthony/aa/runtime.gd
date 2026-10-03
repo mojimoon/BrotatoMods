@@ -485,7 +485,7 @@ func _vuln(e, target) -> void:
 	var b = AAEnemyBehavior.find_on(target)
 	if b != null:
 		# 来源 = 条款内容：同一道具（同 ID 的多件）的同一条款不叠层，不同道具 / 不同条款相加
-		b.add_vuln(e.value, float(max(1, e.value2)), hash(JSON.print(e.to_clause())))
+		b.add_vuln(e.value, float(clamp(e.value2, 1, Catalog.VULN_SECONDS)), hash(JSON.print(e.to_clause())))
 
 
 func _get_player(player_index: int):

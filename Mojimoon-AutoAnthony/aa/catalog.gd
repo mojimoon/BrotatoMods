@@ -185,6 +185,8 @@ const MAX_FIRES_PER_SECOND = 20
 # 受伤加成载荷的估值：同时被伤害的敌人约 8 个，持续时间超过约 4 秒不再增值
 const VULN_CONCURRENT_TARGETS = 8.0
 const VULN_MAX_USEFUL_SECONDS = 4.0
+# 受伤加成固定持续 3 秒（同原版冰块）
+const VULN_SECONDS = 3
 # 按当前生命值伤害：每 1%、每次触发的价值（巨型带：暴击约 80 次 / 波、10% ≈ 62 反推）；单次上限 10%（同原版）
 const HP_DMG_W = 0.08
 const HP_DMG_MAX = 10

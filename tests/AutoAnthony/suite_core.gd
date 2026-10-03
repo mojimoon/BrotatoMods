@@ -2231,6 +2231,8 @@ func test_130_trigger_templates() -> void:
 				_check(txt.find("AA_") == -1 and txt.find("{") == -1, "text: " + txt)
 				if e.payload == "fruit":
 					_check(not e.trigger in ["wave_end", "wave_start", "half_wave", "interval"], "no fruit outside of combat events: " + e.trigger)
+				if e.payload == "vuln":
+					_eq(e.value2, Catalog.VULN_SECONDS, "vulnerability lasts 3 seconds like the ice cube")
 	print("AUDIT counted triggers %s; typed damage types %s; damage/explode types %s" % [str(counted.keys()), str(typed), str(dmg_stats)])
 	for t in ["dodge", "consumable", "hit", "reroll", "buy"]:
 		_check(counted.has(t), "count gate now used on " + t)

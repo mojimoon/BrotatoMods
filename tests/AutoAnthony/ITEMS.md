@@ -53,7 +53,7 @@
 | T1 | 蛮力异变 | 15 | +1 近战伤害<br>每受到2次伤害，对随机1名敌人造成相当于100%幸运的伤害 | stat_melee_damage, stat_luck |  |
 | T1 | 神圣的和平蜜蜂 | 12 | +1 %伤害<br>治疗时爆炸，造成相当于25%远程伤害的伤害<br>每永久持有15元素伤害会-1最大生命值 [+0] | stat_percent_damage, explosive, stat_ranged_damage |  |
 | T1 | 沉重的铅笔 | 20 | +5 近战伤害<br>-3 %伤害 | stat_melee_damage | 核心 |
-| T1 | 灼烧的企鹅 | 30 | +1 护甲<br>点燃敌人时使其额外承受20%伤害，持续4秒<br>-2 工程学 | stat_armor, stat_elemental_damage, stat_percent_damage |  |
+| T1 | 炽热的企鹅 | 30 | +1 护甲<br>+1 生命再生<br>点燃敌人时使其额外承受25%伤害，持续3秒<br>-2 工程学 | stat_armor, stat_hp_regeneration, stat_elemental_damage, stat_percent_damage |  |
 | T1 | 远古植物 | 20 | +4 收获<br>使用元素类武器时+10%攻击速度<br>%闪避的修改减少10% | stat_harvesting, stat_attack_speed |  |
 | T1 | 远视的螺旋桨帽 | 30 | +20 范围<br>-1 元素伤害 | stat_range |  |
 | T1 | 滋补的鼠斯拉 | 20 | 使用消耗品恢复+1HP<br>-1 生命再生 | consumable |  |
@@ -180,7 +180,7 @@
 | T3 | 离奇的孔雀 | 65 | +4 工程学<br>使用虚灵类武器时+25%暴击率 | stat_engineering, stat_crit_chance |  |
 | T3 | 锐利的塑性炸药 | 70 | +25 %伤害<br>-7 最大生命值 | stat_percent_damage | 核心 |
 | T3 | 锋利的毒性补品 | 65 | +5 %伤害<br>对头目和精英怪造成+7%伤害<br>使用重型类武器时+10伤害<br>-9 %攻击速度 | stat_percent_damage |  |
-| T3 | 掠食者的发电机 | 65 | +4 %伤害<br>+6 %攻击速度<br>+5 范围<br>+1 工程学<br>命中生命值高于50%的敌人时，使其额外承受5%伤害，持续4秒 | stat_percent_damage, stat_attack_speed, stat_range, stat_engineering |  |
+| T3 | 锋利的发电机 | 65 | +13 %伤害<br>命中生命值高于50%的敌人时，使其额外承受5%伤害，持续3秒 | stat_percent_damage |  |
 | T3 | 回响的狂怒 | 80 | +3 生命再生<br>+2 最大生命值<br>+3 %攻击速度<br>每50材料会+1最大生命值 [+0]<br>使用消耗品恢复-3HP | stat_hp_regeneration, stat_max_hp, stat_attack_speed, economy |  |
 | T3 | 睿智的悲伤的番茄 | 65 | +87 获得%经验<br>-40 范围 | xp_gain | 核心 |
 | T3 | 修补匠的围巾 | 75 | +18 工程学<br>每12秒-5%伤害，直至敌袭结束 | stat_engineering | 核心 |

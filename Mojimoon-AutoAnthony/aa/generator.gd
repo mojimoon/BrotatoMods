@@ -2439,7 +2439,7 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 			c.value = [25, 50, 75, 100][rng.randi() % 4]
 		"vuln":
 			c.value = 5
-			c.value2 = [2, 3, 4, 5][rng.randi() % 4]
+			c.value2 = Catalog.VULN_SECONDS
 		"hp_dmg":
 			c.value = 1
 		"ignite":
