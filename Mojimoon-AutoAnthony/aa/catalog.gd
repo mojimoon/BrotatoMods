@@ -617,7 +617,7 @@ const GROWTH_COUNTERS = [
 const GROWTH_CONVERSION_MULT = 2.0
 const GROWTH_LINE_CHANCE = 0.5
 const GROWTH_LINE_SHARE = 0.2
-const GROWTH_CURSE_LINE = 2
+const GROWTH_CURSE_LINE = 4
 const GROWTH_DOWNSIDE_CHANCE = 0.5
 # 限制 (X)：1 = 独特
 const GROWTH_LIMITS = {1: 3.0, 2: 2.0, 3: 1.0}
@@ -911,8 +911,8 @@ const MECHANIC_INTERCEPT = {"torture": {"offset": 3, "min": 4}}
 const MIN_LINES_TIER = 2
 const MIN_LINES = 2
 
-# T4 道具不出现 +收获（与原版一致）
-const T4_BANNED_POSITIVE_STATS = ["stat_harvesting"]
+# T4 道具不出现的正面属性（与原版一致：原版 T4 没有 +收获 / +拾取范围 / +消耗品回复）
+const T4_BANNED_POSITIVE_STATS = ["stat_harvesting", "pickup_range", "consumable_heal"]
 # 负面触发条款使用敌人属性（生命 / 伤害 / 速度提高）的概率
 const NEGATIVE_CLAUSE_ENEMY_CHANCE = 0.3
 

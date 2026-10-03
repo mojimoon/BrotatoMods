@@ -1161,8 +1161,9 @@ func test_99b_tier_rules() -> void:
 			var p = plan.items[id]
 			if tier == 3:
 				for e in p.effects:
-					if e.value > 0 and (e.key == "stat_harvesting" or (e is TriggerEffect and e.stat == "stat_harvesting") or (gen.is_scaling(e) and e.key == "stat_harvesting")):
-						_check(false, id + " T4 item has +harvesting: " + e.get_text(0, false))
+					var k = e.stat if e is TriggerEffect else e.key
+					if e.value > 0 and k in Catalog.T4_BANNED_POSITIVE_STATS and (e is TriggerEffect or gen.is_plain_stat(e) or gen.is_scaling(e)):
+						_check(false, id + " T4 item has +" + k + ": " + e.get_text(0, false))
 			if tier == 2 and p.effects.size() == 1:
 				t3_single += 1
 	print("AUDIT T3 single-line items: %d (5 seeds)" % t3_single)
