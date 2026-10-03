@@ -962,8 +962,13 @@ func _generate_growth_item(item) -> Dictionary:
 	# 诅咒是 DLC 属性：未启用 DLC 时玩家 effects 里没有它
 	var curse_ok = PlayerRunData.init_effects().has(Keys.stat_curse_hash)
 	for s in Catalog.GROWTH_COUNTERS:
-		if s != b_stat and not s in cur_stat_bans and (s != "stat_curse" or curse_ok):
-			aw[s] = Catalog.WANTED_BIAS if s in wanted_bias else 1.0
+		if s == b_stat or s in cur_stat_bans or (s == "stat_curse" and not curse_ok):
+			continue
+		# T4 不出现的正面属性（收获等）也不做计数属性（会带上 +[属性 A] 行）
+		if item.tier == 3 and s in Catalog.T4_BANNED_POSITIVE_STATS:
+			continue
+		# 按普通属性行的抽取权重（原版正面属性行的出现次数）；诅咒按闪避；击退保留（原版线圈就是按击退成长）
+		aw[s] = stat_pos_w.get("stat_dodge" if s == "stat_curse" else s, 0.5) * (Catalog.WANTED_BIAS if s in wanted_bias else 1.0)
 	var a_stat = _pick_weighted(aw)
 	anchor_stat = b_stat
 	var used = [a_stat, b_stat]
@@ -981,7 +986,9 @@ func _generate_growth_item(item) -> Dictionary:
 			# 诅咒没有属性估值（原版诅咒道具的 +诅咒行），给一个小的固定值
 			lines.push_back(_stat_effect(a_stat, Catalog.GROWTH_CURSE_LINE))
 		else:
-			var v = int(min(_round_to_unit(budget * Catalog.GROWTH_LINE_SHARE / Catalog.stat_w(a_stat), a_stat), _line_cap(a_stat, false)))
+			# 次要属性（击退、范围、拾取范围）同样只拿一部分份额：线圈 +5 击退
+			var share = Catalog.GROWTH_LINE_SHARE * Catalog.MINOR_POSITIVE_STATS.get(a_stat, 1.0)
+			var v = int(min(_round_to_unit(budget * share / Catalog.stat_w(a_stat), a_stat), _line_cap(a_stat, false)))
 			lines.push_back(_stat_effect(a_stat, v))
 			budget -= v * Catalog.stat_w(a_stat)
 	# 转化率：按常规估值的 GROWTH_CONVERSION_MULT 倍，取最接近的 (数值, 每 N)

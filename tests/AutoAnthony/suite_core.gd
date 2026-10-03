@@ -2327,6 +2327,14 @@ func test_134_growth_items() -> void:
 	for t in samples:
 		print("AUDIT   " + t)
 	_check(n > 0 and n < n_items * 0.08, "growth items are rare but present")
+	# 属性 A 按普通属性行的权重：主要属性占多数
+	var minor = 0
+	for c in counters:
+		if not c in ["stat_max_hp", "stat_hp_regeneration", "stat_lifesteal", "stat_percent_damage", "stat_melee_damage", "stat_ranged_damage",
+				"stat_elemental_damage", "stat_attack_speed", "stat_crit_chance", "stat_engineering", "stat_range", "stat_armor", "stat_dodge",
+				"stat_speed", "stat_luck", "stat_harvesting"]:
+			minor += counters[c]
+	_check(minor < n * 0.2, "secondary stats / curse are a minority of counters (%d of %d)" % [minor, n])
 	# 限制写到道具上，回菜单后还原
 	m.start_new_run()
 	for id in m.plan.items:
