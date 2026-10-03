@@ -130,7 +130,7 @@ const TRIGGERS = {
 	"full_hp": {"kind": "state", "e": 0.45, "timing": 1.0, "gate": "none", "w": 0.4},
 	"reroll": {"kind": "shop", "e": 3.0, "timing": 0.0, "gate": "every", "w": 0.5},
 	# 暴击击杀（触手、狩猎奖杯）/ 击杀燃烧中的敌人（鬼火）：击杀的子集，频率取决于构筑；绑定暴击 / 元素词条
-	"crit_kill": {"kind": "event", "e": 45.0, "timing": 0.5, "gate": "every", "w": 0.7},
+	"crit_kill": {"kind": "event", "e": 50.0, "timing": 0.5, "gate": "every", "w": 0.7},
 	"burning_kill": {"kind": "event", "e": 30.0, "timing": 0.5, "gate": "every", "w": 0.3},
 	# 每走 N 步（徒步旅行者）：移动时约每秒 3.33 步，每波约 200 步，实际强度不足，需要低估
 	"steps": {"kind": "event", "e": 90.0, "timing": 0.5, "gate": "every", "w": 0.3},
@@ -145,7 +145,7 @@ const TRIGGERS = {
 	# 暴击命中（不必击杀）
 	"crit": {"kind": "event", "e": 100.0, "timing": 0.5, "gate": "every", "w": 0.3},
 	# 点燃敌人（敌人开始燃烧；原版以燃烧结算为准）
-	"ignite": {"kind": "event", "e": 30.0, "timing": 0.5, "gate": "every", "w": 0.15},
+	"ignite": {"kind": "event", "e": 40.0, "timing": 0.5, "gate": "every", "w": 0.15},
 	# 首次命中某个敌人（冰块、潜水员的"首次命中时"）；_typed = 限定伤害类型（条款的 dmg_type 字段，按命中的伤害缩放属性）
 	# 一局通常只用一种伤害类型：限定类型与不限定的期望次数相同
 	"first_hit": {"kind": "event", "e": 110.0, "timing": 0.5, "gate": "every", "w": 0.1},
@@ -191,8 +191,8 @@ const VULN_CONCURRENT_TARGETS = 8.0
 const VULN_MAX_USEFUL_SECONDS = 4.0
 # 受伤加成固定持续 3 秒（同原版冰块）
 const VULN_SECONDS = 3
-# 按当前生命值伤害：每 1%、每次触发的价值（巨型带：暴击约 80 次 / 波、10% ≈ 62 反推，实测偏强再 ×2）；单次上限 10%（同原版）
-const HP_DMG_W = 0.16
+# 按当前生命值伤害：每 1%、每次触发的价值（巨型带：暴击约 80 次 / 波、10% ≈ 62 反推）；单次上限 10%（同原版：普通敌人 10%，首领 1%）
+const HP_DMG_W = 0.08
 const HP_DMG_MAX = 10
 # 随机主属性：每点、每次触发的永久价值（糖果袋：每波 8 点、T3 估值 26.4 反推，实测偏强再 ×2）
 const RAND_STAT_W = 1.7

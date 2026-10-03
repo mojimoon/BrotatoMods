@@ -2082,8 +2082,8 @@ func test_127_more_native_triggers() -> void:
 	var belt = Valuation.clause_value({"trigger": "crit", "payload": "hp_dmg", "value": 10, "param": 1, "chance": 100, "cap": 0}, Catalog.PERM_MULT[3])
 	var bag = Valuation.clause_value({"trigger": "wave_end", "payload": "rand_stats", "value": 8, "param": 1, "chance": 100, "cap": 0}, Catalog.PERM_MULT[2])
 	print("AUDIT giant-belt-like clause %.1f, candy-bag-like clause %.1f" % [belt, bag])
-	# 1.2.5：两者实测偏强，估值为原版折算的约 2 倍（同样预算下数值减半）
-	_check(belt > 80 and belt < 180, "giant-belt-like valued at about twice the native item")
+	_check(belt > 40 and belt < 120, "giant-belt-like valued near the native item")
+	# 1.2.5：糖果袋实测偏强，估值为原版折算的约 2 倍（同样预算下数值减半）
 	_check(bag > 30 and bag < 80, "candy-bag-like valued at about twice the native item")
 	# 运行时：随机主属性
 	m.start_new_run()
