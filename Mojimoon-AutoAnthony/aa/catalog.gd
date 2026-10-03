@@ -68,7 +68,7 @@ const STATS = {
 	"stat_luck": {"w": 0.9, "unit": 1, "pct": false, "ref": 30.0},
 	"stat_harvesting": {"w": 0.95, "unit": 1, "pct": false, "ref": 40.0},
 	"xp_gain": {"w": 0.5, "unit": 1, "pct": true, "ref": 0.0},
-	"pickup_range": {"w": 0.46, "unit": 5, "pct": true, "ref": 0.0},
+	"pickup_range": {"w": 0.3, "unit": 5, "pct": true, "ref": 0.0},
 	"knockback": {"w": 0.7, "unit": 1, "pct": false, "ref": 0.0},
 	"explosion_damage": {"w": 0.93, "unit": 5, "pct": true, "ref": 0.0},
 	"explosion_size": {"w": 0.7, "unit": 5, "pct": true, "ref": 0.0},
@@ -77,6 +77,8 @@ const STATS = {
 
 # 次要正面属性：作为属性行（非核心属性）时只分到通常份额的这一比例，余下预算交给其他属性行
 const MINOR_POSITIVE_STATS = {"knockback": 0.4, "stat_range": 0.65, "pickup_range": 0.4}
+# 只作为附属属性行出现、不做主属性 / 整行预算的属性（原版击退只是附属行，数值很小）
+const SIDE_ONLY_STATS = ["knockback"]
 
 # 可作为"对随机敌人造成 X% 属性伤害"缩放源的属性
 const DAMAGE_SCALING_STATS = [

@@ -568,3 +568,55 @@ func _check_reassembled_characters() -> void:
 				_check(e.trigger != "heal" and e.payload != "heal", cid + " no heal-related clause on a no-heal character")
 			if gen2.native_trigger_of(e) != null:
 				_check(false, cid + " still has a native trigger line (should be re-expressed): " + e.key)
+
+
+# 次要正面属性（击退 / 范围 / 拾取范围）：生成道具与原版道具的数值对比（按稀有度，主属性与附属行分开）
+func test_133_minor_stats_audit() -> void:
+	var keys = ["knockback", "stat_range", "pickup_range"]
+	var native = {}
+	for it in isvc.items:
+		if not m.is_native_resource(it) or not it.can_be_looted:
+			continue
+		for e in it.effects:
+			if e.key in keys and e.custom_key == "" and e.value > 0 and e.get_script() == load("res://items/global/effect.gd"):
+				var k = "%s T%d" % [e.key, it.tier + 1]
+				if not native.has(k):
+					native[k] = []
+				native[k].push_back(e.value)
+	var gen_main = {}
+	var gen_side = {}
+	var trig = {}
+	var n_items = 0
+	for sd in SEEDS:
+		var plan = _gen(sd)
+		for id in plan.items:
+			n_items += 1
+			var p = plan.items[id]
+			var tier = _item(id).tier
+			for e in p.effects:
+				if e is TriggerEffect:
+					if e.stat in keys and e.value > 0:
+						var tk = "%s %s" % [e.stat, e.payload]
+						trig[tk] = trig.get(tk, 0) + 1
+					continue
+				if e.key in keys and e.custom_key == "" and e.value > 0:
+					var k = "%s T%d" % [e.key, tier + 1]
+					var d = gen_main if e.key in p.get("main_stats", []) else gen_side
+					if not d.has(k):
+						d[k] = []
+					d[k].push_back(e.value)
+	print("AUDIT minor stats over %d seeds (%d items); values as median [min-max] (count)" % [SEEDS.size(), n_items])
+	for key in keys:
+		for t in 4:
+			var k = "%s T%d" % [key, t + 1]
+			print("AUDIT   %-18s native %-18s generated main %-18s side %s" % [k, _dist(native.get(k, [])), _dist(gen_main.get(k, [])), _dist(gen_side.get(k, []))])
+	print("AUDIT   trigger clauses: %s" % str(trig))
+	_check(true, "audit printed")
+
+
+func _dist(a: Array) -> String:
+	if a.empty():
+		return "-"
+	var s = a.duplicate()
+	s.sort()
+	return "%d [%d-%d] (%d)" % [s[s.size() / 2], s[0], s.back(), s.size()]

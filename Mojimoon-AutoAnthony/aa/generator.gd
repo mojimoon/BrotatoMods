@@ -164,7 +164,7 @@ func _ensure_min_lines(item, r: Dictionary) -> void:
 	if split != null:
 		var unit = Catalog.stat_unit(split.key)
 		var half = int(floor(split.value / 2.0 / unit) * unit)
-		var s2 = _pick_stat(false, used)
+		var s2 = _pick_stat(false, used + Catalog.SIDE_ONLY_STATS)
 		var v2 = _round_to_unit(half * Catalog.stat_w(split.key) / Catalog.stat_w(s2), s2)
 		var idx = effects.find(split)
 		effects[idx] = _stat_effect(split.key, split.value - half)
@@ -172,7 +172,7 @@ func _ensure_min_lines(item, r: Dictionary) -> void:
 	else:
 		var ns = _pick_stat(true, used)
 		var nv = int(min(_round_to_unit(float(r.budget) * 0.15 * divisor / Catalog.stat_w(ns), ns), _line_cap(ns, true)))
-		var ps = _pick_stat(false, used + [ns])
+		var ps = _pick_stat(false, used + [ns] + Catalog.SIDE_ONLY_STATS)
 		var pv = _round_to_unit(neg_value(nv * Catalog.stat_w(ns)) / Catalog.stat_w(ps), ps)
 		effects.push_front(_stat_effect(ps, pv))
 		effects.push_back(_stat_effect(ns, -nv))
@@ -345,7 +345,7 @@ func _generate_clause_tag_item(item, tag: String) -> Dictionary:
 	budget -= Valuation.clause_value(c, perm_mult)
 	var effects = []
 	if budget > 1.0:
-		var stat = _pick_stat(false, [c.get("stat", "")])
+		var stat = _pick_stat(false, [c.get("stat", "")] + Catalog.SIDE_ONLY_STATS)
 		var v = int(min(_round_to_unit(budget / Catalog.stat_w(stat), stat), _line_cap(stat, false)))
 		effects.push_back(_stat_effect(stat, v))
 	effects.push_back(ce)
@@ -382,7 +382,7 @@ func _generate_mechanic_tag_item(item, tag: String) -> Dictionary:
 	var mv: float = me.get_meta("aa_value")
 	budget -= mv
 	var effects = []
-	var stat = _pick_stat(false)
+	var stat = _pick_stat(false, Catalog.SIDE_ONLY_STATS)
 	if budget > 1.0:
 		var cap = _line_cap(stat, false)
 		var v = int(min(_round_to_unit(budget / Catalog.stat_w(stat), stat), cap))
@@ -943,7 +943,7 @@ func _generate_item_once(item, force_special: bool) -> Dictionary:
 	if neg_cat == "E":
 		neg_cat = "*"
 	anchor_stat = ""
-	var primary = _pick_stat(false)
+	var primary = _pick_stat(false, Catalog.SIDE_ONLY_STATS)
 	anchor_stat = primary
 	used_stats.push_back(primary)
 
@@ -2693,7 +2693,7 @@ func _char_reassemble_positive(val: float, perm_mult: float, used: Array) -> Dic
 		var gm = gen_gain_mod(val, false)
 		if not gm.empty():
 			return {"effect": gm.effect, "value": gm.value, "adj": _adj(Catalog.ADJ_GAIN_MOD)}
-	var st = _pick_stat(false, used)
+	var st = _pick_stat(false, used + Catalog.SIDE_ONLY_STATS)
 	used.push_back(st)
 	var v = _round_to_unit(val / Catalog.stat_w(st), st)
 	return {"effect": _stat_effect(st, v), "value": v * Catalog.stat_w(st), "adj": _adj(Catalog.ADJ_BY_STAT.get(st, Catalog.ADJ_MECHANIC))}
