@@ -69,6 +69,10 @@ var cur_tier := -1
 var cur_stat_bans: Array = []
 # 本局玩家角色的偏好词条（开局时由 mod_main 填入）
 var player_wanted_tags: Array = []
+# 本局玩家角色禁用的道具 ID 与禁用语义（mod_main 生成后按语义扩展角色的禁用列表）：
+# 保证偏好词条时不选这些道具、生成的道具主属性也不落在禁用语义上（否则商店里抽不到）
+var player_banned_ids: Array = []
+var player_ban_sems: Array = []
 # 本局玩家角色的初始道具 ID（开局时由 mod_main 填入）：本局不重组，商店里的同 ID 道具也保持原版
 var run_excluded_ids: Array = []
 # 计数型 / 属性修改的原版先验
@@ -126,7 +130,11 @@ func generate(items: Array, all_characters: Array, selected: Array, weapons: Arr
 		cur_stat_bans = []
 		cur_tier = -1
 		for id in plan.items:
-			plan.items[id]["unique"] = has_unique_effect(plan.items[id].effects)
+			var uq = has_unique_effect(plan.items[id].effects)
+			# 成长型道具的限制 (1) = 独特
+			if int(plan.items[id].get("limit", 0)) == 1:
+				uq = true
+			plan.items[id]["unique"] = uq
 			plan.items[id]["price"] = int(gen_prices.get(id, 0))
 	if cfg.get("characters", false):
 		for ch in selected:
@@ -244,7 +252,7 @@ func _ensure_player_wanted_tags(plan: Dictionary, items: Array, gen_items: Array
 			var with_tag = []
 			var others = []
 			for it in sorted_items:
-				if it.tier != tier or not plan.items.has(it.my_id) or core.has(it.my_id) or used.has(it.my_id):
+				if it.tier != tier or not plan.items.has(it.my_id) or core.has(it.my_id) or used.has(it.my_id) or it.my_id in player_banned_ids:
 					continue
 				if tag in it.tags:
 					with_tag.push_back(it)
@@ -269,12 +277,21 @@ func _ensure_player_wanted_tags(plan: Dictionary, items: Array, gen_items: Array
 
 func _tier_has_tag(plan: Dictionary, items: Array, tier: int, tag: String) -> bool:
 	for it in items:
-		if it.tier != tier or it is CharacterData or it is WeaponData or not it.can_be_looted:
+		if it.tier != tier or it is CharacterData or it is WeaponData or not it.can_be_looted or it.my_id in player_banned_ids:
+			continue
+		if plan.items.has(it.my_id) and not _ban_ok(plan.items[it.my_id]):
 			continue
 		var tags = plan.items[it.my_id].tags if plan.items.has(it.my_id) else it.tags
 		if tag in tags:
 			return true
 	return false
+
+
+func _ban_ok(r: Dictionary) -> bool:
+	for s in r.get("main_stats", []):
+		if s in player_ban_sems:
+			return false
+	return true
 
 
 # 为偏好词条生成道具：属性词条 = 单属性道具（同核心属性道具）；诅咒 = 普通道具 + 原版的"+1 诅咒"行；
@@ -293,8 +310,11 @@ func _generate_tag_item(item, tag: String, items: Array) -> Dictionary:
 				if e.key == "stat_curse" and e.custom_key == "" and e.value == 1:
 					curse = e
 		if curse != null:
-			rng.seed = hash(str(seed_value) + "/tagitem/" + item.my_id)
-			r = _generate_item_once(item, false)
+			for attempt in 20:
+				rng.seed = hash(str(seed_value) + "/tagitem/" + item.my_id + ("/" + str(attempt) if attempt > 0 else ""))
+				r = _generate_item_once(item, false)
+				if _ban_ok(r):
+					break
 			var effects = r.effects + [curse.duplicate()]
 			r.effects = effects
 			r.tags = _tags_for(effects)
@@ -302,7 +322,7 @@ func _generate_tag_item(item, tag: String, items: Array) -> Dictionary:
 		for attempt in 20:
 			rng.seed = hash(str(seed_value) + "/tagitem/" + item.my_id + "/" + tag + "/" + str(attempt))
 			var c = _generate_item_once(item, true)
-			if tag in c.tags:
+			if tag in c.tags and _ban_ok(c):
 				r = c
 				break
 		if r.empty():
@@ -922,7 +942,69 @@ func generate_item(item, core_stat: String = "") -> Dictionary:
 	cur_stat_bans = Catalog.ITEM_STAT_BANS.get(item.my_id, [])
 	if core_stat != "":
 		return _generate_core_item(item, core_stat)
+	if item.tier >= 1 and rng.randf() < Catalog.GROWTH_ITEM_CHANCE:
+		var g = _generate_growth_item(item)
+		if not g.empty():
+			return g
 	return _generate_item_once(item, false)
+
+
+# 成长型道具（原版石头皮肤、线圈、发电机、复古卫衣）：见 catalog.GROWTH_*
+func _generate_growth_item(item) -> Dictionary:
+	cur_tier = item.tier
+	var perm_mult: float = Catalog.PERM_MULT[item.tier]
+	var budget: float = item_budget(item) * Catalog.HIDDEN_TIER_MULT[item.tier] * _avg_mult() * _variance_mult()
+	var budget_total = budget
+	pos_cat = ""
+	neg_cat = "*"
+	var b_stat = _pick_weighted(Catalog.GROWTH_TARGETS)
+	var aw = {}
+	# 诅咒是 DLC 属性：未启用 DLC 时玩家 effects 里没有它
+	var curse_ok = PlayerRunData.init_effects().has(Keys.stat_curse_hash)
+	for s in Catalog.GROWTH_COUNTERS:
+		if s != b_stat and not s in cur_stat_bans and (s != "stat_curse" or curse_ok):
+			aw[s] = Catalog.WANTED_BIAS if s in wanted_bias else 1.0
+	var a_stat = _pick_weighted(aw)
+	anchor_stat = b_stat
+	var used = [a_stat, b_stat]
+	var downsides = []
+	if rng.randf() < Catalog.GROWTH_DOWNSIDE_CHANCE:
+		var dres = _gen_downsides(item, budget_total * rng.randf_range(0.1, 0.3), perm_mult, used, budget_total)
+		downsides = dres.effects
+		budget += dres.got
+	var lines = []
+	if rng.randf() < Catalog.GROWTH_LINE_CHANCE:
+		# 数值像副属性；一半概率就是计数属性本身（线圈：+5 击退，每点击退 +1% 伤害）
+		var s = a_stat if Catalog.STATS.has(a_stat) and rng.randf() < 0.5 else _pick_stat(false, used + Catalog.SIDE_ONLY_STATS)
+		var v = int(min(_round_to_unit(budget * Catalog.GROWTH_LINE_SHARE / Catalog.stat_w(s), s), _line_cap(s, false)))
+		lines.push_back(_stat_effect(s, v))
+		budget -= v * Catalog.stat_w(s)
+	# 转化率：按常规估值的 GROWTH_CONVERSION_MULT 倍，取最接近的 (数值, 每 N)
+	var target = max(budget, 2.0) * Catalog.GROWTH_CONVERSION_MULT
+	var unit = Catalog.stat_unit(b_stat)
+	var best = {}
+	for k in range(1, 6):
+		for nb in NICE_NB:
+			var val = Valuation.scaling_value(b_stat, k * unit, a_stat, nb)
+			var err = abs(log(max(0.01, val) / target))
+			if best.empty() or err < best.err:
+				best = {"v": k * unit, "nb": nb, "err": err}
+	var sc = _scaling_effect(b_stat, best.v, a_stat, best.nb, Catalog.STATS.has(a_stat) and rng.randf() < 0.5)
+	var ordered = lines + [sc] + _preserved_lines(item) + downsides
+	pos_cat = ""
+	neg_cat = ""
+	anchor_stat = ""
+	cur_tier = -1
+	return {
+		"effects": ordered,
+		"adj": _adj(Catalog.ADJ_SCALING),
+		"tags": _tags_for(ordered),
+		"main_stats": main_stats(ordered),
+		"budget": budget_total,
+		"class": [Catalog.STAT_CATEGORY.get(b_stat, "A"), "*" if not downsides.empty() else "-"],
+		"growth": true,
+		"limit": int(_pick_weighted(Catalog.GROWTH_LIMITS)),
+	}
 
 
 func _generate_item_once(item, force_special: bool) -> Dictionary:
@@ -1360,6 +1442,8 @@ func _tags_for(effects: Array) -> Array:
 					# 计数属性也是词条（每点护甲 +生命：想要护甲的角色也会想要它）
 					if Catalog.STATS.has(e.stat_scaled):
 						add.push_back(e.stat_scaled)
+						# 非原版词条的属性（爆炸伤害、消耗品回复、拾取范围）用原版词条（explosive / consumable / pickup）
+						add.push_back(Catalog.STAT_EXTRA_TAGS.get(e.stat_scaled, ""))
 		elif is_next_wave(e):
 			if e.value > 0 and Catalog.STATS.has(e.key):
 				add.push_back(e.key)
@@ -2268,19 +2352,24 @@ func gen_scaling(target: float, negative: bool) -> Dictionary:
 		var value = Valuation.scaling_value(stat, v, counter, nb)
 		if value < abs(target) * 0.4 or value > abs(target) * 1.35:
 			continue
-		var e = scaling_script.new()
-		e.key = stat
-		e.key_hash = Keys.generate_hash(stat)
-		e.custom_key_hash = Keys.generate_hash("")
-		e.value = -v if negative else v
-		e.stat_scaled = counter
-		e.stat_scaled_hash = Keys.generate_hash(counter)
-		e.nb_stat_scaled = nb
-		e.perm_stats_only = Catalog.STATS.has(counter) and rng.randf() < 0.5
-		e.text_key = Catalog.counter_text(counter, e.perm_stats_only)
-		e.effect_sign = Effect.Sign.FROM_VALUE
+		var e = _scaling_effect(stat, -v if negative else v, counter, nb, Catalog.STATS.has(counter) and rng.randf() < 0.5)
 		return {"effect": e, "value": -value if negative else value}
 	return {}
+
+
+func _scaling_effect(stat: String, v: int, counter: String, nb: int, perm_only: bool) -> Effect:
+	var e = scaling_script.new()
+	e.key = stat
+	e.key_hash = Keys.generate_hash(stat)
+	e.custom_key_hash = Keys.generate_hash("")
+	e.value = v
+	e.stat_scaled = counter
+	e.stat_scaled_hash = Keys.generate_hash(counter)
+	e.nb_stat_scaled = nb
+	e.perm_stats_only = perm_only
+	e.text_key = Catalog.counter_text(counter, e.perm_stats_only)
+	e.effect_sign = Effect.Sign.FROM_VALUE
+	return e
 
 
 # ============================================================

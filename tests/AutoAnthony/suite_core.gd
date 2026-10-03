@@ -1090,7 +1090,9 @@ func test_96_no_item_limits() -> void:
 	for pair in limited:
 		if m.plan.items.has(pair[0].my_id):
 			# 带叠加有技术问题的效果的重组道具是独特的（catalog.UNIQUE_MECHANIC_*）
-			_eq(pair[0].max_nb, 1 if m.plan.items[pair[0].my_id].unique else -1, pair[0].my_id + " limit lifted")
+			# 成长型道具带自己的限制 (X)
+			var pp = m.plan.items[pair[0].my_id]
+			_eq(pair[0].max_nb, 1 if pp.unique else int(pp.get("limit", -1)), pair[0].my_id + " limit lifted")
 			lifted += 1
 	_check(lifted > 5, "limits lifted on reassembled items (%d)" % lifted)
 	m.on_menu_reset()
@@ -1563,7 +1565,8 @@ func test_112_all_character_effects() -> void:
 						no_heal = true
 					if Catalog.BETA_RESTRICTIONS.has(k):
 						_check(p.budget >= Catalog.BETA_RESTRICTIONS[k].min_budget, "restriction %s only on items with enough budget (%.0f)" % [k, p.budget])
-				_eq(p.get("unique", false), Generator.has_unique_effect(p.effects), "unique flag: " + id)
+				# 成长型道具的限制 (1) 也是独特
+				_eq(p.get("unique", false), Generator.has_unique_effect(p.effects) or int(p.get("limit", 0)) == 1, "unique flag: " + id)
 				if no_heal:
 					for e in p.effects:
 						var ek = e.custom_key if e.custom_key != "" else e.key
@@ -1729,7 +1732,7 @@ func test_114_tag_bindings() -> void:
 				elif gen.is_scaling(e) and e.value > 0:
 					want += Catalog.tags_for_binding("counter:" + e.stat_scaled)
 					if Catalog.STATS.has(e.stat_scaled):
-						want.push_back(e.stat_scaled)
+						want.push_back(Catalog.STAT_EXTRA_TAGS.get(e.stat_scaled, e.stat_scaled))
 					want.push_back(e.key)
 					what = "counter:" + e.stat_scaled
 				elif e.key == "enemy_speed" and e.value < 0 and e.custom_key == "":
@@ -2234,8 +2237,10 @@ func test_130_trigger_templates() -> void:
 				if e.payload == "vuln":
 					_eq(e.value2, Catalog.VULN_SECONDS, "vulnerability lasts 3 seconds like the ice cube")
 	print("AUDIT counted triggers %s; typed damage types %s; damage/explode types %s" % [str(counted.keys()), str(typed), str(dmg_stats)])
-	for t in ["dodge", "consumable", "hit", "reroll", "buy"]:
+	# 商店扳机（刷新 / 购买）出现得少：至少一个用上计次
+	for t in ["dodge", "consumable", "hit"]:
 		_check(counted.has(t), "count gate now used on " + t)
+	_check(counted.has("reroll") or counted.has("buy"), "count gate used on a shop trigger")
 	_check(typed.get("stat_engineering", 0) > 0 and typed.get("stat_engineering", 0) < typed.get("stat_melee_damage", 0), "engineering rarer than melee")
 	for tbl in [Catalog.LEGAL, Catalog.FREE_LEGAL]:
 		_check(not "fruit" in tbl.wave_end and not "fruit" in tbl.wave_start, "no fruit at wave start / end")
@@ -2277,3 +2282,49 @@ func test_132_consumable_heal_over_time_is_downside() -> void:
 					n += 1
 					_check("consumable" in plan.items[id].tags, id + " with heal over time has the consumable tag")
 	print("AUDIT heal-over-time lines over 40 seeds: %d" % n)
+
+
+# 成长型道具：小概率；"每有 [A] 获得 [B]"，B 只取 %伤害 / 攻速 / 最大生命，转化率约为常规估值的 2 倍；带限制 (X)
+func test_134_growth_items() -> void:
+	var n = 0
+	var n_items = 0
+	var targets = {}
+	var samples = []
+	for sd in range(1, 21):
+		var plan = _gen(sd)
+		for id in plan.items:
+			n_items += 1
+			var p = plan.items[id]
+			if not p.get("growth", false):
+				continue
+			n += 1
+			_check(_item(id).tier >= 1, id + " growth items are T2+")
+			var lim = int(p.get("limit", 0))
+			_check(lim >= 1 and lim <= 3, id + " has a limit (%d)" % lim)
+			# 限制 1 = 独特（代价是独特型机制时也会独特）
+			_check(lim != 1 or p.unique, id + " limit 1 is unique")
+			var sc = null
+			for e in p.effects:
+				if e.get_script() != null and e.get_script().resource_path.ends_with("gain_stat_for_every_stat_effect.gd") and e.value > 0:
+					sc = e
+			_check(sc != null, id + " has a scaling line")
+			if sc == null:
+				continue
+			_check(Catalog.GROWTH_TARGETS.has(sc.key), id + " target stat is %damage / attack speed / max hp: " + sc.key)
+			_check(sc.stat_scaled in Catalog.GROWTH_COUNTERS and sc.stat_scaled != sc.key, id + " counter: " + sc.stat_scaled)
+			targets[sc.key] = targets.get(sc.key, 0) + 1
+			var txt = _texts(p.effects)
+			_check(txt.find("AA_") == -1 and txt.find("{") == -1, "text: " + txt)
+			if samples.size() < 8:
+				samples.push_back("T%d limit %d: %s" % [_item(id).tier + 1, lim, txt])
+	print("AUDIT growth items %d of %d (targets %s)" % [n, n_items, str(targets)])
+	for t in samples:
+		print("AUDIT   " + t)
+	_check(n > 0 and n < n_items * 0.08, "growth items are rare but present")
+	# 限制写到道具上，回菜单后还原
+	m.start_new_run()
+	for id in m.plan.items:
+		var p = m.plan.items[id]
+		if int(p.get("limit", 0)) > 1 and not p.unique:
+			_eq(_item(id).max_nb, p.limit, id + " limit written to the item")
+	m.on_menu_reset()

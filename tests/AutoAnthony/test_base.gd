@@ -117,6 +117,10 @@ func _write_items_table() -> void:
 			mark = "词条保底"
 		if p.get("unique", false):
 			mark += ("，" if mark != "" else "") + "独特"
+		elif int(p.get("limit", 0)) > 1:
+			mark += ("，" if mark != "" else "") + "限制 (%d)" % p.limit
+		if p.get("growth", false):
+			mark += ("，" if mark != "" else "") + "成长型"
 		var tags = PoolStringArray(p.tags).join(", ") if not p.tags.empty() else "（无）"
 		lines.push_back("| T%d | %s | %d | %s | %s | %s |" % [it.tier + 1, nm, p.price, PoolStringArray(fx).join("<br>"), tags, mark])
 	var out = "# 默认设置下的全部重组道具\n\n"

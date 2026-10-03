@@ -352,6 +352,13 @@ func _activate(state: Dictionary) -> void:
 		for t in ch.wanted_tags:
 			if not t in gen.player_wanted_tags:
 				gen.player_wanted_tags.push_back(t)
+		gen.player_banned_ids += ch.banned_items
+		for id in ch.banned_items:
+			var it = _find(isvc.items, id)
+			if it != null:
+				for sem in gen.ban_reasons(it.effects):
+					if not sem in ch.wanted_tags and not sem in gen.player_ban_sems:
+						gen.player_ban_sems.push_back(sem)
 	plan = gen.generate(native_only(isvc.items), native_only(isvc.characters), native_only(chars), native_only(isvc.weapons))
 	_gen = gen
 	var rename = bool(state.cfg.get("rename", true))
@@ -364,7 +371,8 @@ func _activate(state: Dictionary) -> void:
 			res.tags = p.tags
 			res.tracking_text = "[EMPTY]"
 			# 原版的"限制 (N)"/"独特"属于原道具，不继承到重组后的道具上；带设定值型角色效果的道具为独特
-			res.max_nb = 1 if p.get("unique", false) else -1
+			# 成长型道具带限制 (X)
+			res.max_nb = 1 if p.get("unique", false) else int(p.get("limit", -1))
 			# 价格不再继承原道具：用本次生成的价格（同稀有度原版价格分布）
 			if int(p.get("price", 0)) > 0:
 				res.value = int(p.price)

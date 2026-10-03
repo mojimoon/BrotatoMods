@@ -596,7 +596,31 @@ const COUNTER_REF = {
 	"materials": 240.0, "structure": 3.0, "living_enemy": 24.0, "burning_enemy": 8.0, "living_tree": 3.0,
 	"percent_player_missing_health": 30.0, "different_item": 18.0, "common_item": 12.0, "legendary_item": 1.5,
 	"free_weapon_slots": 0.8,
+	# 成长型道具的计数（次要属性、诅咒）：诅咒按闪避估计
+	"xp_gain": 30.0, "pickup_range": 40.0, "explosion_damage": 30.0, "explosion_size": 20.0, "consumable_heal": 4.0,
+	"stat_curse": 25.0,
 }
+# ============================================================
+# 成长型道具（原版石头皮肤、线圈、发电机、复古卫衣）：小概率生成，T2 及以上
+#   可选的 +属性行（数值像副属性）+ 高转化率的"每有 [属性 A] 获得 [属性 B]" + 可选的代价，带限制 (X)
+#   B 只取 %伤害 / 攻速 / 最大生命（2 : 2 : 1）；A 取主 / 次要属性与诅咒
+#   转化率 = 常规计数估值的 GROWTH_CONVERSION_MULT 倍（原版这几件都是 1 : 1 或 1 : 2，明显高于常规算法）
+# ============================================================
+const GROWTH_ITEM_CHANCE = 0.06
+const GROWTH_TARGETS = {"stat_percent_damage": 2.0, "stat_attack_speed": 2.0, "stat_max_hp": 1.0}
+const GROWTH_COUNTERS = [
+	"stat_max_hp", "stat_hp_regeneration", "stat_lifesteal", "stat_percent_damage", "stat_melee_damage",
+	"stat_ranged_damage", "stat_elemental_damage", "stat_attack_speed", "stat_crit_chance", "stat_engineering",
+	"stat_range", "stat_armor", "stat_dodge", "stat_speed", "stat_luck", "stat_harvesting",
+	"xp_gain", "pickup_range", "knockback", "explosion_damage", "explosion_size", "consumable_heal", "stat_curse",
+]
+const GROWTH_CONVERSION_MULT = 2.0
+const GROWTH_LINE_CHANCE = 0.5
+const GROWTH_LINE_SHARE = 0.2
+const GROWTH_DOWNSIDE_CHANCE = 0.5
+# 限制 (X)：1 = 独特
+const GROWTH_LIMITS = {1: 3.0, 2: 2.0, 3: 1.0}
+
 # 可用的非属性计数与原版描述 key
 const COUNTER_TEXT = {
 	"free_weapon_slots": "EFFECT_GAIN_STAT_FOR_FREE_WEAPON_SLOTS",
@@ -901,9 +925,9 @@ const CORE_VALUE_MULT = 1
 # 核心道具单行上限相对普通上限的倍数（数值更高的单属性道具）
 const CORE_LINE_CAP_MULT = 1.5
 
-# 原版 DLC 诅咒按道具 ID 特判的属性行（鬼火的元素伤害行会写入 value3，普通效果没有该字段）：
-# 这些道具上不生成对应的普通属性行
-const ITEM_STAT_BANS = {"item_will_o_the_wisp": ["stat_elemental_damage"]}
+# 原版 DLC 诅咒按道具 ID 特判的属性行（鬼火的元素伤害行会写入 value3，普通效果没有该字段；
+# 艾斯蒂的沙发的速度行无论正负都按正面加强，-速度会越诅咒越低）：这些道具上不生成对应的普通属性行
+const ITEM_STAT_BANS = {"item_will_o_the_wisp": ["stat_elemental_damage"], "item_estys_couch": ["stat_speed"]}
 
 # 原道具上保留的原版行：+诅咒（深海 DLC 的诅咒道具）。价值约为 0，但水手 / 生物等角色想要带"诅咒"词条的道具，
 # 保留后这些道具仍带 stat_curse 词条

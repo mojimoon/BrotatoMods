@@ -433,6 +433,8 @@ func _item_card(item, p: Dictionary, width: float) -> Control:
 	var price = str(_item_price(item, p))
 	if p.get("unique", false):
 		price = tr("AA_UI_UNIQUE") + "  " + price
+	elif int(p.get("limit", 0)) > 1:
+		price = tr("LIMITED").replace("{0}/", "").replace("{1}", str(p.limit)) + "  " + price
 	head.add_child(_label(price, FONT_DESC, C_TEXT_DIM))
 	var fx = RichTextLabel.new()
 	fx.bbcode_enabled = true
