@@ -1121,17 +1121,19 @@ func test_98_enemy_stat_clauses() -> void:
 
 
 # ============================================================
-# 建筑 / 宠物 / 沙漏 / 金鱼 / 镜子现在也会被重组；角色初始道具保留原版；T4 无 +收获；T3 单效果非纯数值
+# 建筑 / 宠物 / 沙漏 / 镜子现在也会被重组（金鱼锚定）；角色初始道具保留原版；T4 无 +收获；T3 单效果非纯数值
 # ============================================================
 func test_99_structures_and_special_items_reassembled() -> void:
 	var plan = _gen(42)
-	for id in ["item_turret", "item_landmines", "item_garden", "item_bonk_dog", "item_lootworm", "item_hourglass", "item_goldfish", "item_mirror"]:
+	for id in ["item_turret", "item_landmines", "item_garden", "item_bonk_dog", "item_lootworm", "item_hourglass", "item_mirror"]:
 		_check(plan.items.has(id), id + " is reassembled")
-	for id in ["item_builder_turret_0", "item_goldfish_used", "item_broken_mirror", "item_broken_hourglass"]:
+	# 金鱼锚定（低价是为了允许大量获取），效果仍参与组合
+	for id in ["item_builder_turret_0", "item_goldfish", "item_goldfish_used", "item_broken_mirror", "item_broken_hourglass"]:
 		_check(not plan.items.has(id), id + " kept")
 	m.start_new_run()
-	for id in ["item_hourglass", "item_goldfish", "item_mirror"]:
+	for id in ["item_hourglass", "item_mirror"]:
 		_eq(_item(id).replaced_by, null, id + " no longer turns into another item")
+	_check(_item("item_goldfish").replaced_by != null, "anchored goldfish still turns into the used goldfish")
 	m.on_menu_reset()
 	_check(_item("item_mirror").replaced_by != null, "mirror replaced_by restored")
 	# 技术法师：本局初始道具（炮台）不重组，开局的与商店里的同 ID 道具都是原版

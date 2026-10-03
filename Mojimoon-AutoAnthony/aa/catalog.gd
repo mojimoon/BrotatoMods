@@ -130,8 +130,8 @@ const TRIGGERS = {
 	"full_hp": {"kind": "state", "e": 0.45, "timing": 1.0, "gate": "none", "w": 0.4},
 	"reroll": {"kind": "shop", "e": 3.0, "timing": 0.0, "gate": "every", "w": 0.5},
 	# 暴击击杀（触手、狩猎奖杯）/ 击杀燃烧中的敌人（鬼火）：击杀的子集，频率取决于构筑；绑定暴击 / 元素词条
-	"crit_kill": {"kind": "event", "e": 30.0, "timing": 0.5, "gate": "every", "w": 0.7},
-	"burning_kill": {"kind": "event", "e": 25.0, "timing": 0.5, "gate": "every", "w": 0.3},
+	"crit_kill": {"kind": "event", "e": 45.0, "timing": 0.5, "gate": "every", "w": 0.7},
+	"burning_kill": {"kind": "event", "e": 30.0, "timing": 0.5, "gate": "every", "w": 0.3},
 	# 每走 N 步（徒步旅行者）：移动时约每秒 3.33 步，每波约 200 步，实际强度不足，需要低估
 	"steps": {"kind": "event", "e": 90.0, "timing": 0.5, "gate": "every", "w": 0.3},
 	# 波次进行到一半时（赛博格）
@@ -143,9 +143,9 @@ const TRIGGERS = {
 	# 引发爆炸（任何来源：原版爆炸道具 / 武器）
 	"explode": {"kind": "event", "e": 12.0, "timing": 0.5, "gate": "every", "w": 0.2},
 	# 暴击命中（不必击杀）
-	"crit": {"kind": "event", "e": 80.0, "timing": 0.5, "gate": "every", "w": 0.3},
+	"crit": {"kind": "event", "e": 100.0, "timing": 0.5, "gate": "every", "w": 0.3},
 	# 点燃敌人（敌人开始燃烧；原版以燃烧结算为准）
-	"ignite": {"kind": "event", "e": 25.0, "timing": 0.5, "gate": "every", "w": 0.15},
+	"ignite": {"kind": "event", "e": 30.0, "timing": 0.5, "gate": "every", "w": 0.15},
 	# 首次命中某个敌人（冰块、潜水员的"首次命中时"）；_typed = 限定伤害类型（条款的 dmg_type 字段，按命中的伤害缩放属性）
 	# 一局通常只用一种伤害类型：限定类型与不限定的期望次数相同
 	"first_hit": {"kind": "event", "e": 110.0, "timing": 0.5, "gate": "every", "w": 0.1},
@@ -399,10 +399,11 @@ const REPEAT_PENALTY_PAYLOAD = 0.08
 # 行为写死在道具 ID 上的道具：保持原样，也不作为机制组件的来源
 # 道具 ID 本身还有额外含义的道具（望远镜的升级预览、诱饵的渔夫计数、口袋工厂计入建筑数、美西螈的商店刷新规则、
 # 金鱼 / 沙漏 / 镜子的"用后变成另一件道具"）：道具本身保持原样，但它们的效果可以出现在其他重组道具上
-# 金鱼 / 沙漏 / 镜子本身会被重组（并去掉"用后变成另一件道具"），只保留它们不可获得的"用后形态"
+# 沙漏 / 镜子本身会被重组（并去掉"用后变成另一件道具"），只保留它们不可获得的"用后形态"；
+# 金鱼保持原样（低价是为了允许大量获取），它的效果仍参与组合
 const ANCHORED_ITEMS = [
 	"item_spyglass", "item_bait", "item_pocket_factory", "item_axolotl",
-	"item_goldfish_used", "item_broken_hourglass", "item_broken_mirror",
+	"item_goldfish", "item_goldfish_used", "item_broken_hourglass", "item_broken_mirror",
 	# 鱼钩（生物的诅咒初始道具、原版诅咒按 ID 特判）：本体保持原样，效果仍参与组合
 	"item_fish_hook",
 	"item_builder_turret_0", "item_builder_turret_1", "item_builder_turret_2", "item_builder_turret_3",
