@@ -661,3 +661,52 @@ func test_139_weapon_value_model() -> void:
 
 func _sort_first_desc(a, b) -> bool:
 	return a[0] > b[0]
+
+
+# 深度重组的极端值：系数 / 伤害最大的武器（用户种子 102116457，引入道具效果 + 低级武器）
+# 正常节奏的武器主加成不超过原版正常武器的水平；高系数只出现在慢速武器上；%伤害不作为加成属性
+func test_146_deep_weapon_extremes() -> void:
+	var WV = load(MOD_DIR + "aa/weapon_value.gd")
+	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
+	var cfg = _cfg()
+	cfg.weapons = true
+	cfg.weapon_mode = "deep"
+	cfg.w_item_effects = true
+	cfg.w_low_tiers = true
+	var g = Generator.new(cfg, 102116457)
+	g.generate(isvc.items, isvc.characters, [], [])
+	var natives = m.native_only(isvc.weapons)
+	var wg = WG.new(cfg, 102116457, g)
+	var out = wg.generate(natives + WG.make_low_tiers(natives))
+	var rows = []
+	var bad = 0
+	var slow = 0
+	for id in out:
+		var p = out[id]
+		var mx = 0.0
+		var txt = ""
+		for sc in p.stats.scaling_stats:
+			_check(WV.stat_name(sc[0]) != "stat_percent_damage", id + " does not scale with % damage")
+			mx = max(mx, float(sc[1]) * WV.stat_ref(WV.stat_name(sc[0])) / WV.stat_ref("stat_melee_damage"))
+			txt += "%s %.2f " % [WV.stat_name(sc[0]).replace("stat_", ""), float(sc[1])]
+		var cd = WV.cooldown_seconds(p.stats)
+		if WG.is_slow(p.stats):
+			slow += 1
+		elif mx > 2.5:
+			bad += 1
+			print("AUDIT strong scaling %s: %s cd %.2fs" % [id, txt, cd])
+		rows.push_back([p.stats.damage / max(0.05, cd), id, p.stats.damage, txt, cd, mx])
+	rows.sort_custom(self, "_sort_first_desc")
+	for i in 10:
+		var r = rows[i]
+		print("AUDIT damage/s %s: dmg %d, %s cd %.2fs" % [r[1], r[2], r[3], r[4]])
+		if i < 3:
+			var pw = out[r[1]]
+			var w0 = isvc.get_element_safe(isvc.weapons, r[1])
+			for e in pw.effects:
+				print("AUDIT     effect %s value %.1f" % [e.get_text(0, false), wg.wv.effect_value(e)])
+			print("AUDIT     want %.1f, power %.1f, k %.2f, value %.1f" % [wg._want(w0 if w0 != null else pw, true) if w0 != null else -1.0, WV.power(pw.stats, pw.effects, 0), wg.wv.k(pw.stats, 0), wg.wv.value(pw.stats, pw.effects, 0)])
+	print("AUDIT slow weapons %d / %d, normal weapons with melee-equivalent coef > 2.5: %d" % [slow, rows.size(), bad])
+	_check(bad == 0, "normal-pace weapons keep native-like scaling (%d)" % bad)
+	_check(slow < rows.size() / 5, "slow weapons are uncommon (%d)" % slow)
+

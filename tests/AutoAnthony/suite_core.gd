@@ -2573,7 +2573,7 @@ func test_141_weapon_deep_reassembly() -> void:
 			for e in p.effects:
 				if w.type == 0:
 					_check(not WG.ranged_only(e), id + " melee has no ranged-only effect")
-			var want = wg.wv.value(w.stats, w.effects, w.tier) * wg._family_mult(WG.family_of(w))
+			var want = wg._want(w, true) * wg._family_mult(WG.family_of(w))
 			var got = wg.wv.value(p.stats, p.effects, w.tier)
 			if abs(got - want) > max(3.0, want * 0.15):
 				off += 1
@@ -2704,7 +2704,12 @@ func test_143_low_tier_weapons() -> void:
 		_check(sword1 in isvc._tiers_data[0][0], mode + ": low weapon in the tier I shop pool")
 		var s2 = isvc.get_element_safe(isvc.weapons, "weapon_sword_2")
 		var WV = load(MOD_DIR + "aa/weapon_value.gd")
-		_check(WV.power(sword1.stats, sword1.effects, 0) < WV.power(s2.stats, s2.effects, 1), mode + ": tier I weaker than tier II")
+		# 各自稀有度下含效果的总价值（低级版本的效果更弱、伤害可能更高）
+		var wv = WV.new()
+		wv.calibrate(m.native_only(isvc.weapons))
+		var p1 = wv.value(sword1.stats, sword1.effects, 0)
+		var p2 = wv.value(s2.stats, s2.effects, 1)
+		_check(p1 < p2, mode + ": tier I weaker than tier II (value %.1f < %.1f)" % [p1, p2])
 		# 存档 / 读档：持有补出的低级武器
 		var _nw = rd.add_weapon(sword1, 0)
 		var saved = JSON.parse(JSON.print(rd.get_state())).result

@@ -30,9 +30,9 @@ const EXPLOSION_TARGETS = 2.0
 const BURN_EFF = 0.7
 # 同时燃烧的目标数上限 = 每次攻击命中数 × 此值
 const BURN_TARGETS = 1.5
-# 溢出伤害：单次伤害超过参考敌人生命时，超出部分按幂次折算（慢速重击常打出溢出伤害）
-const OVERKILL_HP = 40.0
-const OVERKILL_EXP = 0.6
+# 溢出伤害：单次伤害超过参考敌人生命（按稀有度对应的阶段）时，超出部分按幂次折算（慢速重击常打出溢出伤害）
+const OVERKILL_HP = [25.0, 50.0, 100.0, 200.0]
+const OVERKILL_EXP = 0.75
 # 效果的残差单位价值不为正时（模型高估了来源武器），按"至少值来源武器价格的这一比例"兜底
 const EFFECT_VALUE_FLOOR = 0.15
 # 命中时射出的投射物 / 闪电：命中率
@@ -45,7 +45,7 @@ const HEAL_DPS = 8.0
 # 以它为加成的武器对专精角色公平、对其他角色偏弱（同原版镰刀的收获加成），而不是用高基础伤害补偿到对谁都强；
 # 生成时这些属性也很少作为主加成（weapon_gen.MAIN_SCALING）
 const REF_STATS = {
-	"stat_melee_damage": 60.0, "stat_ranged_damage": 30.0, "stat_elemental_damage": 30.0, "stat_percent_damage": 70.0,
+	"stat_melee_damage": 60.0, "stat_ranged_damage": 30.0, "stat_elemental_damage": 30.0,
 	"stat_attack_speed": 80.0, "stat_max_hp": 100.0, "stat_lifesteal": 12.0, "stat_armor": 16.0, "stat_levels": 25.0,
 	"stat_hp_regeneration": 30.0, "stat_crit_chance": 60.0, "stat_engineering": 60.0, "stat_range": 400.0,
 	"stat_dodge": 60.0, "stat_speed": 40.0, "stat_luck": 60.0, "stat_harvesting": 300.0, "stat_curse": 100.0,
@@ -123,10 +123,11 @@ static func hit_damage(damage: float, scaling_stats: Array, tier: int = 3) -> fl
 	return d
 
 
-static func overkill(d: float) -> float:
-	if d <= OVERKILL_HP:
+static func overkill(d: float, tier: int = 3) -> float:
+	var hp = OVERKILL_HP[clamp(tier, 0, 3)]
+	if d <= hp:
 		return d
-	return OVERKILL_HP * pow(d / OVERKILL_HP, OVERKILL_EXP)
+	return hp * pow(d / hp, OVERKILL_EXP)
 
 
 static func crit_factor(st) -> float:
@@ -166,7 +167,7 @@ static func effect_id(e) -> String:
 static func power(st, effects: Array, tier: int = 3) -> float:
 	var cd = max(0.05, cooldown_seconds(st))
 	var hit = hit_damage(float(st.damage), st.scaling_stats, tier)
-	var per_hit = overkill(hit * crit_factor(st)) * range_factor(st)
+	var per_hit = overkill(hit * crit_factor(st), tier) * range_factor(st)
 	var hits = hits_per_attack(st)
 	var mult = 1.0
 	var extra = 0.0
@@ -356,9 +357,14 @@ func effect_value(e) -> float:
 		return float(e.get_meta("aa_value"))
 	if is_modeled(e):
 		return 0.0
+	# 补出的低级武器上数值无法按比例缩小的效果：价值按价格比例折算
+	var sc = float(e.get_meta("aa_eff_scale")) if e.has_meta("aa_eff_scale") else 1.0
 	if is_plain_player_stat(e):
-		return Catalog.stat_w(e.key) * float(e.value)
-	return float(unit_by_key.get(effect_key(e), 0.0)) * magnitude(e)
+		return Catalog.stat_w(e.key) * float(e.value) * sc
+	# 每有 1 把武器 +X 属性（王者之剑）：就是玩家属性，按 6 把武器计
+	if e.custom_key == "additional_weapon_effects" and Catalog.STATS.has(e.key):
+		return Catalog.stat_w(e.key) * float(e.value) * WEAPON_COUNT * sc
+	return float(unit_by_key.get(effect_key(e), 0.0)) * magnitude(e) * sc
 
 
 # 武器的材料价值
