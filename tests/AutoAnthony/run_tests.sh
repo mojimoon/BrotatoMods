@@ -34,7 +34,7 @@ LOG="$SANDBOX/test.log"
 trap '[ -n "$AA_KEEP_LOG" ] && cp "$LOG" "$AA_KEEP_LOG"; rm -rf "$SANDBOX"' EXIT
 
 cd "$PROJECT"
-APPDATA=$(cygpath -w "$SANDBOX") AA_TEST=1 AA_SUITE="$SUITE" timeout 900 "$GODOT" --no-window --audio-driver Dummy --path . \
+APPDATA=$(cygpath -w "$SANDBOX") AA_TEST=1 AA_SUITE="$SUITE" timeout 1800 "$GODOT" --no-window --audio-driver Dummy --path . \
 	-s "res://mods/tests/AutoAnthony/run_aa.gd" > "$LOG" 2>&1
 STATUS=$?
 

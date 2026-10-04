@@ -756,3 +756,61 @@ func _weapons_battle(mode: String) -> void:
 	m.cfg_weapons = false
 	m.cfg_weapon_mode = "effects"
 	m.cfg_w_item_effects = false
+
+
+# 选择武器界面：进入时提前生成，显示重组后的武器；任意初始武器列出 T1 全部武器（含补出的低级武器）；
+# 难度确认沿用同一种子；返回角色选择时撤销
+func test_144_weapon_selection_shows_reassembled() -> void:
+	m.cfg_weapons = true
+	m.cfg_weapon_mode = "deep"
+	m.cfg_w_low_tiers = true
+	m.cfg_w_any_start = true
+	m.cfg_fixed_seed = false
+	_setup_player("character_well_rounded")
+	var _e = tree.change_scene(MenuData.weapon_selection_scene)
+	for i in 6:
+		yield(tree, "idle_frame")
+	var sc = tree.current_scene
+	_check(m.active_state != null, "run prepared on the weapon selection screen")
+	var shown = []
+	for el in sc.displayed_elements[0]:
+		if el is WeaponData:
+			shown.push_back(el)
+	_check(shown.size() > 30, "any starting weapon: many weapons listed (%d)" % shown.size())
+	var sword1 = null
+	var all_t1 = true
+	for w in shown:
+		if w.tier != 0:
+			all_t1 = false
+		if w.my_id == "weapon_sword_1":
+			sword1 = w
+	_check(all_t1, "listed weapons are tier I (the character starts with tier I)")
+	_check(sword1 != null, "lower-tier sword listed")
+	if sword1 == null:
+		return
+	_check(m.plan.weapons.has("weapon_sword_1") and sword1.stats == m.plan.weapons["weapon_sword_1"].stats, "listed weapon shows the reassembled stats")
+	var seed0 = int(m.active_state.seed)
+	sc._player_weapons[0] = sword1
+	sc._on_selections_completed()
+	for i in 6:
+		yield(tree, "idle_frame")
+	m.start_new_run()
+	_eq(int(m.active_state.seed), seed0, "difficulty confirmation keeps the prepared run")
+	var owned = rd.get_player_weapons(0)
+	_check(owned.size() > 0 and owned[0].my_id == "weapon_sword_1" and owned[0].stats == m.plan.weapons["weapon_sword_1"].stats, "selected weapon is the reassembled one")
+	m.on_menu_reset()
+	# 返回角色选择：撤销
+	_setup_player("character_well_rounded")
+	_e = tree.change_scene(MenuData.weapon_selection_scene)
+	for i in 6:
+		yield(tree, "idle_frame")
+	_check(m.active_state != null, "prepared again")
+	_e = tree.change_scene(MenuData.character_selection_scene)
+	for i in 6:
+		yield(tree, "idle_frame")
+	_eq(m.active_state, null, "back to character selection cancels the prepared run")
+	_check(isvc.get_element_safe(isvc.weapons, "weapon_sword_1") == null, "lower-tier weapons unregistered")
+	m.cfg_weapons = false
+	m.cfg_weapon_mode = "effects"
+	m.cfg_w_low_tiers = false
+	m.cfg_w_any_start = false

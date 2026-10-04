@@ -83,7 +83,7 @@
 | T2 | 沉重的布雷机器人 | 48 | +4 近战伤害<br>敌袭开始时获得13个材料 | stat_melee_damage, economy |  |
 | T2 | 蛮力篝火 | 45 | +4 近战伤害<br>每17秒-1%闪避，直至敌袭结束。每波最大值：-30 | stat_melee_damage | 核心 |
 | T2 | 生机猫特林机枪 | 50 | +4 生命再生<br>处于最大生命值时元素伤害的修改增加45%<br>敌袭结束后+5%敌人生命值 | stat_hp_regeneration, stat_elemental_damage |  |
-| T2 | 滑溜的大锅 | 45 | +14 %闪避<br>使用枪械类武器时+2贯通<br>每损失10%生命值，有-1护甲[+0] | stat_dodge, stat_ranged_damage |  |
+| T2 | 滑溜的大锅 | 45 | +14 %闪避<br>使用枪械类武器时+2贯通<br>每损失10%生命值，有-1护甲[-3] | stat_dodge, stat_ranged_damage |  |
 | T2 | 奇异的芹菜茶 | 40 | 使用消耗品恢复+3HP<br>使用中世纪类武器时+55%伤害<br>-13 幸运 | consumable, stat_percent_damage |  |
 | T2 | 镀层机械黄蜂 | 55 | +4 护甲<br>敌袭结束后+3%敌人伤害 | stat_armor |  |
 | T2 | 古怪的齿轮 | 40 | +2 %闪避<br>+14%贯通伤害，不会高于基础伤害<br>-4 %伤害 | stat_dodge |  |
@@ -200,9 +200,9 @@
 | T3 | 离奇的流浪机器人 | 80 | +4 幸运<br>复制你从商店获得的下一个道具（不能超过道具限制）（生效后此条效果消失）<br>-8 %暴击率 | stat_luck |  |
 | T3 | 奥术士兵头盔 | 55 | +3 元素伤害<br>移动时+7%暴击率<br>移动时+20%敌人伤害<br>捡起消耗品时-3幸运，直至敌袭结束。每波最大值：-60 | stat_elemental_damage, stat_crit_chance |  |
 | T3 | 贪吃的小麦 | 65 | +2 远程伤害<br>+2 收获<br>捡起消耗品时获得3个材料 | stat_ranged_damage, stat_harvesting, consumable, economy |  |
-| T3 | 丰满的鬼火 | 80 | +9 最大生命值<br>处于最大生命值时，每持有一异种IV级别物品有+5生命再生[+0]<br>闪避时+5%敌人伤害，直至敌袭结束 | stat_max_hp, stat_hp_regeneration, stat_dodge |  |
+| T3 | 丰满的鬼火 | 80 | +9 最大生命值<br>处于最大生命值时，每持有一异种IV级别物品有+5生命再生[+5]<br>闪避时+5%敌人伤害，直至敌袭结束 | stat_max_hp, stat_hp_regeneration, stat_dodge |  |
 | T3 | 回响的翅膀 | 55 | +1 护甲<br>每永久持有1护甲会+2%攻击速度 [+0] | stat_armor, stat_attack_speed | 独特，成长型 |
-| T3 | 回响的智慧 | 75 | +1 护甲<br>+1 %生命窃取<br>每持有一异种IV级别物品有+3%速度[+0] | stat_armor, stat_lifesteal, stat_speed |  |
+| T3 | 回响的智慧 | 75 | +1 护甲<br>+1 %生命窃取<br>每持有一异种IV级别物品有+3%速度[+3] | stat_armor, stat_lifesteal, stat_speed |  |
 | T4 | 奥术铁砧 | 100 | +8 元素伤害<br>敌袭开始时，永久获得“每8生命再生会+2最大生命值 [+0]”<br>-5 近战伤害 | stat_elemental_damage, stat_hp_regeneration, stat_max_hp |  |
 | T4 | 回响的灰烬 | 110 | +8 近战伤害<br>+5 最大生命值<br>每持有一异种I级别物品有+5幸运[+0]<br>下场敌袭以1点生命值开始 | stat_melee_damage, stat_max_hp, stat_luck |  |
 | T4 | 古怪的巨臂 | 100 | +15 范围<br>+1 武器栏<br>下场敌袭以1点生命值开始 | stat_range |  |

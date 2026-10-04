@@ -642,6 +642,7 @@ func _sort_by_tier_id(a, b) -> bool:
 func _on_close_pressed() -> void:
 	if _mod != null:
 		_mod.save_settings()
+		_mod.on_settings_closed()
 	queue_free()
 
 

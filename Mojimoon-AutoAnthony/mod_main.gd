@@ -317,9 +317,67 @@ static func _parse_csv_line(line: String) -> PoolStringArray:
 # 本局生命周期
 # ============================================================
 
+# 选择武器界面：提前生成本局内容，界面上直接显示重组后的武器（与角色）；难度确认时沿用（设置未变时）
+var _prepared_sig = null
+
+
+func _run_sig() -> String:
+	return JSON.print([enabled, get_cfg(), cfg_fixed_seed, cfg_seed])
+
+
+func prepare_selection() -> void:
+	if _prepared_sig == _run_sig():
+		return
+	_prepared_sig = null
+	start_new_run()
+	_prepared_sig = _run_sig()
+
+
+# 回到角色选择（换角色）：撤销提前生成的内容
+func cancel_selection() -> void:
+	if _prepared_sig != null:
+		_prepared_sig = null
+		on_menu_reset()
+
+
+# 设置弹窗关闭：选择武器界面已提前生成时按新设置重新生成
+func on_settings_closed() -> void:
+	if _prepared_sig != null and _prepared_sig != _run_sig():
+		_prepared_sig = null
+		prepare_selection()
+
+
+# 任意初始武器：本局角色初始武器所在的稀有度（T1 / T2 / 都有）中的全部已解锁武器
+func any_start_weapons(character) -> Array:
+	if active_state == null or not bool(active_state.cfg.get("weapons", false)) or not bool(active_state.cfg.get("w_any_start", false)):
+		return []
+	var tiers = []
+	for w in character.starting_weapons:
+		if not w.tier in tiers:
+			tiers.push_back(w.tier)
+	var isvc = _autoload("ItemService")
+	var pd = _autoload("ProgressData")
+	var out = []
+	for w in isvc.weapons:
+		if w.tier in tiers and w.can_be_looted and (pd == null or pd.weapons_unlocked.has(w.weapon_id_hash)) and (is_native_resource(w) or w in _low_weapons):
+			out.push_back(w)
+	out.sort_custom(self, "_sort_by_name")
+	return isvc.get_ordered_starting_weapons(out)
+
+
+func _sort_by_name(a, b) -> bool:
+	return tr(a.name) < tr(b.name)
+
+
 # 难度确认、进入战斗前调用：生成并把已持有的角色 / 初始道具 / 初始武器换成生成版本
 func start_new_run() -> void:
 	register_effect_script()
+	# 选择武器界面已按相同设置提前生成：只把已持有的对象换成生成版本
+	if _prepared_sig != null and _prepared_sig == _run_sig() and active_state != null:
+		_prepared_sig = null
+		_materialize_owned(_collect_owned())
+		return
+	_prepared_sig = null
 	if not enabled or not (cfg_items or cfg_characters or cfg_weapons):
 		restore()
 		active_state = null
@@ -333,6 +391,7 @@ func start_new_run() -> void:
 
 # 回到主菜单 / 新开一局前
 func on_menu_reset() -> void:
+	_prepared_sig = null
 	restore()
 	active_state = null
 
