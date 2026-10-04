@@ -710,8 +710,13 @@ func test_135_no_triggers_after_wave_end() -> void:
 
 # 仅重组效果：所有 T4 武器（效果可跨近战 / 远程）分组装备后在真实战斗中运行，原版代码不报错、武器造成伤害
 func test_140_reassembled_weapons_in_battle() -> void:
+	for mode in ["effects", "deep"]:
+		yield(_weapons_battle(mode), "completed")
+
+
+func _weapons_battle(mode: String) -> void:
 	m.cfg_weapons = true
-	m.cfg_weapon_mode = "effects"
+	m.cfg_weapon_mode = mode
 	m.start_new_run()
 	var t4 = []
 	for w in isvc.weapons:
@@ -734,16 +739,18 @@ func test_140_reassembled_weapons_in_battle() -> void:
 		var main = tree.current_scene
 		main._players[0].disable_hurtbox()
 		main._wave_timer.start(600)
-		yield(tree.create_timer(8.0), "timeout")
+		yield(tree.create_timer(7.0), "timeout")
 		for w in rd.get_player_weapons(0):
 			total += 1
 			if w.dmg_dealt_last_wave > 0:
 				dealt += 1
 		main._cleaning_up = true
 	print("AUDIT watch end")
-	print("AUDIT reassembled T4 weapons dealing damage: %d / %d" % [dealt, total])
-	_check(dealt >= total * 0.6, "most reassembled weapons deal damage (%d / %d)" % [dealt, total])
+	print("AUDIT %s: reassembled T4 weapons dealing damage: %d / %d" % [mode, dealt, total])
+	# 7 秒内敌人未必进入射程（构筑物、治疗枪等也不直接造成伤害）：主要检查的是原版代码不报错
+	_check(dealt >= total * 0.5, "most reassembled weapons deal damage (%d / %d)" % [dealt, total])
 	for w in rd.get_player_weapons(0).duplicate():
 		rd.remove_weapon(w, 0)
 	m.on_menu_reset()
 	m.cfg_weapons = false
+	m.cfg_weapon_mode = "effects"

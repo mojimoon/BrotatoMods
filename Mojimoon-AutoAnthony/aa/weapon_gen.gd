@@ -3,7 +3,8 @@ extends Reference
 # 武器重组。以武器家族（同 weapon_id 的各稀有度）为单位：
 #   仅重组效果（effects）：每个家族换用另一个随机家族的效果（可跨近战 / 远程），
 #     再按价值模型（weapon_value.gd）缩放伤害与属性加成，使新武器的价值 = 原武器价值 × 平均数值 × 浮动
-#   深度重组（deep）：见 generate_deep
+#   深度重组（deep）：冷却、暴击、射程、击退、吸血、投射物 / 贯穿 / 弹跳 / 换弹、属性加成、效果、武器类别全部重新生成
+#     （各属性从同类型原版武器的分布中抽取），再按价值模型解出伤害与加成系数；近战 / 远程、武器场景不变
 # 输出 { my_id: {effects, stats, sets, donor} }
 
 const Catalog = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/catalog.gd")
@@ -65,6 +66,8 @@ func generate(weapons: Array) -> Dictionary:
 		families[f].tiers[w.tier] = w
 	fam_names = families.keys()
 	fam_names.sort()
+	if str(cfg.get("weapon_mode", "effects")) == "deep":
+		return generate_deep()
 	return generate_effects_only()
 
 
@@ -193,3 +196,280 @@ func _shuffle(arr: Array) -> void:
 		var tmp = arr[i]
 		arr[i] = arr[j]
 		arr[j] = tmp
+
+
+# ============================================================
+# 深度重组
+# ============================================================
+# 加成属性：16 种主要属性 + 诅咒
+const SCALING_STATS = [
+	"stat_max_hp", "stat_hp_regeneration", "stat_lifesteal", "stat_percent_damage", "stat_melee_damage",
+	"stat_ranged_damage", "stat_elemental_damage", "stat_attack_speed", "stat_crit_chance", "stat_engineering",
+	"stat_range", "stat_armor", "stat_dodge", "stat_speed", "stat_luck", "stat_harvesting", "stat_curse",
+]
+# 第二条加成属性的概率（大部分武器只有主属性）
+const SECOND_SCALING_CHANCE = 0.3
+# 主属性权重 = 原版同类型武器家族中作为主属性的次数 + 此值（原版没出现过的属性也能出现）
+const SCALING_BASE_W = 1.5
+# 第二个效果的概率
+const SECOND_EFFECT_CHANCE = 0.2
+# 第二个武器类别的概率（原版约 60% 的武器有两个类别）
+const SECOND_SET_CHANCE = 0.6
+# 每个类别至少这么多个武器家族（不超过原版数量）
+const MIN_SET_FAMILIES = 3
+# 每升一级冷却 × 此值
+const TIER_COOLDOWN_MULT = 0.95
+const DEEP_TRIES = 8
+
+var _bases: Dictionary = {}		# 类型 -> 各家族最低稀有度的原版武器
+var _primary_w: Dictionary = {}	# 类型 -> {属性: 权重}
+var _second_coefs: Array = []
+var _sets: Dictionary = {}		# set my_id -> SetData
+var _set_native_count: Dictionary = {}
+
+
+func _collect_deep_priors() -> void:
+	_bases = {0: [], 1: []}
+	_primary_w = {0: {}, 1: {}}
+	var counts = {0: {}, 1: {}}
+	for f in fam_names:
+		var fam = families[f]
+		var lo = _closest_tier(fam.tiers, 0)
+		_bases[fam.type].push_back(lo)
+		var sc = lo.stats.scaling_stats
+		if sc.size() > 0:
+			var st = WeaponValue.stat_name(sc[0][0])
+			counts[fam.type][st] = counts[fam.type].get(st, 0) + 1
+			for i in range(1, sc.size()):
+				if float(sc[i][1]) > 0:
+					_second_coefs.push_back(float(sc[i][1]))
+		for set in lo.sets:
+			_sets[set.my_id] = set
+			_set_native_count[set.my_id] = _set_native_count.get(set.my_id, 0) + 1
+	for ty in [0, 1]:
+		for st in SCALING_STATS:
+			_primary_w[ty][st] = float(counts[ty].get(st, 0)) + SCALING_BASE_W
+	if _second_coefs.empty():
+		_second_coefs = [0.5]
+
+
+func _pick_base(ty: int):
+	var arr: Array = _bases[ty]
+	return arr[rng.randi() % arr.size()]
+
+
+func _pick_w(weights: Dictionary) -> String:
+	var total = 0.0
+	for k in weights:
+		total += weights[k]
+	var x = rng.randf() * total
+	for k in weights:
+		x -= weights[k]
+		if x <= 0:
+			return k
+	return weights.keys()[0]
+
+
+func generate_deep() -> Dictionary:
+	_collect_deep_priors()
+	var out = {}
+	var fam_sets = {}
+	for f in fam_names:
+		rng.seed = hash(str(seed_value) + "/wdeep/" + f)
+		var fam = families[f]
+		var mult = _family_mult(f)
+		rng.seed = hash(str(seed_value) + "/wdeep/" + f)
+		var res = {}
+		for _k in DEEP_TRIES:
+			res = _deep_family(fam, mult)
+			if not res.empty():
+				break
+		if res.empty():
+			res = _deep_family(fam, mult, true)
+		for id in res:
+			out[id] = res[id]
+		fam_sets[f] = _pick_sets(fam, res)
+	_ensure_set_minimum(fam_sets)
+	for f in fam_names:
+		for tier in families[f].tiers:
+			var id = families[f].tiers[tier].my_id
+			if out.has(id):
+				out[id]["sets"] = fam_sets[f]
+	return out
+
+
+# 一个家族的蓝图：属性在各稀有度共用（冷却逐级略降），效果取来源家族对应稀有度，伤害与加成系数按价值解出
+func _deep_family(fam: Dictionary, mult: float, force := false) -> Dictionary:
+	var ty: int = fam.type
+	var lo = _closest_tier(fam.tiers, 0)
+	var bp = lo.stats.duplicate()
+	var b = _pick_base(ty).stats
+	bp.cooldown = b.cooldown
+	bp.recoil_duration = b.recoil_duration
+	b = _pick_base(ty).stats
+	bp.crit_chance = b.crit_chance
+	bp.crit_damage = b.crit_damage
+	b = _pick_base(ty).stats
+	bp.max_range = b.max_range
+	bp.knockback = b.knockback
+	bp.lifesteal = _pick_base(ty).stats.lifesteal
+	if ty == 0:
+		b = _pick_base(ty).stats
+		bp.attack_type = b.attack_type
+		bp.alternate_attack_type = b.alternate_attack_type
+	else:
+		b = _pick_base(ty).stats
+		bp.nb_projectiles = b.nb_projectiles
+		bp.projectile_spread = b.projectile_spread
+		b = _pick_base(ty).stats
+		bp.piercing = b.piercing
+		bp.piercing_dmg_reduction = b.piercing_dmg_reduction
+		b = _pick_base(ty).stats
+		bp.bounce = b.bounce
+		bp.bounce_dmg_reduction = b.bounce_dmg_reduction
+		b = _pick_base(ty).stats
+		bp.additional_cooldown_every_x_shots = b.additional_cooldown_every_x_shots
+		bp.additional_cooldown_multiplier = b.additional_cooldown_multiplier
+	# 属性加成：主属性 + 少数武器有第二属性；系数先取原版的值，后面随伤害一起缩放
+	var primary = _pick_w(_primary_w[ty])
+	var coef = 1.0
+	var bsc = _pick_base(ty).stats.scaling_stats
+	if bsc.size() > 0 and float(bsc[0][1]) > 0:
+		coef = float(bsc[0][1])
+	var sc = [[Keys.generate_hash(primary), coef]]
+	if rng.randf() < SECOND_SCALING_CHANCE:
+		var w2 = _primary_w[ty].duplicate()
+		w2.erase(primary)
+		sc.push_back([Keys.generate_hash(_pick_w(w2)), _second_coefs[rng.randi() % _second_coefs.size()]])
+	bp.scaling_stats = sc
+	bp.damage = _pick_base(ty).stats.damage
+	# 效果：随机来源家族（可跨类型），少数武器再加一个
+	var donors = [families[fam_names[rng.randi() % fam_names.size()]]]
+	if rng.randf() < SECOND_EFFECT_CHANCE:
+		donors.push_back(families[fam_names[rng.randi() % fam_names.size()]])
+	var out = {}
+	var tiers = fam.tiers.keys()
+	tiers.sort()
+	for tier in tiers:
+		var tw = fam.tiers[tier]
+		var effects = []
+		var keys = []
+		for e in tw.effects:
+			if bound_key(e):
+				effects.push_back(e)
+		for d in donors:
+			var dw = _closest_tier(d.tiers, tier)
+			for e in dw.effects:
+				var key = WeaponValue.effect_key(e)
+				if bound_key(e) or key in keys or (ranged_only(e) and ty == 0):
+					continue
+				keys.push_back(key)
+				effects.push_back(_adapt(e.duplicate(), tw))
+		var st = bp.duplicate()
+		st.scaling_stats = bp.scaling_stats.duplicate(true)
+		st.cooldown = int(max(2, round(bp.cooldown * pow(TIER_COOLDOWN_MULT, tier - lo.tier))))
+		var want = wv.value(tw.stats, tw.effects, tier) * mult
+		var r = _solve_scale(st, effects, tier, want)
+		if not force and (r < MIN_SCALE or r > MAX_SCALE):
+			return {}
+		var dwf = _closest_tier(donors[0].tiers, tier)
+		out[tw.my_id] = {"effects": effects, "stats": scaled_stats(st, r), "donor": dwf.my_id, "scale": r}
+	return out
+
+
+# 武器类别：按新武器的特性加权（爆炸 -> 爆炸类，点燃 / 元素加成 -> 元素类……），再加少量随机；1–2 个
+func _pick_sets(fam: Dictionary, res: Dictionary) -> Array:
+	var lo = _closest_tier(fam.tiers, 0)
+	var p = res.get(lo.my_id)
+	if p == null:
+		return lo.sets
+	var w = _set_weights(fam, lo, p.stats, p.effects)
+	var first = _pick_w(w)
+	var out = [_sets[first]]
+	if rng.randf() < SECOND_SET_CHANCE:
+		w.erase(first)
+		if not w.empty():
+			out.push_back(_sets[_pick_w(w)])
+	return out
+
+
+func _set_weights(fam: Dictionary, lo, st, effects: Array) -> Dictionary:
+	var w = {}
+	for id in _sets:
+		w[id] = 0.5
+	var melee = fam.type == 0
+	var primary = WeaponValue.stat_name(st.scaling_stats[0][0]) if st.scaling_stats.size() > 0 else ""
+	var ids = []
+	for e in effects:
+		ids.push_back(WeaponValue.effect_id(e))
+		ids.push_back(WeaponValue.effect_key(e))
+	var add = {}
+	if "weapon_exploding" in ids:
+		add["set_explosive"] = 8.0
+	if "weapon_burning" in ids or primary == "stat_elemental_damage":
+		add["set_elemental"] = 8.0
+	if float(st.crit_chance) >= 0.1 or float(st.crit_damage) >= 2.5 or "pierce_on_crit" in ids or "bounce_on_crit" in ids or "gold_on_crit_kill" in ids:
+		add["set_precise"] = 5.0
+	if float(st.lifesteal) > 0 or primary in ["stat_hp_regeneration", "stat_lifesteal", "stat_max_hp"]:
+		add["set_medical"] = 5.0
+	if WeaponValue.cooldown_seconds(st) >= 1.4:
+		add["set_heavy"] = 5.0
+	if primary == "stat_engineering" or "turret" in ids or "structure" in ids or "reload_turrets_on_shoot" in ids:
+		add["set_tool"] = 5.0
+		add["set_support"] = 3.0
+	if primary in ["stat_harvesting", "stat_luck"]:
+		add["set_support"] = 5.0
+	if "weapon_gain_stat_every_killed_enemies" in ids:
+		add["set_ethereal"] = 8.0
+	if "null_charm" in ids or "weapon_percent_damage_effect" in ids:
+		add["set_musical"] = 8.0
+	if not melee and primary == "stat_ranged_damage":
+		add["set_gun"] = 5.0
+	if melee:
+		if int(st.knockback) >= 8:
+			add["set_blunt"] = 4.0
+		if int(st.max_range) <= 150:
+			add["set_unarmed"] = 3.0
+		if int(st.attack_type) == 0:
+			add["set_blade"] = 3.0
+		if st.alternate_attack_type or int(st.max_range) >= 175:
+			add["set_medieval"] = 3.0
+	if int(st.knockback) < 0 or int(st.min_range) > 0:
+		add["set_naval"] = 4.0
+	if lo.tier == 0:
+		add["set_primitive"] = 2.0
+	for id in add:
+		if w.has(id):
+			w[id] += add[id]
+	# 传奇类别只属于原本只有 T4 的武器
+	w.erase("set_legendary")
+	if lo.tier == 3 and _sets.has("set_legendary"):
+		w = {"set_legendary": 1.0}
+	return w
+
+
+# 每个类别至少 MIN_SET_FAMILIES 个家族（不超过原版数量）：不足时随机补给只有一个类别的家族
+func _ensure_set_minimum(fam_sets: Dictionary) -> void:
+	for id in _sets:
+		if id == "set_legendary":
+			continue
+		var need = min(MIN_SET_FAMILIES, int(_set_native_count.get(id, 0)))
+		var have = 0
+		for f in fam_sets:
+			for s in fam_sets[f]:
+				if s.my_id == id:
+					have += 1
+		if have >= need:
+			continue
+		var cands = []
+		for f in fam_names:
+			var cur: Array = fam_sets[f]
+			if cur.size() >= 2 or _sets[id] in cur or _closest_tier(families[f].tiers, 0).tier == 3:
+				continue
+			cands.push_back([rng.randf(), f])
+		cands.sort()
+		for c in cands:
+			if have >= need:
+				break
+			fam_sets[c[1]] = fam_sets[c[1]] + [_sets[id]]
+			have += 1

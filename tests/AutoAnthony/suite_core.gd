@@ -582,6 +582,8 @@ func test_51_ui_builds_and_previews() -> void:
 		var page = OS.get_environment("AA_UI_PAGE")
 		if page != "":
 			m.cfg_weapons = true
+			if OS.get_environment("AA_UI_WMODE") != "":
+				m.cfg_weapon_mode = OS.get_environment("AA_UI_WMODE")
 			ui._on_page_pressed(page)
 			ui._on_preview_pressed()
 			ui._on_tier_pressed(1, "weapons")
@@ -2519,3 +2521,66 @@ func test_138_ultimate_chaos() -> void:
 	_eq(res.tier, before[id0][0], "tier restored")
 	_check(res.icon == before[id0][1], "icon restored")
 	m.cfg_chaos = false
+
+
+# 深度重组：属性从原版分布抽取、价值按模型守恒；大部分武器只有主属性；每个类别都有足够的武器
+func test_141_weapon_deep_reassembly() -> void:
+	var WV = load(MOD_DIR + "aa/weapon_value.gd")
+	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
+	var weapons = m.native_only(isvc.weapons)
+	var cfg = _cfg()
+	cfg.weapons = true
+	cfg.weapon_mode = "deep"
+	for sd in [3, 17]:
+		var wg = WG.new(cfg, sd)
+		var out = wg.generate(weapons)
+		_check(out.size() > 200, "deep: weapons generated (%d)" % out.size())
+		var off = 0
+		var cd_changed = 0
+		var one_scaling = 0
+		var primaries = {}
+		var set_count = {}
+		var fams = {}
+		for id in out:
+			var w = isvc.get_element_safe(isvc.weapons, id)
+			var p = out[id]
+			_check(p.stats.damage >= 1, id + " damage >= 1")
+			_eq(WV.is_melee(p.stats), w.type == 0, id + " keeps melee / ranged")
+			_check(p.sets.size() >= 1 and p.sets.size() <= 2 + 1, id + " has 1-2 sets (+1 for the minimum rule)")
+			if p.stats.cooldown != w.stats.cooldown:
+				cd_changed += 1
+			if p.stats.scaling_stats.size() == 1:
+				one_scaling += 1
+			var pr = WV.stat_name(p.stats.scaling_stats[0][0])
+			primaries[pr] = primaries.get(pr, 0) + 1
+			for e in p.effects:
+				if w.type == 0:
+					_check(not WG.ranged_only(e), id + " melee has no ranged-only effect")
+			var want = wg.wv.value(w.stats, w.effects, w.tier) * wg._family_mult(WG.family_of(w))
+			var got = wg.wv.value(p.stats, p.effects, w.tier)
+			if abs(got - want) > max(3.0, want * 0.15):
+				off += 1
+			var f = WG.family_of(w)
+			if not fams.has(f):
+				fams[f] = true
+				for s in p.sets:
+					set_count[s.my_id] = set_count.get(s.my_id, 0) + 1
+				var legendary = false
+				for s in p.sets:
+					if s.my_id == "set_legendary":
+						legendary = true
+				var lowest = 3
+				for x in weapons:
+					if WG.family_of(x) == f:
+						lowest = min(lowest, x.tier)
+				_eq(legendary, lowest == 3, f + " legendary iff only tier IV")
+		_check(off <= out.size() / 20, "deep: values match (%d off)" % off)
+		_check(cd_changed > out.size() / 2, "deep: cooldowns rerolled (%d)" % cd_changed)
+		_check(one_scaling > out.size() / 2, "deep: most weapons scale with one stat (%d)" % one_scaling)
+		_check(primaries.size() >= 8, "deep: varied primary stats (%d)" % primaries.size())
+		for s in wg._sets:
+			if s != "set_legendary":
+				_check(set_count.get(s, 0) >= min(3, wg._set_native_count.get(s, 0)), "deep: set %s has enough families (%d)" % [s, set_count.get(s, 0)])
+		if sd == 3:
+			print("AUDIT deep primaries %s" % str(primaries))
+			print("AUDIT deep sets %s" % str(set_count))
