@@ -478,12 +478,27 @@ func test_51_ui_builds_and_previews() -> void:
 	_eq(m.cfg_avg, 150, "avg slider")
 	ui._on_switch_toggled(true, "cfg_weapons")
 	_eq(m.cfg_weapons, true, "weapons switch")
-	ui._on_switch_toggled(false, "cfg_rename")
-	_check(ui.build_preview_text(42).find(tr("AA_ADJ_ODD")) == -1 or true, "preview without rename")
+	# "保留原名"是"重组名称"的反向显示
 	ui._on_switch_toggled(true, "cfg_rename")
-	ui._on_switch_toggled(false, "cfg_weapons")
-	# 三张设置卡片 + 每个效果开关都有灰色说明；预览按稀有度分页，每件道具一张卡片
-	for k in ["cfg_char_effects", "cfg_all_char_effects", "cfg_more_double", "cfg_items", "cfg_characters", "cfg_weapons", "cfg_rename"]:
+	_eq(m.cfg_rename, false, "keep names on = no rename")
+	_eq(ui._switches["cfg_rename"].pressed, true, "keep names switch shows on")
+	ui._on_switch_toggled(false, "cfg_rename")
+	_eq(m.cfg_rename, true, "keep names off = rename")
+	# 重组方式二选一
+	ui._on_mode_toggled(true, "deep")
+	_eq(m.cfg_weapon_mode, "deep", "deep mode")
+	_check(not ui._mode_switches["effects"].pressed, "modes are exclusive")
+	ui._on_mode_toggled(true, "effects")
+	_eq(m.cfg_weapon_mode, "effects", "effects mode")
+	# 页签：只显示当前页；页签右边的开关就是本页总开关
+	ui._on_page_pressed("weapons")
+	_check(ui._pages["weapons"].visible and not ui._pages["items"].visible, "weapons page shown")
+	ui._on_page_pressed("items")
+	for pg in ["items", "weapons", "characters"]:
+		_check(ui._page_switches.has(pg), "page switch: " + pg)
+	_eq(ui._page_switches["weapons"].pressed, true, "weapons page switch follows cfg")
+	# 每个开关都有灰色说明
+	for k in ["cfg_char_effects", "cfg_all_char_effects", "cfg_more_double", "cfg_starting_items", "cfg_rename", "cfg_force_items", "cfg_chaos", "cfg_w_item_effects", "cfg_w_low_tiers", "cfg_w_any_start"]:
 		_check(ui._switches.has(k), "switch exists: " + k)
 		var sw = ui._switches[k]
 		var desc = sw.get_parent().get_child(sw.get_index() + 1)
@@ -513,10 +528,22 @@ func test_51_ui_builds_and_previews() -> void:
 	for t in 4:
 		ui._on_tier_pressed(t)
 		yield(tree, "idle_frame")
-		var n = ui._preview_grid.get_child_count()
+		var n = ui._pv.items.grid.get_child_count()
 		_eq(n, ui._preview_entries(ui._plan, t).size(), "preview tier %d shows one card per item" % (t + 1))
 		_check(n > 10, "preview tier %d has items (%d)" % [t + 1, n])
-		_check(ui._tier_buttons[t].text.find("(") > 0, "tier button shows a count: " + ui._tier_buttons[t].text)
+		_check(ui._pv.items.buttons[t].text.find("(") > 0, "tier button shows a count: " + ui._pv.items.buttons[t].text)
+	# 武器预览：每把武器一张卡片，带原版的属性文本
+	ui._on_page_pressed("weapons")
+	for t in 4:
+		ui._on_tier_pressed(t, "weapons")
+		yield(tree, "idle_frame")
+		var n = ui._pv.weapons.grid.get_child_count()
+		_eq(n, ui._preview_entries(ui._plan, t, "weapons").size(), "weapon preview tier %d shows one card per weapon" % (t + 1))
+		_check(n > 5, "weapon preview tier %d has weapons (%d)" % [t + 1, n])
+	var wt = ui.weapon_preview_text(ui._preview_entries(ui._plan, 0, "weapons")[0], ui._plan.weapons[ui._preview_entries(ui._plan, 0, "weapons")[0].my_id])
+	_check(wt.find(tr("STAT_DAMAGE")) >= 0 and wt.find("AA_") == -1, "weapon card text: " + wt.left(80))
+	ui._on_page_pressed("items")
+	ui._on_switch_toggled(false, "cfg_weapons")
 	for i in 6:
 		yield(tree, "idle_frame")
 	var vp = tree.root.get_visible_rect().size
@@ -525,7 +552,15 @@ func test_51_ui_builds_and_previews() -> void:
 	_check(panel.rect_size.x <= max(vp.x, 1920) and panel.rect_size.y <= max(vp.y, 1080), "settings panel fits the screen")
 	var shot = OS.get_environment("AA_UI_SHOT")
 	if shot != "":
-		ui._on_tier_pressed(1)
+		# AA_UI_PAGE=weapons / characters：截取对应分页
+		var page = OS.get_environment("AA_UI_PAGE")
+		if page != "":
+			m.cfg_weapons = true
+			ui._on_page_pressed(page)
+			ui._on_preview_pressed()
+			ui._on_tier_pressed(1, "weapons")
+		else:
+			ui._on_tier_pressed(1)
 		for i in 10:
 			yield(tree, "idle_frame")
 		var img = tree.root.get_texture().get_data()

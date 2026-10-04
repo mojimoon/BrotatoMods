@@ -28,7 +28,16 @@ var cfg_char_effects: bool = false	# 更多角色效果
 var cfg_starting_items: bool = false	# 重组初始道具（本局角色的初始道具也参与重组）
 var cfg_all_char_effects: bool = false	# 全部角色效果（BETA）
 var cfg_more_double: bool = false	# 更多双面效果
-var cfg_rename: bool = true			# 重组名称
+var cfg_rename: bool = true			# 重组名称（界面上显示为相反的"保留原名"）
+var cfg_force_items: bool = false	# 强制重组 (BETA)：锚定道具（商店里买得到的）也参与重组
+var cfg_chaos: bool = false			# 究极混沌：重组道具的稀有度与图标随机
+# 重组武器
+var cfg_weapon_mode: String = "effects"	# effects = 仅重组效果；deep = 深度重组
+var cfg_w_item_effects: bool = false	# 引入道具效果
+var cfg_w_low_tiers: bool = false	# 允许低级武器
+var cfg_w_any_start: bool = false	# 任意初始武器
+var cfg_w_avg: int = 100			# 武器平均数值 50–250%
+var cfg_w_variance: int = 100		# 武器浮动范围 50–250%
 var cfg_avg: int = 100				# 平均数值 50–250%
 var cfg_variance: int = 125			# 浮动范围 50–250%（100% = 原版离散度）
 var cfg_triggers: int = 150			# 触发效果 50–250%（100% = 原版特殊行比例）
@@ -142,6 +151,14 @@ func get_cfg() -> Dictionary:
 		"all_char_effects": cfg_all_char_effects,
 		"more_double": cfg_more_double,
 		"rename": cfg_rename,
+		"force_items": cfg_force_items,
+		"chaos": cfg_chaos,
+		"weapon_mode": cfg_weapon_mode,
+		"w_item_effects": cfg_w_item_effects,
+		"w_low_tiers": cfg_w_low_tiers,
+		"w_any_start": cfg_w_any_start,
+		"w_avg": cfg_w_avg,
+		"w_variance": cfg_w_variance,
 		"avg": cfg_avg,
 		"variance": cfg_variance,
 		"triggers": cfg_triggers,
@@ -191,6 +208,14 @@ func apply_settings(d: Dictionary) -> void:
 	cfg_all_char_effects = bool(d.get("all_char_effects", false))
 	cfg_more_double = bool(d.get("more_double", false))
 	cfg_rename = bool(d.get("rename", true))
+	cfg_force_items = bool(d.get("force_items", false))
+	cfg_chaos = bool(d.get("chaos", false))
+	cfg_weapon_mode = "deep" if str(d.get("weapon_mode", "effects")) == "deep" else "effects"
+	cfg_w_item_effects = bool(d.get("w_item_effects", false))
+	cfg_w_low_tiers = bool(d.get("w_low_tiers", false))
+	cfg_w_any_start = bool(d.get("w_any_start", false))
+	cfg_w_avg = int(clamp(int(d.get("w_avg", 100)), 50, 250))
+	cfg_w_variance = int(clamp(int(d.get("w_variance", 100)), 50, 250))
 	cfg_avg = int(clamp(int(d.get("avg", 100)), 50, 250))
 	cfg_variance = int(clamp(int(d.get("variance", 125)), 50, 250))
 	cfg_triggers = int(clamp(int(d.get("triggers", 150)), 50, 250))
@@ -327,7 +352,7 @@ func on_resume(state: Dictionary) -> void:
 func preview_plan(p_seed: int) -> Dictionary:
 	var gen = Generator.new(get_cfg(), p_seed)
 	var isvc = _autoload("ItemService")
-	return gen.generate(native_only(isvc.items), native_only(isvc.characters), [], [])
+	return gen.generate(native_only(isvc.items), native_only(isvc.characters), [], native_only(isvc.weapons))
 
 
 func _activate(state: Dictionary) -> void:
