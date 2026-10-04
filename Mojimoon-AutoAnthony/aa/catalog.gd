@@ -409,6 +409,8 @@ const ANCHORED_ITEMS = [
 	"item_fish_hook",
 	"item_builder_turret_0", "item_builder_turret_1", "item_builder_turret_2", "item_builder_turret_3",
 ]
+# 强制重组 (BETA)：原版按下标读取效果的道具，效果行不足时补空效果（望远镜：商店按 effects[1] 统计刷新折扣）
+const FORCE_PAD_EFFECTS = {"item_spyglass": 2}
 # 不作为机制来源：建造者炮台（角色专属）、蝾螈（属性互换按道具 ID 在商店中重置）
 const MECHANIC_SOURCE_EXCLUDED = ["item_builder_turret_0", "item_builder_turret_1", "item_builder_turret_2", "item_builder_turret_3", "item_axolotl"]
 # 效果里存"持有者道具 ID"的机制：搬运时改为新持有者的 ID

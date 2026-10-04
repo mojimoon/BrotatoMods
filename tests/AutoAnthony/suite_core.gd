@@ -2410,3 +2410,86 @@ func test_136_pearl_needs_positive_lines() -> void:
 			_check(pos > 0, id + " pearl has another positive line: " + _texts(p.effects))
 	_check(n > 0, "pearl lines appear (%d)" % n)
 	print("AUDIT pearl lines %d, values %s" % [n, str(pct)])
+
+
+# 强制重组 (BETA)：商店里买得到的锚定道具也参与重组；望远镜补足按下标读取的效果行
+func test_137_force_reassembly() -> void:
+	var plan = _gen(5)
+	for id in Catalog.ANCHORED_ITEMS:
+		_check(not plan.items.has(id), "anchored by default: " + id)
+	var cfg = _cfg()
+	cfg.force_items = true
+	plan = _gen(5, cfg)
+	for id in Catalog.ANCHORED_ITEMS:
+		var it = _item(id)
+		if it == null:
+			continue
+		_eq(plan.items.has(id), it.can_be_looted, "forced iff lootable: " + id)
+	for sd in range(1, 21):
+		plan = _gen(sd, cfg)
+		var sp = plan.items.get("item_spyglass")
+		_check(sp != null and sp.effects.size() >= 2, "spyglass has effects[1] (seed %d)" % sd)
+		if sp != null:
+			_check(_texts(sp.effects).find("AA_") == -1, "spyglass text: " + _texts(sp.effects))
+	# 实际开局：望远镜的 effects[1] 可读（商店刷新时按它统计折扣）
+	m.cfg_force_items = true
+	_setup_player("character_well_rounded")
+	m.start_new_run()
+	var spy = _item("item_spyglass")
+	_check(spy.effects.size() >= 2 and spy.effects[1].value is int, "live spyglass effects[1].value readable")
+	m.on_menu_reset()
+	m.cfg_force_items = false
+
+
+# 究极混沌：被重组道具之间交换稀有度（每档数量不变）与图标；预览不改动资源；开局写入、回到菜单还原
+func test_138_ultimate_chaos() -> void:
+	var cfg = _cfg()
+	cfg.chaos = true
+	var before = {}
+	for it in isvc.items:
+		before[it.my_id] = [it.tier, it.icon]
+	var plan = _gen(9, cfg)
+	var moved = 0
+	var icons = 0
+	var count_old = [0, 0, 0, 0]
+	var count_new = [0, 0, 0, 0]
+	var budget_by_tier = [[], [], [], []]
+	for id in plan.items:
+		var p = plan.items[id]
+		_check(p.has("tier") and p.has("icon"), id + " has chaos tier / icon")
+		count_old[before[id][0]] += 1
+		count_new[int(p.tier)] += 1
+		budget_by_tier[int(p.tier)].push_back(float(p.budget))
+		if int(p.tier) != before[id][0]:
+			moved += 1
+		if p.icon != before[id][1]:
+			icons += 1
+	_eq(str(count_new), str(count_old), "tier counts unchanged")
+	_check(moved > plan.items.size() / 2, "most items change tier (%d)" % moved)
+	_check(icons > plan.items.size() / 2, "most items change icon (%d)" % icons)
+	var med = []
+	for t in 4:
+		budget_by_tier[t].sort()
+		med.push_back(budget_by_tier[t][budget_by_tier[t].size() / 2])
+	_check(med[0] < med[1] and med[1] < med[2] and med[2] < med[3], "budget follows the new tier %s" % str(med))
+	var untouched = true
+	for it in isvc.items:
+		if it.tier != before[it.my_id][0] or it.icon != before[it.my_id][1]:
+			untouched = false
+	_check(untouched, "preview leaves resources unchanged")
+	# 开局：资源与商店分档池使用新稀有度；回到菜单还原
+	m.cfg_chaos = true
+	_setup_player("character_well_rounded")
+	m.start_new_run()
+	var id0 = ""
+	for id in m.plan.items:
+		if int(m.plan.items[id].tier) != before[id][0]:
+			id0 = id
+			break
+	var res = _item(id0)
+	_eq(res.tier, int(m.plan.items[id0].tier), "live tier applied: " + id0)
+	_check(res in isvc._tiers_data[res.tier][0] or not res.can_be_looted or not ProgressData.items_unlocked.has(res.my_id_hash), "shop pool rebuilt with the new tier")
+	m.on_menu_reset()
+	_eq(res.tier, before[id0][0], "tier restored")
+	_check(res.icon == before[id0][1], "icon restored")
+	m.cfg_chaos = false

@@ -116,7 +116,8 @@ func generate(items: Array, all_characters: Array, selected: Array, weapons: Arr
 		for item in items:
 			if _is_reassemblable_item(item) and not _keeps_native(item):
 				gen_items.push_back(item)
-		assign_prices(gen_items)
+		var orig_tiers = _chaos_shuffle(gen_items) if cfg.get("chaos", false) else {}
+		assign_prices(gen_items, orig_tiers)
 		var core = pick_core_items(gen_items)
 		for item in gen_items:
 			var r = generate_item(item, core.get(item.my_id, ""))
@@ -136,12 +137,62 @@ func generate(items: Array, all_characters: Array, selected: Array, weapons: Arr
 				uq = true
 			plan.items[id]["unique"] = uq
 			plan.items[id]["price"] = int(gen_prices.get(id, 0))
+			_pad_effects(id, plan.items[id])
+		# 究极混沌：生成时按新稀有度估值，生成后把资源上的稀有度还原，由 mod_main 写入新稀有度与图标
+		for item in gen_items:
+			if orig_tiers.has(item.my_id):
+				if plan.items.has(item.my_id):
+					plan.items[item.my_id]["tier"] = item.tier
+					plan.items[item.my_id]["icon"] = chaos_icons[item.my_id]
+				item.tier = orig_tiers[item.my_id]
 	if cfg.get("characters", false):
 		for ch in selected:
 			plan.characters[ch.my_id] = generate_character(ch)
 	if cfg.get("weapons", false):
 		plan.weapons = generate_weapons(weapons)
 	return plan
+
+
+# 究极混沌：被重组道具之间随机交换稀有度（每档数量不变）与图标。返回 {道具 ID: 原稀有度}；
+# 生成期间资源上的稀有度临时改为新稀有度（预算、价格、稀有度规则都按新稀有度），生成后还原
+var chaos_icons: Dictionary = {}
+
+
+func _chaos_shuffle(gen_items: Array) -> Dictionary:
+	rng.seed = hash(str(seed_value) + "/chaos")
+	var tiers = []
+	var icons = []
+	for it in gen_items:
+		tiers.push_back(it.tier)
+		icons.push_back(it.icon)
+	_shuffle(tiers)
+	_shuffle(icons)
+	var orig = {}
+	for i in gen_items.size():
+		var it = gen_items[i]
+		orig[it.my_id] = it.tier
+		it.tier = tiers[i]
+		chaos_icons[it.my_id] = icons[i]
+	return orig
+
+
+func _shuffle(arr: Array) -> void:
+	for i in range(arr.size() - 1, 0, -1):
+		var j = rng.randi() % (i + 1)
+		var tmp = arr[i]
+		arr[i] = arr[j]
+		arr[j] = tmp
+
+
+# 强制重组：原版按下标读取效果的道具补足效果行数（空效果不显示、不生效）
+static func _pad_effects(id: String, p: Dictionary) -> void:
+	var n = int(Catalog.FORCE_PAD_EFFECTS.get(id, 0))
+	while p.effects.size() < n:
+		var e = NullEffect.new()
+		e.key = ""
+		e.text_key = ""
+		e.value = 0
+		p.effects.push_back(e)
 
 
 # T3 及以上的道具至少有两条效果（catalog.MIN_LINES_TIER / MIN_LINES），价值不变：
@@ -433,7 +484,10 @@ func _seed_for(id: String) -> void:
 func _is_reassemblable_item(item) -> bool:
 	if item is CharacterData or item is WeaponData:
 		return false
-	if item.my_id in Catalog.ANCHORED_ITEMS or item.my_id in run_excluded_ids:
+	if item.my_id in run_excluded_ids:
+		return false
+	# 强制重组 (BETA)：锚定道具中商店里买得到的也参与重组
+	if item.my_id in Catalog.ANCHORED_ITEMS and not (cfg.get("force_items", false) and item.can_be_looted):
 		return false
 	if item.tier < 0 or item.tier > 3:
 		return false
@@ -689,11 +743,12 @@ func item_budget(item) -> float:
 
 
 # 为每件重组道具生成价格：从同稀有度被重组道具的原版价格中有放回抽取（按种子与道具 ID 确定）
-func assign_prices(gen_items: Array) -> void:
+# orig_tiers：究极混沌时道具的原稀有度（价格池按原稀有度的原版价格统计）
+func assign_prices(gen_items: Array, orig_tiers: Dictionary = {}) -> void:
 	var pools = [[], [], [], []]
 	for it in gen_items:
 		if it.value >= Catalog.PRICE_POOL_MIN and not it.my_id in Catalog.PRICE_POOL_EXCLUDED:
-			pools[it.tier].push_back(it.value)
+			pools[int(orig_tiers.get(it.my_id, it.tier))].push_back(it.value)
 	for t in 4:
 		pools[t].sort()
 	for it in gen_items:

@@ -405,6 +405,10 @@ func _activate(state: Dictionary) -> void:
 			res.replaced_by = null
 			if rename:
 				res.name = _compose_name(p.adj, _backups[res.get_instance_id()].name)
+			# 究极混沌：新稀有度与随机图标
+			if p.has("tier"):
+				res.tier = int(p.tier)
+				res.icon = p.icon
 	for id in plan.characters:
 		var res = _find(isvc.characters, id)
 		if res != null:
@@ -419,6 +423,9 @@ func _activate(state: Dictionary) -> void:
 			_backup(res)
 			res.effects = plan.weapons[id].effects
 	_rebuild_groups_and_bans(isvc)
+	# 商店的分档池在本局开始时（RunData.reset）已按原稀有度建好：稀有度改变后重建
+	if bool(state.cfg.get("chaos", false)) and isvc.has_method("init_unlocked_pool"):
+		isvc.init_unlocked_pool()
 	triggers_dirty = true
 	ModLoaderLog.info("Activated seed %d: %d items, %d characters, %d weapons" % [int(state.seed), plan.items.size(), plan.characters.size(), plan.weapons.size()], MOD_ID)
 
@@ -533,6 +540,8 @@ func _backup(res) -> void:
 		b.tracking_text = res.tracking_text
 		b.max_nb = res.max_nb
 		b.replaced_by = res.replaced_by
+		b.tier = res.tier
+		b.icon = res.icon
 	_backups[id] = b
 
 
@@ -552,6 +561,8 @@ func restore() -> void:
 			res.tracking_text = b.tracking_text
 			res.max_nb = b.max_nb
 			res.replaced_by = b.replaced_by
+			res.tier = b.tier
+			res.icon = b.icon
 	_backups.clear()
 	if _groups_backup != null:
 		var isvc = _autoload("ItemService")
@@ -617,6 +628,8 @@ func _materialize_owned(owned: Array) -> void:
 				res.tracking_text = tmpl.tracking_text
 				res.max_nb = tmpl.max_nb
 				res.replaced_by = tmpl.replaced_by
+				res.tier = tmpl.tier
+				res.icon = tmpl.icon
 		rd.apply_item_effects(res, p)
 		touched[p] = true
 	for p in touched:
@@ -675,6 +688,8 @@ func _repair_item(it) -> void:
 		it.tracking_text = tmpl.tracking_text
 		it.max_nb = tmpl.max_nb
 		it.replaced_by = tmpl.replaced_by
+		it.tier = tmpl.tier
+		it.icon = tmpl.icon
 	var has_trigger = false
 	for e in it.effects:
 		if e is TriggerEffect:
