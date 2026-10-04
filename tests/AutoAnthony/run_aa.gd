@@ -1,17 +1,21 @@
 extends SceneTree
 
 # -s 入口。本脚本在 autoload 创建之前就被编译，所以不能引用任何游戏的 class_name / autoload；
-# 等 autoload 和 ModLoader 就绪后再加载测试组（AA_SUITE：core / audit / battle，逗号分隔；all = 全部）。
+# 等 autoload 和 ModLoader 就绪后再加载测试组（AA_SUITE：core / audit / battle / weapons，逗号分隔；
+# items = core,battle,audit（道具与共通部分）；all = 全部）。
 
 const DIR = "res://mods/tests/AutoAnthony/"
-const ALL = ["core", "audit", "battle"]
+const ALL = ["core", "audit", "battle", "weapons"]
+const GROUPS = {"items": ["core", "battle", "audit"]}
 
 
 func _initialize() -> void:
 	yield(self, "idle_frame")
 	yield(self, "idle_frame")
 	var sel = OS.get_environment("AA_SUITE")
-	var suites = ALL if sel == "all" else Array((sel if sel != "" else "core").split(","))
+	var suites = []
+	for x in (ALL if sel == "all" else Array((sel if sel != "" else "core").split(","))):
+		suites += GROUPS.get(x, [x])
 	var ctx = {"checks": 0, "failures": []}
 	var last = null
 	print("user dir: ", OS.get_user_data_dir())

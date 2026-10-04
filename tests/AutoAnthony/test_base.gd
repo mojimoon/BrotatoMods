@@ -180,6 +180,9 @@ func _reset() -> void:
 	m.cfg_w_any_start = false
 	m.cfg_w_avg = 100
 	m.cfg_w_variance = 100
+	m.cfg_tier_chaos = false
+	m.cfg_w_chaos = false
+	m.cfg_w_rename = true
 	m.cfg_native_ratio = 0
 	m.cfg_fixed_seed = true
 	m.cfg_seed = 42
@@ -558,3 +561,7 @@ func _char_value(gen, e) -> float:
 		var cv = Valuation.clause_value(e.to_clause(), Catalog.PERM_MULT_CHARACTER)
 		return cv if cv >= 0 else cv / Catalog.DOWNSIDE_DIVISOR
 	return gen.char_line_value(e)
+
+
+func _sort_first_desc(a, b) -> bool:
+	return a[0] > b[0]

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # AutoAnthony 无头测试
-# 用法（Git Bash）：bash mods/tests/AutoAnthony/run_tests.sh [core|audit|battle|all|core,battle]
-#   core（默认）：每次改动都跑的逻辑测试；battle：真实战斗场景；audit：价值 / 分布统计审计
+# 用法（Git Bash）：bash mods/tests/AutoAnthony/run_tests.sh [core|audit|battle|weapons|items|all|core,battle]
+#   core（默认）：道具与共通部分的逻辑测试；battle：真实战斗场景；audit：价值 / 分布统计审计；
+#   weapons：武器重组的全部测试；items = core,battle,audit；all = 全部
 #   AA_ONLY=<名字片段> 只跑名字含该片段的测试
 #
 # - 在反编译的游戏工程（本仓库的上一级目录）里运行，使用真实的 ItemService / RunData / ModLoader

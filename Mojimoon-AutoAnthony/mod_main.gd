@@ -31,11 +31,14 @@ var cfg_more_double: bool = false	# 更多双面效果
 var cfg_rename: bool = true			# 重组名称（界面上显示为相反的"保留原名"）
 var cfg_force_items: bool = false	# 强制重组 (BETA)：锚定道具（商店里买得到的）也参与重组
 var cfg_chaos: bool = false			# 究极混沌：重组道具的稀有度与图标随机
+var cfg_tier_chaos: bool = false	# 混沌：重组道具的稀有度随机（与究极混沌互斥）
 # 重组武器
 var cfg_weapon_mode: String = "effects"	# effects = 仅重组效果；deep = 深度重组
 var cfg_w_item_effects: bool = false	# 引入道具效果
 var cfg_w_low_tiers: bool = false	# 允许低级武器
 var cfg_w_any_start: bool = false	# 任意初始武器
+var cfg_w_chaos: bool = false		# 武器混沌：武器家族的稀有度整体随机平移（与补全低级武器互斥）
+var cfg_w_rename: bool = true		# 武器重组名称（界面上显示为相反的"保留原名"）
 var cfg_w_avg: int = 100			# 武器平均数值 50–250%
 var cfg_w_variance: int = 100		# 武器浮动范围 50–250%
 var cfg_avg: int = 100				# 平均数值 50–250%
@@ -153,6 +156,9 @@ func get_cfg() -> Dictionary:
 		"rename": cfg_rename,
 		"force_items": cfg_force_items,
 		"chaos": cfg_chaos,
+		"tier_chaos": cfg_tier_chaos and not cfg_chaos,
+		"w_chaos": cfg_w_chaos and not cfg_w_low_tiers,
+		"w_rename": cfg_w_rename,
 		"weapon_mode": cfg_weapon_mode,
 		"w_item_effects": cfg_w_item_effects,
 		"w_low_tiers": cfg_w_low_tiers,
@@ -210,6 +216,9 @@ func apply_settings(d: Dictionary) -> void:
 	cfg_rename = bool(d.get("rename", true))
 	cfg_force_items = bool(d.get("force_items", false))
 	cfg_chaos = bool(d.get("chaos", false))
+	cfg_tier_chaos = bool(d.get("tier_chaos", false)) and not cfg_chaos
+	cfg_w_chaos = bool(d.get("w_chaos", false)) and not bool(d.get("w_low_tiers", false))
+	cfg_w_rename = bool(d.get("w_rename", true))
 	cfg_weapon_mode = "deep" if str(d.get("weapon_mode", "effects")) == "deep" else "effects"
 	cfg_w_item_effects = bool(d.get("w_item_effects", false))
 	cfg_w_low_tiers = bool(d.get("w_low_tiers", false))
@@ -517,6 +526,7 @@ func _activate(state: Dictionary) -> void:
 			# 究极混沌：新稀有度与随机图标
 			if p.has("tier"):
 				res.tier = int(p.tier)
+			if p.has("icon"):
 				res.icon = p.icon
 	for id in plan.characters:
 		var res = _find(isvc.characters, id)
@@ -526,19 +536,26 @@ func _activate(state: Dictionary) -> void:
 			res.effects = p.effects
 			if rename:
 				res.name = _compose_name(p.adj, _backups[res.get_instance_id()].name)
+	var w_rename = bool(state.cfg.get("w_rename", true))
 	for id in plan.weapons:
 		var res = _find(isvc.weapons, id)
 		if res != null:
 			_backup(res)
 			var pw = plan.weapons[id]
 			res.effects = pw.effects
+			if w_rename and pw.has("adj"):
+				res.name = _compose_name(pw.adj, _backups[res.get_instance_id()].name)
+			# 武器混沌：新稀有度与价格
+			if pw.has("tier"):
+				res.tier = int(pw.tier)
+				res.value = int(pw.price)
 			if pw.has("stats"):
 				res.stats = pw.stats
 			if pw.has("sets"):
 				res.sets = pw.sets
 	_rebuild_groups_and_bans(isvc)
 	# 商店的分档池在本局开始时（RunData.reset）已按原稀有度建好：稀有度改变后重建
-	if (bool(state.cfg.get("chaos", false)) or not _low_weapons.empty()) and isvc.has_method("init_unlocked_pool"):
+	if (bool(state.cfg.get("chaos", false)) or bool(state.cfg.get("tier_chaos", false)) or bool(state.cfg.get("w_chaos", false)) or not _low_weapons.empty()) and isvc.has_method("init_unlocked_pool"):
 		isvc.init_unlocked_pool()
 	triggers_dirty = true
 	ModLoaderLog.info("Activated seed %d: %d items, %d characters, %d weapons" % [int(state.seed), plan.items.size(), plan.characters.size(), plan.weapons.size()], MOD_ID)
@@ -659,6 +676,8 @@ func _backup(res) -> void:
 	if res is WeaponData:
 		b.stats = res.stats
 		b.sets = res.sets
+		b.w_tier = res.tier
+		b.w_value = res.value
 	_backups[id] = b
 
 
@@ -675,6 +694,8 @@ func restore() -> void:
 		if b.has("stats"):
 			res.stats = b.stats
 			res.sets = b.sets
+			res.tier = b.w_tier
+			res.value = b.w_value
 		if b.has("tags"):
 			res.tags = b.tags
 			res.value = b.value
@@ -746,6 +767,8 @@ func _materialize_owned(owned: Array) -> void:
 			if res is WeaponData:
 				res.stats = tmpl.stats
 				res.sets = tmpl.sets
+				res.tier = tmpl.tier
+				res.value = tmpl.value
 			if res is ItemData and not res is CharacterData:
 				res.tags = tmpl.tags
 				res.value = tmpl.value

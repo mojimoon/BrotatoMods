@@ -32,9 +32,10 @@ const BURN_EFF = 0.7
 const BURN_TARGETS = 1.5
 # 溢出伤害：单次伤害超过参考敌人生命（按稀有度对应的阶段）时，超出部分按幂次折算（慢速重击常打出溢出伤害）
 const OVERKILL_HP = [25.0, 50.0, 100.0, 200.0]
-const OVERKILL_EXP = 0.75
-# 效果的残差单位价值不为正时（模型高估了来源武器），按"至少值来源武器价格的这一比例"兜底
-const EFFECT_VALUE_FLOOR = 0.15
+const OVERKILL_EXP = 0.85
+# 效果的单位价值（多数效果只出现在一个家族里，残差噪声大）：限制在"来源武器价格的这一范围"内
+const EFFECT_VALUE_FLOOR = 0.1
+const EFFECT_VALUE_CEIL = 0.5
 # 命中时射出的投射物 / 闪电：命中率
 const SUB_PROJ_EFF = 0.7
 # 吸血：每秒 1 点回复折算的 DPS
@@ -53,8 +54,11 @@ const REF_STATS = {
 # 各稀有度武器对应的属性阶段（T4 = 终局）
 const TIER_STAT_FRAC = [0.3, 0.5, 0.75, 1.0]
 
-# 可建模（计入 power）的效果脚本 id
+# 可建模（计入 power）的效果脚本 id / key
 const MODELED_EFFECTS = ["weapon_exploding", "weapon_burning", "weapon_projectiles_on_hit"]
+const MODELED_KEYS = ["reload_when_pickup_gold"]
+# 捡材料时换弹（喇叭枪）：实际攻击间隔约为此值（秒）
+const GOLD_RELOAD_CD = 1.2
 
 
 static func _tween(d: float) -> int:
@@ -166,6 +170,9 @@ static func effect_id(e) -> String:
 # 等效 DPS（参考状态）；effects 中可建模的效果计入
 static func power(st, effects: Array, tier: int = 3) -> float:
 	var cd = max(0.05, cooldown_seconds(st))
+	for e in effects:
+		if effect_key(e) == "reload_when_pickup_gold":
+			cd = min(cd, GOLD_RELOAD_CD)
 	var hit = hit_damage(float(st.damage), st.scaling_stats, tier)
 	var per_hit = overkill(hit * crit_factor(st), tier) * range_factor(st)
 	var hits = hits_per_attack(st)
@@ -250,7 +257,7 @@ static func magnitude(e) -> float:
 
 # 效果是否计入 power（其余按残差 / 属性权重估值）
 static func is_modeled(e) -> bool:
-	return effect_id(e) in MODELED_EFFECTS
+	return effect_id(e) in MODELED_EFFECTS or effect_key(e) in MODELED_KEYS
 
 
 # ------------------------------------------------------------
@@ -273,10 +280,27 @@ static func _median(a: Array) -> float:
 	return b[b.size() / 2]
 
 
+# 只有 T4 的原版传奇武器（链枪、王者之剑……）普遍超模：不参与 价格 / power 比例的标定，
+# 按普通武器的标准估值（因此它们的模型价值高于价格，程度不等）
+var legendary_families: Dictionary = {}
+
+
+static func _family(w) -> String:
+	return w.weapon_id if w.weapon_id != "" else w.my_id
+
+
 func calibrate(weapons: Array) -> void:
+	var lowest = {}
+	for w in weapons:
+		var f = _family(w)
+		lowest[f] = min(int(lowest.get(f, 3)), w.tier)
+	legendary_families = {}
+	for f in lowest:
+		if lowest[f] == 3:
+			legendary_families[f] = true
 	var ratios = {}
 	for w in weapons:
-		if w.stats == null or int(w.value) <= 0:
+		if w.stats == null or int(w.value) <= 0 or legendary_families.has(_family(w)):
 			continue
 		var pure = true
 		for e in w.effects:
@@ -326,12 +350,10 @@ func calibrate(weapons: Array) -> void:
 			resid[key].push_back(r / others.size() / mg)
 			prices[key].push_back(float(w.value))
 			mags[key].push_back(abs(mg))
-	# 单位价值不为正：模型高估了来源武器（或效果本是代价但大小记为正），按来源价格的一定比例兜底
+	# 单位价值限制在 [10%, 50%] × 来源武器价格 / 效果大小（残差为负 = 模型高估了来源武器，取下限）
 	for key in resid:
-		var u = _median(resid[key])
-		if u <= 0.0:
-			u = EFFECT_VALUE_FLOOR * _median(prices[key]) / max(0.0001, _median(mags[key]))
-		unit_by_key[key] = u
+		var per = _median(prices[key]) / max(0.0001, _median(mags[key]))
+		unit_by_key[key] = clamp(_median(resid[key]), EFFECT_VALUE_FLOOR * per, EFFECT_VALUE_CEIL * per)
 	fit_rows = []
 	for w in weapons:
 		if w.stats != null and int(w.value) > 0:

@@ -117,7 +117,11 @@ func generate(items: Array, all_characters: Array, selected: Array, weapons: Arr
 		for item in items:
 			if _is_reassemblable_item(item) and not _keeps_native(item):
 				gen_items.push_back(item)
-		var orig_tiers = _chaos_shuffle(gen_items) if cfg.get("chaos", false) else {}
+		var orig_tiers = {}
+		if cfg.get("chaos", false):
+			orig_tiers = _chaos_shuffle(gen_items, true)
+		elif cfg.get("tier_chaos", false):
+			orig_tiers = _chaos_shuffle(gen_items, false)
 		assign_prices(gen_items, orig_tiers)
 		var core = pick_core_items(gen_items)
 		for item in gen_items:
@@ -144,7 +148,8 @@ func generate(items: Array, all_characters: Array, selected: Array, weapons: Arr
 			if orig_tiers.has(item.my_id):
 				if plan.items.has(item.my_id):
 					plan.items[item.my_id]["tier"] = item.tier
-					plan.items[item.my_id]["icon"] = chaos_icons[item.my_id]
+					if chaos_icons.has(item.my_id):
+						plan.items[item.my_id]["icon"] = chaos_icons[item.my_id]
 				item.tier = orig_tiers[item.my_id]
 	if cfg.get("characters", false):
 		for ch in selected:
@@ -154,12 +159,12 @@ func generate(items: Array, all_characters: Array, selected: Array, weapons: Arr
 	return plan
 
 
-# 究极混沌：被重组道具之间随机交换稀有度（每档数量不变）与图标。返回 {道具 ID: 原稀有度}；
+# 究极混沌：被重组道具之间随机交换稀有度（每档数量不变）与图标；混沌：只交换稀有度。返回 {道具 ID: 原稀有度}；
 # 生成期间资源上的稀有度临时改为新稀有度（预算、价格、稀有度规则都按新稀有度），生成后还原
 var chaos_icons: Dictionary = {}
 
 
-func _chaos_shuffle(gen_items: Array) -> Dictionary:
+func _chaos_shuffle(gen_items: Array, with_icons: bool) -> Dictionary:
 	rng.seed = hash(str(seed_value) + "/chaos")
 	var tiers = []
 	var icons = []
@@ -173,7 +178,8 @@ func _chaos_shuffle(gen_items: Array) -> Dictionary:
 		var it = gen_items[i]
 		orig[it.my_id] = it.tier
 		it.tier = tiers[i]
-		chaos_icons[it.my_id] = icons[i]
+		if with_icons:
+			chaos_icons[it.my_id] = icons[i]
 	return orig
 
 

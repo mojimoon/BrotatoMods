@@ -49,17 +49,28 @@ const MORE_SWITCHES = [
 	["cfg_rename", "AA_UI_KEEP_NAMES", "AA_UI_KEEP_NAMES_DESC", true],
 	["cfg_force_items", "AA_UI_FORCE", "AA_UI_FORCE_DESC"],
 	["cfg_chaos", "AA_UI_CHAOS", "AA_UI_CHAOS_DESC"],
+	["cfg_tier_chaos", "AA_UI_TIER_CHAOS", "AA_UI_TIER_CHAOS_DESC"],
 ]
 # 重组方式（二选一）：[模式, 名称 key, 说明 key]
 const WEAPON_MODES = [
 	["effects", "AA_UI_W_EFFECTS", "AA_UI_W_EFFECTS_DESC"],
 	["deep", "AA_UI_W_DEEP", "AA_UI_W_DEEP_DESC"],
 ]
-const WEAPON_SWITCHES = [
+# 武器的效果设置：两种重组方式下方的开关
+const WEAPON_EFFECT_SWITCHES = [
 	["cfg_w_item_effects", "AA_UI_W_ITEM_EFFECTS", "AA_UI_W_ITEM_EFFECTS_DESC"],
+]
+const WEAPON_SWITCHES = [
+	["cfg_w_rename", "AA_UI_KEEP_NAMES", "AA_UI_W_KEEP_NAMES_DESC", true],
 	["cfg_w_low_tiers", "AA_UI_W_LOW_TIERS", "AA_UI_W_LOW_TIERS_DESC"],
+	["cfg_w_chaos", "AA_UI_W_CHAOS", "AA_UI_W_CHAOS_DESC"],
 	["cfg_w_any_start", "AA_UI_W_ANY_START", "AA_UI_W_ANY_START_DESC"],
 ]
+# 互斥的开关：打开一个时关闭另一个
+const EXCLUSIVE = {
+	"cfg_chaos": "cfg_tier_chaos", "cfg_tier_chaos": "cfg_chaos",
+	"cfg_w_low_tiers": "cfg_w_chaos", "cfg_w_chaos": "cfg_w_low_tiers",
+}
 # [配置字段, 名称 key, 最小, 最大, 步长, 说明 key]
 const SLIDERS = [
 	["cfg_avg", "AA_UI_AVG", 50, 250, 5, "AA_UI_AVG_DESC"],
@@ -255,14 +266,20 @@ func _build_switch_section(parent: Control, title_key: String, defs: Array, acce
 		box.add_child(_desc(tr(d[2])))
 
 
-# 重组方式：两个互斥的开关
+# 武器的效果设置：两种重组方式（互斥）+ 引入道具效果
 func _build_mode_section(parent: Control) -> void:
-	var box = _section(parent, "AA_UI_SEC_WEAPON_MODE", C_ACCENT_3)
+	var box = _section(parent, "AA_UI_SEC_EFFECTS", C_ACCENT_3)
 	for d in WEAPON_MODES:
 		var sw = _switch(tr(d[1]), _mod.cfg_weapon_mode == d[0])
 		sw.connect("toggled", self, "_on_mode_toggled", [d[0]])
 		box.add_child(sw)
 		_mode_switches[d[0]] = sw
+		box.add_child(_desc(tr(d[2])))
+	for d in WEAPON_EFFECT_SWITCHES:
+		var sw = _switch(tr(d[1]), _mod.get(d[0]))
+		sw.connect("toggled", self, "_on_switch_toggled", [d[0]])
+		box.add_child(sw)
+		_switches[d[0]] = sw
 		box.add_child(_desc(tr(d[2])))
 
 
@@ -410,6 +427,8 @@ func _on_page_pressed(id: String) -> void:
 
 func _on_switch_toggled(pressed: bool, key: String) -> void:
 	_mod.set(key, pressed != _inverted.has(key))
+	if pressed and EXCLUSIVE.has(key):
+		_mod.set(EXCLUSIVE[key], false)
 	_refresh_all()
 
 
@@ -605,9 +624,12 @@ func _item_card(item, p: Dictionary, width: float) -> Control:
 
 # 武器卡片：按生成结果临时组装一份武器数据，用原版的属性 / 效果文本
 func _weapon_card(weapon, p: Dictionary, width: float) -> Control:
-	var color = ItemService.get_color_from_tier(weapon.tier)
+	var color = ItemService.get_color_from_tier(int(p.get("tier", weapon.tier)))
 	var col = _card_shell(weapon.icon, color, width)
-	_card_head(col, tr(weapon.name), color, str(int(p.get("price", weapon.value))))
+	var nm = tr(weapon.name)
+	if _mod.cfg_w_rename and p.has("adj"):
+		nm = tr("AA_NAME_FMT").replace("{0}", tr(p.adj)).replace("{1}", nm)
+	_card_head(col, nm, color, str(int(p.get("price", weapon.value))))
 	_card_text(col, weapon_preview_text(weapon, p))
 	return col.get_parent().get_parent()
 

@@ -1,5 +1,6 @@
 extends "res://mods/tests/AutoAnthony/test_base.gd"
 
+
 # core：每次改动都跑的逻辑测试（目录、生成、估值、生命周期、文本、触发与载荷的单元测试、选项、原版效果拆解、词条）
 
 
@@ -330,51 +331,6 @@ func test_30_character_keeps_identity() -> void:
 		_check(p.current_character == ch, "current character is the generated resource")
 		m.on_menu_reset()
 		_check(ch.effects == before, cid + " restored")
-
-
-func test_31_weapons_swap_within_type() -> void:
-	m.cfg_weapons = true
-	m.cfg_items = false
-	var WV = load(MOD_DIR + "aa/weapon_value.gd")
-	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
-	var weapons = m.native_only(isvc.weapons)
-	var g = Generator.new(m.get_cfg(), 11)
-	var out = g.generate_weapons(weapons)
-	var wg = WG.new(m.get_cfg(), 11)
-	wg.generate(weapons)
-	_check(out.size() > 200, "weapons mapped (%d)" % out.size())
-	var changed = 0
-	var cross = 0
-	var off = 0
-	for id in out:
-		var w = isvc.get_element_safe(isvc.weapons, id)
-		var p = out[id]
-		var donor = isvc.get_element_safe(isvc.weapons, p.donor)
-		if WG.family_of(donor) != WG.family_of(w):
-			changed += 1
-		if donor.type != w.type:
-			cross += 1
-		_check(p.stats.damage >= 1, id + " damage >= 1")
-		for e in p.effects:
-			if e is WeaponStackEffect:
-				_eq(e.weapon_stacked_id, w.weapon_id, "stack effect retargeted on " + id)
-			if w.type == 0:
-				_check(not WG.ranged_only(e), "%s (melee) has no ranged-only effect %s" % [id, WV.effect_key(e)])
-			if WG.bound_key(e):
-				_check(e in w.effects, "%s keeps only its own family-bound effect %s" % [id, WV.effect_key(e)])
-		for e in w.effects:
-			if WG.bound_key(e):
-				_check(e in p.effects, "%s keeps its family-bound effect" % id)
-		# 价值守恒：新武器价值 = 原价值 × 家族浮动（伤害取整误差内）
-		var want = wg.wv.value(w.stats, w.effects, w.tier) * wg._family_mult(WG.family_of(w))
-		var got = wg.wv.value(p.stats, p.effects, w.tier)
-		if abs(got - want) > max(3.0, want * 0.15):
-			off += 1
-			print("AUDIT weapon value off %s: want %.1f got %.1f (scale %.2f)" % [id, want, got, p.scale])
-	_check(changed > out.size() / 2, "most weapons got another family's effects (%d)" % changed)
-	_check(cross > 0, "effects cross melee / ranged (%d)" % cross)
-	_check(off <= out.size() / 20, "weapon values match the target (%d off)" % off)
-	print("AUDIT weapons: %d, other family %d, cross-type %d" % [out.size(), changed, cross])
 
 
 func test_40_runtime_gating_and_payloads() -> void:
@@ -2543,185 +2499,41 @@ func test_138_ultimate_chaos() -> void:
 	m.cfg_chaos = false
 
 
-# 深度重组：属性从原版分布抽取、价值按模型守恒；主加成大多是本类型的伤害；类别按词条（必定 / 可能）选取
-func test_141_weapon_deep_reassembly() -> void:
-	var WV = load(MOD_DIR + "aa/weapon_value.gd")
-	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
-	var weapons = m.native_only(isvc.weapons)
+# 混沌：只交换被重组道具的稀有度（图标不变）；与究极混沌互斥（界面上打开一个关闭另一个、配置里同时打开时以究极混沌为准）
+func test_149_tier_chaos() -> void:
 	var cfg = _cfg()
-	cfg.weapons = true
-	cfg.weapon_mode = "deep"
-	for sd in [3, 17]:
-		var wg = WG.new(cfg, sd)
-		var out = wg.generate(weapons)
-		_check(out.size() > 200, "deep: weapons generated (%d)" % out.size())
-		var off = 0
-		var cd_changed = 0
-		var mains = {0: {}, 1: {}}
-		var n_type = {0: 0, 1: 0}
-		var set_count = {}
-		var must_ok = 0
-		var must_all = 0
-		var fams = {}
-		for id in out:
-			var w = isvc.get_element_safe(isvc.weapons, id)
-			var p = out[id]
-			_check(p.stats.damage >= 1, id + " damage >= 1")
-			_eq(WV.is_melee(p.stats), w.type == 0, id + " keeps melee / ranged")
-			if p.stats.cooldown != w.stats.cooldown:
-				cd_changed += 1
-			for e in p.effects:
-				if w.type == 0:
-					_check(not WG.ranged_only(e), id + " melee has no ranged-only effect")
-			var want = wg._want(w, true) * wg._family_mult(WG.family_of(w))
-			var got = wg.wv.value(p.stats, p.effects, w.tier)
-			if abs(got - want) > max(3.0, want * 0.15):
-				off += 1
-			var f = WG.family_of(w)
-			if fams.has(f):
-				continue
-			fams[f] = true
-			n_type[w.type] += 1
-			var main = WV.stat_name(p.stats.scaling_stats[0][0])
-			if not main in WG.DAMAGE_STATS:
-				main = "other"
-			mains[w.type][main] = mains[w.type].get(main, 0) + 1
-			var ids = []
-			for x in p.sets:
-				ids.push_back(x.my_id)
-				set_count[x.my_id] = set_count.get(x.my_id, 0) + 1
-				if w.type == 0:
-					_check(not x.my_id in WG.RANGED_ONLY_SETS, f + " melee is not " + x.my_id)
-				else:
-					_check(not x.my_id in WG.MELEE_ONLY_SETS, f + " ranged is not " + x.my_id)
-			_check(ids.size() >= 1 and ids.size() <= 3, f + " has 1-2 sets (+1 for the minimum rule)")
-			var lowest = 3
-			for x in weapons:
-				if WG.family_of(x) == f:
-					lowest = min(lowest, x.tier)
-			_eq("set_legendary" in ids, lowest == 3, f + " legendary iff only tier IV")
-			# 第一个"必定"类别一定在
-			for t in wg.weapon_tags(w.type, p.stats, p.effects):
-				var must = WG.TAG_SETS.get(t, {}).get("must", [])
-				if not must.empty() and wg._set_ok(must[0], w.type) and lowest < 3:
-					must_all += 1
-					if must[0] in ids:
-						must_ok += 1
-					break
-		_check(off <= out.size() / 20, "deep: values match (%d off)" % off)
-		_check(cd_changed > out.size() / 2, "deep: cooldowns rerolled (%d)" % cd_changed)
-		_check(mains[0].get("stat_melee_damage", 0) >= n_type[0] * 0.7, "deep: melee weapons mostly scale with melee damage %s" % str(mains[0]))
-		_check(mains[1].get("stat_ranged_damage", 0) >= n_type[1] * 0.5, "deep: ranged weapons mostly scale with ranged damage %s" % str(mains[1]))
-		_check(mains[0].get("other", 0) + mains[1].get("other", 0) <= (n_type[0] + n_type[1]) * 0.2, "deep: few weapons without a damage main scaling")
-		_check(must_ok == must_all, "deep: the first required class is always present (%d / %d)" % [must_ok, must_all])
-		for x in wg._sets:
-			if x != "set_legendary":
-				_check(set_count.get(x, 0) >= min(3, wg._set_native_count.get(x, 0)), "deep: set %s has enough families (%d)" % [x, set_count.get(x, 0)])
-		if sd == 3:
-			print("AUDIT deep main scaling melee %s ranged %s" % [str(mains[0]), str(mains[1])])
-			print("AUDIT deep sets %s" % str(set_count))
-
-
-# 引入道具效果：约六成武器家族多一条道具属性行 / 触发条款，各稀有度相同、数值随稀有度增长；相关时是武器的加成属性
-func test_142_weapon_item_effects() -> void:
-	var WV = load(MOD_DIR + "aa/weapon_value.gd")
-	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
-	var weapons = m.native_only(isvc.weapons)
-	for mode in ["effects", "deep"]:
-		var cfg = _cfg()
-		cfg.weapons = true
-		cfg.weapon_mode = mode
-		cfg.w_item_effects = true
-		var g = Generator.new(cfg, 23)
-		g.generate(isvc.items, isvc.characters, [], [])
-		var out = g.generate_weapons(weapons)
-		var fam_lines = {}
-		var related = 0
-		var clauses = 0
-		for id in out:
-			var w = isvc.get_element_safe(isvc.weapons, id)
-			var f = WG.family_of(w)
-			var line = null
-			for e in out[id].effects:
-				if e.has_meta("aa_value"):
-					_check(line == null, id + " at most one item line")
-					line = e
-			if line == null:
-				_check(not fam_lines.has(f) or fam_lines[f] == null, f + " item line on every tier or none")
-				fam_lines[f] = null
-				continue
-			var txt = line.get_text(0, false)
-			_check(txt != "" and txt.find("AA_") == -1, id + " item line text: " + txt)
-			var key = line.trigger + "/" + line.payload if line is TriggerEffect else line.key
-			if fam_lines.has(f):
-				_check(fam_lines[f] != null and fam_lines[f][0] == key, f + " same item line on every tier")
-			if line is TriggerEffect:
-				clauses += 1
-			else:
-				for sc in out[id].stats.scaling_stats:
-					if WV.stat_name(sc[0]) == line.key:
-						related += 1
-						if float(sc[1]) < 0:
-							_check(line.value < 0, id + " negative scaling -> negative related line")
-			fam_lines[f] = [key]
-		var with_line = 0
-		for f in fam_lines:
-			if fam_lines[f] != null:
-				with_line += 1
-		print("AUDIT %s item lines: %d / %d families, related %d, clauses %d" % [mode, with_line, fam_lines.size(), related, clauses])
-		_check(with_line > fam_lines.size() * 0.4 and with_line < fam_lines.size() * 0.8, mode + ": about 60% of families get an item line")
-		_check(related > 0 and clauses > 0, mode + ": related stat lines and clauses both appear")
-
-
-# 允许低级武器：没有低级版本的家族补到 T1（价格递减、合成升级为上一级）；开局注册进商店池，回到菜单移除；读档能找回
-func test_143_low_tier_weapons() -> void:
-	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
-	var natives = m.native_only(isvc.weapons)
-	var low = WG.make_low_tiers(natives)
-	var lowest = {}
-	for w in natives:
-		var f = WG.family_of(w)
-		lowest[f] = min(lowest.get(f, 3), w.tier)
-	var expect = 0
-	for f in lowest:
-		expect += lowest[f]
-	_eq(low.size(), expect, "one new weapon per missing lower tier")
-	for w in low:
-		_eq(w.my_id, w.weapon_id + "_" + str(w.tier + 1), "id pattern " + w.my_id)
-		_check(w.upgrades_into != null and w.upgrades_into.tier == w.tier + 1, w.my_id + " upgrades into the next tier")
-		_check(w.value < w.upgrades_into.value, w.my_id + " cheaper than its upgrade (%d < %d)" % [w.value, w.upgrades_into.value])
-	m.cfg_weapons = true
-	m.cfg_w_low_tiers = true
-	for mode in ["effects", "deep"]:
-		m.cfg_weapon_mode = mode
-		_setup_player("character_well_rounded")
-		m.start_new_run()
-		var sword1 = isvc.get_element_safe(isvc.weapons, "weapon_sword_1")
-		_check(sword1 != null, mode + ": weapon_sword_1 registered")
-		if sword1 == null:
-			continue
-		_check(m.plan.weapons.has("weapon_sword_1"), mode + ": low weapon reassembled")
-		_check(sword1 in isvc._tiers_data[0][0], mode + ": low weapon in the tier I shop pool")
-		var s2 = isvc.get_element_safe(isvc.weapons, "weapon_sword_2")
-		var WV = load(MOD_DIR + "aa/weapon_value.gd")
-		# 各自稀有度下含效果的总价值（低级版本的效果更弱、伤害可能更高）
-		var wv = WV.new()
-		wv.calibrate(m.native_only(isvc.weapons))
-		var p1 = wv.value(sword1.stats, sword1.effects, 0)
-		var p2 = wv.value(s2.stats, s2.effects, 1)
-		_check(p1 < p2, mode + ": tier I weaker than tier II (value %.1f < %.1f)" % [p1, p2])
-		# 存档 / 读档：持有补出的低级武器
-		var _nw = rd.add_weapon(sword1, 0)
-		var saved = JSON.parse(JSON.print(rd.get_state())).result
-		m.on_menu_reset()
-		_check(isvc.get_element_safe(isvc.weapons, "weapon_sword_1") == null, mode + ": removed on menu reset")
-		rd.resume_from_state(saved)
-		var found = false
-		for w in rd.get_player_weapons(0):
-			if w.my_id == "weapon_sword_1":
-				found = true
-		_check(found, mode + ": low weapon survives save / load")
-		m.on_menu_reset()
-	m.cfg_weapons = false
+	cfg.tier_chaos = true
+	var before = {}
+	for it in isvc.items:
+		before[it.my_id] = it.tier
+	var plan = _gen(9, cfg)
+	var moved = 0
+	for id in plan.items:
+		var p = plan.items[id]
+		_check(p.has("tier") and not p.has("icon"), id + " tier changed, icon kept")
+		if int(p.tier) != before[id]:
+			moved += 1
+	_check(moved > plan.items.size() / 2, "most items change tier (%d)" % moved)
+	var ui = load(MOD_DIR + "ui/settings_ui.tscn").instance()
+	tree.root.add_child(ui)
+	ui._on_switch_toggled(true, "cfg_chaos")
+	ui._on_switch_toggled(true, "cfg_tier_chaos")
+	_check(m.cfg_tier_chaos and not m.cfg_chaos, "chaos and ultimate chaos are exclusive")
+	ui._on_switch_toggled(true, "cfg_chaos")
+	_check(m.cfg_chaos and not m.cfg_tier_chaos, "ultimate chaos turns chaos off")
+	ui._on_switch_toggled(true, "cfg_w_chaos")
+	ui._on_switch_toggled(true, "cfg_w_low_tiers")
+	_check(m.cfg_w_low_tiers and not m.cfg_w_chaos, "weapon chaos and lower tiers are exclusive")
+	ui.queue_free()
+	m.apply_settings({"items": true, "chaos": true, "tier_chaos": true, "w_chaos": true, "w_low_tiers": true})
+	_check(m.cfg_chaos and not m.cfg_tier_chaos and m.cfg_w_low_tiers and not m.cfg_w_chaos, "imported settings resolve exclusive options")
+	m.cfg_chaos = false
 	m.cfg_w_low_tiers = false
-	m.cfg_weapon_mode = "effects"
+	# 道具名称：保底形容词"古怪的"不再频繁
+	var odd = 0
+	plan = _gen(9)
+	for id in plan.items:
+		if plan.items[id].adj == "AA_ADJ_ODD":
+			odd += 1
+	print("AUDIT items named 'Odd': %d / %d" % [odd, plan.items.size()])
+	_check(odd < plan.items.size() / 12, "fallback adjective 'Odd' is not frequent (%d)" % odd)
