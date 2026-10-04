@@ -46,8 +46,9 @@ const PRICE_POOL_MIN = 5
 # 不进入价格池的道具：金鱼（23）/ 休息的金鱼（30）的价格远低于同稀有度，会把重组道具的价格拉低
 const PRICE_POOL_EXCLUDED = ["item_goldfish", "item_goldfish_used"]
 # 机制估值修正：来源道具 / 机制 key -> 估值倍率（< 1 = 同样预算给出更高的数值）
-#   从升级中获得的属性 +X%（藤壶）；MultiTool 里评级偏低的特殊机制道具（花园 C、眼罩）
-const MECHANIC_VALUE_MULT = {"level_upgrades_modifications": 0.6, "item_garden": 0.75, "item_eyepatch": 0.8}
+#   从升级中获得的属性 +X%（藤壶）；MultiTool 里评级偏低的特殊机制道具（花园 C、眼罩）；
+#   珍珠（箱子里额外出现这件道具自己：本身价值取决于道具的其他行）
+const MECHANIC_VALUE_MULT = {"level_upgrades_modifications": 0.6, "item_garden": 0.75, "item_eyepatch": 0.8, "item_pearl": 0.5}
 
 # ------------------------------------------------------------
 # 属性：权重（材料 / 点）、每次触发的自然粒度、是否百分比显示、伤害参考值（用于"X% 某属性的伤害"）

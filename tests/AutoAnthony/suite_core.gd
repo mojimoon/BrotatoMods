@@ -2350,3 +2350,28 @@ func test_134_growth_items() -> void:
 		if int(p.get("limit", 0)) > 1 and not p.unique:
 			_eq(_item(id).max_nb, p.limit, id + " limit written to the item")
 	m.on_menu_reset()
+
+
+# 珍珠（箱子里额外出现这件道具自己）必须同时带有其他正面行
+func test_136_pearl_needs_positive_lines() -> void:
+	var n = 0
+	var pct = []
+	for sd in range(1, 41):
+		var plan = _gen(sd)
+		for id in plan.items:
+			var p = plan.items[id]
+			var pearl = null
+			for e in p.effects:
+				if e.custom_key == "extra_item_in_crate" and e.key != "random":
+					pearl = e
+			if pearl == null:
+				continue
+			n += 1
+			pct.push_back(pearl.value)
+			var pos = 0
+			for e in p.effects:
+				if e != pearl and e.value > 0 and e.key != "stat_curse" and not Catalog.is_downside_mechanic(e):
+					pos += 1
+			_check(pos > 0, id + " pearl has another positive line: " + _texts(p.effects))
+	_check(n > 0, "pearl lines appear (%d)" % n)
+	print("AUDIT pearl lines %d, values %s" % [n, str(pct)])

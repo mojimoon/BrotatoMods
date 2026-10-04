@@ -403,7 +403,7 @@ func _generate_mechanic_tag_item(item, tag: String) -> Dictionary:
 	budget -= mv
 	var effects = []
 	var stat = _pick_stat(false, Catalog.SIDE_ONLY_STATS)
-	if budget > 1.0:
+	if budget > 1.0 or _has_self_crate([me]):
 		var cap = _line_cap(stat, false)
 		var v = int(min(_round_to_unit(budget / Catalog.stat_w(stat), stat), cap))
 		effects.push_back(_stat_effect(stat, v))
@@ -1130,10 +1130,11 @@ func _generate_item_once(item, force_special: bool) -> Dictionary:
 
 	# 3) 属性行：行数取自原版同稀有度道具的分布；剩余预算较多时至少补一行
 	var n = int(lines_by_tier[tier][rng.randi() % lines_by_tier[tier].size()])
-	if effects.empty() or budget > max(6.0, budget_total * 0.2):
+	var needs_positive = effects.empty() or _has_self_crate(effects)
+	if needs_positive or budget > max(6.0, budget_total * 0.2):
 		n = max(n, 1)
 	if budget < 2.0:
-		n = 0 if not effects.empty() else 1
+		n = 1 if needs_positive else 0
 	elif n > 0:
 		n = int(clamp(n, 1, max(1, floor(budget / 4.0))))
 	var shares = []
@@ -1351,6 +1352,14 @@ func _mechanic_copy(m: Dictionary, target: float = -1.0, holder_id: String = "")
 	e.set_meta("aa_value", v)
 	e.set_meta("aa_tags", m.get("tags", []))
 	return e
+
+
+# 珍珠（箱子里额外出现这件道具自己）：本身价值取决于道具的其他行，必须同时带有其他正面行
+static func _has_self_crate(effects: Array) -> bool:
+	for e in effects:
+		if e.custom_key == "extra_item_in_crate" and e.key != "random":
+			return true
+	return false
 
 
 # 原版按道具 ID 查找持有者的机制：改写为新持有者；生效后会移除持有者的，在同一行注明
