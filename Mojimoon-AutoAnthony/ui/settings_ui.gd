@@ -611,8 +611,7 @@ func weapon_preview_text(weapon, p: Dictionary) -> String:
 	var names = []
 	for set in w.sets:
 		names.push_back(tr(set.name))
-	var text = "[color=#" + C_TEXT_DIM.to_html(false) + "]" + PoolStringArray(names).join(" / ") + "[/color]
-" + w.get_weapon_stats_text(0)
+	var text = "[color=#" + C_TEXT_DIM.to_html(false) + "]" + PoolStringArray(names).join(" / ") + "[/color]\n" + w.get_weapon_stats_text(0)
 	var fx = w.get_effects_text(0, false)
 	if fx != "":
 		text += "\n" + fx
