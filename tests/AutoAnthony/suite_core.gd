@@ -378,6 +378,8 @@ func test_40_runtime_gating_and_payloads() -> void:
 	rt.fire("consumable", 0)
 	_check(rd.get_player_xp(0) > xp_before, "xp on consumable")
 	rt.on_wave_end()
+	# 实际游戏每波重建运行时：模拟下一波
+	rt._wave_over = false
 	rt.fire("kill", 0)
 	rt.fire("kill", 0)
 	rt.fire("kill", 0)
@@ -736,6 +738,8 @@ func test_88_grant_runtime() -> void:
 	rt._set_state(0, rt.entries[0][2], false)
 	_eq(rd.get_player_effects(0)[bounce], b0, "state grant off")
 	rt.on_wave_end()
+	# 实际游戏每波重建运行时：模拟下一波
+	rt._wave_over = false
 	_eq(rd.get_player_effects(0)[pierce], base, "temp grant reverted at wave end")
 	_eq(rd.get_player_effects(0)[dg], dg0 + 5, "perm grant kept")
 	rt.fire("kill", 0)

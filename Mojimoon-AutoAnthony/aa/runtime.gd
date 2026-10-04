@@ -13,6 +13,8 @@ const AAEnemyBehavior = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/ene
 const FEEDBACK_MAX_RATE = 12.0
 const EXPLOSION_EFFECT_PATH = "res://items/all/rip_and_tear/rip_and_tear_effect_1.tres"
 
+# 本波已结束（运行时每波重建）
+var _wave_over := false
 var main: Node = null
 var mod: Node = null
 # 每个玩家的触发条款列表：[{effect, count, fired, active}]
@@ -93,7 +95,7 @@ func _check_dirty() -> void:
 # chain_depth：延迟发生的事件（爆炸）携带的连锁深度；target：有目标敌人的事件（命中、暴击、点燃）；
 # info：命中事件的附加信息（hp_pct：命中前的生命百分比；first_any / first_stats：对该敌人的首次命中 / 首次某类伤害命中）
 func fire(event: String, player_index: int, pos = null, chain_depth: int = -1, target = null, info = null) -> void:
-	if player_index < 0 or player_index >= RunData.get_player_count():
+	if _wave_over or player_index < 0 or player_index >= RunData.get_player_count():
 		return
 	_check_dirty()
 	var saved_depth = _depth
@@ -183,6 +185,8 @@ func on_player_took_damage(unit, value: int, _knockback, _is_crit: bool, is_dodg
 
 
 func _physics_process(delta: float) -> void:
+	if _wave_over:
+		return
 	_elapsed += delta
 	_count_steps(delta)
 	_poll_time += delta
@@ -533,6 +537,8 @@ func _exit_tree() -> void:
 # 波次结束：清空状态（TempStats 由原版在波末整体重置）；撤销"本波获得"的效果
 func on_wave_end() -> void:
 	_wave_serial += 1
+	# 波次结束后（回收箱子道具、清场期间）不再触发任何条款：每 N 秒、状态、事件
+	_wave_over = true
 	revert_all_grants()
 	for p in entries.size():
 		for en in entries[p]:

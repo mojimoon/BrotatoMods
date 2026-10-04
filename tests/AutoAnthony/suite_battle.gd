@@ -671,3 +671,38 @@ func test_131_fruit_drops_in_battle() -> void:
 	rt.revert_all_grants()
 	rd.remove_item(holder, 0)
 	m.on_menu_reset()
+
+
+# 波次结束后（回收箱子道具、清场期间）"每 N 秒"等条款不再生效
+func test_135_no_triggers_after_wave_end() -> void:
+	m.start_new_run()
+	var holder = _item("item_potato").duplicate()
+	holder.effects = [TriggerEffect.make({"trigger": "interval", "param": 1, "payload": "gold", "value": 1}),
+		TriggerEffect.make({"trigger": "still", "payload": "temp_stat", "stat": "stat_armor", "value": 5})]
+	rd.add_item(holder, 0)
+	rd.current_wave = 1
+	TempStats.reset()
+	var _e = tree.change_scene("res://main.tscn")
+	yield(_wait_frames(10), "completed")
+	var main = tree.current_scene
+	var rt = main.get_node_or_null("AutoAnthonyRuntime") if main != null else null
+	_check(rt != null, "runtime in battle")
+	if rt == null:
+		return
+	main._players[0].disable_hurtbox()
+	main._wave_timer.start(600)
+	var g0 = rd.get_player_gold(0)
+	yield(tree.create_timer(2.5), "timeout")
+	_check(rd.get_player_gold(0) > g0, "interval fires during the wave")
+	# 波次结束：原版 _on_WaveTimer_timeout 里先触发"波次结束时"再结束运行时
+	rt.on_wave_end()
+	TempStats.reset()
+	var g1 = rd.get_player_gold(0)
+	yield(tree.create_timer(2.5), "timeout")
+	_eq(rd.get_player_gold(0), g1, "interval does not fire after the wave ended")
+	_eq(int(TempStats.get_stat(Keys.stat_armor_hash, 0)), 0, "state clauses do not turn on after the wave ended")
+	rt.fire("kill", 0)
+	_eq(rd.get_player_gold(0), g1, "events do not fire after the wave ended")
+	main._cleaning_up = true
+	rd.remove_item(holder, 0)
+	m.on_menu_reset()
