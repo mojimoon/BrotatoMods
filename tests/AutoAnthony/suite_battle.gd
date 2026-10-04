@@ -717,6 +717,7 @@ func test_140_reassembled_weapons_in_battle() -> void:
 func _weapons_battle(mode: String) -> void:
 	m.cfg_weapons = true
 	m.cfg_weapon_mode = mode
+	m.cfg_w_item_effects = mode == "deep"
 	m.start_new_run()
 	var t4 = []
 	for w in isvc.weapons:
@@ -754,3 +755,4 @@ func _weapons_battle(mode: String) -> void:
 	m.on_menu_reset()
 	m.cfg_weapons = false
 	m.cfg_weapon_mode = "effects"
+	m.cfg_w_item_effects = false

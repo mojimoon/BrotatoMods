@@ -342,6 +342,9 @@ static func _player_stat_value(effects: Array) -> float:
 
 # 效果的材料价值（不含计入 power 的部分）
 func effect_value(e) -> float:
+	# 本 mod 加上的道具效果（引入道具效果）：生成时记下的价值
+	if e.has_meta("aa_value"):
+		return float(e.get_meta("aa_value"))
 	if is_modeled(e):
 		return 0.0
 	if is_plain_player_stat(e):

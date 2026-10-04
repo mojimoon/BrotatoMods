@@ -9,6 +9,8 @@ extends Reference
 
 const Catalog = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/catalog.gd")
 const WeaponValue = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/weapon_value.gd")
+const TriggerEffect = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/trigger_effect.gd")
+const Valuation = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/valuation.gd")
 
 # 绑定在武器场景 / 家族上的效果：只留在原家族（不给别的武器，也不从原家族拿走）
 #   电击枪 / 鱼叉枪的区域减速由投射物场景实现（效果只是说明文字）；磁轨炮的未受伤加成只在它的场景脚本里生效；
@@ -29,11 +31,14 @@ var rng := RandomNumberGenerator.new()
 var wv = WeaponValue.new()
 var families: Dictionary = {}	# weapon_id -> {type, tiers: {tier: WeaponData}}
 var fam_names: Array = []
+# 道具生成器（引入道具效果时用它的属性 / 条款生成；为 null 时不引入）
+var gen = null
 
 
-func _init(p_cfg: Dictionary, p_seed: int) -> void:
+func _init(p_cfg: Dictionary, p_seed: int, p_gen = null) -> void:
 	cfg = p_cfg
 	seed_value = p_seed
+	gen = p_gen
 
 
 static func family_of(w) -> String:
@@ -124,6 +129,7 @@ func generate_effects_only() -> Dictionary:
 # 把来源家族的效果放到目标家族各稀有度上，缩放伤害使价值达标；任一稀有度无法达标返回 {}
 func _apply_donor(f: String, target: Dictionary, donor: Dictionary, mult: float, force := false) -> Dictionary:
 	var out = {}
+	var spec = _item_spec(f, _closest_tier(target.tiers, 0).stats.scaling_stats)
 	for tier in target.tiers:
 		var tw = target.tiers[tier]
 		var dw = _closest_tier(donor.tiers, tier)
@@ -141,6 +147,9 @@ func _apply_donor(f: String, target: Dictionary, donor: Dictionary, mult: float,
 				return {}
 			effects.push_back(_adapt(e.duplicate(), tw))
 		var want = wv.value(tw.stats, tw.effects, tier) * mult
+		var line = _item_effect(spec, tier, want)
+		if line != null:
+			effects.push_back(line)
 		var r = _solve_scale(tw.stats, effects, tier, want)
 		if not force and (r < MIN_SCALE or r > MAX_SCALE):
 			return {}
@@ -348,6 +357,7 @@ func _deep_family(fam: Dictionary, mult: float, force := false) -> Dictionary:
 	if rng.randf() < SECOND_EFFECT_CHANCE:
 		donors.push_back(families[fam_names[rng.randi() % fam_names.size()]])
 	var out = {}
+	var spec = _item_spec(family_of(lo), bp.scaling_stats)
 	var tiers = fam.tiers.keys()
 	tiers.sort()
 	for tier in tiers:
@@ -369,6 +379,9 @@ func _deep_family(fam: Dictionary, mult: float, force := false) -> Dictionary:
 		st.scaling_stats = bp.scaling_stats.duplicate(true)
 		st.cooldown = int(max(2, round(bp.cooldown * pow(TIER_COOLDOWN_MULT, tier - lo.tier))))
 		var want = wv.value(tw.stats, tw.effects, tier) * mult
+		var line = _item_effect(spec, tier, want)
+		if line != null:
+			effects.push_back(line)
 		var r = _solve_scale(st, effects, tier, want)
 		if not force and (r < MIN_SCALE or r > MAX_SCALE):
 			return {}
@@ -473,3 +486,61 @@ func _ensure_set_minimum(fam_sets: Dictionary) -> void:
 				break
 			fam_sets[c[1]] = fam_sets[c[1]] + [_sets[id]]
 			have += 1
+
+
+# ============================================================
+# 引入道具效果：每个家族至多一条道具的属性行或触发条款（各稀有度相同，数值随稀有度的价值增长）
+# ============================================================
+# 拿到道具效果的家族比例
+const ITEM_LINE_CHANCE = 0.6
+# 道具效果与武器本身相关的概率：武器加成属性的属性行（狼牙棒吃 -攻速 加成 -> -攻速）
+const ITEM_RELATED_CHANCE = 0.4
+# 道具效果占武器价值的比例
+const ITEM_LINE_SHARE = 0.25
+# 不相关时属性行 / 触发条款各半
+const ITEM_CLAUSE_CHANCE = 0.5
+
+
+# 家族的道具效果规格：{kind: stat / clause, stat, neg, clause}；不加时为 {}
+func _item_spec(f: String, scaling: Array) -> Dictionary:
+	if gen == null or not cfg.get("w_item_effects", false):
+		return {}
+	rng.seed = hash(str(seed_value) + "/witem/" + f)
+	if rng.randf() >= ITEM_LINE_CHANCE:
+		return {}
+	if rng.randf() < ITEM_RELATED_CHANCE and scaling.size() > 0:
+		var x = scaling[rng.randi() % scaling.size()]
+		var st = WeaponValue.stat_name(x[0])
+		if Catalog.STATS.has(st):
+			return {"kind": "stat", "stat": st, "neg": float(x[1]) < 0, "related": true}
+	gen.rng.seed = hash(str(seed_value) + "/witemgen/" + f)
+	gen.cur_tier = 0
+	if rng.randf() < ITEM_CLAUSE_CHANCE:
+		var c = gen.gen_clause(6.0, Catalog.PERM_MULT[0], false)
+		gen.cur_tier = -1
+		if not c.empty():
+			return {"kind": "clause", "clause": c, "base": abs(Valuation.clause_value(c, Catalog.PERM_MULT[0]))}
+	var st = gen._pick_stat(false, Catalog.SIDE_ONLY_STATS)
+	gen.cur_tier = -1
+	return {"kind": "stat", "stat": st, "neg": false, "related": false}
+
+
+# 规格在某稀有度上的效果：价值 = 武器价值 × ITEM_LINE_SHARE
+func _item_effect(spec: Dictionary, tier: int, weapon_value: float):
+	if spec.empty():
+		return null
+	var budget = max(1.0, weapon_value * ITEM_LINE_SHARE)
+	if spec.kind == "stat":
+		var st: String = spec.stat
+		var v = gen._round_to_unit(budget / Catalog.stat_w(st), st)
+		v = int(min(v, gen._line_cap(st, false)))
+		var e = gen._stat_effect(st, -v if spec.neg else v)
+		# 负系数相关的属性行（狼牙棒的 -攻速）：对这把武器是好处、对其他武器是代价，不计价值
+		e.set_meta("aa_value", 0.0 if spec.neg else v * Catalog.stat_w(st))
+		return e
+	var c: Dictionary = spec.clause.duplicate(true)
+	var perm = Catalog.PERM_MULT[tier]
+	c.value = int(max(1, round(float(c.value) * budget / max(0.1, float(spec.base)))))
+	var te = TriggerEffect.make(c)
+	te.set_meta("aa_value", abs(Valuation.clause_value(c, perm)))
+	return te

@@ -2584,3 +2584,54 @@ func test_141_weapon_deep_reassembly() -> void:
 		if sd == 3:
 			print("AUDIT deep primaries %s" % str(primaries))
 			print("AUDIT deep sets %s" % str(set_count))
+
+
+# 引入道具效果：约六成武器家族多一条道具属性行 / 触发条款，各稀有度相同、数值随稀有度增长；相关时是武器的加成属性
+func test_142_weapon_item_effects() -> void:
+	var WV = load(MOD_DIR + "aa/weapon_value.gd")
+	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
+	var weapons = m.native_only(isvc.weapons)
+	for mode in ["effects", "deep"]:
+		var cfg = _cfg()
+		cfg.weapons = true
+		cfg.weapon_mode = mode
+		cfg.w_item_effects = true
+		var g = Generator.new(cfg, 23)
+		g.generate(isvc.items, isvc.characters, [], [])
+		var out = g.generate_weapons(weapons)
+		var fam_lines = {}
+		var related = 0
+		var clauses = 0
+		for id in out:
+			var w = isvc.get_element_safe(isvc.weapons, id)
+			var f = WG.family_of(w)
+			var line = null
+			for e in out[id].effects:
+				if e.has_meta("aa_value"):
+					_check(line == null, id + " at most one item line")
+					line = e
+			if line == null:
+				_check(not fam_lines.has(f) or fam_lines[f] == null, f + " item line on every tier or none")
+				fam_lines[f] = null
+				continue
+			var txt = line.get_text(0, false)
+			_check(txt != "" and txt.find("AA_") == -1, id + " item line text: " + txt)
+			var key = line.trigger + "/" + line.payload if line is TriggerEffect else line.key
+			if fam_lines.has(f):
+				_check(fam_lines[f] != null and fam_lines[f][0] == key, f + " same item line on every tier")
+			if line is TriggerEffect:
+				clauses += 1
+			else:
+				for sc in out[id].stats.scaling_stats:
+					if WV.stat_name(sc[0]) == line.key:
+						related += 1
+						if float(sc[1]) < 0:
+							_check(line.value < 0, id + " negative scaling -> negative related line")
+			fam_lines[f] = [key]
+		var with_line = 0
+		for f in fam_lines:
+			if fam_lines[f] != null:
+				with_line += 1
+		print("AUDIT %s item lines: %d / %d families, related %d, clauses %d" % [mode, with_line, fam_lines.size(), related, clauses])
+		_check(with_line > fam_lines.size() * 0.4 and with_line < fam_lines.size() * 0.8, mode + ": about 60% of families get an item line")
+		_check(related > 0 and clauses > 0, mode + ": related stat lines and clauses both appear")

@@ -2902,7 +2902,7 @@ func char_line_value(e) -> float:
 # 武器：见 weapon_gen.gd
 # ============================================================
 func generate_weapons(weapons: Array) -> Dictionary:
-	return WeaponGen.new(cfg, seed_value).generate(weapons)
+	return WeaponGen.new(cfg, seed_value, self).generate(weapons)
 
 
 # ============================================================
