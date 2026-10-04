@@ -2505,6 +2505,23 @@ func test_138_ultimate_chaos() -> void:
 		if it.tier != before[it.my_id][0] or it.icon != before[it.my_id][1]:
 			untouched = false
 	_check(untouched, "preview leaves resources unchanged")
+	# 预览界面按新稀有度分页、显示新图标
+	m.cfg_chaos = true
+	var ui = load(MOD_DIR + "ui/settings_ui.tscn").instance()
+	tree.root.add_child(ui)
+	var pplan = m.preview_plan(9)
+	var shown_moved = 0
+	for t in 4:
+		for it in ui._preview_entries(pplan, t):
+			_eq(int(pplan.items[it.my_id].tier), t, it.my_id + " previewed under its new tier")
+			if t != it.tier:
+				shown_moved += 1
+	_check(shown_moved > 0, "preview shows items under changed tiers (%d)" % shown_moved)
+	var card = ui._item_card(ui._preview_entries(pplan, 0)[0], pplan.items[ui._preview_entries(pplan, 0)[0].my_id], 400)
+	_check(card.get_child(0).get_child(0).texture == pplan.items[ui._preview_entries(pplan, 0)[0].my_id].icon, "preview card uses the new icon")
+	card.free()
+	ui.queue_free()
+	m.cfg_chaos = false
 	# 开局：资源与商店分档池使用新稀有度；回到菜单还原
 	m.cfg_chaos = true
 	_setup_player("character_well_rounded")
@@ -2523,7 +2540,7 @@ func test_138_ultimate_chaos() -> void:
 	m.cfg_chaos = false
 
 
-# 深度重组：属性从原版分布抽取、价值按模型守恒；大部分武器只有主属性；每个类别都有足够的武器
+# 深度重组：属性从原版分布抽取、价值按模型守恒；主加成大多是本类型的伤害；类别按词条（必定 / 可能）选取
 func test_141_weapon_deep_reassembly() -> void:
 	var WV = load(MOD_DIR + "aa/weapon_value.gd")
 	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
@@ -2537,22 +2554,19 @@ func test_141_weapon_deep_reassembly() -> void:
 		_check(out.size() > 200, "deep: weapons generated (%d)" % out.size())
 		var off = 0
 		var cd_changed = 0
-		var one_scaling = 0
-		var primaries = {}
+		var mains = {0: {}, 1: {}}
+		var n_type = {0: 0, 1: 0}
 		var set_count = {}
+		var must_ok = 0
+		var must_all = 0
 		var fams = {}
 		for id in out:
 			var w = isvc.get_element_safe(isvc.weapons, id)
 			var p = out[id]
 			_check(p.stats.damage >= 1, id + " damage >= 1")
 			_eq(WV.is_melee(p.stats), w.type == 0, id + " keeps melee / ranged")
-			_check(p.sets.size() >= 1 and p.sets.size() <= 2 + 1, id + " has 1-2 sets (+1 for the minimum rule)")
 			if p.stats.cooldown != w.stats.cooldown:
 				cd_changed += 1
-			if p.stats.scaling_stats.size() == 1:
-				one_scaling += 1
-			var pr = WV.stat_name(p.stats.scaling_stats[0][0])
-			primaries[pr] = primaries.get(pr, 0) + 1
 			for e in p.effects:
 				if w.type == 0:
 					_check(not WG.ranged_only(e), id + " melee has no ranged-only effect")
@@ -2561,28 +2575,47 @@ func test_141_weapon_deep_reassembly() -> void:
 			if abs(got - want) > max(3.0, want * 0.15):
 				off += 1
 			var f = WG.family_of(w)
-			if not fams.has(f):
-				fams[f] = true
-				for s in p.sets:
-					set_count[s.my_id] = set_count.get(s.my_id, 0) + 1
-				var legendary = false
-				for s in p.sets:
-					if s.my_id == "set_legendary":
-						legendary = true
-				var lowest = 3
-				for x in weapons:
-					if WG.family_of(x) == f:
-						lowest = min(lowest, x.tier)
-				_eq(legendary, lowest == 3, f + " legendary iff only tier IV")
+			if fams.has(f):
+				continue
+			fams[f] = true
+			n_type[w.type] += 1
+			var main = WV.stat_name(p.stats.scaling_stats[0][0])
+			if not main in WG.DAMAGE_STATS:
+				main = "other"
+			mains[w.type][main] = mains[w.type].get(main, 0) + 1
+			var ids = []
+			for x in p.sets:
+				ids.push_back(x.my_id)
+				set_count[x.my_id] = set_count.get(x.my_id, 0) + 1
+				if w.type == 0:
+					_check(not x.my_id in WG.RANGED_ONLY_SETS, f + " melee is not " + x.my_id)
+				else:
+					_check(not x.my_id in WG.MELEE_ONLY_SETS, f + " ranged is not " + x.my_id)
+			_check(ids.size() >= 1 and ids.size() <= 3, f + " has 1-2 sets (+1 for the minimum rule)")
+			var lowest = 3
+			for x in weapons:
+				if WG.family_of(x) == f:
+					lowest = min(lowest, x.tier)
+			_eq("set_legendary" in ids, lowest == 3, f + " legendary iff only tier IV")
+			# 第一个"必定"类别一定在
+			for t in wg.weapon_tags(w.type, p.stats, p.effects):
+				var must = WG.TAG_SETS.get(t, {}).get("must", [])
+				if not must.empty() and wg._set_ok(must[0], w.type) and lowest < 3:
+					must_all += 1
+					if must[0] in ids:
+						must_ok += 1
+					break
 		_check(off <= out.size() / 20, "deep: values match (%d off)" % off)
 		_check(cd_changed > out.size() / 2, "deep: cooldowns rerolled (%d)" % cd_changed)
-		_check(one_scaling > out.size() / 2, "deep: most weapons scale with one stat (%d)" % one_scaling)
-		_check(primaries.size() >= 8, "deep: varied primary stats (%d)" % primaries.size())
-		for s in wg._sets:
-			if s != "set_legendary":
-				_check(set_count.get(s, 0) >= min(3, wg._set_native_count.get(s, 0)), "deep: set %s has enough families (%d)" % [s, set_count.get(s, 0)])
+		_check(mains[0].get("stat_melee_damage", 0) >= n_type[0] * 0.7, "deep: melee weapons mostly scale with melee damage %s" % str(mains[0]))
+		_check(mains[1].get("stat_ranged_damage", 0) >= n_type[1] * 0.5, "deep: ranged weapons mostly scale with ranged damage %s" % str(mains[1]))
+		_check(mains[0].get("other", 0) + mains[1].get("other", 0) <= (n_type[0] + n_type[1]) * 0.2, "deep: few weapons without a damage main scaling")
+		_check(must_ok == must_all, "deep: the first required class is always present (%d / %d)" % [must_ok, must_all])
+		for x in wg._sets:
+			if x != "set_legendary":
+				_check(set_count.get(x, 0) >= min(3, wg._set_native_count.get(x, 0)), "deep: set %s has enough families (%d)" % [x, set_count.get(x, 0)])
 		if sd == 3:
-			print("AUDIT deep primaries %s" % str(primaries))
+			print("AUDIT deep main scaling melee %s ranged %s" % [str(mains[0]), str(mains[1])])
 			print("AUDIT deep sets %s" % str(set_count))
 
 
@@ -2668,7 +2701,7 @@ func test_143_low_tier_weapons() -> void:
 		_check(sword1 in isvc._tiers_data[0][0], mode + ": low weapon in the tier I shop pool")
 		var s2 = isvc.get_element_safe(isvc.weapons, "weapon_sword_2")
 		var WV = load(MOD_DIR + "aa/weapon_value.gd")
-		_check(WV.power(sword1.stats, sword1.effects) < WV.power(s2.stats, s2.effects), mode + ": tier I weaker than tier II")
+		_check(WV.power(sword1.stats, sword1.effects, 0) < WV.power(s2.stats, s2.effects, 1), mode + ": tier I weaker than tier II")
 		# 存档 / 读档：持有补出的低级武器
 		var _nw = rd.add_weapon(sword1, 0)
 		var saved = JSON.parse(JSON.print(rd.get_state())).result

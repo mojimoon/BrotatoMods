@@ -172,6 +172,14 @@ func _reset() -> void:
 	m.cfg_all_char_effects = false
 	m.cfg_more_double = false
 	m.cfg_rename = true
+	m.cfg_force_items = false
+	m.cfg_chaos = false
+	m.cfg_weapon_mode = "effects"
+	m.cfg_w_item_effects = false
+	m.cfg_w_low_tiers = false
+	m.cfg_w_any_start = false
+	m.cfg_w_avg = 100
+	m.cfg_w_variance = 100
 	m.cfg_native_ratio = 0
 	m.cfg_fixed_seed = true
 	m.cfg_seed = 42

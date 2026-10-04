@@ -32,11 +32,11 @@ const C_ACCENT_2 = Color(0.40, 0.72, 1.0)
 const C_ACCENT_3 = Color(0.55, 0.85, 0.55)
 const C_DANGER = Color(0.92, 0.38, 0.44)
 
-# 页签：[页 id, 名称 key, 总开关配置字段]
+# 页签：[页 id, 名称 key, 总开关配置字段, 颜色（绿 / 蓝 / 黄，与下方三栏标题的颜色对应）]
 const PAGES = [
-	["items", "AA_UI_ITEMS", "cfg_items"],
-	["weapons", "AA_UI_TAB_WEAPONS", "cfg_weapons"],
-	["characters", "AA_UI_TAB_CHARACTERS", "cfg_characters"],
+	["items", "AA_UI_ITEMS", "cfg_items", Color(0.55, 0.85, 0.55)],
+	["weapons", "AA_UI_TAB_WEAPONS", "cfg_weapons", Color(0.40, 0.72, 1.0)],
+	["characters", "AA_UI_TAB_CHARACTERS", "cfg_characters", Color(1.0, 0.72, 0.30)],
 ]
 # [配置字段, 名称 key, 说明 key, 反向显示]
 const EFFECT_SWITCHES = [
@@ -198,25 +198,25 @@ func _build_header(root: Control) -> void:
 	header.add_child(close_btn)
 
 
-# | 重组道具 [开关] | 重组武器 [开关] | 重组角色 [开关] |
+# | 重组道具 [开关] | 重组武器 [开关] | 重组角色 [开关] |：整个页签可点击，选中时用本页颜色
 func _build_tabs(root: Control) -> void:
 	var tabs = HBoxContainer.new()
 	tabs.add_constant_override("separation", 10)
 	root.add_child(tabs)
-	var group = ButtonGroup.new()
 	for d in PAGES:
-		var chip = PanelContainer.new()
-		chip.add_stylebox_override("panel", _style(C_BG_CARD, C_BORDER, 8, 1, 6, 2))
-		tabs.add_child(chip)
+		var tab = PanelContainer.new()
+		tab.mouse_filter = Control.MOUSE_FILTER_STOP
+		tab.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		tab.connect("gui_input", self, "_on_tab_input", [d[0]])
+		tabs.add_child(tab)
 		var row = HBoxContainer.new()
-		row.add_constant_override("separation", 2)
-		chip.add_child(row)
-		var btn = _button(tr(d[1]), FONT_NORMAL)
-		btn.toggle_mode = true
-		btn.group = group
-		btn.connect("pressed", self, "_on_page_pressed", [d[0]])
-		row.add_child(btn)
-		_tab_buttons[d[0]] = btn
+		row.add_constant_override("separation", 8)
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tab.add_child(row)
+		var lbl = _label(tr(d[1]), FONT_NORMAL, C_TEXT_DIM)
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(lbl)
+		_tab_buttons[d[0]] = [tab, lbl, d[3]]
 		var sw = _switch("", _mod.get(d[2]))
 		sw.connect("toggled", self, "_on_switch_toggled", [d[2]])
 		row.add_child(sw)
@@ -372,8 +372,10 @@ func _refresh_all() -> void:
 		_page_switches[d[0]].pressed = _mod.get(d[2])
 		_pages[d[0]].visible = d[0] == _page
 		_pages[d[0]].modulate.a = 1.0 if _mod.enabled and _mod.get(d[2]) else 0.45
-		_tab_buttons[d[0]].pressed = d[0] == _page
-		_apply_chip_style(_tab_buttons[d[0]], d[0] == _page, C_ACCENT)
+		var tb = _tab_buttons[d[0]]
+		var on = d[0] == _page
+		tb[0].add_stylebox_override("panel", _style(tb[2].darkened(0.62) if on else C_BG_CHIP, tb[2] if on else C_BORDER, 8, 2 if on else 1, 14, 4))
+		tb[1].add_color_override("font_color", tb[2] if on else C_TEXT_DIM)
 
 
 func _refresh_tier_buttons(kind: String) -> void:
@@ -392,6 +394,11 @@ func _refresh_tier_buttons(kind: String) -> void:
 func _on_enable_toggled(pressed: bool) -> void:
 	_mod.enabled = pressed
 	_refresh_all()
+
+
+func _on_tab_input(event: InputEvent, id: String) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == BUTTON_LEFT:
+		_on_page_pressed(id)
 
 
 func _on_page_pressed(id: String) -> void:
@@ -512,7 +519,8 @@ func _preview_entries(plan: Dictionary, tier: int, kind: String = "items") -> Ar
 	var source = ItemService.weapons + plan.get("low_weapons", []) if kind == "weapons" else ItemService.items
 	var gen: Dictionary = plan.weapons if kind == "weapons" else plan.items
 	for res in source:
-		if (tier < 0 or res.tier == tier) and gen.has(res.my_id):
+		# 究极混沌：按生成结果中的新稀有度分页
+		if gen.has(res.my_id) and (tier < 0 or int(gen[res.my_id].get("tier", res.tier)) == tier):
 			entries.push_back(res)
 	entries.sort_custom(self, "_sort_by_tier_id")
 	return entries
@@ -575,8 +583,8 @@ func _card_text(col: Control, bbcode: String) -> void:
 
 
 func _item_card(item, p: Dictionary, width: float) -> Control:
-	var color = ItemService.get_color_from_tier(item.tier)
-	var col = _card_shell(item.icon, color, width)
+	var color = ItemService.get_color_from_tier(int(p.get("tier", item.tier)))
+	var col = _card_shell(p.get("icon", item.icon), color, width)
 	var price = str(_item_price(item, p))
 	if p.get("unique", false):
 		price = tr("AA_UI_UNIQUE") + "  " + price
@@ -624,7 +632,7 @@ func build_preview_text(p_seed: int) -> String:
 	var text = ""
 	for item in _preview_entries(plan, -1):
 		var p = plan.items[item.my_id]
-		var color = ItemService.get_color_from_tier(item.tier).to_html(false)
+		var color = ItemService.get_color_from_tier(int(p.get("tier", item.tier))).to_html(false)
 		text += "[color=#" + color + "]" + _item_name(item, p) + "[/color]  [color=#" + C_TEXT_DIM.to_html(false) + "]" + str(_item_price(item, p)) + "[/color]\n"
 		for e in p.effects:
 			var line = e.get_text(0)

@@ -39,8 +39,8 @@ var cfg_w_any_start: bool = false	# 任意初始武器
 var cfg_w_avg: int = 100			# 武器平均数值 50–250%
 var cfg_w_variance: int = 100		# 武器浮动范围 50–250%
 var cfg_avg: int = 100				# 平均数值 50–250%
-var cfg_variance: int = 125			# 浮动范围 50–250%（100% = 原版离散度）
-var cfg_triggers: int = 150			# 触发效果 50–250%（100% = 原版特殊行比例）
+var cfg_variance: int = 100			# 浮动范围 50–250%（100% = 原版离散度）
+var cfg_triggers: int = 125			# 触发效果 50–250%（100% = 原版特殊行比例）
 var cfg_native_ratio: int = 0		# 保留原版道具 0–100%
 var cfg_fixed_seed: bool = false
 var cfg_seed: int = 0
@@ -217,8 +217,8 @@ func apply_settings(d: Dictionary) -> void:
 	cfg_w_avg = int(clamp(int(d.get("w_avg", 100)), 50, 250))
 	cfg_w_variance = int(clamp(int(d.get("w_variance", 100)), 50, 250))
 	cfg_avg = int(clamp(int(d.get("avg", 100)), 50, 250))
-	cfg_variance = int(clamp(int(d.get("variance", 125)), 50, 250))
-	cfg_triggers = int(clamp(int(d.get("triggers", 150)), 50, 250))
+	cfg_variance = int(clamp(int(d.get("variance", 100)), 50, 250))
+	cfg_triggers = int(clamp(int(d.get("triggers", 125)), 50, 250))
 	cfg_native_ratio = int(clamp(int(d.get("native_ratio", 0)), 0, 100))
 	cfg_fixed_seed = bool(d.get("fixed_seed", false))
 	cfg_seed = int(d.get("seed", 0))

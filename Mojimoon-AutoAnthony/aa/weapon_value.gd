@@ -4,7 +4,7 @@ extends Reference
 #
 # 冷却按 codex 攻速计算器（AttackSpeedCalculator / codexStore.js）移植：攻速 0、6 把武器、范围 0，
 #   取实际攻击间隔的平均帧数（含后坐 / 近战出招收招的补间帧、6 武器的随机冷却抖动、换弹折算到每发）。
-# 每次攻击的伤害 = 基础伤害 + Σ 加成系数 × 参考属性（catalog.STATS.ref，例如 15 近战伤害、40 最大生命）；
+# 每次攻击的伤害 = 基础伤害 + Σ 加成系数 × 参考属性（REF_STATS：终局属性 × 稀有度比例）；
 #   负系数（狼牙棒的 -攻速加成）不计入。
 # power = 每次伤害 × 暴击期望 × 射程系数 × 多发 × (1 + 贯穿 / 弹跳的额外命中) / 冷却 + 吸血折算
 #   + 可建模的效果（爆炸、点燃、命中时射出投射物）。
@@ -39,8 +39,19 @@ const EFFECT_VALUE_FLOOR = 0.15
 const SUB_PROJ_EFF = 0.7
 # 吸血：每秒 1 点回复折算的 DPS
 const HEAL_DPS = 8.0
-# catalog.STATS 里没有参考值的加成属性
-const REF_EXTRA = {"stat_curse": 20.0, "stat_levels": 10.0}
+# 武器加成用的参考属性（终局，用于衡量 T4 武器）。
+# 大部分角色围绕近战 / 远程 / 元素伤害构筑，这些属性按一般角色的终局值；
+# 其他属性只有少数角色会走（企业家的收获、工程师的工程、生物的诅咒……），按专精角色的终局值估值：
+# 以它为加成的武器对专精角色公平、对其他角色偏弱（同原版镰刀的收获加成），而不是用高基础伤害补偿到对谁都强；
+# 生成时这些属性也很少作为主加成（weapon_gen.MAIN_SCALING）
+const REF_STATS = {
+	"stat_melee_damage": 60.0, "stat_ranged_damage": 30.0, "stat_elemental_damage": 30.0, "stat_percent_damage": 70.0,
+	"stat_attack_speed": 80.0, "stat_max_hp": 100.0, "stat_lifesteal": 12.0, "stat_armor": 16.0, "stat_levels": 25.0,
+	"stat_hp_regeneration": 30.0, "stat_crit_chance": 60.0, "stat_engineering": 60.0, "stat_range": 400.0,
+	"stat_dodge": 60.0, "stat_speed": 40.0, "stat_luck": 60.0, "stat_harvesting": 300.0, "stat_curse": 100.0,
+}
+# 各稀有度武器对应的属性阶段（T4 = 终局）
+const TIER_STAT_FRAC = [0.3, 0.5, 0.75, 1.0]
 
 # 可建模（计入 power）的效果脚本 id
 const MODELED_EFFECTS = ["weapon_exploding", "weapon_burning", "weapon_projectiles_on_hit"]
@@ -100,17 +111,15 @@ static func stat_name(s) -> String:
 	return Keys.hash_to_string.get(s, "")
 
 
-static func stat_ref(stat: String) -> float:
-	if Catalog.STATS.has(stat) and float(Catalog.STATS[stat].get("ref", 0.0)) > 0.0:
-		return float(Catalog.STATS[stat].ref)
-	return float(REF_EXTRA.get(stat, 10.0))
+static func stat_ref(stat: String, tier: int = 3) -> float:
+	return float(REF_STATS.get(stat, 10.0)) * TIER_STAT_FRAC[clamp(tier, 0, 3)]
 
 
 # 每次命中的伤害（参考属性下）
-static func hit_damage(damage: float, scaling_stats: Array) -> float:
+static func hit_damage(damage: float, scaling_stats: Array, tier: int = 3) -> float:
 	var d = damage
 	for sc in scaling_stats:
-		d += max(0.0, float(sc[1])) * stat_ref(stat_name(sc[0]))
+		d += max(0.0, float(sc[1])) * stat_ref(stat_name(sc[0]), tier)
 	return d
 
 
@@ -154,9 +163,9 @@ static func effect_id(e) -> String:
 
 
 # 等效 DPS（参考状态）；effects 中可建模的效果计入
-static func power(st, effects: Array) -> float:
+static func power(st, effects: Array, tier: int = 3) -> float:
 	var cd = max(0.05, cooldown_seconds(st))
-	var hit = hit_damage(float(st.damage), st.scaling_stats)
+	var hit = hit_damage(float(st.damage), st.scaling_stats, tier)
 	var per_hit = overkill(hit * crit_factor(st)) * range_factor(st)
 	var hits = hits_per_attack(st)
 	var mult = 1.0
@@ -173,11 +182,11 @@ static func power(st, effects: Array) -> float:
 				var bd = e.burning_data
 				if bd != null:
 					var targets = min(hits * float(bd.duration) / cd, BURN_TARGETS * hits)
-					extra += float(bd.chance) * hit_damage(float(bd.damage), bd.scaling_stats) * targets * BURN_EFF
+					extra += float(bd.chance) * hit_damage(float(bd.damage), bd.scaling_stats, tier) * targets * BURN_EFF
 			"weapon_projectiles_on_hit":
 				var ws = e.weapon_stats
 				if ws != null:
-					var sub = hit_damage(float(ws.damage), ws.scaling_stats) * crit_factor(ws)
+					var sub = hit_damage(float(ws.damage), ws.scaling_stats, tier) * crit_factor(ws)
 					if ws.can_bounce:
 						sub *= 1.0 + _extra_hits(int(ws.bounce), float(ws.bounce_dmg_reduction))
 					extra += float(e.value) * sub * SUB_PROJ_EFF * hits / cd
@@ -274,7 +283,7 @@ func calibrate(weapons: Array) -> void:
 				pure = false
 		if not pure:
 			continue
-		var p = power(w.stats, w.effects)
+		var p = power(w.stats, w.effects, w.tier)
 		var stat_v = _player_stat_value(w.effects)
 		var key = _tk(w.stats, w.tier)
 		if not ratios.has(key):
@@ -303,7 +312,7 @@ func calibrate(weapons: Array) -> void:
 				others.push_back(e)
 		if others.empty():
 			continue
-		var r = float(w.value) - k(w.stats, w.tier) * power(w.stats, w.effects) - _player_stat_value(w.effects)
+		var r = float(w.value) - k(w.stats, w.tier) * power(w.stats, w.effects, w.tier) - _player_stat_value(w.effects)
 		for e in others:
 			var mg = magnitude(e)
 			if abs(mg) < 0.0001:
@@ -354,7 +363,7 @@ func effect_value(e) -> float:
 
 # 武器的材料价值
 func value(st, effects: Array, tier: int) -> float:
-	var v = k(st, tier) * power(st, effects)
+	var v = k(st, tier) * power(st, effects, tier)
 	for e in effects:
 		v += effect_value(e)
 	return v
