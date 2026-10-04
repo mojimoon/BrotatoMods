@@ -350,9 +350,48 @@ func on_resume(state: Dictionary) -> void:
 
 
 func preview_plan(p_seed: int) -> Dictionary:
-	var gen = Generator.new(get_cfg(), p_seed)
+	var cfg = get_cfg()
+	var gen = Generator.new(cfg, p_seed)
 	var isvc = _autoload("ItemService")
-	return gen.generate(native_only(isvc.items), native_only(isvc.characters), [], native_only(isvc.weapons))
+	var low = _low_tier_weapons(cfg, isvc)
+	var p = gen.generate(native_only(isvc.items), native_only(isvc.characters), [], native_only(isvc.weapons) + low)
+	p["low_weapons"] = low
+	return p
+
+
+# 允许低级武器：补出的低级武器（未注册）
+func _low_tier_weapons(cfg: Dictionary, isvc) -> Array:
+	if not bool(cfg.get("weapons", false)) or not bool(cfg.get("w_low_tiers", false)):
+		return []
+	return Generator.WeaponGen.make_low_tiers(native_only(isvc.weapons))
+
+
+# 注册补出的低级武器（商店、合成、存档按 ID 查找）；restore() 时移除
+var _low_weapons: Array = []
+
+
+func register_low_weapons(cfg: Dictionary) -> void:
+	var isvc = _autoload("ItemService")
+	if isvc == null or not _low_weapons.empty():
+		return
+	_low_weapons = _low_tier_weapons(cfg, isvc)
+	for w in _low_weapons:
+		isvc.weapons.push_back(w)
+
+
+func _unregister_low_weapons() -> void:
+	var isvc = _autoload("ItemService")
+	if isvc != null:
+		for w in _low_weapons:
+			isvc.weapons.erase(w)
+	_low_weapons = []
+
+
+# 读档前：存档里的补出低级武器要能按 ID 找到
+func pre_resume(state: Dictionary) -> void:
+	var aa = state.get("aa_state", null)
+	if aa is Dictionary and aa.get("cfg") is Dictionary:
+		register_low_weapons(aa.cfg)
 
 
 func _activate(state: Dictionary) -> void:
@@ -384,7 +423,8 @@ func _activate(state: Dictionary) -> void:
 				for sem in gen.ban_reasons(it.effects):
 					if not sem in ch.wanted_tags and not sem in gen.player_ban_sems:
 						gen.player_ban_sems.push_back(sem)
-	plan = gen.generate(native_only(isvc.items), native_only(isvc.characters), native_only(chars), native_only(isvc.weapons))
+	register_low_weapons(state.cfg)
+	plan = gen.generate(native_only(isvc.items), native_only(isvc.characters), native_only(chars), native_only(isvc.weapons) + _low_weapons)
 	_gen = gen
 	var rename = bool(state.cfg.get("rename", true))
 	for id in plan.items:
@@ -429,7 +469,7 @@ func _activate(state: Dictionary) -> void:
 				res.sets = pw.sets
 	_rebuild_groups_and_bans(isvc)
 	# 商店的分档池在本局开始时（RunData.reset）已按原稀有度建好：稀有度改变后重建
-	if bool(state.cfg.get("chaos", false)) and isvc.has_method("init_unlocked_pool"):
+	if (bool(state.cfg.get("chaos", false)) or not _low_weapons.empty()) and isvc.has_method("init_unlocked_pool"):
 		isvc.init_unlocked_pool()
 	triggers_dirty = true
 	ModLoaderLog.info("Activated seed %d: %d items, %d characters, %d weapons" % [int(state.seed), plan.items.size(), plan.characters.size(), plan.weapons.size()], MOD_ID)
@@ -575,6 +615,7 @@ func restore() -> void:
 			res.tier = b.tier
 			res.icon = b.icon
 	_backups.clear()
+	_unregister_low_weapons()
 	if _groups_backup != null:
 		var isvc = _autoload("ItemService")
 		if isvc != null:

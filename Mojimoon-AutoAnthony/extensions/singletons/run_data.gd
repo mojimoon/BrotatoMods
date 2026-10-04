@@ -31,6 +31,9 @@ func get_state() -> Dictionary:
 
 
 func resume_from_state(state: Dictionary) -> void:
+	var m0 = AAMain.get_mod()
+	if m0 != null:
+		m0.pre_resume(state)
 	.resume_from_state(state)
 	var m = AAMain.get_mod()
 	if m != null:

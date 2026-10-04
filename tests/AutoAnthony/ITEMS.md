@@ -83,7 +83,7 @@
 | T2 | 沉重的布雷机器人 | 48 | +4 近战伤害<br>敌袭开始时获得13个材料 | stat_melee_damage, economy |  |
 | T2 | 蛮力篝火 | 45 | +4 近战伤害<br>每17秒-1%闪避，直至敌袭结束。每波最大值：-30 | stat_melee_damage | 核心 |
 | T2 | 生机猫特林机枪 | 50 | +4 生命再生<br>处于最大生命值时元素伤害的修改增加45%<br>敌袭结束后+5%敌人生命值 | stat_hp_regeneration, stat_elemental_damage |  |
-| T2 | 滑溜的大锅 | 45 | +14 %闪避<br>使用枪械类武器时+2贯通<br>每损失10%生命值，有-1护甲[-3] | stat_dodge, stat_ranged_damage |  |
+| T2 | 滑溜的大锅 | 45 | +14 %闪避<br>使用枪械类武器时+2贯通<br>每损失10%生命值，有-1护甲[+0] | stat_dodge, stat_ranged_damage |  |
 | T2 | 奇异的芹菜茶 | 40 | 使用消耗品恢复+3HP<br>使用中世纪类武器时+55%伤害<br>-13 幸运 | consumable, stat_percent_damage |  |
 | T2 | 镀层机械黄蜂 | 55 | +4 护甲<br>敌袭结束后+3%敌人伤害 | stat_armor |  |
 | T2 | 古怪的齿轮 | 40 | +2 %闪避<br>+14%贯通伤害，不会高于基础伤害<br>-4 %伤害 | stat_dodge |  |
@@ -221,7 +221,7 @@
 | T4 | 急切的Grind的魔法绿叶 | 90 | +9 最大生命值<br>命中生命值高于50%的敌人时，有45%概率获得1个材料<br>-65 范围 | stat_max_hp, economy |  |
 | T4 | 耐心的重型子弹 | 100 | +32 幸运<br>敌袭结束时永久获得“最大生命值的修改增加10%”<br>-26 %伤害 | stat_luck, stat_max_hp |  |
 | T4 | 古怪的沙漏 | 100 | +2 最大生命值<br>+2 护甲<br>每秒回复5生命值，但无法通过其他途径恢复生命值。 | stat_max_hp, stat_armor |  |
-| T4 | 锐利的喷气背包 | 110 | +30 %伤害<br>目前每一个存活的敌人+1 %伤害[+4]<br>每秒受到1伤害（不给予无敌时间） | stat_percent_damage |  |
+| T4 | 锐利的喷气背包 | 110 | +30 %伤害<br>目前每一个存活的敌人+1 %伤害[+0]<br>每秒受到1伤害（不给予无敌时间） | stat_percent_damage |  |
 | T4 | 善变的克拉肯的眼睛 | 100 | +3 护甲<br>+2 %攻击速度<br>刷新商店时，永久获得“每150材料会+1%速度 [+0]”（每波最多3次）<br>+15 诅咒<br>下场敌袭以1点生命值开始 | stat_armor, stat_attack_speed, economy, stat_speed, stat_curse |  |
 | T4 | 精炼的灯笼 | 110 | +3 近战伤害<br>+3 生命再生<br>最大生命值的修改增加20%<br>移动时-5生命再生 | stat_melee_damage, stat_hp_regeneration, stat_max_hp |  |
 | T4 | 灵巧的幸运硬币 | 110 | +13 %闪避<br>+1 武器栏<br>-15 %伤害 | stat_dodge |  |

@@ -2635,3 +2635,52 @@ func test_142_weapon_item_effects() -> void:
 		print("AUDIT %s item lines: %d / %d families, related %d, clauses %d" % [mode, with_line, fam_lines.size(), related, clauses])
 		_check(with_line > fam_lines.size() * 0.4 and with_line < fam_lines.size() * 0.8, mode + ": about 60% of families get an item line")
 		_check(related > 0 and clauses > 0, mode + ": related stat lines and clauses both appear")
+
+
+# 允许低级武器：没有低级版本的家族补到 T1（价格递减、合成升级为上一级）；开局注册进商店池，回到菜单移除；读档能找回
+func test_143_low_tier_weapons() -> void:
+	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
+	var natives = m.native_only(isvc.weapons)
+	var low = WG.make_low_tiers(natives)
+	var lowest = {}
+	for w in natives:
+		var f = WG.family_of(w)
+		lowest[f] = min(lowest.get(f, 3), w.tier)
+	var expect = 0
+	for f in lowest:
+		expect += lowest[f]
+	_eq(low.size(), expect, "one new weapon per missing lower tier")
+	for w in low:
+		_eq(w.my_id, w.weapon_id + "_" + str(w.tier + 1), "id pattern " + w.my_id)
+		_check(w.upgrades_into != null and w.upgrades_into.tier == w.tier + 1, w.my_id + " upgrades into the next tier")
+		_check(w.value < w.upgrades_into.value, w.my_id + " cheaper than its upgrade (%d < %d)" % [w.value, w.upgrades_into.value])
+	m.cfg_weapons = true
+	m.cfg_w_low_tiers = true
+	for mode in ["effects", "deep"]:
+		m.cfg_weapon_mode = mode
+		_setup_player("character_well_rounded")
+		m.start_new_run()
+		var sword1 = isvc.get_element_safe(isvc.weapons, "weapon_sword_1")
+		_check(sword1 != null, mode + ": weapon_sword_1 registered")
+		if sword1 == null:
+			continue
+		_check(m.plan.weapons.has("weapon_sword_1"), mode + ": low weapon reassembled")
+		_check(sword1 in isvc._tiers_data[0][0], mode + ": low weapon in the tier I shop pool")
+		var s2 = isvc.get_element_safe(isvc.weapons, "weapon_sword_2")
+		var WV = load(MOD_DIR + "aa/weapon_value.gd")
+		_check(WV.power(sword1.stats, sword1.effects) < WV.power(s2.stats, s2.effects), mode + ": tier I weaker than tier II")
+		# 存档 / 读档：持有补出的低级武器
+		var _nw = rd.add_weapon(sword1, 0)
+		var saved = JSON.parse(JSON.print(rd.get_state())).result
+		m.on_menu_reset()
+		_check(isvc.get_element_safe(isvc.weapons, "weapon_sword_1") == null, mode + ": removed on menu reset")
+		rd.resume_from_state(saved)
+		var found = false
+		for w in rd.get_player_weapons(0):
+			if w.my_id == "weapon_sword_1":
+				found = true
+		_check(found, mode + ": low weapon survives save / load")
+		m.on_menu_reset()
+	m.cfg_weapons = false
+	m.cfg_w_low_tiers = false
+	m.cfg_weapon_mode = "effects"

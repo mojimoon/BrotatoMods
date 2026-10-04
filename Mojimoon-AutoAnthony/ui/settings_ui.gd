@@ -509,7 +509,7 @@ func _fill_preview(kind: String) -> void:
 
 func _preview_entries(plan: Dictionary, tier: int, kind: String = "items") -> Array:
 	var entries = []
-	var source = ItemService.weapons if kind == "weapons" else ItemService.items
+	var source = ItemService.weapons + plan.get("low_weapons", []) if kind == "weapons" else ItemService.items
 	var gen: Dictionary = plan.weapons if kind == "weapons" else plan.items
 	for res in source:
 		if (tier < 0 or res.tier == tier) and gen.has(res.my_id):

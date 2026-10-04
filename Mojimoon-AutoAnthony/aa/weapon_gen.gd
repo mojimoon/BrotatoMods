@@ -60,7 +60,11 @@ static func ranged_only(e) -> bool:
 
 
 func generate(weapons: Array) -> Dictionary:
-	wv.calibrate(weapons)
+	var natives = []
+	for w in weapons:
+		if not w.has_meta("aa_low_of"):
+			natives.push_back(w)
+	wv.calibrate(natives)
 	families = {}
 	for w in weapons:
 		if w.stats == null:
@@ -146,7 +150,7 @@ func _apply_donor(f: String, target: Dictionary, donor: Dictionary, mult: float,
 					continue
 				return {}
 			effects.push_back(_adapt(e.duplicate(), tw))
-		var want = wv.value(tw.stats, tw.effects, tier) * mult
+		var want = _want(tw) * mult
 		var line = _item_effect(spec, tier, want)
 		if line != null:
 			effects.push_back(line)
@@ -378,7 +382,7 @@ func _deep_family(fam: Dictionary, mult: float, force := false) -> Dictionary:
 		var st = bp.duplicate()
 		st.scaling_stats = bp.scaling_stats.duplicate(true)
 		st.cooldown = int(max(2, round(bp.cooldown * pow(TIER_COOLDOWN_MULT, tier - lo.tier))))
-		var want = wv.value(tw.stats, tw.effects, tier) * mult
+		var want = _want(tw) * mult
 		var line = _item_effect(spec, tier, want)
 		if line != null:
 			effects.push_back(line)
@@ -544,3 +548,61 @@ func _item_effect(spec: Dictionary, tier: int, weapon_value: float):
 	var te = TriggerEffect.make(c)
 	te.set_meta("aa_value", abs(Valuation.clause_value(c, perm)))
 	return te
+
+
+# 武器的目标价值（未乘浮动）：原版武器按模型估值；补出的低级武器 = 原最低级的价值 × 价格比例
+func _want(w) -> float:
+	if w.has_meta("aa_low_of"):
+		var base = w.get_meta("aa_low_of")
+		return wv.value(base.stats, base.effects, base.tier) * float(w.value) / max(1.0, float(base.value))
+	return wv.value(w.stats, w.effects, w.tier)
+
+
+# ============================================================
+# 允许低级武器：没有低级版本的武器家族补到 T1。新武器复制最低级的原版武器（图标、场景、类别），
+# 价格按原版同类型武器相邻稀有度的价格比例（中位数）递减，合成后升级为上一级；属性由重组按价值重新解出
+# ============================================================
+static func make_low_tiers(weapons: Array) -> Array:
+	var fams = {}
+	for w in weapons:
+		if w.stats == null or w.has_meta("aa_low_of"):
+			continue
+		var f = family_of(w)
+		if not fams.has(f):
+			fams[f] = {}
+		fams[f][w.tier] = w
+	# 相邻稀有度价格比例（低 / 高），按类型取中位数
+	var ratios = {0: [[], [], []], 1: [[], [], []]}
+	for f in fams:
+		for t in 3:
+			if fams[f].has(t) and fams[f].has(t + 1):
+				var lo = fams[f][t]
+				ratios[lo.type][t].push_back(float(lo.value) / max(1.0, float(fams[f][t + 1].value)))
+	var out = []
+	var names = fams.keys()
+	names.sort()
+	for f in names:
+		var tiers: Dictionary = fams[f]
+		var t0 = 3
+		for t in tiers:
+			t0 = min(t0, t)
+		var base = tiers[t0]
+		var next = base
+		var price = float(base.value)
+		for t in range(t0 - 1, -1, -1):
+			var arr: Array = ratios[base.type][t]
+			arr.sort()
+			price *= arr[arr.size() / 2] if not arr.empty() else 0.5
+			var w = base.duplicate()
+			w.my_id = base.weapon_id + "_" + str(t + 1)
+			w.my_id_hash = Keys.generate_hash(w.my_id)
+			w.weapon_id_hash = Keys.generate_hash(base.weapon_id)
+			w.tier = t
+			w.value = int(max(1, round(price)))
+			w.stats = base.stats.duplicate()
+			w.effects = base.effects.duplicate()
+			w.upgrades_into = next
+			w.set_meta("aa_low_of", base)
+			out.push_back(w)
+			next = w
+	return out
