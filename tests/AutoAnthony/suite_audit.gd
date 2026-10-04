@@ -620,3 +620,44 @@ func _dist(a: Array) -> String:
 	var s = a.duplicate()
 	s.sort()
 	return "%d [%d-%d] (%d)" % [s[s.size() / 2], s[0], s.back(), s.size()]
+
+
+# 武器价值模型：原版武器的 模型价值 / 价格 拟合（按类型、稀有度），以及各效果 key 的单位价值
+func test_139_weapon_value_model() -> void:
+	var WV = load(MOD_DIR + "aa/weapon_value.gd")
+	var wv = WV.new()
+	var weapons = m.native_only(isvc.weapons)
+	wv.calibrate(weapons)
+	print("AUDIT weapon k (price / power): " + str(wv.k_by))
+	var keys = wv.unit_by_key.keys()
+	keys.sort()
+	for key in keys:
+		print("AUDIT   unit %s = %.2f" % [key, wv.unit_by_key[key]])
+	var sx = 0.0
+	var sy = 0.0
+	var sxx = 0.0
+	var syy = 0.0
+	var sxy = 0.0
+	var n = 0
+	var worst = []
+	for row in wv.fit_rows:
+		var x = log(max(1.0, row[2]))
+		var y = log(max(1.0, row[1]))
+		sx += x
+		sy += y
+		sxx += x * x
+		syy += y * y
+		sxy += x * y
+		n += 1
+		worst.push_back([abs(x - y), row[0].my_id, row[1], row[2], WV.cooldown_seconds(row[0].stats), WV.power(row[0].stats, row[0].effects)])
+	var r = (n * sxy - sx * sy) / sqrt(max(0.0001, (n * sxx - sx * sx) * (n * syy - sy * sy)))
+	print("AUDIT weapon value fit: n %d, r^2 %.3f (log value vs log price)" % [n, r * r])
+	worst.sort_custom(self, "_sort_first_desc")
+	for i in min(15, worst.size()):
+		var w = worst[i]
+		print("AUDIT   off %s: price %d, model %.0f, cd %.2fs, power %.1f" % [w[1], w[2], w[3], w[4], w[5]])
+	_check(r * r > 0.8, "weapon value model explains native prices (r^2 %.3f)" % (r * r))
+
+
+func _sort_first_desc(a, b) -> bool:
+	return a[0] > b[0]
