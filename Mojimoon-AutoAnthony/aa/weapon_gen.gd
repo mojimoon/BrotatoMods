@@ -78,10 +78,6 @@ func generate(weapons: Array) -> Dictionary:
 	for key in vp:
 		vp[key].sort()
 		_vp[key] = vp[key][vp[key].size() / 2]
-	# 武器混沌：生成期间资源上的稀有度与价格临时改为平移后的值，生成后还原，由 mod_main 写入
-	var shifted = []
-	if cfg.get("w_chaos", false) and not cfg.get("w_low_tiers", false):
-		shifted = _weapon_chaos(natives)
 	families = {}
 	for w in weapons:
 		if w.stats == null:
@@ -94,74 +90,6 @@ func generate(weapons: Array) -> Dictionary:
 	fam_names.sort()
 	var out = generate_deep() if str(cfg.get("weapon_mode", "effects")) == "deep" else generate_effects_only()
 	_name_families(out)
-	for w in shifted:
-		if out.has(w.my_id):
-			out[w.my_id]["tier"] = w.tier
-			out[w.my_id]["price"] = int(w.value)
-		var orig = w.get_meta("aa_chaos")
-		w.tier = orig[0]
-		w.value = orig[1]
-		w.remove_meta("aa_chaos")
-	return out
-
-
-# 武器混沌：每个武器家族的稀有度整体随机平移（保持逐级升级；T1–T4 齐全的家族不动），价格按相邻稀有度的价格比例换算
-func _weapon_chaos(natives: Array) -> Array:
-	var fams = {}
-	for w in natives:
-		if w.stats == null:
-			continue
-		var f = family_of(w)
-		if not fams.has(f):
-			fams[f] = []
-		fams[f].push_back(w)
-	var ratios = price_ratios(natives)
-	var names = fams.keys()
-	names.sort()
-	rng.seed = hash(str(seed_value) + "/wchaos")
-	_shuffle(names)
-	# 各稀有度的武器数量保持 T1 ≤ T2 ≤ T3 ≤ T4（原版即如此）：家族按随机顺序尝试平移，会破坏这一点的平移不采用
-	var counts = [0, 0, 0, 0]
-	for w in natives:
-		if w.stats != null:
-			counts[w.tier] += 1
-	var out = []
-	for f in names:
-		var lo = 3
-		var hi = 0
-		for w in fams[f]:
-			lo = min(lo, w.tier)
-			hi = max(hi, w.tier)
-		var opts = []
-		for o in range(-lo, 3 - hi + 1):
-			if o != 0:
-				opts.push_back(o)
-		_shuffle(opts)
-		var off = 0
-		for o in opts:
-			var c = counts.duplicate()
-			for w in fams[f]:
-				c[w.tier] -= 1
-				c[w.tier + o] += 1
-			if c[0] <= c[1] + CHAOS_SLACK and c[1] <= c[2] + CHAOS_SLACK and c[2] <= c[3] + CHAOS_SLACK:
-				off = o
-				counts = c
-				break
-		if off == 0:
-			continue
-		for w in fams[f]:
-			w.set_meta("aa_chaos", [w.tier, w.value])
-			var price = float(w.value)
-			var t = w.tier
-			while t > w.tier + off:
-				price *= ratios[w.type][t - 1]
-				t -= 1
-			while t < w.tier + off:
-				price /= ratios[w.type][t]
-				t += 1
-			w.tier += off
-			w.value = int(max(1, round(price)))
-			out.push_back(w)
 	return out
 
 
@@ -422,11 +350,9 @@ const FX_SHARE_CAP = 0.4
 const MAIN_STEP_CAP = 1.15
 # 单次伤害（含暴击）不宜超过该阶段参考敌人生命的倍数
 const HIT_CAP = 3.0
-const KB_CAP = {0: 10, 1: 5}
+const KB_CAP = {0: 15, 1: 8}
 # 非传奇 T4 武器的目标价值倍率（原版 T4 相对价格偏强）
 const T4_VALUE_MULT = 0.85
-# 武器混沌：相邻稀有度的数量允许倒挂的最大差值（大致逐级增加即可）
-const CHAOS_SLACK = 3
 # 基础伤害下限（按稀有度；多发武器按发数开方折算）：1 点基础伤害前期没有战斗力，宁可降低加成与攻速也要保证。
 # 点燃敌人的武器、以收获为加成的武器（原版掌、火炬、魔杖）不受限
 const BASE_DMG_MIN = [3.0, 5.0, 7.0, 10.0]
@@ -709,7 +635,7 @@ func _deep_family(fam: Dictionary, mult: float, stats: Array) -> Dictionary:
 	bp.crit_damage = b.crit_damage
 	b = _pick_base(ty).stats
 	bp.max_range = b.max_range
-	# 击退：原版大多很小（中位数 2），远程常为 0；截到近战 10 / 远程 5（太高把怪打飞往往是负面作用），不计入价值
+	# 击退：原版大多很小（中位数 2），远程常为 0；截到近战 15 / 远程 8（原版拳、双管霰弹枪）（太高把怪打飞往往是负面作用），不计入价值
 	bp.knockback = int(min(b.knockback, KB_CAP[ty]))
 	bp.lifesteal = _pick_base(ty).stats.lifesteal
 	if ty == 0:
@@ -1168,16 +1094,16 @@ var _vp: Dictionary = {}
 
 func _want(w, by_price := false) -> float:
 	# 会碎裂的武器（砖头）：低价来自"用完就换"，强度按原版模型估值，不按价格
-	if by_price and not w.has_meta("aa_low_of") and not w.has_meta("aa_chaos"):
+	if by_price and not w.has_meta("aa_low_of"):
 		for e in w.effects:
 			if WeaponValue.effect_key(e) == "break_on_hit":
 				return wv.value(w.stats, w.effects, w.tier)
-	if by_price or w.has_meta("aa_low_of") or w.has_meta("aa_chaos"):
+	if by_price or w.has_meta("aa_low_of"):
 		var v = float(w.value) * float(_vp.get(str(w.type) + "/" + str(w.tier), 1.0))
 		if w.tier == 3 and not (wv.legendary_families.has(family_of(w)) and not w.has_meta("aa_low_of")):
 			v *= T4_VALUE_MULT
 		# 传奇武器（只有 T4 的原版武器）普遍超模、程度不等：取模型价值与按价格换算值的几何平均（链枪约 ×2，大镰刀因代价基本不变）
-		if not w.has_meta("aa_low_of") and not w.has_meta("aa_chaos") and wv.legendary_families.has(family_of(w)):
+		if not w.has_meta("aa_low_of") and wv.legendary_families.has(family_of(w)):
 			v = sqrt(v * max(1.0, wv.value(w.stats, w.effects, w.tier)))
 		return v
 	var mv = wv.value(w.stats, w.effects, w.tier)

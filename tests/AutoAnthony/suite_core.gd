@@ -2521,13 +2521,10 @@ func test_149_tier_chaos() -> void:
 	_check(m.cfg_tier_chaos and not m.cfg_chaos, "chaos and ultimate chaos are exclusive")
 	ui._on_switch_toggled(true, "cfg_chaos")
 	_check(m.cfg_chaos and not m.cfg_tier_chaos, "ultimate chaos turns chaos off")
-	ui._on_switch_toggled(true, "cfg_w_chaos")
-	ui._on_switch_toggled(true, "cfg_w_low_tiers")
-	_check(m.cfg_w_low_tiers and not m.cfg_w_chaos, "weapon chaos and lower tiers are exclusive")
 	ui.queue_free()
-	m.apply_settings({"items": true, "chaos": true, "tier_chaos": true, "w_chaos": true, "w_low_tiers": true})
-	# 两个都开时保留先列出的（混沌、补全低级武器）
-	_check(m.cfg_tier_chaos and not m.cfg_chaos and m.cfg_w_low_tiers and not m.cfg_w_chaos, "imported settings resolve exclusive options")
+	m.apply_settings({"items": true, "chaos": true, "tier_chaos": true})
+	# 两个都开时保留先列出的（混沌）
+	_check(m.cfg_tier_chaos and not m.cfg_chaos, "imported settings resolve exclusive options")
 	m.cfg_tier_chaos = false
 	m.cfg_w_low_tiers = false
 	# 道具名称：保底形容词"古怪的"不再频繁

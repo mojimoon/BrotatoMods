@@ -182,7 +182,6 @@ func _reset() -> void:
 	m.cfg_w_variance = 100
 	m.cfg_w_effects = 125
 	m.cfg_tier_chaos = false
-	m.cfg_w_chaos = false
 	m.cfg_w_rename = true
 	m.cfg_native_ratio = 0
 	m.cfg_fixed_seed = true

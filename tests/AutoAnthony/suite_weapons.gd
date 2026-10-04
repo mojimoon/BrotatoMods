@@ -558,47 +558,31 @@ func test_148_legendary_values() -> void:
 		print("AUDIT legendary %s price %d model %.0f power %.0f %s" % [id, w.value, wv.value(w.stats, w.effects, 3), WV.power(w.stats, w.effects, 3), fx])
 
 
-# 武器混沌：家族的稀有度整体平移（保持逐级升级，T1–T4 齐全的家族不动），价格按相邻稀有度比例换算；开局写入、回到菜单还原
-func test_150_weapon_chaos_and_names() -> void:
-	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
+# 武器名称：每个家族一个特性形容词（各稀有度相同、形容词多样），回到菜单还原；"保留原名"时不改名
+func test_150_weapon_names() -> void:
 	m.cfg_weapons = true
-	m.cfg_w_chaos = true
 	for mode in ["effects", "deep"]:
 		m.cfg_weapon_mode = mode
 		var before = {}
 		for w in isvc.weapons:
-			before[w.my_id] = [w.tier, w.value, w.name]
+			before[w.my_id] = w.name
 		_setup_player("character_well_rounded")
 		m.start_new_run()
-		var shifted = 0
 		var adjs = {}
 		for w in isvc.weapons:
 			if not m.plan.weapons.has(w.my_id):
 				continue
 			var p = m.plan.weapons[w.my_id]
-			if p.has("tier"):
-				shifted += 1
-				_eq(w.tier, int(p.tier), w.my_id + " live tier")
-			if w.upgrades_into != null and m.plan.weapons.has(w.upgrades_into.my_id):
-				_eq(w.upgrades_into.tier, w.tier + 1, w.my_id + " still upgrades one tier up")
-				_check(w.upgrades_into.value > w.value, w.my_id + " cheaper than its upgrade")
-			_check(p.has("adj") and w.name != before[w.my_id][2], w.my_id + " renamed")
+			_check(p.has("adj") and w.name != before[w.my_id], w.my_id + " renamed")
 			adjs[p.adj] = adjs.get(p.adj, 0) + 1
-		_check(shifted > 15, mode + ": weapons shifted (%d)" % shifted)
-		var cnt = [0, 0, 0, 0]
-		for w in isvc.weapons:
-			if m.plan.weapons.has(w.my_id):
-				cnt[w.tier] += 1
-		_check(cnt[0] <= cnt[1] + WG.CHAOS_SLACK and cnt[1] <= cnt[2] + WG.CHAOS_SLACK and cnt[2] <= cnt[3] + WG.CHAOS_SLACK, mode + ": weapon counts still grow by tier %s" % str(cnt))
 		_check(adjs.size() >= 15, mode + ": varied weapon adjectives (%d)" % adjs.size())
 		print("AUDIT %s weapon adjectives %s" % [mode, str(adjs)])
 		m.on_menu_reset()
 		var restored = true
 		for w in isvc.weapons:
-			if before.has(w.my_id) and (w.tier != before[w.my_id][0] or w.value != before[w.my_id][1] or w.name != before[w.my_id][2]):
+			if before.has(w.my_id) and w.name != before[w.my_id]:
 				restored = false
-		_check(restored, mode + ": tiers, prices and names restored")
-	# 保留原名
+		_check(restored, mode + ": names restored")
 	m.cfg_w_rename = false
 	var sword = isvc.get_element_safe(isvc.weapons, "weapon_sword_2")
 	var native_name = sword.name
@@ -606,7 +590,6 @@ func test_150_weapon_chaos_and_names() -> void:
 	_eq(sword.name, native_name, "keep original weapon names")
 	m.on_menu_reset()
 	m.cfg_w_rename = true
-	m.cfg_w_chaos = false
 	m.cfg_weapons = false
 	m.cfg_weapon_mode = "effects"
 

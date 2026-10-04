@@ -37,7 +37,6 @@ var cfg_weapon_mode: String = "deep"	# effects = 仅重组效果；deep = 深度
 var cfg_w_item_effects: bool = true	# 引入道具效果
 var cfg_w_low_tiers: bool = false	# 允许低级武器
 var cfg_w_any_start: bool = true	# 任意初始武器
-var cfg_w_chaos: bool = false		# 武器混沌：武器家族的稀有度整体随机平移（与补全低级武器互斥）
 var cfg_w_rename: bool = true		# 武器重组名称（界面上显示为相反的"保留原名"）
 var cfg_w_avg: int = 100			# 武器平均数值 50–250%
 var cfg_w_variance: int = 100		# 武器浮动范围 50–250%
@@ -158,7 +157,6 @@ func get_cfg() -> Dictionary:
 		"force_items": cfg_force_items,
 		"chaos": cfg_chaos and not cfg_tier_chaos,
 		"tier_chaos": cfg_tier_chaos,
-		"w_chaos": cfg_w_chaos and not cfg_w_low_tiers,
 		"w_rename": cfg_w_rename,
 		"weapon_mode": cfg_weapon_mode,
 		"w_item_effects": cfg_w_item_effects,
@@ -219,7 +217,6 @@ func apply_settings(d: Dictionary) -> void:
 	cfg_force_items = bool(d.get("force_items", false))
 	cfg_tier_chaos = bool(d.get("tier_chaos", false))
 	cfg_chaos = bool(d.get("chaos", false)) and not cfg_tier_chaos
-	cfg_w_chaos = bool(d.get("w_chaos", false)) and not bool(d.get("w_low_tiers", false))
 	cfg_w_rename = bool(d.get("w_rename", true))
 	cfg_weapon_mode = "effects" if str(d.get("weapon_mode", "deep")) == "effects" else "deep"
 	cfg_w_item_effects = bool(d.get("w_item_effects", true))
@@ -555,17 +552,13 @@ func _activate(state: Dictionary) -> void:
 			res.effects = pw.effects
 			if w_rename and pw.has("adj"):
 				res.name = _compose_name(pw.adj, _backups[res.get_instance_id()].name)
-			# 武器混沌：新稀有度与价格
-			if pw.has("tier"):
-				res.tier = int(pw.tier)
-				res.value = int(pw.price)
 			if pw.has("stats"):
 				res.stats = pw.stats
 			if pw.has("sets"):
 				res.sets = pw.sets
 	_rebuild_groups_and_bans(isvc)
 	# 商店的分档池在本局开始时（RunData.reset）已按原稀有度建好：稀有度改变后重建
-	if (bool(state.cfg.get("chaos", false)) or bool(state.cfg.get("tier_chaos", false)) or bool(state.cfg.get("w_chaos", false)) or not _low_weapons.empty()) and isvc.has_method("init_unlocked_pool"):
+	if (bool(state.cfg.get("chaos", false)) or bool(state.cfg.get("tier_chaos", false)) or not _low_weapons.empty()) and isvc.has_method("init_unlocked_pool"):
 		isvc.init_unlocked_pool()
 	triggers_dirty = true
 	ModLoaderLog.info("Activated seed %d: %d items, %d characters, %d weapons" % [int(state.seed), plan.items.size(), plan.characters.size(), plan.weapons.size()], MOD_ID)

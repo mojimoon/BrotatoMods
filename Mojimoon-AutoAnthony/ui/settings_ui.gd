@@ -63,13 +63,11 @@ const WEAPON_EFFECT_SWITCHES = [
 const WEAPON_SWITCHES = [
 	["cfg_w_rename", "AA_UI_KEEP_NAMES", "AA_UI_W_KEEP_NAMES_DESC", true],
 	["cfg_w_low_tiers", "AA_UI_W_LOW_TIERS", "AA_UI_W_LOW_TIERS_DESC"],
-	["cfg_w_chaos", "AA_UI_W_CHAOS", "AA_UI_W_CHAOS_DESC"],
 	["cfg_w_any_start", "AA_UI_W_ANY_START", "AA_UI_W_ANY_START_DESC"],
 ]
 # 互斥的开关：打开一个时关闭另一个
 const EXCLUSIVE = {
-	"cfg_chaos": "cfg_tier_chaos", "cfg_tier_chaos": "cfg_chaos",
-	"cfg_w_low_tiers": "cfg_w_chaos", "cfg_w_chaos": "cfg_w_low_tiers",
+	"cfg_chaos": "cfg_tier_chaos", "cfg_tier_chaos": "cfg_chaos"
 }
 # [配置字段, 名称 key, 最小, 最大, 步长, 说明 key]
 const SLIDERS = [
