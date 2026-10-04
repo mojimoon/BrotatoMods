@@ -33,14 +33,15 @@ var cfg_force_items: bool = false	# 强制重组 (BETA)：锚定道具（商店�
 var cfg_chaos: bool = false			# 究极混沌：重组道具的稀有度与图标随机
 var cfg_tier_chaos: bool = false	# 混沌：重组道具的稀有度随机（与究极混沌互斥）
 # 重组武器
-var cfg_weapon_mode: String = "effects"	# effects = 仅重组效果；deep = 深度重组
-var cfg_w_item_effects: bool = false	# 引入道具效果
+var cfg_weapon_mode: String = "deep"	# effects = 仅重组效果；deep = 深度重组
+var cfg_w_item_effects: bool = true	# 引入道具效果
 var cfg_w_low_tiers: bool = false	# 允许低级武器
-var cfg_w_any_start: bool = false	# 任意初始武器
+var cfg_w_any_start: bool = true	# 任意初始武器
 var cfg_w_chaos: bool = false		# 武器混沌：武器家族的稀有度整体随机平移（与补全低级武器互斥）
 var cfg_w_rename: bool = true		# 武器重组名称（界面上显示为相反的"保留原名"）
 var cfg_w_avg: int = 100			# 武器平均数值 50–250%
 var cfg_w_variance: int = 100		# 武器浮动范围 50–250%
+var cfg_w_effects: int = 125		# 武器额外效果 50–250%（100% ≈ 原版有效果的武器比例与条数）
 var cfg_avg: int = 100				# 平均数值 50–250%
 var cfg_variance: int = 100			# 浮动范围 50–250%（100% = 原版离散度）
 var cfg_triggers: int = 125			# 触发效果 50–250%（100% = 原版特殊行比例）
@@ -165,6 +166,7 @@ func get_cfg() -> Dictionary:
 		"w_any_start": cfg_w_any_start,
 		"w_avg": cfg_w_avg,
 		"w_variance": cfg_w_variance,
+		"w_effects": cfg_w_effects,
 		"avg": cfg_avg,
 		"variance": cfg_variance,
 		"triggers": cfg_triggers,
@@ -219,12 +221,13 @@ func apply_settings(d: Dictionary) -> void:
 	cfg_chaos = bool(d.get("chaos", false)) and not cfg_tier_chaos
 	cfg_w_chaos = bool(d.get("w_chaos", false)) and not bool(d.get("w_low_tiers", false))
 	cfg_w_rename = bool(d.get("w_rename", true))
-	cfg_weapon_mode = "deep" if str(d.get("weapon_mode", "effects")) == "deep" else "effects"
-	cfg_w_item_effects = bool(d.get("w_item_effects", false))
+	cfg_weapon_mode = "effects" if str(d.get("weapon_mode", "deep")) == "effects" else "deep"
+	cfg_w_item_effects = bool(d.get("w_item_effects", true))
 	cfg_w_low_tiers = bool(d.get("w_low_tiers", false))
-	cfg_w_any_start = bool(d.get("w_any_start", false))
+	cfg_w_any_start = bool(d.get("w_any_start", true))
 	cfg_w_avg = int(clamp(int(d.get("w_avg", 100)), 50, 250))
 	cfg_w_variance = int(clamp(int(d.get("w_variance", 100)), 50, 250))
+	cfg_w_effects = int(clamp(int(d.get("w_effects", 125)), 50, 250))
 	cfg_avg = int(clamp(int(d.get("avg", 100)), 50, 250))
 	cfg_variance = int(clamp(int(d.get("variance", 100)), 50, 250))
 	cfg_triggers = int(clamp(int(d.get("triggers", 125)), 50, 250))

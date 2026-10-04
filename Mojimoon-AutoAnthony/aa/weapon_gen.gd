@@ -118,6 +118,13 @@ func _weapon_chaos(natives: Array) -> Array:
 	var ratios = price_ratios(natives)
 	var names = fams.keys()
 	names.sort()
+	rng.seed = hash(str(seed_value) + "/wchaos")
+	_shuffle(names)
+	# 各稀有度的武器数量保持 T1 ≤ T2 ≤ T3 ≤ T4（原版即如此）：家族按随机顺序尝试平移，会破坏这一点的平移不采用
+	var counts = [0, 0, 0, 0]
+	for w in natives:
+		if w.stats != null:
+			counts[w.tier] += 1
 	var out = []
 	for f in names:
 		var lo = 3
@@ -126,13 +133,22 @@ func _weapon_chaos(natives: Array) -> Array:
 			lo = min(lo, w.tier)
 			hi = max(hi, w.tier)
 		var opts = []
-		for off in range(-lo, 3 - hi + 1):
-			if off != 0:
-				opts.push_back(off)
-		if opts.empty():
+		for o in range(-lo, 3 - hi + 1):
+			if o != 0:
+				opts.push_back(o)
+		_shuffle(opts)
+		var off = 0
+		for o in opts:
+			var c = counts.duplicate()
+			for w in fams[f]:
+				c[w.tier] -= 1
+				c[w.tier + o] += 1
+			if c[0] <= c[1] + CHAOS_SLACK and c[1] <= c[2] + CHAOS_SLACK and c[2] <= c[3] + CHAOS_SLACK:
+				off = o
+				counts = c
+				break
+		if off == 0:
 			continue
-		rng.seed = hash(str(seed_value) + "/wchaos/" + f)
-		var off = opts[rng.randi() % opts.size()]
 		for w in fams[f]:
 			w.set_meta("aa_chaos", [w.tier, w.value])
 			var price = float(w.value)
@@ -380,7 +396,8 @@ const SECOND_SCALING_CHANCE = {0: 0.45, 1: 0.3}
 # 第二条 / 非伤害主加成的属性权重 = 原版作为附加加成的次数 + 此值
 const SCALING_BASE_W = 1.0
 # 第二个效果的概率
-const SECOND_EFFECT_CHANCE = 0.2
+# 额外效果中道具效果所占的比例（引入道具效果开启时）
+const ITEM_SLOT_SHARE = 0.4
 # 第二个武器类别的概率（原版约 60% 的武器有两个类别）
 const SECOND_SET_CHANCE = 0.6
 # 每个类别至少这么多个武器家族（不超过原版数量）
@@ -405,6 +422,11 @@ const FX_SHARE_CAP = 0.4
 const MAIN_STEP_CAP = 1.15
 # 单次伤害（含暴击）不宜超过该阶段参考敌人生命的倍数
 const HIT_CAP = 3.0
+const KB_CAP = {0: 10, 1: 5}
+# 非传奇 T4 武器的目标价值倍率（原版 T4 相对价格偏强）
+const T4_VALUE_MULT = 0.85
+# 武器混沌：相邻稀有度的数量允许倒挂的最大差值（大致逐级增加即可）
+const CHAOS_SLACK = 3
 # 基础伤害下限（按稀有度；多发武器按发数开方折算）：1 点基础伤害前期没有战斗力，宁可降低加成与攻速也要保证。
 # 点燃敌人的武器、以收获为加成的武器（原版掌、火炬、魔杖）不受限
 const BASE_DMG_MIN = [3.0, 5.0, 7.0, 10.0]
@@ -460,6 +482,8 @@ var _sec_coefs: Dictionary = {}	# 属性 -> [原版附加加成系数（最低�
 var _shapes: Dictionary = {}	# 类型 -> [{cd, dmg, main, sec}]：原版家族每升一级的相对倍率
 var _sets: Dictionary = {}		# set my_id -> SetData
 var _set_native_count: Dictionary = {}
+var _fx_share: Array = [1.0, 0.6, 0.1]	# 原版（非传奇）武器家族：[-, 至少 1 条效果的比例, 2 条以上的比例]
+var _effectful: Array = []		# 有（可搬运的）效果的家族
 
 
 # 原版只有 T4 的传奇武器家族（补出低级版本时不算）
@@ -545,6 +569,28 @@ func _collect_deep_priors() -> void:
 	for ty in _shares:
 		for t in _shares[ty]:
 			_shares[ty][t].sort()
+	_effectful = []
+	var n_all = 0
+	var n1 = 0
+	var n2 = 0
+	for f in fam_names:
+		var lo2 = _closest_tier(families[f].tiers, 0)
+		if lo2.has_meta("aa_low_of"):
+			lo2 = lo2.get_meta("aa_low_of")
+		var n = 0
+		for e in lo2.effects:
+			if not bound_key(e):
+				n += 1
+		if n > 0:
+			_effectful.push_back(f)
+		if not _is_legendary(lo2):
+			n_all += 1
+			if n >= 1:
+				n1 += 1
+			if n >= 2:
+				n2 += 1
+	if n_all > 0:
+		_fx_share = [1.0, float(n1) / n_all, float(n2) / n_all]
 
 
 func _pick_base(ty: int):
@@ -663,7 +709,8 @@ func _deep_family(fam: Dictionary, mult: float, stats: Array) -> Dictionary:
 	bp.crit_damage = b.crit_damage
 	b = _pick_base(ty).stats
 	bp.max_range = b.max_range
-	bp.knockback = b.knockback
+	# 击退：原版大多很小（中位数 2），远程常为 0；截到近战 10 / 远程 5（太高把怪打飞往往是负面作用），不计入价值
+	bp.knockback = int(min(b.knockback, KB_CAP[ty]))
 	bp.lifesteal = _pick_base(ty).stats.lifesteal
 	if ty == 0:
 		b = _pick_base(ty).stats
@@ -691,17 +738,30 @@ func _deep_family(fam: Dictionary, mult: float, stats: Array) -> Dictionary:
 	var sec_base = 0.0
 	if stats.size() > 1:
 		sec_base = _coef_from(_sec_coefs.get(stats[1], []), stats[1], 0.3)
-	# 效果：攻击节奏有定义性效果时带上它的；否则随机来源家族（可跨类型）；少数武器再加一个
+	# 额外效果的条数：按原版有效果的武器比例 × "额外效果"滑条（100% ≈ 原版）抽取；
+	# 攻击节奏有定义性效果时它占一条；其余每条是一个有效果的随机家族（可跨类型）或一条道具效果
+	var fx_mult = float(cfg.get("w_effects", 125)) / 100.0
+	var n_fx = 0
+	var u = rng.randf()
+	if u < min(0.95, _fx_share[1] * fx_mult):
+		n_fx = 1
+		if u < min(0.5, _fx_share[2] * fx_mult):
+			n_fx = 2
 	var donors = []
 	var prof_fam = families.get(family_of(prof_w))
 	if prof_fam != null and _has_defining_effect(prof_w):
 		donors.push_back(prof_fam)
-	else:
-		donors.push_back(families[fam_names[rng.randi() % fam_names.size()]])
-	if rng.randf() < SECOND_EFFECT_CHANCE:
-		donors.push_back(families[fam_names[rng.randi() % fam_names.size()]])
+		n_fx = max(1, n_fx)
+	var want_item = false
+	while donors.size() + (1 if want_item else 0) < n_fx:
+		if not want_item and gen != null and cfg.get("w_item_effects", false) and rng.randf() < ITEM_SLOT_SHARE:
+			want_item = true
+		elif not _effectful.empty():
+			donors.push_back(families[_effectful[rng.randi() % _effectful.size()]])
+		else:
+			break
 	var out = {}
-	var spec = _item_spec(family_of(lo), _spec_scaling(stats))
+	var spec = _item_spec(family_of(lo), _spec_scaling(stats), true) if want_item else {}
 	var tiers = fam.tiers.keys()
 	tiers.sort()
 	var score = 0.0
@@ -762,8 +822,8 @@ func _deep_family(fam: Dictionary, mult: float, stats: Array) -> Dictionary:
 		if heavy > 1.0:
 			score += 3.0 * log(heavy)
 		c1_prev = float(final.scaling_stats[0][1])
-		var dwf = _closest_tier(donors[0].tiers, tier)
-		out[tw.my_id] = {"effects": effects, "stats": final, "donor": dwf.my_id, "scale": h}
+		var donor_id = _closest_tier(donors[0].tiers, tier).my_id if not donors.empty() else ""
+		out[tw.my_id] = {"effects": effects, "stats": final, "donor": donor_id, "scale": h}
 	return {"out": out, "score": score}
 
 
@@ -1056,12 +1116,13 @@ const ITEM_CLAUSE_CHANCE = 0.5
 
 
 # 家族的道具效果规格：{kind: stat / clause, stat, neg, clause}；不加时为 {}
-func _item_spec(f: String, scaling: Array) -> Dictionary:
+func _item_spec(f: String, scaling: Array, forced := false) -> Dictionary:
 	if gen == null or not cfg.get("w_item_effects", false):
 		return {}
-	rng.seed = hash(str(seed_value) + "/witem/" + f)
-	if rng.randf() >= ITEM_LINE_CHANCE:
-		return {}
+	if not forced:
+		rng.seed = hash(str(seed_value) + "/witem/" + f)
+		if rng.randf() >= min(0.9, ITEM_LINE_CHANCE * float(cfg.get("w_effects", 125)) / 125.0):
+			return {}
 	if rng.randf() < ITEM_RELATED_CHANCE and scaling.size() > 0:
 		var x = scaling[rng.randi() % scaling.size()]
 		var st = WeaponValue.stat_name(x[0])
@@ -1113,11 +1174,16 @@ func _want(w, by_price := false) -> float:
 				return wv.value(w.stats, w.effects, w.tier)
 	if by_price or w.has_meta("aa_low_of") or w.has_meta("aa_chaos"):
 		var v = float(w.value) * float(_vp.get(str(w.type) + "/" + str(w.tier), 1.0))
+		if w.tier == 3 and not (wv.legendary_families.has(family_of(w)) and not w.has_meta("aa_low_of")):
+			v *= T4_VALUE_MULT
 		# 传奇武器（只有 T4 的原版武器）普遍超模、程度不等：取模型价值与按价格换算值的几何平均（链枪约 ×2，大镰刀因代价基本不变）
 		if not w.has_meta("aa_low_of") and not w.has_meta("aa_chaos") and wv.legendary_families.has(family_of(w)):
 			v = sqrt(v * max(1.0, wv.value(w.stats, w.effects, w.tier)))
 		return v
-	return wv.value(w.stats, w.effects, w.tier)
+	var mv = wv.value(w.stats, w.effects, w.tier)
+	if w.tier == 3 and not wv.legendary_families.has(family_of(w)):
+		mv *= T4_VALUE_MULT
+	return mv
 
 
 # ============================================================

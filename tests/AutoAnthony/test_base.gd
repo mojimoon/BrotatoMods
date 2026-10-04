@@ -180,6 +180,7 @@ func _reset() -> void:
 	m.cfg_w_any_start = false
 	m.cfg_w_avg = 100
 	m.cfg_w_variance = 100
+	m.cfg_w_effects = 125
 	m.cfg_tier_chaos = false
 	m.cfg_w_chaos = false
 	m.cfg_w_rename = true

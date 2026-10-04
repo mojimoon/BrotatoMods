@@ -81,6 +81,7 @@ const SLIDERS = [
 const WEAPON_SLIDERS = [
 	["cfg_w_avg", "AA_UI_AVG", 50, 250, 5, "AA_UI_W_AVG_DESC"],
 	["cfg_w_variance", "AA_UI_VARIANCE", 50, 250, 5, "AA_UI_W_VARIANCE_DESC"],
+	["cfg_w_effects", "AA_UI_W_FX", 50, 250, 5, "AA_UI_W_FX_DESC"],
 ]
 
 var _mod = null

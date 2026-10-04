@@ -37,7 +37,7 @@ func test_31_weapons_swap_within_type() -> void:
 			if WG.bound_key(e):
 				_check(e in p.effects, "%s keeps its family-bound effect" % id)
 		# 价值守恒：新武器价值 = 原价值 × 家族浮动（伤害取整误差内）
-		var want = wg.wv.value(w.stats, w.effects, w.tier) * wg._family_mult(WG.family_of(w))
+		var want = wg._want(w) * wg._family_mult(WG.family_of(w))
 		var got = wg.wv.value(p.stats, p.effects, w.tier)
 		if abs(got - want) > max(3.0, want * 0.15):
 			off += 1
@@ -174,7 +174,10 @@ func test_142_weapon_item_effects() -> void:
 			if fam_lines[f] != null:
 				with_line += 1
 		print("AUDIT %s item lines: %d / %d families, related %d, clauses %d" % [mode, with_line, fam_lines.size(), related, clauses])
-		_check(with_line > fam_lines.size() * 0.4 and with_line < fam_lines.size() * 0.8, mode + ": about 60% of families get an item line")
+		# 仅重组效果：约六成家族有道具效果；深度重组：道具效果是"额外效果"中的一部分
+		var lo_share = 0.4 if mode == "effects" else 0.1
+		var hi_share = 0.8 if mode == "effects" else 0.5
+		_check(with_line > fam_lines.size() * lo_share and with_line < fam_lines.size() * hi_share, mode + ": share of families with an item line (%d)" % with_line)
 		_check(related > 0 and clauses > 0, mode + ": related stat lines and clauses both appear")
 
 
@@ -581,7 +584,12 @@ func test_150_weapon_chaos_and_names() -> void:
 				_check(w.upgrades_into.value > w.value, w.my_id + " cheaper than its upgrade")
 			_check(p.has("adj") and w.name != before[w.my_id][2], w.my_id + " renamed")
 			adjs[p.adj] = adjs.get(p.adj, 0) + 1
-		_check(shifted > 30, mode + ": many weapons shifted (%d)" % shifted)
+		_check(shifted > 15, mode + ": weapons shifted (%d)" % shifted)
+		var cnt = [0, 0, 0, 0]
+		for w in isvc.weapons:
+			if m.plan.weapons.has(w.my_id):
+				cnt[w.tier] += 1
+		_check(cnt[0] <= cnt[1] + WG.CHAOS_SLACK and cnt[1] <= cnt[2] + WG.CHAOS_SLACK and cnt[2] <= cnt[3] + WG.CHAOS_SLACK, mode + ": weapon counts still grow by tier %s" % str(cnt))
 		_check(adjs.size() >= 15, mode + ": varied weapon adjectives (%d)" % adjs.size())
 		print("AUDIT %s weapon adjectives %s" % [mode, str(adjs)])
 		m.on_menu_reset()
@@ -621,3 +629,24 @@ func test_151_scaling_stats_available() -> void:
 			for x in out[id].stats.scaling_stats:
 				var st = WV.stat_name(x[0])
 				_check(keys.has(Keys.generate_hash(st)) or used.has(st), "%s scales with an available stat: %s" % [id, st])
+
+
+func test_152_tier_value_ratio() -> void:
+	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
+	var cfg = _cfg()
+	cfg.weapons = true
+	cfg.weapon_mode = "deep"
+	var wg = WG.new(cfg, 1)
+	var out = wg.generate(m.native_only(isvc.weapons))
+	print("AUDIT value / price by type/tier: " + str(wg._vp))
+	var sums = {}
+	for id in out:
+		var w = isvc.get_element_safe(isvc.weapons, id)
+		var key = str(w.type) + "/" + str(w.tier)
+		if not sums.has(key):
+			sums[key] = [0.0, 0.0, 0]
+		sums[key][0] += load(MOD_DIR + "aa/weapon_value.gd").power(out[id].stats, out[id].effects, w.tier)
+		sums[key][1] += load(MOD_DIR + "aa/weapon_value.gd").power(w.stats, w.effects, w.tier)
+		sums[key][2] += 1
+	for key in sums:
+		print("AUDIT %s mean power deep %.0f native %.0f" % [key, sums[key][0] / sums[key][2], sums[key][1] / sums[key][2]])
