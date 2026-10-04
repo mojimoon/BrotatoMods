@@ -57,6 +57,21 @@ ERRORS=$(awk '
 	}
 ' "$LOG")
 
+# 测试打印 "AUDIT watch begin" / "AUDIT watch end" 之间的任何脚本错误（包括原版脚本）都算失败：
+# 用于在真实战斗里检查搬到别的武器上的原版效果不会让原版代码报错
+# （stdout / stderr 交错：无头启动时原版固有的 ProgressData / 光标报错可能落在区间内，忽略）
+WATCHED=$(awk '
+	/AUDIT watch begin/ { on = 1; next }
+	/AUDIT watch end/ { on = 0; next }
+	on && /SCRIPT ERROR/ { cur = $0; if ((getline nxt) > 0 && nxt !~ /progress_data.gd|cursor_manager.gd/) { print cur; print nxt } }
+' "$LOG")
+if [ -n "$WATCHED" ]; then
+	echo
+	echo "Script errors during a watched battle:"
+	echo "$WATCHED" | head -40
+	STATUS=1
+fi
+
 grep -E "^(suite |  ran |FAIL |[0-9]+ checks|ALL TESTS PASSED|user dir|Refusing|Mod node|AUDIT|items table)" "$LOG"
 if [ -n "$ERRORS" ]; then
 	echo

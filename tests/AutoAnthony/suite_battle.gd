@@ -706,3 +706,44 @@ func test_135_no_triggers_after_wave_end() -> void:
 	main._cleaning_up = true
 	rd.remove_item(holder, 0)
 	m.on_menu_reset()
+
+
+# 仅重组效果：所有 T4 武器（效果可跨近战 / 远程）分组装备后在真实战斗中运行，原版代码不报错、武器造成伤害
+func test_140_reassembled_weapons_in_battle() -> void:
+	m.cfg_weapons = true
+	m.cfg_weapon_mode = "effects"
+	m.start_new_run()
+	var t4 = []
+	for w in isvc.weapons:
+		if w.tier == 3 and m.plan.weapons.has(w.my_id) and w.can_be_looted:
+			t4.push_back(w)
+	_check(t4.size() > 40, "T4 weapons reassembled (%d)" % t4.size())
+	var dealt = 0
+	var total = 0
+	print("AUDIT watch begin")
+	for g in range(0, t4.size(), 6):
+		for w in rd.get_player_weapons(0).duplicate():
+			rd.remove_weapon(w, 0)
+		var group = t4.slice(g, min(g + 5, t4.size() - 1))
+		for w in group:
+			var _nw = rd.add_weapon(w, 0)
+		rd.current_wave = 8
+		TempStats.reset()
+		var _e = tree.change_scene("res://main.tscn")
+		yield(_wait_frames(10), "completed")
+		var main = tree.current_scene
+		main._players[0].disable_hurtbox()
+		main._wave_timer.start(600)
+		yield(tree.create_timer(8.0), "timeout")
+		for w in rd.get_player_weapons(0):
+			total += 1
+			if w.dmg_dealt_last_wave > 0:
+				dealt += 1
+		main._cleaning_up = true
+	print("AUDIT watch end")
+	print("AUDIT reassembled T4 weapons dealing damage: %d / %d" % [dealt, total])
+	_check(dealt >= total * 0.6, "most reassembled weapons deal damage (%d / %d)" % [dealt, total])
+	for w in rd.get_player_weapons(0).duplicate():
+		rd.remove_weapon(w, 0)
+	m.on_menu_reset()
+	m.cfg_weapons = false

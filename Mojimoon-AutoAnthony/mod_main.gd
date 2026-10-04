@@ -421,7 +421,12 @@ func _activate(state: Dictionary) -> void:
 		var res = _find(isvc.weapons, id)
 		if res != null:
 			_backup(res)
-			res.effects = plan.weapons[id].effects
+			var pw = plan.weapons[id]
+			res.effects = pw.effects
+			if pw.has("stats"):
+				res.stats = pw.stats
+			if pw.has("sets"):
+				res.sets = pw.sets
 	_rebuild_groups_and_bans(isvc)
 	# 商店的分档池在本局开始时（RunData.reset）已按原稀有度建好：稀有度改变后重建
 	if bool(state.cfg.get("chaos", false)) and isvc.has_method("init_unlocked_pool"):
@@ -542,6 +547,9 @@ func _backup(res) -> void:
 		b.replaced_by = res.replaced_by
 		b.tier = res.tier
 		b.icon = res.icon
+	if res is WeaponData:
+		b.stats = res.stats
+		b.sets = res.sets
 	_backups[id] = b
 
 
@@ -555,6 +563,9 @@ func restore() -> void:
 		res.name = b.name
 		if b.has("banned_items"):
 			res.banned_items = b.banned_items
+		if b.has("stats"):
+			res.stats = b.stats
+			res.sets = b.sets
 		if b.has("tags"):
 			res.tags = b.tags
 			res.value = b.value
@@ -622,6 +633,9 @@ func _materialize_owned(owned: Array) -> void:
 		if res != tmpl:
 			res.effects = tmpl.effects if res is WeaponData else _dup_effects(tmpl.effects)
 			res.name = tmpl.name
+			if res is WeaponData:
+				res.stats = tmpl.stats
+				res.sets = tmpl.sets
 			if res is ItemData and not res is CharacterData:
 				res.tags = tmpl.tags
 				res.value = tmpl.value

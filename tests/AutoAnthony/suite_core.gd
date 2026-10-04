@@ -335,20 +335,46 @@ func test_30_character_keeps_identity() -> void:
 func test_31_weapons_swap_within_type() -> void:
 	m.cfg_weapons = true
 	m.cfg_items = false
+	var WV = load(MOD_DIR + "aa/weapon_value.gd")
+	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
+	var weapons = m.native_only(isvc.weapons)
 	var g = Generator.new(m.get_cfg(), 11)
-	var out = g.generate_weapons(isvc.weapons)
-	_check(out.size() > 100, "weapons mapped (%d)" % out.size())
+	var out = g.generate_weapons(weapons)
+	var wg = WG.new(m.get_cfg(), 11)
+	wg.generate(weapons)
+	_check(out.size() > 200, "weapons mapped (%d)" % out.size())
 	var changed = 0
+	var cross = 0
+	var off = 0
 	for id in out:
 		var w = isvc.get_element_safe(isvc.weapons, id)
-		var donor = isvc.get_element_safe(isvc.weapons, out[id].donor)
-		_eq(donor.type, w.type, "%s donor %s same type" % [id, donor.my_id])
-		if donor.weapon_id != w.weapon_id:
+		var p = out[id]
+		var donor = isvc.get_element_safe(isvc.weapons, p.donor)
+		if WG.family_of(donor) != WG.family_of(w):
 			changed += 1
-		for e in out[id].effects:
+		if donor.type != w.type:
+			cross += 1
+		_check(p.stats.damage >= 1, id + " damage >= 1")
+		for e in p.effects:
 			if e is WeaponStackEffect:
 				_eq(e.weapon_stacked_id, w.weapon_id, "stack effect retargeted on " + id)
+			if w.type == 0:
+				_check(not WG.ranged_only(e), "%s (melee) has no ranged-only effect %s" % [id, WV.effect_key(e)])
+			if WG.bound_key(e):
+				_check(e in w.effects, "%s keeps only its own family-bound effect %s" % [id, WV.effect_key(e)])
+		for e in w.effects:
+			if WG.bound_key(e):
+				_check(e in p.effects, "%s keeps its family-bound effect" % id)
+		# 价值守恒：新武器价值 = 原价值 × 家族浮动（伤害取整误差内）
+		var want = wg.wv.value(w.stats, w.effects, w.tier) * wg._family_mult(WG.family_of(w))
+		var got = wg.wv.value(p.stats, p.effects, w.tier)
+		if abs(got - want) > max(3.0, want * 0.15):
+			off += 1
+			print("AUDIT weapon value off %s: want %.1f got %.1f (scale %.2f)" % [id, want, got, p.scale])
 	_check(changed > out.size() / 2, "most weapons got another family's effects (%d)" % changed)
+	_check(cross > 0, "effects cross melee / ranged (%d)" % cross)
+	_check(off <= out.size() / 20, "weapon values match the target (%d off)" % off)
+	print("AUDIT weapons: %d, other family %d, cross-type %d" % [out.size(), changed, cross])
 
 
 func test_40_runtime_gating_and_payloads() -> void:

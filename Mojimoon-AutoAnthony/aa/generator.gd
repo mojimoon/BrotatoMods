@@ -21,11 +21,12 @@ extends Reference
 # 输出 plan：
 #   items:      { my_id: {effects, adj, tags, budget} }
 #   characters: { my_id: {effects, adj} }
-#   weapons:    { my_id: {effects, donor} }
+#   weapons:    { my_id: {effects, stats, donor, ...} }（weapon_gen.gd）
 
 const Catalog = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/catalog.gd")
 const Valuation = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/valuation.gd")
 const TriggerEffect = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/trigger_effect.gd")
+const WeaponGen = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/weapon_gen.gd")
 
 # 原版价值 / 价格的对数离散度（浮动范围 100% 的参考）
 const NATIVE_VALUE_SIGMA = 0.35
@@ -2898,69 +2899,10 @@ func char_line_value(e) -> float:
 
 
 # ============================================================
-# 武器（实验）：同类型（近战 / 远程）武器家族之间交换整套特效，按等级对齐
+# 武器：见 weapon_gen.gd
 # ============================================================
-static func family_of(weapon_my_id: String) -> String:
-	var idx = weapon_my_id.find_last("_")
-	if idx > 0 and weapon_my_id.substr(idx + 1).is_valid_integer():
-		return weapon_my_id.substr(0, idx)
-	return weapon_my_id
-
-
 func generate_weapons(weapons: Array) -> Dictionary:
-	_seed_for("__weapons__")
-	var families = {}	# family -> {type, tiers: {tier: weapon}}
-	for w in weapons:
-		var f = w.weapon_id if w.weapon_id != "" else family_of(w.my_id)
-		if not families.has(f):
-			families[f] = {"type": w.type, "tiers": {}}
-		families[f].tiers[w.tier] = w
-	var by_type = {}
-	var fam_names = families.keys()
-	fam_names.sort()
-	for f in fam_names:
-		var ty = families[f].type
-		if not by_type.has(ty):
-			by_type[ty] = []
-		by_type[ty].push_back(f)
-	var out = {}
-	for ty in by_type:
-		var names: Array = by_type[ty]
-		var donors = names.duplicate()
-		# Fisher-Yates
-		for i in range(donors.size() - 1, 0, -1):
-			var j = rng.randi() % (i + 1)
-			var tmp = donors[i]
-			donors[i] = donors[j]
-			donors[j] = tmp
-		for i in names.size():
-			var target = families[names[i]]
-			var donor = families[donors[i]]
-			for tier in target.tiers:
-				var tw = target.tiers[tier]
-				var dw = _closest_tier(donor.tiers, tier)
-				var new_effects = []
-				for e in dw.effects:
-					var ne = e.duplicate()
-					if ne is WeaponStackEffect:
-						ne.weapon_stacked_id = tw.weapon_id
-						ne.weapon_stacked_id_hash = Keys.generate_hash(tw.weapon_id)
-						ne.weapon_stacked_name = tw.name
-					new_effects.push_back(ne)
-				out[tw.my_id] = {"effects": new_effects, "donor": dw.my_id}
-	return out
-
-
-func _closest_tier(tiers: Dictionary, tier: int):
-	if tiers.has(tier):
-		return tiers[tier]
-	var best = null
-	var best_d = 99
-	for t in tiers:
-		if abs(t - tier) < best_d:
-			best_d = abs(t - tier)
-			best = tiers[t]
-	return best
+	return WeaponGen.new(cfg, seed_value).generate(weapons)
 
 
 # ============================================================
