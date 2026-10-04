@@ -340,11 +340,13 @@ func cancel_selection() -> void:
 		on_menu_reset()
 
 
-# 设置弹窗关闭：选择武器界面已提前生成时按新设置重新生成
-func on_settings_closed() -> void:
+# 设置弹窗关闭：选择武器界面已提前生成时按新设置重新生成；重新生成了返回 true
+func on_settings_closed() -> bool:
 	if _prepared_sig != null and _prepared_sig != _run_sig():
 		_prepared_sig = null
 		prepare_selection()
+		return true
+	return false
 
 
 # 任意初始武器：本局角色初始武器所在的稀有度（T1 / T2 / 都有）中的全部已解锁武器
@@ -408,8 +410,16 @@ func on_resume(state: Dictionary) -> void:
 	_repair_loaded(state)
 
 
-func preview_plan(p_seed: int) -> Dictionary:
+# kind：items = 只生成道具池；weapons = 只生成武器（预览当前页，不必两者都生成）
+func preview_plan(p_seed: int, kind: String = "") -> Dictionary:
 	var cfg = get_cfg()
+	if kind == "items":
+		cfg.weapons = false
+		cfg.characters = false
+	elif kind == "weapons":
+		cfg.items = false
+		cfg.characters = false
+		cfg.weapons = true
 	var gen = Generator.new(cfg, p_seed)
 	var isvc = _autoload("ItemService")
 	var low = _low_tier_weapons(cfg, isvc)

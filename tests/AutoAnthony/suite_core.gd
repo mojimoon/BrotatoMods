@@ -555,18 +555,21 @@ func test_51_ui_builds_and_previews() -> void:
 		ui._on_tier_pressed(t)
 		yield(tree, "idle_frame")
 		var n = ui._pv.items.grid.get_child_count()
-		_eq(n, ui._preview_entries(ui._plan, t).size(), "preview tier %d shows one card per item" % (t + 1))
+		_eq(n, ui._preview_entries(ui._pv.items.plan, t).size(), "preview tier %d shows one card per item" % (t + 1))
 		_check(n > 10, "preview tier %d has items (%d)" % [t + 1, n])
 		_check(ui._pv.items.buttons[t].text.find("(") > 0, "tier button shows a count: " + ui._pv.items.buttons[t].text)
-	# 武器预览：每把武器一张卡片，带原版的属性文本
+	# 武器预览：每把武器一张卡片，带原版的属性文本（只在点击武器页的预览时生成）
+	_check(ui._pv.weapons.plan == null, "item preview does not generate weapons")
 	ui._on_page_pressed("weapons")
+	ui._on_preview_pressed("weapons")
 	for t in 4:
 		ui._on_tier_pressed(t, "weapons")
 		yield(tree, "idle_frame")
 		var n = ui._pv.weapons.grid.get_child_count()
-		_eq(n, ui._preview_entries(ui._plan, t, "weapons").size(), "weapon preview tier %d shows one card per weapon" % (t + 1))
+		_eq(n, ui._preview_entries(ui._pv.weapons.plan, t, "weapons").size(), "weapon preview tier %d shows one card per weapon" % (t + 1))
 		_check(n > 5, "weapon preview tier %d has weapons (%d)" % [t + 1, n])
-	var wt = ui.weapon_preview_text(ui._preview_entries(ui._plan, 0, "weapons")[0], ui._plan.weapons[ui._preview_entries(ui._plan, 0, "weapons")[0].my_id])
+	var wp = ui._pv.weapons.plan
+	var wt = ui.weapon_preview_text(ui._preview_entries(wp, 0, "weapons")[0], wp.weapons[ui._preview_entries(wp, 0, "weapons")[0].my_id])
 	_check(wt.find(tr("STAT_DAMAGE")) >= 0 and wt.find("AA_") == -1, "weapon card text: " + wt.left(80))
 	ui._on_page_pressed("items")
 	ui._on_switch_toggled(false, "cfg_weapons")
@@ -585,7 +588,7 @@ func test_51_ui_builds_and_previews() -> void:
 			if OS.get_environment("AA_UI_WMODE") != "":
 				m.cfg_weapon_mode = OS.get_environment("AA_UI_WMODE")
 			ui._on_page_pressed(page)
-			ui._on_preview_pressed()
+			ui._on_preview_pressed("weapons")
 			ui._on_tier_pressed(1, "weapons")
 		else:
 			ui._on_tier_pressed(1)

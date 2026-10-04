@@ -17,7 +17,7 @@ const FONT_DESC = preload("res://resources/fonts/actual/base/font_very_smallest_
 
 const PANEL_SIZE = Vector2(1680, 1040)
 const SECTION_WIDTH = 530
-const PREVIEW_COLUMNS = 3
+const PREVIEW_COLUMNS = 4
 
 const C_TEXT = Color(0.94, 0.96, 1.0)
 const C_TEXT_DIM = Color(0.62, 0.67, 0.76)
@@ -87,8 +87,7 @@ var _page := "items"
 var _tab_buttons: Dictionary = {}
 var _page_switches: Dictionary = {}
 var _pages: Dictionary = {}
-# 预览（道具 / 武器各一份）：页 id -> {tier, buttons, grid, scroll, hint}
-var _plan = null
+# 预览（道具 / 武器各一份，点击时只生成当前页）：页 id -> {tier, buttons, grid, scroll, hint, plan}
 var _pv: Dictionary = {}
 
 
@@ -205,6 +204,7 @@ func _build_tabs(root: Control) -> void:
 	root.add_child(tabs)
 	for d in PAGES:
 		var tab = PanelContainer.new()
+		tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tab.mouse_filter = Control.MOUSE_FILTER_STOP
 		tab.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		tab.connect("gui_input", self, "_on_tab_input", [d[0]])
@@ -214,6 +214,8 @@ func _build_tabs(root: Control) -> void:
 		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		tab.add_child(row)
 		var lbl = _label(tr(d[1]), FONT_NORMAL, C_TEXT_DIM)
+		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		lbl.align = Label.ALIGN_CENTER
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(lbl)
 		_tab_buttons[d[0]] = [tab, lbl, d[3]]
@@ -300,7 +302,7 @@ func _build_preview(parent: Control, kind: String, title_key: String, button_key
 	var vbox = VBoxContainer.new()
 	vbox.add_constant_override("separation", 8)
 	card.add_child(vbox)
-	var pv = {"tier": 0, "buttons": []}
+	var pv = {"tier": 0, "buttons": [], "plan": null}
 	_pv[kind] = pv
 
 	var head = HBoxContainer.new()
@@ -328,7 +330,7 @@ func _build_preview(parent: Control, kind: String, title_key: String, button_key
 	head.add_child(export_btn)
 	var prev_btn = _button(tr(button_key), FONT_SMALL)
 	_apply_action_style(prev_btn, C_ACCENT)
-	prev_btn.connect("pressed", self, "_on_preview_pressed")
+	prev_btn.connect("pressed", self, "_on_preview_pressed", [kind])
 	head.add_child(prev_btn)
 
 	pv.hint = _desc(tr(hint_key))
@@ -382,8 +384,8 @@ func _refresh_tier_buttons(kind: String) -> void:
 	var pv = _pv[kind]
 	for t in pv.buttons.size():
 		var text = tr("AA_UI_TIER").replace("{0}", str(t + 1))
-		if _plan != null:
-			text += " (" + str(_preview_entries(_plan, t, kind).size()) + ")"
+		if pv.plan != null:
+			text += " (" + str(_preview_entries(pv.plan, t, kind).size()) + ")"
 		pv.buttons[t].text = text
 		_apply_chip_style(pv.buttons[t], t == pv.tier, ItemService.get_color_from_tier(t))
 
@@ -440,13 +442,13 @@ func _on_random_seed_pressed() -> void:
 	_refresh_all()
 
 
-# 预览按当前设置生成道具池与武器（两页共用同一份生成结果）
-func _on_preview_pressed() -> void:
-	_plan = _mod.preview_plan(_mod.cfg_seed)
-	for kind in _pv:
-		_pv[kind].hint.text = tr("AA_UI_PREVIEW_SEED").replace("{0}", str(_mod.cfg_seed))
-		_refresh_tier_buttons(kind)
-		_fill_preview(kind)
+# 预览：只按当前设置生成本页的内容（道具池或武器）
+func _on_preview_pressed(kind: String = "items") -> void:
+	var pv = _pv[kind]
+	pv.plan = _mod.preview_plan(_mod.cfg_seed, kind)
+	pv.hint.text = tr("AA_UI_PREVIEW_SEED").replace("{0}", str(_mod.cfg_seed))
+	_refresh_tier_buttons(kind)
+	_fill_preview(kind)
 
 
 # 剪贴板（测试时用 test_clipboard 代替系统剪贴板）
@@ -501,16 +503,17 @@ func _fill_preview(kind: String) -> void:
 	for c in pv.grid.get_children():
 		pv.grid.remove_child(c)
 		c.queue_free()
-	if _plan == null:
+	var plan = pv.plan
+	if plan == null:
 		return
 	var w = (pv.scroll.rect_size.x - 30) / PREVIEW_COLUMNS
 	if w < 200:
 		w = (PANEL_SIZE.x - 110) / PREVIEW_COLUMNS
-	for res in _preview_entries(_plan, pv.tier, kind):
+	for res in _preview_entries(plan, pv.tier, kind):
 		if kind == "weapons":
-			pv.grid.add_child(_weapon_card(res, _plan.weapons[res.my_id], w))
+			pv.grid.add_child(_weapon_card(res, plan.weapons[res.my_id], w))
 		else:
-			pv.grid.add_child(_item_card(res, _plan.items[res.my_id], w))
+			pv.grid.add_child(_item_card(res, plan.items[res.my_id], w))
 	pv.scroll.scroll_vertical = 0
 
 
@@ -628,7 +631,7 @@ func weapon_preview_text(weapon, p: Dictionary) -> String:
 
 # 纯文本预览（不修改任何游戏资源；测试与日志用）
 func build_preview_text(p_seed: int) -> String:
-	var plan = _mod.preview_plan(p_seed)
+	var plan = _mod.preview_plan(p_seed, "items")
 	var text = ""
 	for item in _preview_entries(plan, -1):
 		var p = plan.items[item.my_id]
@@ -650,7 +653,9 @@ func _sort_by_tier_id(a, b) -> bool:
 func _on_close_pressed() -> void:
 	if _mod != null:
 		_mod.save_settings()
-		_mod.on_settings_closed()
+		# 选择武器界面已提前生成、设置有变：重新生成并重新载入界面（列出的武器随设置变化，例如关闭"允许低级武器"）
+		if _mod.on_settings_closed() and get_tree().current_scene is WeaponSelection:
+			get_tree().call_deferred("reload_current_scene")
 	queue_free()
 
 

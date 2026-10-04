@@ -814,3 +814,49 @@ func test_144_weapon_selection_shows_reassembled() -> void:
 	m.cfg_weapon_mode = "effects"
 	m.cfg_w_low_tiers = false
 	m.cfg_w_any_start = false
+
+
+# 究极混沌开、允许低级武器开 -> 关：在选择武器界面打开设置切换后，界面重新载入、不再列出已注销的补出武器，选武器开局正常
+func test_145_toggle_low_tiers_with_chaos() -> void:
+	m.cfg_chaos = true
+	m.cfg_weapons = true
+	m.cfg_w_low_tiers = true
+	m.cfg_w_any_start = true
+	_setup_player("character_well_rounded")
+	var _e = tree.change_scene(MenuData.weapon_selection_scene)
+	for i in 6:
+		yield(tree, "idle_frame")
+	var sc = tree.current_scene
+	sc.get_node("%BackButton").get_node("AutoAnthonyBtn").emit_signal("pressed")
+	yield(tree, "idle_frame")
+	var ui = null
+	for c in sc.get_children():
+		if c is CanvasLayer and c.get_child_count() > 0 and c.get_child(0).name == "AutoAnthonySettings":
+			ui = c.get_child(0)
+	ui._on_page_pressed("weapons")
+	ui._on_preview_pressed("weapons")
+	ui._on_switch_toggled(false, "cfg_w_low_tiers")
+	ui._on_close_pressed()
+	for i in 10:
+		yield(tree, "idle_frame")
+	sc = tree.current_scene
+	_check(sc is WeaponSelection and sc != null, "weapon selection reloaded")
+	var stale = 0
+	var pick = null
+	for el in sc.displayed_elements[0]:
+		if el is WeaponData:
+			if isvc.get_element_safe(isvc.weapons, el.my_id) == null:
+				stale += 1
+			elif pick == null:
+				pick = el
+	_eq(stale, 0, "no unregistered weapons listed after turning lower tiers off")
+	sc._player_weapons[0] = pick
+	sc._on_selections_completed()
+	for i in 6:
+		yield(tree, "idle_frame")
+	m.start_new_run()
+	_check(rd.get_player_weapons(0).size() > 0, "run starts with the picked weapon")
+	m.on_menu_reset()
+	m.cfg_chaos = false
+	m.cfg_weapons = false
+	m.cfg_w_any_start = false
