@@ -34,8 +34,10 @@ const BURN_TARGETS = 1.5
 const OVERKILL_HP = [25.0, 50.0, 100.0, 200.0]
 const OVERKILL_EXP = 0.85
 # 效果的单位价值（多数效果只出现在一个家族里，残差噪声大）：限制在"来源武器价格的这一范围"内
-const EFFECT_VALUE_FLOOR = 0.1
-const EFFECT_VALUE_CEIL = 0.5
+const EFFECT_VALUE_FLOOR = 0.05
+const EFFECT_VALUE_CEIL = 0.25
+# 个别效果的估值再打折：秒杀几率很低，多数时候怪物在秒杀触发前已经被打死（原版剑与斩首剑的差距很小）
+const EFFECT_KEY_MULT = {"weapon_one_shot_on_hit": 0.4}
 # 命中时射出的投射物 / 闪电：命中率
 const SUB_PROJ_EFF = 0.7
 # 吸血：每秒 1 点回复折算的 DPS
@@ -232,7 +234,8 @@ static func magnitude(e) -> float:
 		"gain_stat_for_every_step_after_equip":
 			return 1.0 / max(1.0, float(e.value2))
 		"break_on_hit":
-			return float(e.value2)
+			# 命中后有几率碎裂（砖头）：代价（所以砖头便宜、伤害高，过渡用），按碎裂几率计
+			return -v
 		"enemy_percent_damage_taken":
 			return v * float(e.max_stacks)
 		"temp_stats_per_interval":
@@ -386,7 +389,7 @@ func effect_value(e) -> float:
 	# 每有 1 把武器 +X 属性（王者之剑）：就是玩家属性，按 6 把武器计
 	if e.custom_key == "additional_weapon_effects" and Catalog.STATS.has(e.key):
 		return Catalog.stat_w(e.key) * float(e.value) * WEAPON_COUNT * sc
-	return float(unit_by_key.get(effect_key(e), 0.0)) * magnitude(e) * sc
+	return float(unit_by_key.get(effect_key(e), 0.0)) * magnitude(e) * sc * float(EFFECT_KEY_MULT.get(effect_key(e), 1.0))
 
 
 # 武器的材料价值

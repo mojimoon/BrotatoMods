@@ -155,8 +155,8 @@ func get_cfg() -> Dictionary:
 		"more_double": cfg_more_double,
 		"rename": cfg_rename,
 		"force_items": cfg_force_items,
-		"chaos": cfg_chaos,
-		"tier_chaos": cfg_tier_chaos and not cfg_chaos,
+		"chaos": cfg_chaos and not cfg_tier_chaos,
+		"tier_chaos": cfg_tier_chaos,
 		"w_chaos": cfg_w_chaos and not cfg_w_low_tiers,
 		"w_rename": cfg_w_rename,
 		"weapon_mode": cfg_weapon_mode,
@@ -215,8 +215,8 @@ func apply_settings(d: Dictionary) -> void:
 	cfg_more_double = bool(d.get("more_double", false))
 	cfg_rename = bool(d.get("rename", true))
 	cfg_force_items = bool(d.get("force_items", false))
-	cfg_chaos = bool(d.get("chaos", false))
-	cfg_tier_chaos = bool(d.get("tier_chaos", false)) and not cfg_chaos
+	cfg_tier_chaos = bool(d.get("tier_chaos", false))
+	cfg_chaos = bool(d.get("chaos", false)) and not cfg_tier_chaos
 	cfg_w_chaos = bool(d.get("w_chaos", false)) and not bool(d.get("w_low_tiers", false))
 	cfg_w_rename = bool(d.get("w_rename", true))
 	cfg_weapon_mode = "deep" if str(d.get("weapon_mode", "effects")) == "deep" else "effects"
@@ -358,14 +358,21 @@ func on_settings_closed() -> bool:
 	return false
 
 
-# 任意初始武器：本局角色初始武器所在的稀有度（T1 / T2 / 都有）中的全部已解锁武器
+# 任意初始武器：本局角色初始武器最常见的稀有度中的全部已解锁武器
 func any_start_weapons(character) -> Array:
 	if active_state == null or not bool(active_state.cfg.get("weapons", false)) or not bool(active_state.cfg.get("w_any_start", false)):
 		return []
-	var tiers = []
+	# 稀有度取原角色初始武器中最常见的那个（并列时取较低的）
+	var counts = {}
 	for w in character.starting_weapons:
-		if not w.tier in tiers:
-			tiers.push_back(w.tier)
+		counts[w.tier] = counts.get(w.tier, 0) + 1
+	var best = 0
+	var best_n = -1
+	for t in [0, 1, 2, 3]:
+		if counts.get(t, 0) > best_n:
+			best = t
+			best_n = counts.get(t, 0)
+	var tiers = [best]
 	var isvc = _autoload("ItemService")
 	var pd = _autoload("ProgressData")
 	var out = []

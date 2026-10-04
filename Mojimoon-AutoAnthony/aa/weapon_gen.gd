@@ -407,7 +407,7 @@ const MAIN_STEP_CAP = 1.15
 const HIT_CAP = 3.0
 # 基础伤害下限（按稀有度；多发武器按发数开方折算）：1 点基础伤害前期没有战斗力，宁可降低加成与攻速也要保证。
 # 点燃敌人的武器、以收获为加成的武器（原版掌、火炬、魔杖）不受限
-const BASE_DMG_MIN = [5.0, 8.0, 12.0, 18.0]
+const BASE_DMG_MIN = [3.0, 5.0, 7.0, 10.0]
 # 高暴击：暴击率 / 暴击伤害达到此值的武器带"暴击"词条（必定精准类）
 const HIGH_CRIT_CHANCE = 0.15
 const HIGH_CRIT_DAMAGE = 2.5
@@ -531,8 +531,17 @@ func _collect_deep_priors() -> void:
 		for set in lo.sets:
 			_sets[set.my_id] = set
 			_set_native_count[set.my_id] = _set_native_count.get(set.my_id, 0) + 1
+	# 只用当前可用的属性（未启用 DLC 时没有诅咒：原版计算伤害时会读到空值）：
+	# 玩家属性表里有的，或当前加载的原版武器用过的
+	var keys = PlayerRunData.init_effects()
+	var used = {}
+	for f in fam_names:
+		for t in families[f].tiers:
+			for x in families[f].tiers[t].stats.scaling_stats:
+				used[WeaponValue.stat_name(x[0])] = true
 	for st in SCALING_STATS:
-		_second_w[st] = float(counts.get(st, 0)) + SCALING_BASE_W
+		if keys.has(Keys.generate_hash(st)) or used.has(st):
+			_second_w[st] = float(counts.get(st, 0)) + SCALING_BASE_W
 	for ty in _shares:
 		for t in _shares[ty]:
 			_shares[ty][t].sort()
@@ -586,6 +595,8 @@ func _coef_from(pool: Array, st: String, melee_equiv: float) -> float:
 # 加成属性（每个家族先定，避免择优时偏向系数小的属性）：主加成大多是本类型的伤害，少数武器有附加加成
 func _pick_scaling_stats(ty: int) -> Array:
 	var main = _pick_w(MAIN_SCALING[ty])
+	if main != "none" and not _second_w.has(main):
+		main = "stat_melee_damage" if ty == 0 else "stat_ranged_damage"
 	if main == "none":
 		var w = _second_w.duplicate()
 		for d in DAMAGE_STATS:
@@ -1095,6 +1106,11 @@ var _vp: Dictionary = {}
 
 
 func _want(w, by_price := false) -> float:
+	# 会碎裂的武器（砖头）：低价来自"用完就换"，强度按原版模型估值，不按价格
+	if by_price and not w.has_meta("aa_low_of") and not w.has_meta("aa_chaos"):
+		for e in w.effects:
+			if WeaponValue.effect_key(e) == "break_on_hit":
+				return wv.value(w.stats, w.effects, w.tier)
 	if by_price or w.has_meta("aa_low_of") or w.has_meta("aa_chaos"):
 		var v = float(w.value) * float(_vp.get(str(w.type) + "/" + str(w.tier), 1.0))
 		# 传奇武器（只有 T4 的原版武器）普遍超模、程度不等：取模型价值与按价格换算值的几何平均（链枪约 ×2，大镰刀因代价基本不变）

@@ -497,6 +497,7 @@ func test_147_deep_value_breakdown() -> void:
 	var cases = {
 		66622907: ["weapon_dagger_1", "weapon_double_barrel_shotgun_1", "weapon_fist_1", "weapon_crossbow_1", "weapon_ghost_scepter_1", "weapon_hand_1"],
 		812597668: ["weapon_chain_gun_4", "weapon_chainsaw_4", "weapon_blunderbuss_4", "weapon_anchor_4", "weapon_captains_sword_4", "weapon_brick_4"],
+		867169211: ["weapon_brick_4", "weapon_knife_4", "weapon_bloody_vorpal_4", "weapon_sword_4"],
 	}
 	for sd in cases:
 		var cfg = _cfg()
@@ -600,3 +601,23 @@ func test_150_weapon_chaos_and_names() -> void:
 	m.cfg_w_chaos = false
 	m.cfg_weapons = false
 	m.cfg_weapon_mode = "effects"
+
+
+# 加成属性只用当前可用的属性：未启用 DLC（玩家属性表里没有诅咒）时不生成诅咒加成
+func test_151_scaling_stats_available() -> void:
+	var WV = load(MOD_DIR + "aa/weapon_value.gd")
+	var keys = PlayerRunData.init_effects()
+	var cfg = _cfg()
+	cfg.weapons = true
+	cfg.weapon_mode = "deep"
+	var natives = m.native_only(isvc.weapons)
+	var used = {}
+	for w in natives:
+		for x in w.stats.scaling_stats:
+			used[WV.stat_name(x[0])] = true
+	for sd in [1, 2, 3]:
+		var out = Generator.new(cfg, sd).generate_weapons(natives)
+		for id in out:
+			for x in out[id].stats.scaling_stats:
+				var st = WV.stat_name(x[0])
+				_check(keys.has(Keys.generate_hash(st)) or used.has(st), "%s scales with an available stat: %s" % [id, st])
