@@ -18,11 +18,9 @@ const FPS = 60.0
 const MIN_CD_FRAMES = 2
 const MELEE_ATTACK_DURATION = 0.2
 const WEAPON_COUNT = 6
-# 贯穿 / 弹跳 / 爆炸命中其他敌人的概率（敌人密度），额外命中最多计 3 次
-const CROWD = 0.5
-const MAX_EXTRA_HITS = 3
-# 多发投射物（散射）每多一发的有效命中
-const PROJ_EXTRA = 0.5
+# 多发投射物、贯穿、弹跳按全部命中计（敌人成群时基本都能打满），贯穿 / 弹跳逐次按衰减递减；
+# 额外命中最多计 MAX_EXTRA_HITS 次（只有火焰喷射器类的 99 贯穿会碰到）
+const MAX_EXTRA_HITS = 5
 # 爆炸平均命中数（含主目标）
 const EXPLOSION_TARGETS = 2.0
 # 点燃：同一目标重复点燃只刷新持续时间。攻击间隔短于持续时间时，燃烧约等于每秒一跳的持续伤害；
@@ -163,14 +161,14 @@ static func _extra_hits(n: int, reduction: float) -> float:
 	for _k in min(n, MAX_EXTRA_HITS):
 		f *= (1.0 - reduction)
 		s += f
-	return s * CROWD
+	return s
 
 
 # 每次攻击的命中数（多发、贯穿、弹跳）
 static func hits_per_attack(st) -> float:
 	if is_melee(st):
 		return 1.0
-	var proj = 1.0 + (max(1, int(st.nb_projectiles)) - 1) * PROJ_EXTRA
+	var proj = float(max(1, int(st.nb_projectiles)))
 	var extra = _extra_hits(int(st.piercing), float(st.piercing_dmg_reduction))
 	if st.can_bounce:
 		extra += _extra_hits(int(st.bounce), float(st.bounce_dmg_reduction))

@@ -186,7 +186,8 @@ func _closest_tier(tiers: Dictionary, tier: int):
 func _family_mult(f: String) -> float:
 	rng.seed = hash(str(seed_value) + "/wmult/" + f)
 	var sigma = NATIVE_SIGMA * float(cfg.get("w_variance", 100)) / 100.0
-	var z = clamp(rng.randfn(0.0, 1.0), -2.5, 2.5)
+	# 向上至多 +1.5σ（原版的离散度有不少是模型误差，不全是真实强度差）
+	var z = clamp(rng.randfn(0.0, 1.0), -2.5, 1.5)
 	return float(cfg.get("w_avg", 100)) / 100.0 * exp(z * sigma)
 
 
@@ -585,6 +586,7 @@ func _pick_scaling_stats(ty: int) -> Array:
 
 func generate_deep() -> Dictionary:
 	_collect_deep_priors()
+	_sample_prices()
 	var out = {}
 	var fam_sets = {}
 	for f in fam_names:
@@ -613,7 +615,79 @@ func generate_deep() -> Dictionary:
 			var id = families[f].tiers[tier].my_id
 			if out.has(id):
 				out[id]["sets"] = fam_sets[f]
+				out[id]["price"] = int(round(_price_of(families[f].tiers[tier])))
 	return out
+
+
+# 深度重组的价格重新抽样：整个家族沿用一个原版家族的价格阶梯（同类型、最低稀有度相同的原版家族中随机一个；
+# 不足 2 个时不限类型），所以同为 T4，最低 T1 < 最低 T2 < 最低 T3 < 传奇。砖头（会碎裂）价格固定。
+# 补出的低级武器按相邻稀有度的价格比例从上一级递减。目标价值按新价格估计
+var _price: Dictionary = {}
+
+
+func _price_of(w) -> float:
+	return float(_price.get(w.my_id, w.value))
+
+
+static func _native_ladder(fam: Dictionary) -> Dictionary:
+	var lad = {}
+	for t in fam.tiers:
+		if not fam.tiers[t].has_meta("aa_low_of"):
+			lad[t] = float(fam.tiers[t].value)
+	return lad
+
+
+static func _is_brick(fam: Dictionary) -> bool:
+	for t in fam.tiers:
+		for e in fam.tiers[t].effects:
+			if WeaponValue.effect_key(e) == "break_on_hit":
+				return true
+	return false
+
+
+func _sample_prices() -> void:
+	_price = {}
+	var ladders = []
+	for f in fam_names:
+		var lad = _native_ladder(families[f])
+		if not lad.empty() and not _is_brick(families[f]):
+			ladders.push_back({"type": families[f].type, "min": lad.keys().min(), "lad": lad})
+	var natives = []
+	for f in fam_names:
+		for t in families[f].tiers:
+			natives.push_back(families[f].tiers[t])
+	var ratios = price_ratios(natives)
+	for f in fam_names:
+		var fam = families[f]
+		var own = _native_ladder(fam)
+		if own.empty() or _is_brick(fam):
+			continue
+		var lo: int = own.keys().min()
+		var same = []
+		var any = []
+		for l in ladders:
+			if l.min != lo:
+				continue
+			var covers = true
+			for t in own:
+				if not l.lad.has(t):
+					covers = false
+			if not covers:
+				continue
+			any.push_back(l)
+			if l.type == fam.type:
+				same.push_back(l)
+		var pool = same if same.size() >= 2 else any
+		if pool.empty():
+			continue
+		rng.seed = hash(str(seed_value) + "/wprice/" + f)
+		var lad: Dictionary = pool[rng.randi() % pool.size()].lad
+		for t in own:
+			_price[fam.tiers[t].my_id] = lad[t]
+		# 补出的低级武器：从最低的原版稀有度往下按比例递减
+		for t in range(lo - 1, -1, -1):
+			if fam.tiers.has(t) and fam.tiers.has(t + 1):
+				_price[fam.tiers[t].my_id] = max(1.0, _price_of(fam.tiers[t + 1]) * float(ratios[fam.type][t]))
 
 
 # 一个家族的一次抽取。先定预算，再定数值：
@@ -625,7 +699,7 @@ func _deep_family(fam: Dictionary, mult: float, stats: Array) -> Dictionary:
 	var ty: int = fam.type
 	var lo = _closest_tier(fam.tiers, 0)
 	var bp = lo.stats.duplicate()
-	var prof_w = _pick_profile(ty, float(lo.value))
+	var prof_w = _pick_profile(ty, _price_of(lo))
 	var prof = prof_w.stats
 	bp.cooldown = prof.cooldown
 	bp.recoil_duration = prof.recoil_duration
@@ -1120,7 +1194,7 @@ func _want(w, by_price := false) -> float:
 			if WeaponValue.effect_key(e) == "break_on_hit":
 				return wv.value(w.stats, w.effects, w.tier)
 	if by_price or w.has_meta("aa_low_of"):
-		var v = float(w.value) * float(_vp.get(str(w.type) + "/" + str(w.tier), 1.0))
+		var v = _price_of(w) * float(_vp.get(str(w.type) + "/" + str(w.tier), 1.0))
 		if w.tier == 3 and not (wv.legendary_families.has(family_of(w)) and not w.has_meta("aa_low_of")):
 			v *= T4_VALUE_MULT
 		# 传奇武器（只有 T4 的原版武器）普遍超模、程度不等：取模型价值与按价格换算值的几何平均（链枪约 ×2，大镰刀因代价基本不变）

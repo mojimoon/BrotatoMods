@@ -556,6 +556,9 @@ func _activate(state: Dictionary) -> void:
 				res.stats = pw.stats
 			if pw.has("sets"):
 				res.sets = pw.sets
+			# 深度重组：价格重新抽样
+			if int(pw.get("price", 0)) > 0:
+				res.value = int(pw.price)
 	_rebuild_groups_and_bans(isvc)
 	# 商店的分档池在本局开始时（RunData.reset）已按原稀有度建好：稀有度改变后重建
 	if (bool(state.cfg.get("chaos", false)) or bool(state.cfg.get("tier_chaos", false)) or not _low_weapons.empty()) and isvc.has_method("init_unlocked_pool"):
