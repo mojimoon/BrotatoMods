@@ -575,7 +575,11 @@ func test_17_character_effects_on_items() -> void:
 					if mech.source.begins_with("character_"):
 						char_mechs += 1
 						_check(not mech.effect.key in Catalog.CHAR_MECHANIC_BANNED, "banned key not transferred: " + mech.effect.key)
-						_check(mech.value >= 30.0 and mech.value <= 80.0, "character mechanic value in range")
+						# 原版道具里也有的可缩放机制按道具的单位价值估值（不受平分值范围限制）
+						if mech.get("scalar", false):
+							_check(mech.value > 0.0, "scalable character mechanic valued by item unit")
+						else:
+							_check(mech.value >= 30.0 and mech.value <= 80.0, "character mechanic value in range")
 			print("AUDIT character budget %.1f, transferable character mechanics %d" % [gen.character_budget, char_mechs])
 		for id in plan.items:
 			for e in plan.items[id].effects:
@@ -2623,3 +2627,27 @@ func test_164_search_growth_ref() -> void:
 
 func _sort_first_num_asc(a, b) -> bool:
 	return a[0] < b[0]
+
+
+# 角色机制搬到道具上：原版道具里也有的可缩放机制按道具的单位价值估值并缩放（材料掉落 ↔ 邪恶帽子 +70%）；杰克的效果不迁移
+func test_165_char_mechanic_scaled_by_item_unit() -> void:
+	var n = 0
+	var worst = 0.0
+	for sd in range(1, 31):
+		var plan = _gen(sd)
+		for id in plan.items:
+			for e in plan.items[id].effects:
+				if e.key == "gold_drops" and e.value > 0:
+					n += 1
+					var per = float(e.get_meta("aa_value")) / float(e.value) if e.has_meta("aa_value") else 0.0
+					_check(per >= 1.0, "%s +%d%% materials valued %.2f per %%" % [id, e.value, per])
+					_check(e.value <= 105, "%s +%d%% materials is scaled to the budget" % [id, e.value])
+					worst = max(worst, e.value)
+	print("AUDIT gold_drops lines %d, largest +%d%%" % [n, worst])
+	# 杰克的效果不迁移
+	var g = Generator.new(_cfg(), 1)
+	g.generate(isvc.items, isvc.characters, [], [])
+	for t in 4:
+		for mm in g.mechanics_by_tier[t]:
+			_check(mm.source != "character_jack", "no mechanic comes from Jack: " + str(mm.effect.key))
+	_check(n > 0, "gold_drops lines appear")

@@ -87,7 +87,7 @@
 | T2 | 离奇的芹菜茶 | 40 | 生成一个焰蜥蜴宠物，造成1（+1%）伤害。每4秒钟，向所有方向发射燃烧的投射物，每发造成1（+1%）伤害。被这些攻击命中的敌人会受到5x3（+50%）燃烧伤害<br>每永久持有4%速度会-5范围 [-6] | pet |  |
 | T2 | 古怪的机械黄蜂 | 55 | +1 远程伤害<br>在箱子中有+2%的几率发现额外的机械黄蜂<br>-1 护甲 | stat_ranged_damage |  |
 | T2 | 扎根齿轮 | 40 | +16 获得%经验<br>站立不动时，每持有一异种I级别物品有+1元素伤害[+0]<br>下场敌袭一开始会出现特殊敌人 | xp_gain, stand_still, stat_elemental_damage |  |
-| T2 | 异想天开的指南针 | 40 | +1 工程学<br>+5 %暴击率<br>使用音乐类武器时+20%暴击率<br>每持有一异种IV级别物品有-3%速度[-3] | stat_engineering, stat_crit_chance |  |
+| T2 | 异想天开的指南针 | 40 | +1 工程学<br>+5 %暴击率<br>使用音乐类武器时+20%暴击率<br>每持有一异种IV级别物品有-3%速度[+0] | stat_engineering, stat_crit_chance |  |
 | T2 | 远足的珊瑚 | 40 | +2 工程学<br>每前进1步，有15%概率恢复1点生命值<br>-1 %生命窃取 | stat_engineering, stat_speed |  |
 | T2 | 伸缩的赛博球 | 40 | +25 范围<br>每4秒+8%暴击率，持续3秒<br>每4秒-4远程伤害，持续3秒<br>每6秒-1%攻击速度，直至敌袭结束。每波最大值：-15 | stat_range, stat_crit_chance |  |
 | T2 | 回响的独眼虫 | 40 | +5 范围<br>目前每一棵存活的树木有+1生命再生[+0] | stat_range, stat_hp_regeneration |  |
@@ -202,7 +202,7 @@
 | T3 | 贪吃的小麦 | 65 | +2 远程伤害<br>+2 收获<br>捡起消耗品时获得3个材料 | stat_ranged_damage, stat_harvesting, consumable, economy |  |
 | T3 | 厚重的鬼火 | 80 | +11 最大生命值<br>生命值低于50%时+38%伤害<br>生命值低于50%时-25%速度<br>闪避时+5%敌人伤害，直至敌袭结束 | stat_max_hp, stat_percent_damage, stat_dodge |  |
 | T3 | 回响的翅膀 | 55 | +1 护甲<br>每永久持有1护甲会+2%攻击速度 [+0] | stat_armor, stat_attack_speed | 独特，成长型 |
-| T3 | 回响的智慧 | 75 | +1 护甲<br>+1 %生命窃取<br>每持有一异种IV级别物品有+3%速度[+3] | stat_armor, stat_lifesteal, stat_speed |  |
+| T3 | 回响的智慧 | 75 | +1 护甲<br>+1 %生命窃取<br>每持有一异种IV级别物品有+3%速度[+0] | stat_armor, stat_lifesteal, stat_speed |  |
 | T4 | 奥术铁砧 | 100 | +8 元素伤害<br>敌袭开始时，永久获得“每8生命再生会+2最大生命值 [+0]”<br>-5 近战伤害 | stat_elemental_damage, stat_hp_regeneration, stat_max_hp |  |
 | T4 | 回响的灰烬 | 110 | +8 近战伤害<br>+5 最大生命值<br>每持有一异种I级别物品有+5幸运[+0]<br>下场敌袭以1点生命值开始 | stat_melee_damage, stat_max_hp, stat_luck |  |
 | T4 | 古怪的巨臂 | 100 | +15 范围<br>+1 武器栏<br>下场敌袭以1点生命值开始 | stat_range |  |
@@ -235,7 +235,7 @@
 | T4 | 充能的Retromation的连帽衫 | 105 | +5 工程学<br>+7 %伤害<br>捡起消耗品时，每永久持有30范围会+2%暴击率 [+0]，直至敌袭结束<br>每持有1件武器-2%伤害 [+0] | stat_engineering, stat_percent_damage, consumable, stat_range, stat_crit_chance |  |
 | T4 | 鹰眼跳弹 | 110 | +10 远程伤害<br>+21 %伤害<br>下场敌袭期间+65 获得%经验<br>下场敌袭期间+35 %敌人伤害<br>-25 %速度 | stat_ranged_damage, stat_percent_damage, xp_gain |  |
 | T4 | 处决机械臂 | 110 | +63 获得%经验<br>+15 范围<br>+7 幸运<br>以暴击杀死敌人时，获得1个材料<br>-7 最大生命值 | xp_gain, stat_range, stat_luck, economy, stat_crit_chance |  |
-| T4 | 回响的替罪羔羊 | 110 | 每永久持有2最大生命值会+1%伤害 [+7]<br>-7击退 | stat_percent_damage, stat_max_hp | 独特，成长型 |
+| T4 | 回响的替罪羔羊 | 110 | 每永久持有5最大生命值会+2%伤害 [+6]<br>-7击退 | stat_percent_damage, stat_max_hp | 独特，成长型 |
 | T4 | 掠食者的海贝壳 | 110 | +2 工程学<br>+10击退<br>+13 %暴击率<br>+10 范围<br>+1 %速度<br>命中生命值高于90%的敌人时，对随机1名敌人造成相当于225%远程伤害的伤害<br>-5 护甲 | stat_engineering, knockback, stat_crit_chance, stat_range, stat_speed, stat_ranged_damage |  |
 | T4 | 贪吃的Sifd的圣物 | 100 | +8 最大生命值<br>+20 范围<br>+1 护甲<br>捡起消耗品时获得15经验<br>-10 %伤害 | stat_max_hp, stat_range, stat_armor, consumable, xp_gain |  |
 | T4 | 铁甲蜘蛛 | 90 | +5 护甲<br>+1 %生命窃取<br>以暴击杀死敌人时，+1%速度，持续8秒 | stat_armor, stat_lifesteal, stat_speed, stat_crit_chance |  |

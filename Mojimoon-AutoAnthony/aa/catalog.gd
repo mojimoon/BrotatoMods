@@ -436,6 +436,8 @@ const DOWNSIDE_SIGN = {
 	"damage_against_bosses": -1, "recycling_gains": -1, "structure_attack_speed": -1, "loot_alien_chance": -1,
 	"level_upgrades_modifications": -1,
 }
+# 效果不迁移到道具 / 其他角色的原版角色：杰克（+200% 材料、+125% 首领伤害等数值靠 -70% 敌人数量平衡，原版道具都有同类）
+const CHAR_SOURCE_EXCLUDED = ["character_jack"]
 # 角色效果中不能搬到道具上的身份 / 结构性 key
 const CHAR_MECHANIC_BANNED = [
 	"weapon_slot", "weapon_slot_upgrades", "min_weapon_tier", "max_weapon_tier", "no_melee_weapons",
@@ -636,7 +638,7 @@ const GROWTH_MIN_TIER = 2
 # 字典以便审计搜索时修改
 const GROWTH_REF = {"v": 56.0, "mult": 1.0}
 # 不靠专门投入也会有的持有量：最大生命（初始 10、每级 +1、许多道具顺带加）
-const GROWTH_BASELINE = {"stat_max_hp": 30.0}
+const GROWTH_BASELINE = {"stat_max_hp": 50.0}
 const GROWTH_TARGETS = {"stat_percent_damage": 2.0, "stat_attack_speed": 2.0, "stat_max_hp": 1.0}
 const GROWTH_COUNTERS = [
 	"stat_max_hp", "stat_hp_regeneration", "stat_lifesteal", "stat_percent_damage", "stat_melee_damage",

@@ -825,6 +825,8 @@ func _collect_character_mechanics(characters: Array, effect_keys: Dictionary) ->
 	var known_only = []
 	var per_char = []
 	for ch in characters:
+		if ch.my_id in Catalog.CHAR_SOURCE_EXCLUDED:
+			continue
 		var known = 0.0
 		var mechs = []
 		for e in ch.effects:
@@ -840,12 +842,28 @@ func _collect_character_mechanics(characters: Array, effect_keys: Dictionary) ->
 	if known_only.size() >= 3:
 		known_only.sort()
 		character_budget = max(Catalog.CHARACTER_BUDGET_DEFAULT, known_only[known_only.size() / 2])
+	# 原版道具里也有的可缩放机制（杰克的 +200% 材料掉落 ↔ 邪恶帽子的 +70%）：按道具反推的单位价值估值，并可缩放
+	# （复制到道具上时按预算缩小数值）。否则按角色预算平分、数值固定——角色的这类效果常靠其他代价平衡（杰克 -70% 敌人数量），
+	# 单独搬到道具上按平分值估价会严重低估
+	var unit = {}
+	for t in 4:
+		for m in mechanics_by_tier[t]:
+			if m.get("scalar", false) and not m.down and m.effect.value != 0:
+				var mk = m.effect.custom_key if m.effect.custom_key != "" else m.effect.key
+				if not unit.has(mk):
+					unit[mk] = abs(float(m.value) / float(m.effect.value))
 	for entry in per_char:
 		# 角色机制往往是整局核心（某类武器 +50% 攻速等），保守起见每条至少 30
 		var each = clamp((character_budget - entry[1]) / entry[2].size(), 30.0, 80.0)
 		var tier = 0 if each < 15.0 else (1 if each < 35.0 else (2 if each < 60.0 else 3))
 		for e in entry[2]:
-			mechanics_by_tier[tier].push_back({"effect": e, "value": each, "down": false, "source": entry[0].my_id, "tags": []})
+			var k = e.custom_key if e.custom_key != "" else e.key
+			if unit.has(k):
+				var v = unit[k] * abs(float(e.value))
+				var vt = 0 if v < 15.0 else (1 if v < 35.0 else (2 if v < 60.0 else 3))
+				mechanics_by_tier[vt].push_back({"effect": e, "value": v, "down": false, "source": entry[0].my_id, "tags": [], "scalar": true})
+			else:
+				mechanics_by_tier[tier].push_back({"effect": e, "value": each, "down": false, "source": entry[0].my_id, "tags": []})
 
 
 func _is_transferable_character_mechanic(e, effect_keys: Dictionary) -> bool:
@@ -1815,7 +1833,11 @@ var char_templates: Dictionary = {}		# 原版角色效果模板：class_bonus（
 var guaranteed_candidates: Array = []
 
 
-func _collect_char_templates(characters: Array, items: Array = []) -> void:
+func _collect_char_templates(all_characters: Array, items: Array = []) -> void:
+	var characters = []
+	for ch in all_characters:
+		if not ch.my_id in Catalog.CHAR_SOURCE_EXCLUDED:
+			characters.push_back(ch)
 	char_templates = {"class_bonus": [], "weapon_counters": {}, "beta": {}}
 	var class_script = load("res://effects/items/class_bonus_effect.gd")
 	# 全部角色效果：按 key（列表型按 custom_key）收集模板
