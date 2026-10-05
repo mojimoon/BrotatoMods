@@ -201,7 +201,7 @@
 | T3 | 觉醒士兵头盔 | 55 | +1 元素伤害<br>+11 获得%经验<br>移动时，每150材料会+3近战伤害 [+0]<br>捡起消耗品时-3幸运，直至敌袭结束。每波最大值：-60 | stat_elemental_damage, xp_gain, economy, stat_melee_damage |  |
 | T3 | 贪吃的小麦 | 65 | +2 远程伤害<br>+2 收获<br>捡起消耗品时获得3个材料 | stat_ranged_damage, stat_harvesting, consumable, economy |  |
 | T3 | 厚重的鬼火 | 80 | +11 最大生命值<br>生命值低于50%时+38%伤害<br>生命值低于50%时-25%速度<br>闪避时+5%敌人伤害，直至敌袭结束 | stat_max_hp, stat_percent_damage, stat_dodge |  |
-| T3 | 回响的翅膀 | 55 | +1 护甲<br>每永久持有2护甲会+3%攻击速度 [+0] | stat_armor, stat_attack_speed | 独特，成长型 |
+| T3 | 回响的翅膀 | 55 | +1 护甲<br>每永久持有1护甲会+2%攻击速度 [+0] | stat_armor, stat_attack_speed | 独特，成长型 |
 | T3 | 回响的智慧 | 75 | +1 护甲<br>+1 %生命窃取<br>每持有一异种IV级别物品有+3%速度[+3] | stat_armor, stat_lifesteal, stat_speed |  |
 | T4 | 奥术铁砧 | 100 | +8 元素伤害<br>敌袭开始时，永久获得“每8生命再生会+2最大生命值 [+0]”<br>-5 近战伤害 | stat_elemental_damage, stat_hp_regeneration, stat_max_hp |  |
 | T4 | 回响的灰烬 | 110 | +8 近战伤害<br>+5 最大生命值<br>每持有一异种I级别物品有+5幸运[+0]<br>下场敌袭以1点生命值开始 | stat_melee_damage, stat_max_hp, stat_luck |  |
@@ -225,7 +225,7 @@
 | T4 | 锐利的克拉肯的眼睛 | 100 | +1 护甲<br>+4 近战伤害<br>+8 %伤害<br>刷新商店时将1点属性点随机分配到你的主要属性上（每波最多7次）<br>+15 诅咒<br>下场敌袭以1点生命值开始 | stat_armor, stat_melee_damage, stat_percent_damage, stat_curse |  |
 | T4 | 精炼的灯笼 | 110 | +3 近战伤害<br>+3 生命再生<br>最大生命值的修改增加20%<br>移动时-5生命再生 | stat_melee_damage, stat_hp_regeneration, stat_max_hp |  |
 | T4 | 灵巧的幸运硬币 | 110 | +13 %闪避<br>+1 武器栏<br>-15 %伤害 | stat_dodge |  |
-| T4 | 共鸣猛犸 | 100 | +5 工程学<br>每永久持有3工程学会+5%伤害 [+0]<br>杀死敌人时-1%攻击速度，直至敌袭结束。每波最大值：-30 | stat_engineering, stat_percent_damage | 限制 (2)，成长型 |
+| T4 | 共鸣猛犸 | 100 | +5 工程学<br>每永久持有2工程学会+5%伤害 [+0]<br>杀死敌人时-1%攻击速度，直至敌袭结束。每波最大值：-30 | stat_engineering, stat_percent_damage | 限制 (2)，成长型 |
 | T4 | 沉重的急救包 | 105 | +18 近战伤害<br>使用音乐类武器时+200％暴击伤害<br>-80 范围 | stat_melee_damage, stat_crit_chance |  |
 | T4 | 生机夜视镜 | 90 | +13 生命再生<br>+4 %攻击速度<br>%速度的修改增加50%<br>-24 %伤害 | stat_hp_regeneration, stat_attack_speed, stat_speed |  |
 | T4 | 增幅章鱼 | 105 | +12 %暴击率<br>+8 %速度<br>+4 生命再生<br>%闪避的修改增加50% | stat_crit_chance, stat_speed, stat_hp_regeneration, stat_dodge |  |
@@ -241,4 +241,4 @@
 | T4 | 铁甲蜘蛛 | 90 | +5 护甲<br>+1 %生命窃取<br>以暴击杀死敌人时，+1%速度，持续8秒 | stat_armor, stat_lifesteal, stat_speed, stat_crit_chance |  |
 | T4 | 古怪的拷问 | 100 | +5 最大生命值<br>+3 生命再生<br>掉落+16%材料<br>-4 远程伤害 | stat_max_hp, stat_hp_regeneration, economy, pickup |  |
 | T4 | 耐心的爆炸炮塔 | 100 | +2 %闪避<br>+1 护甲<br>+1 %生命窃取<br>+2 %攻击速度<br>+2 最大生命值<br>敌袭结束时+3%速度<br>下场敌袭以1点生命值开始 | stat_dodge, stat_armor, stat_lifesteal, stat_attack_speed, stat_max_hp, stat_speed |  |
-| T4 | 回响的野狼头盔 | 80 | +4 %闪避<br>每永久持有12%闪避会+5最大生命值 [+0]<br>杀死敌人时-1幸运，直至敌袭结束。每波最大值：-15 | stat_dodge, stat_max_hp | 独特，成长型 |
+| T4 | 回响的野狼头盔 | 80 | +4 %闪避<br>每永久持有8%闪避会+5最大生命值 [+0]<br>杀死敌人时-1幸运，直至敌袭结束。每波最大值：-15 | stat_dodge, stat_max_hp | 独特，成长型 |

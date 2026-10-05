@@ -2542,7 +2542,7 @@ func test_149_tier_chaos() -> void:
 
 # 成长型道具计数期望的参数搜索（AA_SEARCH=<次数> 时才运行）：用原版属性转化道具做锚点，
 # 预测转化率 =（道具预算 - 其余效果价值）/（B 的权重 × 计数期望），目标 = 原版转化率 × GROWTH_TARGET
-const GROWTH_TARGET = 0.85
+const GROWTH_TARGET = 1.0
 const GROWTH_ANCHORS = ["item_bloody_hand", "item_power_generator", "item_retromations_hoodie", "item_stone_skin", "item_strange_book", "item_lucky_coin", "item_coil", "item_padding", "item_community_support", "item_fried_rice"]
 
 
@@ -2603,7 +2603,7 @@ func test_164_search_growth_ref() -> void:
 	var results = []
 	for i in n_try + 1:
 		if i > 0:
-			params.kappa = rng.randf_range(0.0, 1.0)
+			params.v = rng.randf_range(30.0, 600.0)
 			params.mult = rng.randf_range(0.4, 2.5)
 		var err = 0.0
 		var detail = ""
@@ -2612,13 +2612,13 @@ func test_164_search_growth_ref() -> void:
 			var l = log(pred / (r[4] * GROWTH_TARGET))
 			err += l * l
 			detail += "%s %.2f/%.2f " % [r[0].replace("item_", ""), pred, r[4]]
-		results.push_back([err / rows.size(), params.kappa, params.mult, detail])
-	params.kappa = base.kappa
+		results.push_back([err / rows.size(), params.v, params.mult, detail])
+	params.v = base.v
 	params.mult = base.mult
-	print("AUDIT growth search baseline err %.3f kappa %.2f mult %.2f | %s" % results[0])
+	print("AUDIT growth search baseline err %.3f v %.1f mult %.2f | %s" % results[0])
 	results.sort_custom(self, "_sort_first_num_asc")
 	for r in results.slice(0, 5):
-		print("AUDIT growth search err %.3f kappa %.2f mult %.2f | %s" % r)
+		print("AUDIT growth search err %.3f v %.1f mult %.2f | %s" % r)
 
 
 func _sort_first_num_asc(a, b) -> bool:

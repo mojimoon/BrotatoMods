@@ -632,14 +632,11 @@ const COUNTER_REF = {
 const GROWTH_ITEM_CHANCE = 0.06
 # 成长型道具只出现在 T3 及以上（原版的属性转化道具全是 T3–T4；T2 便宜、买得早、持有久，最容易超模）
 const GROWTH_MIN_TIER = 2
-# 计数期望的参数（见 Valuation.growth_counter_ref）：字典以便审计搜索时修改
-const GROWTH_REF = {"kappa": 0.4, "mult": 1.12}
-# 原版角色"想要词条"里出现该属性的角色比例（suite_core test_164 打印）
-const GROWTH_COVERAGE = {
-	"stat_armor": 0.08, "stat_crit_chance": 0.05, "stat_dodge": 0.03, "stat_elemental_damage": 0.03, "stat_engineering": 0.06,
-	"stat_harvesting": 0.03, "stat_hp_regeneration": 0.08, "stat_lifesteal": 0.06, "stat_luck": 0.06, "stat_max_hp": 0.09,
-	"stat_melee_damage": 0.11, "stat_percent_damage": 0.02, "stat_range": 0.03, "stat_ranged_damage": 0.05, "stat_speed": 0.05,
-}
+# 计数期望的参数（见 Valuation.growth_counter_ref）：v = 专精玩家在计数属性上投入的价值，mult = 非属性计数的倍率；
+# 字典以便审计搜索时修改
+const GROWTH_REF = {"v": 56.0, "mult": 1.0}
+# 不靠专门投入也会有的持有量：最大生命（初始 10、每级 +1、许多道具顺带加）
+const GROWTH_BASELINE = {"stat_max_hp": 30.0}
 const GROWTH_TARGETS = {"stat_percent_damage": 2.0, "stat_attack_speed": 2.0, "stat_max_hp": 1.0}
 const GROWTH_COUNTERS = [
 	"stat_max_hp", "stat_hp_regeneration", "stat_lifesteal", "stat_percent_damage", "stat_melee_damage",
