@@ -649,3 +649,46 @@ func test_153_flat_damage_effects_relative() -> void:
 	print("AUDIT stick +X damage: relative gain at 5 dmg %.2f, at 60 dmg %.2f" % [gain_lo, gain_hi])
 	_check(gain_lo > 1.0 and gain_hi > 1.0, "flat damage effect adds power")
 	_check(gain_lo - 1.0 > (gain_hi - 1.0) * 2.0, "worth relatively more on a low-damage weapon")
+
+
+# 效果里的暴击 / 元素属性不给词条：精准类别只来自高暴击面板，元素类别只来自元素加成与燃烧（默认设置：深度重组 + 道具效果）
+func test_154_effect_crit_elemental_no_tag() -> void:
+	var WV = load(MOD_DIR + "aa/weapon_value.gd")
+	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
+	var weapons = m.native_only(isvc.weapons)
+	var cfg = _cfg()
+	cfg.weapons = true
+	cfg.weapon_mode = "deep"
+	cfg.w_item_effects = true
+	for sd in [3, 23]:
+		var g = Generator.new(cfg, sd)
+		g.generate(isvc.items, isvc.characters, [], [])
+		var wg = WG.new(cfg, sd, g)
+		var out = wg.generate(weapons)
+		var set_count = {}
+		var fams = {}
+		var burning = 0
+		var elem = 0
+		for id in out:
+			var w = isvc.get_element_safe(isvc.weapons, id)
+			var f = WG.family_of(w)
+			if fams.has(f):
+				continue
+			fams[f] = true
+			var p = out[id]
+			var tags = wg.weapon_tags(w.type, p.stats, p.effects)
+			var high_crit = float(p.stats.crit_chance) >= WG.HIGH_CRIT_CHANCE or float(p.stats.crit_damage) >= WG.HIGH_CRIT_DAMAGE
+			_eq("stat_crit_chance" in tags, high_crit, f + " crit tag only from the stat panel")
+			var elem_scaling = false
+			for sc in p.stats.scaling_stats:
+				if WV.stat_name(sc[0]) == "stat_elemental_damage" and float(sc[1]) > 0:
+					elem_scaling = true
+			_eq("stat_elemental_damage" in tags, elem_scaling, f + " elemental tag only from scaling")
+			for x in p.sets:
+				set_count[x.my_id] = set_count.get(x.my_id, 0) + 1
+			if "burning" in tags:
+				burning += 1
+			if elem_scaling:
+				elem += 1
+		print("AUDIT default sets seed %d %s; burning %d, elemental scaling %d" % [sd, str(set_count), burning, elem])
+		print("AUDIT native sets %s" % str(wg._set_native_count))

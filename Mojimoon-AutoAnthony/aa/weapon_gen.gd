@@ -904,6 +904,10 @@ func _solve_damage(st, effects: Array, tier: int, want: float) -> float:
 	return sqrt(lo * hi)
 
 
+# 效果里的暴击 / 元素属性不给词条（不决定精准 / 元素类别）；暴击词条只看武器面板，元素只看加成属性与燃烧
+const EFFECT_NO_TAG_STATS = ["stat_crit_chance", "stat_elemental_damage"]
+
+
 # 武器的词条：加成属性、暴击 / 吸血 / 慢速重击等特性、效果的词条、道具效果的属性
 func weapon_tags(ty: int, st, effects: Array) -> Array:
 	var tags = []
@@ -939,10 +943,10 @@ func weapon_tags(ty: int, st, effects: Array) -> Array:
 				tags.push_back("structure")
 			"burning_spread":
 				tags.push_back("burning")
-			"pierce_on_crit", "bounce_on_crit", "crit_on_hitting_burning_target":
-				tags.push_back("stat_crit_chance")
 			"temp_stats_while_not_moving":
 				tags.push_back("stand_still")
+		if e.key in EFFECT_NO_TAG_STATS:
+			continue
 		if e.has_meta("aa_value") and not e is TriggerEffect and Catalog.STATS.has(e.key) and e.value > 0:
 			tags.push_back(e.key)
 		elif Catalog.STATS.has(e.key) and WeaponValue.is_plain_player_stat(e) and e.value > 0:
