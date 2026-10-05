@@ -686,7 +686,7 @@ func test_154_effect_crit_elemental_no_tag() -> void:
 			_eq("stat_elemental_damage" in tags, elem_scaling, f + " elemental tag only from scaling")
 			for x in p.sets:
 				set_count[x.my_id] = set_count.get(x.my_id, 0) + 1
-			if "burning" in tags:
+			if "burning" in tags or "burning_main" in tags:
 				burning += 1
 			if elem_scaling:
 				elem += 1

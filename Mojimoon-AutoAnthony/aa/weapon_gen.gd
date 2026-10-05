@@ -360,15 +360,15 @@ const BASE_DMG_MIN = [3.0, 5.0, 7.0, 10.0]
 const HIGH_CRIT_CHANCE = 0.15
 const HIGH_CRIT_DAMAGE = 2.5
 
-# 词条 -> 武器类别：must = 必定、may = 可能（重复出现 = 权重更高）。词条包括原版角色的偏好词条（含全部主要属性）与武器自身特性；
+# 词条 -> 武器类别：must = 必定、high = 优先（必定之后、名额未满时先取）、may = 可能（重复出现 = 权重更高）。词条包括原版角色的偏好词条（含全部主要属性）与武器自身特性；
 # 宠物词条没有对应类别（驯兽师没有武器）
 const TAG_SETS = {
 	"stat_melee_damage": {"may": ["set_blade", "set_blade", "set_primitive", "set_primitive", "set_blunt", "set_medieval", "set_unarmed"]},
-	"stat_ranged_damage": {"may": ["set_gun", "set_gun", "set_gun", "set_gun", "set_precise", "set_heavy"]},
+	"stat_ranged_damage": {"high": ["set_gun"], "may": ["set_precise", "set_heavy"]},
 	"stat_elemental_damage": {"must": ["set_elemental"]},
 	"stat_engineering": {"must": ["set_tool"], "may": ["set_support"]},
-	"stat_lifesteal": {"must": ["set_medical"], "may": ["set_blade"]},
-	"stat_hp_regeneration": {"must": ["set_medical"]},
+	"stat_lifesteal": {"may": ["set_medical", "set_blade"]},
+	"stat_hp_regeneration": {"may": ["set_medical"]},
 	"stat_max_hp": {"may": ["set_blunt", "set_heavy", "set_medical"]},
 	"stat_armor": {"may": ["set_blunt", "set_medieval", "set_heavy"]},
 	"stat_dodge": {"may": ["set_ethereal", "set_unarmed"]},
@@ -381,7 +381,8 @@ const TAG_SETS = {
 	"stat_attack_speed": {"may": ["set_primitive", "set_unarmed"]},
 	"stat_levels": {"may": ["set_primitive", "set_medieval"]},
 	"explosive": {"must": ["set_explosive"]},
-	"burning": {"must": ["set_elemental"]},
+	"burning": {"may": ["set_elemental"]},
+	"burning_main": {"high": ["set_elemental"]},
 	"structure": {"must": ["set_tool"], "may": ["set_support"]},
 	"ethereal": {"must": ["set_ethereal"]},
 	"musical": {"must": ["set_musical"]},
@@ -951,6 +952,11 @@ func weapon_tags(ty: int, st, effects: Array) -> Array:
 			tags.push_back(e.key)
 		elif Catalog.STATS.has(e.key) and WeaponValue.is_plain_player_stat(e) and e.value > 0:
 			tags.push_back(e.key)
+	# 燃烧武器的主加成是元素伤害：优先元素类别；否则只是"可能"
+	if not st.scaling_stats.empty() and WeaponValue.stat_name(st.scaling_stats[0][0]) == "stat_elemental_damage":
+		for i in tags.size():
+			if tags[i] == "burning":
+				tags[i] = "burning_main"
 	return tags
 
 
@@ -978,17 +984,27 @@ func _pick_sets(fam: Dictionary, res: Dictionary) -> Array:
 		out.push_back("set_legendary")
 	var tags = weapon_tags(ty, p.stats, p.effects)
 	var may = {}
+	var high = {}
 	for t in tags:
 		var m = TAG_SETS.get(t, {})
 		for id in m.get("must", []):
 			if _set_ok(id, ty) and not id in out:
 				out.push_back(id)
+		for id in m.get("high", []):
+			if _set_ok(id, ty):
+				high[id] = high.get(id, 0.0) + 1.0
 		for id in m.get("may", []):
 			if _set_ok(id, ty):
 				may[id] = may.get(id, 0.0) + 1.0
 	n = max(n, min(out.size(), 2))
 	while out.size() > n:
 		out.pop_back()
+	for id in out:
+		high.erase(id)
+	while out.size() < n and not high.empty():
+		var id = _pick_w(high)
+		high.erase(id)
+		out.push_back(id)
 	while out.size() < n:
 		var w = {}
 		for id in _sets:
