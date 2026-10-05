@@ -3,6 +3,14 @@ extends "res://mods/tests/AutoAnthony/test_base.gd"
 # weapons：武器重组的全部测试（价值模型、仅重组效果、深度重组、道具效果、低级武器、混沌、名称、真实战斗与选择武器界面）
 
 
+func _keys_of(effects: Array) -> Array:
+	var WV = load(MOD_DIR + "aa/weapon_value.gd")
+	var ks = []
+	for e in effects:
+		ks.push_back(WV.effect_key(e))
+	return ks
+
+
 func test_31_weapons_swap_within_type() -> void:
 	m.cfg_weapons = true
 	m.cfg_items = false
@@ -14,6 +22,8 @@ func test_31_weapons_swap_within_type() -> void:
 	var wg = WG.new(m.get_cfg(), 11)
 	wg.generate(weapons)
 	_check(out.size() > 200, "weapons mapped (%d)" % out.size())
+	var lifted = 0
+	var over = 0
 	var changed = 0
 	var cross = 0
 	var off = 0
@@ -32,19 +42,28 @@ func test_31_weapons_swap_within_type() -> void:
 			if w.type == 0:
 				_check(not WG.ranged_only(e), "%s (melee) has no ranged-only effect %s" % [id, WV.effect_key(e)])
 			if WG.bound_key(e):
-				_check(e in w.effects, "%s keeps only its own family-bound effect %s" % [id, WV.effect_key(e)])
+				_check(WV.effect_key(e) in _keys_of(w.effects), "%s keeps only its own family-bound effect %s" % [id, WV.effect_key(e)])
+		# 绑定效果按 key 比较（参数按家族随机）
 		for e in w.effects:
 			if WG.bound_key(e):
-				_check(e in p.effects, "%s keeps its family-bound effect" % id)
+				_check(WV.effect_key(e) in _keys_of(p.effects), "%s keeps its family-bound effect" % id)
 		# 价值守恒：新武器价值 = 原价值 × 家族浮动（伤害取整误差内）
 		var want = wg._want(w) * wg._family_mult(WG.family_of(w))
 		var got = wg.wv.value(p.stats, p.effects, w.tier)
-		if abs(got - want) > max(3.0, want * 0.15):
+		# 为不倒挂而抬高伤害的武器会超出目标，单独计数
+		if p.get("lifted", false):
+			lifted += 1
+			if got > want * 1.3:
+				over += 1
+				print("AUDIT lifted over target %s: want %.1f got %.1f" % [id, want, got])
+		elif abs(got - want) > max(3.0, want * 0.15):
 			off += 1
 			print("AUDIT weapon value off %s: want %.1f got %.1f (scale %.2f)" % [id, want, got, p.scale])
 	_check(changed > out.size() / 2, "most weapons got another family's effects (%d)" % changed)
 	_check(cross > 0, "effects cross melee / ranged (%d)" % cross)
 	_check(off <= out.size() / 20, "weapon values match the target (%d off)" % off)
+	print("AUDIT lifted %d, of which > 1.3x target %d" % [lifted, over])
+	_check(over <= out.size() / 10, "few lifted weapons far above target (%d)" % over)
 	print("AUDIT weapons: %d, other family %d, cross-type %d" % [out.size(), changed, cross])
 
 
@@ -80,7 +99,8 @@ func test_141_weapon_deep_reassembly() -> void:
 					_check(not WG.ranged_only(e), id + " melee has no ranged-only effect")
 			var want = wg._want(w, true) * wg._family_mult(WG.family_of(w))
 			var got = wg.wv.value(p.stats, p.effects, w.tier)
-			if abs(got - want) > max(3.0, want * 0.15):
+			# 为不倒挂而抬高伤害的武器会超出目标，不计
+			if not p.get("lifted", false) and abs(got - want) > max(3.0, want * 0.15):
 				off += 1
 			var f = WG.family_of(w)
 			if fams.has(f):
@@ -985,3 +1005,55 @@ func _eval_value_params(WV, all: Array, rows: Array, c: Array) -> Array:
 			bias += float(sums[g][1]) / n * mean * mean
 		gm[g] = stepify(exp(mean), 0.01)
 	return [var_ + 2.0 * bias, var_, bias, gm]
+
+
+# 伤害不倒挂（两种模式）：同一家族高一级的基础伤害与每项加成系数不低于低一级；
+# 固定参数的效果按家族随机（砖头碎裂几率 1–3%，各级相同）；原版砖头按寿命折扣估值后与按价格的估值相近
+func test_162_no_inversion_and_fixed_params() -> void:
+	var WV = load(MOD_DIR + "aa/weapon_value.gd")
+	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
+	var weapons = m.native_only(isvc.weapons)
+	for mode in ["effects", "deep"]:
+		var cfg = _cfg()
+		cfg.weapons = true
+		cfg.weapon_mode = mode
+		for sd in [3, 11]:
+			var wg = WG.new(cfg, sd)
+			var out = wg.generate(weapons)
+			var bad = 0
+			for f in wg.fam_names:
+				var tiers = wg.families[f].tiers.keys()
+				tiers.sort()
+				var prev = null
+				var chance = -1
+				for t in tiers:
+					var p = out.get(wg.families[f].tiers[t].my_id)
+					if p == null:
+						continue
+					if prev != null:
+						if p.stats.damage < prev.stats.damage:
+							bad += 1
+							print("AUDIT inversion %s T%d damage %d < %d" % [f, t + 1, p.stats.damage, prev.stats.damage])
+						for x in p.stats.scaling_stats:
+							for y in prev.stats.scaling_stats:
+								if x[0] == y[0] and float(y[1]) >= 0 and float(x[1]) < float(y[1]):
+									bad += 1
+									print("AUDIT inversion %s T%d coef %s < %s" % [f, t + 1, str(x[1]), str(y[1])])
+					for e in p.effects:
+						if WV.effect_key(e) == "break_on_hit":
+							_check(int(e.value) >= 1 and int(e.value) <= 3, f + " break chance 1-3%")
+							if chance >= 0:
+								_eq(int(e.value), chance, f + " break chance same on every tier")
+							chance = int(e.value)
+					prev = p
+			_eq(bad, 0, "%s seed %d: no tier has lower damage / scaling than the tier below" % [mode, sd])
+	var wv = WV.new()
+	wv.calibrate(weapons)
+	var wg2 = WG.new(_cfg(), 1)
+	wg2.generate(weapons)
+	for w in weapons:
+		if WG.family_of(w) == "weapon_brick":
+			var by_price = float(w.value) * float(wg2._vp.get(str(w.type) + "/" + str(w.tier), 1.0))
+			var r = wv.value(w.stats, w.effects, w.tier) / by_price
+			print("AUDIT brick %s value / by-price %.2f (brick_k %.2f)" % [w.my_id, r, wv.brick_k])
+			_check(r > 0.4 and r < 2.5, w.my_id + " valued near its price after the life discount (%.2f)" % r)

@@ -64,7 +64,9 @@ const MODELED_EFFECTS = ["weapon_exploding", "weapon_burning", "weapon_projectil
 # 计入每次命中的伤害，价值随 X / 面板伤害变化；计数取典型值
 const FREE_SLOTS_REF = 2.0
 const STACK_REF = 4.0
-const MODELED_KEYS = ["reload_when_pickup_gold"]
+const MODELED_KEYS = ["reload_when_pickup_gold", "break_on_hit"]
+# 自伤（大镰刀"每秒受到 X 点伤害"）：每点约等于 LOSE_HP_REGEN 点生命回复的代价
+const LOSE_HP_REGEN = 10.0
 # 武器上的玩家属性行相对道具属性权重的倍率（原版武器的属性行定价约为道具的 2 倍以上；随机搜索得出）
 const STAT_LINE_MULT = 2.2
 # 捡材料时换弹（喇叭枪）：实际攻击间隔约为此值（秒）
@@ -255,9 +257,6 @@ static func magnitude(e) -> float:
 			return 1.0 / max(1.0, v)
 		"gain_stat_for_every_step_after_equip":
 			return 1.0 / max(1.0, float(e.value2))
-		"break_on_hit":
-			# 命中后有几率碎裂（砖头）：代价（所以砖头便宜、伤害高，过渡用），按碎裂几率计
-			return -v
 		"enemy_percent_damage_taken":
 			return v * float(e.max_stacks)
 		"temp_stats_per_interval":
@@ -291,6 +290,19 @@ static func is_modeled(e) -> bool:
 var k_by: Dictionary = {}		# "M0" -> 价格 / power
 var unit_by_key: Dictionary = {}	# 效果 key -> 每单位大小的材料价值
 var fit_rows: Array = []		# [weapon, price, value]
+# 会碎裂的武器（砖头）：伤害部分的价值 × 1 / (1 + brick_k × 碎裂几率%)（用到碎裂为止），由原版砖头标定
+var brick_k: float = 2.0
+
+
+static func break_chance(effects: Array) -> float:
+	for e in effects:
+		if effect_key(e) == "break_on_hit":
+			return float(e.value)
+	return 0.0
+
+
+func life_mult(effects: Array) -> float:
+	return 1.0 / (1.0 + brick_k * break_chance(effects))
 
 
 static func _tk(st, tier: int) -> String:
@@ -325,7 +337,7 @@ func calibrate(weapons: Array) -> void:
 			legendary_families[f] = true
 	var ratios = {}
 	for w in weapons:
-		if w.stats == null or int(w.value) <= 0 or legendary_families.has(_family(w)):
+		if w.stats == null or int(w.value) <= 0 or legendary_families.has(_family(w)) or break_chance(w.effects) > 0:
 			continue
 		var pure = true
 		for e in w.effects:
@@ -350,6 +362,15 @@ func calibrate(weapons: Array) -> void:
 					if k_by.has(ty + str(t + d)):
 						k_by[key] = k_by[ty + str(t + d)]
 						break
+	# 砖头：价格 = k × power / (1 + brick_k × 几率) + 属性行 ⇒ brick_k 取中位数
+	var bk = []
+	for w in weapons:
+		var c = break_chance(w.effects)
+		if c > 0 and w.stats != null and int(w.value) > 0:
+			var rest = max(1.0, float(w.value) - _player_stat_value(w.stats, w.effects))
+			bk.push_back(max(0.0, (k(w.stats, w.tier) * power(w.stats, w.effects, w.tier) / rest - 1.0) / c))
+	if not bk.empty():
+		brick_k = _median(bk)
 	var resid = {}
 	var prices = {}
 	var mags = {}
@@ -362,7 +383,7 @@ func calibrate(weapons: Array) -> void:
 				others.push_back(e)
 		if others.empty():
 			continue
-		var r = float(w.value) - k(w.stats, w.tier) * power(w.stats, w.effects, w.tier) - _player_stat_value(w.stats, w.effects)
+		var r = float(w.value) - k(w.stats, w.tier) * power(w.stats, w.effects, w.tier) * life_mult(w.effects) - _player_stat_value(w.stats, w.effects)
 		for e in others:
 			var mg = magnitude(e)
 			if abs(mg) < 0.0001:
@@ -425,6 +446,8 @@ func effect_value(e, neg: Dictionary = {}) -> float:
 		if neg.has(e.key):
 			return 0.0
 		return Catalog.stat_w(e.key) * float(e.value) * sc * stat_line_mult
+	if effect_key(e) == "lose_hp_per_second":
+		return -float(e.value) * LOSE_HP_REGEN * Catalog.stat_w("stat_hp_regeneration") * sc
 	# 每有 1 把武器 +X 属性（王者之剑）：就是玩家属性，按 6 把武器计
 	if e.custom_key == "additional_weapon_effects" and Catalog.STATS.has(e.key):
 		return Catalog.stat_w(e.key) * float(e.value) * WEAPON_COUNT * sc
@@ -433,7 +456,7 @@ func effect_value(e, neg: Dictionary = {}) -> float:
 
 # 武器的材料价值
 func value(st, effects: Array, tier: int) -> float:
-	var v = k(st, tier) * power(st, effects, tier)
+	var v = k(st, tier) * power(st, effects, tier) * life_mult(effects)
 	var neg = _neg_scaling(st)
 	for e in effects:
 		v += effect_value(e, neg)

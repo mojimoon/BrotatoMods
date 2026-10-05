@@ -89,6 +89,7 @@ func generate(weapons: Array) -> Dictionary:
 	fam_names = families.keys()
 	fam_names.sort()
 	var out = generate_deep() if str(cfg.get("weapon_mode", "effects")) == "deep" else generate_effects_only()
+	_no_inversion(out)
 	_name_families(out)
 	return out
 
@@ -232,7 +233,7 @@ func _apply_donor(f: String, target: Dictionary, donor: Dictionary, mult: float,
 		# 目标家族自身绑定的效果保留
 		for e in tw.effects:
 			if bound_key(e):
-				effects.push_back(e)
+				effects.push_back(_vary_fixed(e, f))
 		for e in dw.effects:
 			if bound_key(e):
 				continue
@@ -240,7 +241,7 @@ func _apply_donor(f: String, target: Dictionary, donor: Dictionary, mult: float,
 				if force:
 					continue
 				return {}
-			effects.push_back(_adapt(_convert_explosion(e.duplicate(), target.type), tw))
+			effects.push_back(_vary_fixed(_adapt(_convert_explosion(e.duplicate(), target.type), tw), f))
 		var want = _want(tw) * mult
 		var line = _item_effect(spec, tier, want)
 		if line != null:
@@ -249,11 +250,76 @@ func _apply_donor(f: String, target: Dictionary, donor: Dictionary, mult: float,
 		if not force and (r < MIN_SCALE or r > MAX_SCALE):
 			return {}
 		var st = scaled_stats(tw.stats, r)
-		out[tw.my_id] = {"effects": effects, "stats": st, "donor": dw.my_id, "scale": r}
+		out[tw.my_id] = {"effects": effects, "stats": st, "donor": dw.my_id, "scale": r, "want": want}
 	return out
 
 
 # 效果搬到新武器上的改写：棍子的"每有 1 把同名武器"指向新武器
+# 固定参数的效果按家族随机（各稀有度共用一次抽取）：砖头的碎裂几率（掉落材料同比放大）、磁轨炮的加成、自伤
+func _vary_fixed(e, f: String):
+	var key = WeaponValue.effect_key(e)
+	if not key in ["break_on_hit", "effect_no_hit_boost", "lose_hp_per_second"]:
+		return e
+	var r = RandomNumberGenerator.new()
+	r.seed = hash(str(seed_value) + "/wfix/" + f + "/" + key)
+	var ne = e.duplicate()
+	match key:
+		"break_on_hit":
+			var c = r.randi_range(1, 3)
+			if "value2" in ne:
+				ne.value2 = int(round(float(ne.value2) * c / max(1.0, float(ne.value))))
+			ne.value = c
+		"effect_no_hit_boost":
+			ne.value = int(max(1, round(float(ne.value) * r.randf_range(0.5, 1.5))))
+		"lose_hp_per_second":
+			ne.value = r.randi_range(1, 4)
+	return ne
+
+
+# 高一级的基础伤害与每项加成系数不低于低一级（效果价值逐级增长时，按价值解出的伤害可能倒挂）；
+# 抬高后价值超出目标时缩小效果数值补回（让效果让步，而不是伤害）
+func _no_inversion(out: Dictionary) -> void:
+	for f in fam_names:
+		var tiers = families[f].tiers.keys()
+		tiers.sort()
+		var prev = null
+		for t in tiers:
+			var id = families[f].tiers[t].my_id
+			if not out.has(id) or not out[id].has("stats"):
+				continue
+			var st = out[id].stats
+			if prev != null:
+				var lifted = st.damage < prev.damage
+				st.damage = int(max(st.damage, prev.damage))
+				var sc = []
+				for x in st.scaling_stats:
+					var c = float(x[1])
+					for y in prev.scaling_stats:
+						if y[0] == x[0] and c >= 0 and float(y[1]) > c:
+							c = float(y[1])
+							lifted = true
+					sc.push_back([x[0], c])
+				st.scaling_stats = sc
+				if lifted:
+					out[id]["lifted"] = true
+					_fit_effects(out[id], t)
+			prev = st
+
+
+func _fit_effects(p: Dictionary, tier: int) -> void:
+	if not p.has("want"):
+		return
+	var want = float(p.want)
+	var got = wv.value(p.stats, p.effects, tier)
+	if got <= want * 1.05:
+		return
+	var bare = wv.value(p.stats, [], tier)
+	var fx = got - bare
+	if fx <= 0:
+		return
+	p.effects = _shrink_effects(p.effects, clamp((want - bare) / fx, 0.0, 1.0))
+
+
 static func _adapt(e, tw):
 	if e is WeaponStackEffect:
 		e.weapon_stacked_id = tw.weapon_id
@@ -352,8 +418,8 @@ const MAIN_STEP_CAP = 1.15
 # 单次伤害（含暴击）不宜超过该阶段参考敌人生命的倍数
 const HIT_CAP = 3.0
 const KB_CAP = {0: 15, 1: 8}
-# 非传奇 T4 武器的目标价值倍率（原版 T4 相对价格偏强）
-const T4_VALUE_MULT = 0.85
+# 各稀有度武器的目标价值倍率（含传奇；暂定，后续按实战调整）
+const TIER_BUDGET_MULT = [1.0, 0.95, 0.9, 0.85]
 # 基础伤害下限（按稀有度；多发武器按发数开方折算）：1 点基础伤害前期没有战斗力，宁可降低加成与攻速也要保证。
 # 点燃敌人的武器、以收获为加成的武器（原版掌、火炬、魔杖）不受限
 const BASE_DMG_MIN = [3.0, 5.0, 7.0, 10.0]
@@ -774,7 +840,7 @@ func _deep_family(fam: Dictionary, mult: float, stats: Array) -> Dictionary:
 		var keys = []
 		for e in tw.effects:
 			if bound_key(e):
-				effects.push_back(e)
+				effects.push_back(_vary_fixed(e, family_of(tw)))
 		for dn in donors:
 			var dw = _closest_tier(dn.tiers, tier)
 			for e in dw.effects:
@@ -782,7 +848,7 @@ func _deep_family(fam: Dictionary, mult: float, stats: Array) -> Dictionary:
 				if bound_key(e) or key in keys or (ranged_only(e) and ty == 0):
 					continue
 				keys.push_back(key)
-				effects.push_back(_adapt(_convert_explosion(e.duplicate(), ty), tw))
+				effects.push_back(_vary_fixed(_adapt(_convert_explosion(e.duplicate(), ty), tw), family_of(tw)))
 		var st = bp.duplicate()
 		st.cooldown = int(max(2, round(bp.cooldown * pow(shape.cd, d))))
 		var want = _want(tw, true) * mult
@@ -824,7 +890,7 @@ func _deep_family(fam: Dictionary, mult: float, stats: Array) -> Dictionary:
 			score += 3.0 * log(heavy)
 		c1_prev = float(final.scaling_stats[0][1])
 		var donor_id = _closest_tier(donors[0].tiers, tier).my_id if not donors.empty() else ""
-		out[tw.my_id] = {"effects": effects, "stats": final, "donor": donor_id, "scale": h}
+		out[tw.my_id] = {"effects": effects, "stats": final, "donor": donor_id, "scale": h, "want": want}
 	return {"out": out, "score": score}
 
 
@@ -921,7 +987,8 @@ func _solve_hit(st, plan: Dictionary, effects: Array, tier: int, want: float) ->
 static func _shrink_effects(effects: Array, f: float) -> Array:
 	var out = []
 	for e in effects:
-		if e.has_meta("aa_value"):
+		# 道具效果不缩；碎裂、自伤是代价，也不缩
+		if e.has_meta("aa_value") or WeaponValue.effect_key(e) in ["break_on_hit", "lose_hp_per_second"]:
 			out.push_back(e)
 			continue
 		var ne = e.duplicate()
@@ -1190,23 +1257,15 @@ var _vp: Dictionary = {}
 
 
 func _want(w, by_price := false) -> float:
-	# 会碎裂的武器（砖头）：低价来自"用完就换"，强度按原版模型估值，不按价格
-	if by_price and not w.has_meta("aa_low_of"):
-		for e in w.effects:
-			if WeaponValue.effect_key(e) == "break_on_hit":
-				return wv.value(w.stats, w.effects, w.tier)
+	var m = TIER_BUDGET_MULT[clamp(w.tier, 0, 3)]
+	# 砖头也按价格：碎裂在估值里按寿命折扣计（WeaponValue.life_mult）
 	if by_price or w.has_meta("aa_low_of"):
 		var v = _price_of(w) * float(_vp.get(str(w.type) + "/" + str(w.tier), 1.0))
-		if w.tier == 3 and not (wv.legendary_families.has(family_of(w)) and not w.has_meta("aa_low_of")):
-			v *= T4_VALUE_MULT
-		# 传奇武器（只有 T4 的原版武器）普遍超模、程度不等：取模型价值与按价格换算值的几何平均（链枪约 ×2，大镰刀因代价基本不变）
+		# 传奇武器（只有 T4 的原版武器）普遍超模、程度不等：取模型价值与按价格换算值的几何平均（链枪约 ×2）
 		if not w.has_meta("aa_low_of") and wv.legendary_families.has(family_of(w)):
 			v = sqrt(v * max(1.0, wv.value(w.stats, w.effects, w.tier)))
-		return v
-	var mv = wv.value(w.stats, w.effects, w.tier)
-	if w.tier == 3 and not wv.legendary_families.has(family_of(w)):
-		mv *= T4_VALUE_MULT
-	return mv
+		return v * m
+	return wv.value(w.stats, w.effects, w.tier) * m
 
 
 # ============================================================
