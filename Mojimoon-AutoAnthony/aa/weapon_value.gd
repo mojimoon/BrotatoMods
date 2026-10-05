@@ -40,6 +40,9 @@ const EFFECT_KEY_MULT = {"weapon_one_shot_on_hit": 0.4}
 const SUB_PROJ_EFF = 0.7
 # 吸血：每秒 1 点回复折算的 DPS
 const HEAL_DPS = 8.0
+# 每次命中的附加价值（玩家的吸血属性、命中触发的道具效果等，按每秒命中数计，随稀有度的属性阶段增长）：
+# 快攻武器从中获益更多。数组以便审计搜索时修改
+const ON_HIT_DPS = [14.0]
 # 武器加成用的参考属性（终局，用于衡量 T4 武器）。
 # 大部分角色围绕近战 / 远程 / 元素伤害构筑，这些属性按一般角色的终局值；
 # 其他属性只有少数角色会走（企业家的收获、工程师的工程、生物的诅咒……），按专精角色的终局值估值：
@@ -52,7 +55,8 @@ const REF_STATS = {
 	"stat_dodge": 60.0, "stat_speed": 40.0, "stat_luck": 60.0, "stat_harvesting": 300.0, "stat_curse": 100.0,
 }
 # 各稀有度武器对应的属性阶段（T4 = 终局）
-const TIER_STAT_FRAC = [0.3, 0.5, 0.75, 1.0]
+# 数值由原版价格随机搜索得出（suite_weapons test_160）：低级武器多在前期购买，属性远未到终局
+const TIER_STAT_FRAC = [0.15, 0.27, 0.5, 1.0]
 
 # 可建模（计入 power）的效果脚本 id / key
 const MODELED_EFFECTS = ["weapon_exploding", "weapon_burning", "weapon_projectiles_on_hit", "weapon_gain_stat_for_every_stat", "weapon_stack"]
@@ -61,6 +65,8 @@ const MODELED_EFFECTS = ["weapon_exploding", "weapon_burning", "weapon_projectil
 const FREE_SLOTS_REF = 2.0
 const STACK_REF = 4.0
 const MODELED_KEYS = ["reload_when_pickup_gold"]
+# 武器上的玩家属性行相对道具属性权重的倍率（原版武器的属性行定价约为道具的 2 倍以上；随机搜索得出）
+const STAT_LINE_MULT = 2.2
 # 捡材料时换弹（喇叭枪）：实际攻击间隔约为此值（秒）
 const GOLD_RELOAD_CD = 1.2
 
@@ -217,6 +223,7 @@ static func power(st, effects: Array, tier: int = 3) -> float:
 					extra += float(e.value) * sub * SUB_PROJ_EFF * hits / cd
 	var p = per_hit * hits * mult / cd + extra
 	p += HEAL_DPS * float(st.lifesteal) * hits / cd
+	p += float(ON_HIT_DPS[0]) * TIER_STAT_FRAC[clamp(tier, 0, 3)] * hits / cd
 	return p
 
 
@@ -327,7 +334,7 @@ func calibrate(weapons: Array) -> void:
 		if not pure:
 			continue
 		var p = power(w.stats, w.effects, w.tier)
-		var stat_v = _player_stat_value(w.effects)
+		var stat_v = _player_stat_value(w.stats, w.effects)
 		var key = _tk(w.stats, w.tier)
 		if not ratios.has(key):
 			ratios[key] = []
@@ -355,7 +362,7 @@ func calibrate(weapons: Array) -> void:
 				others.push_back(e)
 		if others.empty():
 			continue
-		var r = float(w.value) - k(w.stats, w.tier) * power(w.stats, w.effects, w.tier) - _player_stat_value(w.effects)
+		var r = float(w.value) - k(w.stats, w.tier) * power(w.stats, w.effects, w.tier) - _player_stat_value(w.stats, w.effects)
 		for e in others:
 			var mg = magnitude(e)
 			if abs(mg) < 0.0001:
@@ -382,16 +389,31 @@ func k(st, tier: int) -> float:
 	return float(k_by.get(_tk(st, tier), 1.0))
 
 
-static func _player_stat_value(effects: Array) -> float:
+# 武器上的玩家属性行：按道具属性权重 × STAT_LINE_MULT 估值
+var stat_line_mult: float = STAT_LINE_MULT
+
+
+# 武器负系数加成的属性（狼牙棒吃 -攻速 加成）：对应的属性行对这把武器是好处、对其他武器是代价，不计价值
+static func _neg_scaling(st) -> Dictionary:
+	var neg = {}
+	if st != null:
+		for sc in st.scaling_stats:
+			if float(sc[1]) < 0:
+				neg[stat_name(sc[0])] = true
+	return neg
+
+
+func _player_stat_value(st, effects: Array) -> float:
+	var neg = _neg_scaling(st)
 	var v = 0.0
 	for e in effects:
-		if is_plain_player_stat(e):
-			v += Catalog.stat_w(e.key) * float(e.value)
+		if is_plain_player_stat(e) and not neg.has(e.key):
+			v += Catalog.stat_w(e.key) * float(e.value) * stat_line_mult
 	return v
 
 
 # 效果的材料价值（不含计入 power 的部分）
-func effect_value(e) -> float:
+func effect_value(e, neg: Dictionary = {}) -> float:
 	# 本 mod 加上的道具效果（引入道具效果）：生成时记下的价值
 	if e.has_meta("aa_value"):
 		return float(e.get_meta("aa_value"))
@@ -400,7 +422,9 @@ func effect_value(e) -> float:
 	# 补出的低级武器上数值无法按比例缩小的效果：价值按价格比例折算
 	var sc = float(e.get_meta("aa_eff_scale")) if e.has_meta("aa_eff_scale") else 1.0
 	if is_plain_player_stat(e):
-		return Catalog.stat_w(e.key) * float(e.value) * sc
+		if neg.has(e.key):
+			return 0.0
+		return Catalog.stat_w(e.key) * float(e.value) * sc * stat_line_mult
 	# 每有 1 把武器 +X 属性（王者之剑）：就是玩家属性，按 6 把武器计
 	if e.custom_key == "additional_weapon_effects" and Catalog.STATS.has(e.key):
 		return Catalog.stat_w(e.key) * float(e.value) * WEAPON_COUNT * sc
@@ -410,6 +434,7 @@ func effect_value(e) -> float:
 # 武器的材料价值
 func value(st, effects: Array, tier: int) -> float:
 	var v = k(st, tier) * power(st, effects, tier)
+	var neg = _neg_scaling(st)
 	for e in effects:
-		v += effect_value(e)
+		v += effect_value(e, neg)
 	return v

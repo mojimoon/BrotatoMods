@@ -1168,11 +1168,13 @@ func _item_effect(spec: Dictionary, tier: int, weapon_value: float):
 	var budget = max(1.0, weapon_value * ITEM_LINE_SHARE)
 	if spec.kind == "stat":
 		var st: String = spec.stat
-		var v = gen._round_to_unit(budget / Catalog.stat_w(st), st)
+		# 武器上的属性行按武器的属性行倍率估值（与原版武器一致）
+		var sw = Catalog.stat_w(st) * wv.stat_line_mult
+		var v = gen._round_to_unit(budget / sw, st)
 		v = int(min(v, gen._line_cap(st, false)))
 		var e = gen._stat_effect(st, -v if spec.neg else v)
 		# 负系数相关的属性行（狼牙棒的 -攻速）：对这把武器是好处、对其他武器是代价，不计价值
-		e.set_meta("aa_value", 0.0 if spec.neg else v * Catalog.stat_w(st))
+		e.set_meta("aa_value", 0.0 if spec.neg else v * sw)
 		return e
 	var c: Dictionary = spec.clause.duplicate(true)
 	var perm = Catalog.PERM_MULT[tier]

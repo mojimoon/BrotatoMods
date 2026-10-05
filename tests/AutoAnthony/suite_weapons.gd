@@ -423,8 +423,7 @@ func test_139_weapon_value_model() -> void:
 	for i in min(15, worst.size()):
 		var w = worst[i]
 		print("AUDIT   off %s: price %d, model %.0f, cd %.2fs, power %.1f" % [w[1], w[2], w[3], w[4], w[5]])
-	# 多发 / 贯穿 / 弹跳按打满计后，与原版定价的吻合度略降（原版对这些特性定价偏低）
-	_check(r * r > 0.72, "weapon value model explains native prices (r^2 %.3f)" % (r * r))
+	_check(r * r > 0.78, "weapon value model explains native prices (r^2 %.3f)" % (r * r))
 
 
 # 深度重组的极端值：系数 / 伤害最大的武器（用户种子 102116457，引入道具效果 + 低级武器）
@@ -871,3 +870,118 @@ func test_158_deep_price_resample() -> void:
 		if ns[i] > 0 and ns[i + 1] > 0:
 			_check(means[i] < means[i + 1], "T4 lowest T%d cheaper than lowest T%d" % [i + 1, i + 2])
 	_check(changed > out.size() / 2, "most prices resampled (%d / %d)" % [changed, out.size()])
+
+
+# 估值参数随机搜索（AA_SEARCH=<次数> 时才运行）：各稀有度的参考属性阶段 TIER_STAT_FRAC[0..2]、武器属性行倍率。
+# 目标 = 原版"价值 / 价格"（相对同档中位数）的对数方差 + 2 × 各特性组偏差平方的加权和（多发 / 贯穿 / 弹跳除外）；不含传奇与 99 贯穿的火焰类
+func test_160_search_value_params() -> void:
+	var n_try = int(OS.get_environment("AA_SEARCH")) if OS.get_environment("AA_SEARCH").is_valid_integer() else 0
+	if n_try <= 0:
+		return
+	var WV = load(MOD_DIR + "aa/weapon_value.gd")
+	var all = m.native_only(isvc.weapons)
+	var base_frac = WV.TIER_STAT_FRAC.duplicate()
+	var base_on_hit = WV.ON_HIT_DPS[0]
+	var wv0 = WV.new()
+	wv0.calibrate(all)
+	var rows = []
+	for w in all:
+		if w.stats == null or int(w.value) <= 0 or wv0.legendary_families.has(WV._family(w)) or (w.type == 1 and int(w.stats.piercing) >= 50):
+			continue
+		var groups = []
+		var hit = WV.hit_damage(float(w.stats.damage), w.stats.scaling_stats, w.tier)
+		var share = float(w.stats.damage) / max(0.01, hit)
+		groups.push_back("T%d %s" % [w.tier + 1, "base" if share > 0.6 else ("scal" if share < 0.3 else "mid")])
+		if WV.cooldown_seconds(w.stats) <= 0.5:
+			groups.push_back("fast")
+		if WV.cooldown_seconds(w.stats) >= 1.4:
+			groups.push_back("slow")
+		if w.type == 1 and int(w.stats.nb_projectiles) > 1:
+			groups.push_back("multi_proj")
+		if w.type == 1 and int(w.stats.piercing) > 0:
+			groups.push_back("pierce")
+		if w.type == 1 and w.stats.can_bounce and int(w.stats.bounce) > 0:
+			groups.push_back("bounce")
+		if float(w.stats.crit_chance) >= 0.15:
+			groups.push_back("high_crit")
+		for e in w.effects:
+			if WV.is_plain_player_stat(e):
+				groups.push_back("stat_line")
+				break
+		rows.push_back([w, groups])
+	var rng = RandomNumberGenerator.new()
+	rng.seed = 7
+	var results = []
+	for i in n_try + 1:
+		var c = [base_frac[0], base_frac[1], base_frac[2], WV.STAT_LINE_MULT, WV.ON_HIT_DPS[0]]
+		if i > 0:
+			c[0] = rng.randf_range(0.05, 0.45)
+			c[1] = rng.randf_range(max(c[0], 0.2), 0.7)
+			c[2] = rng.randf_range(max(c[1], 0.45), 0.95)
+			c[3] = rng.randf_range(0.8, 4.0)
+			c[4] = rng.randf_range(0.0, 20.0)
+		results.push_back([_eval_value_params(WV, all, rows, c), c])
+		_set_frac(WV, [base_frac[0], base_frac[1], base_frac[2], 0, base_on_hit])
+	print("AUDIT search baseline obj %.4f var %.4f bias %.4f %s %s" % [results[0][0][0], results[0][0][1], results[0][0][2], str(results[0][1]), str(results[0][0][3])])
+	results.sort_custom(self, "_sort_first_asc")
+	for r in results.slice(0, 7):
+		print("AUDIT search obj %.4f var %.4f bias %.4f frac %.2f %.2f %.2f statmult %.2f onhit %.1f %s" % [r[0][0], r[0][1], r[0][2], r[1][0], r[1][1], r[1][2], r[1][3], r[1][4], str(r[0][3])])
+
+
+# 常量数组只能取出引用后修改（Godot 3 的常量数组本身可变）
+func _set_frac(WV, c: Array) -> void:
+	var fr: Array = WV.TIER_STAT_FRAC
+	for i in 3:
+		fr[i] = c[i]
+	var oh: Array = WV.ON_HIT_DPS
+	oh[0] = c[4]
+
+
+func _sort_first_asc(a, b) -> bool:
+	return a[0][0] < b[0][0]
+
+
+func _eval_value_params(WV, all: Array, rows: Array, c: Array) -> Array:
+	_set_frac(WV, c)
+	var wv = WV.new()
+	wv.stat_line_mult = c[3]
+	wv.calibrate(all)
+	var by = {}
+	var lr = []
+	for r in rows:
+		var w = r[0]
+		var key = str(w.type) + "/" + str(w.tier)
+		var x = wv.value(w.stats, w.effects, w.tier) / float(w.value)
+		lr.push_back(x)
+		if not by.has(key):
+			by[key] = []
+		by[key].push_back(x)
+	var med = {}
+	for key in by:
+		var a: Array = by[key]
+		a.sort()
+		med[key] = a[a.size() / 2]
+	var sums = {}
+	var tot = 0.0
+	var tot2 = 0.0
+	for i in rows.size():
+		var w = rows[i][0]
+		var l = log(max(0.01, lr[i] / med[str(w.type) + "/" + str(w.tier)]))
+		tot += l
+		tot2 += l * l
+		for g in rows[i][1]:
+			if not sums.has(g):
+				sums[g] = [0.0, 0]
+			sums[g][0] += l
+			sums[g][1] += 1
+	var n = float(rows.size())
+	var var_ = tot2 / n - pow(tot / n, 2)
+	var bias = 0.0
+	var gm = {}
+	for g in sums:
+		var mean = sums[g][0] / sums[g][1]
+		# 多发 / 贯穿 / 弹跳按打满计是定下的规则，不参与目标
+		if not g in ["multi_proj", "pierce", "bounce"]:
+			bias += float(sums[g][1]) / n * mean * mean
+		gm[g] = stepify(exp(mean), 0.01)
+	return [var_ + 2.0 * bias, var_, bias, gm]
