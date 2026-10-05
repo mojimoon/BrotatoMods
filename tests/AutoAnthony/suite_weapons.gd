@@ -633,3 +633,19 @@ func test_152_tier_value_ratio() -> void:
 		sums[key][2] += 1
 	for key in sums:
 		print("AUDIT %s mean power deep %.0f native %.0f" % [key, sums[key][0] / sums[key][2], sums[key][1] / sums[key][2]])
+
+
+# "+X 伤害"类效果（船长之剑、棍子）按 X / 面板伤害估值：同一效果放在低伤害武器上增幅更大
+func test_153_flat_damage_effects_relative() -> void:
+	var WV = load(MOD_DIR + "aa/weapon_value.gd")
+	var stick = isvc.get_element_safe(isvc.weapons, "weapon_stick_1")
+	var fx = stick.effects
+	var lo = stick.stats.duplicate()
+	lo.damage = 5
+	var hi = stick.stats.duplicate()
+	hi.damage = 60
+	var gain_lo = WV.power(lo, fx, 0) / WV.power(lo, [], 0)
+	var gain_hi = WV.power(hi, fx, 0) / WV.power(hi, [], 0)
+	print("AUDIT stick +X damage: relative gain at 5 dmg %.2f, at 60 dmg %.2f" % [gain_lo, gain_hi])
+	_check(gain_lo > 1.0 and gain_hi > 1.0, "flat damage effect adds power")
+	_check(gain_lo - 1.0 > (gain_hi - 1.0) * 2.0, "worth relatively more on a low-damage weapon")

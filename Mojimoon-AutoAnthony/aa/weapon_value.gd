@@ -57,7 +57,11 @@ const REF_STATS = {
 const TIER_STAT_FRAC = [0.3, 0.5, 0.75, 1.0]
 
 # 可建模（计入 power）的效果脚本 id / key
-const MODELED_EFFECTS = ["weapon_exploding", "weapon_burning", "weapon_projectiles_on_hit"]
+const MODELED_EFFECTS = ["weapon_exploding", "weapon_burning", "weapon_projectiles_on_hit", "weapon_gain_stat_for_every_stat", "weapon_stack"]
+# 按计数加固定伤害的效果（船长之剑"每个空武器栏 +X 伤害"、棍子"每多 1 把同名武器 +X 伤害"）：
+# 计入每次命中的伤害，价值随 X / 面板伤害变化；计数取典型值
+const FREE_SLOTS_REF = 2.0
+const STACK_REF = 4.0
 const MODELED_KEYS = ["reload_when_pickup_gold"]
 # 捡材料时换弹（喇叭枪）：实际攻击间隔约为此值（秒）
 const GOLD_RELOAD_CD = 1.2
@@ -129,6 +133,19 @@ static func hit_damage(damage: float, scaling_stats: Array, tier: int = 3) -> fl
 	return d
 
 
+static func flat_damage_bonus(effects: Array) -> float:
+	var b = 0.0
+	for e in effects:
+		match effect_id(e):
+			"weapon_gain_stat_for_every_stat":
+				if str(e.increased_stat_name) == "damage":
+					b += float(e.value) * FREE_SLOTS_REF
+			"weapon_stack":
+				if str(e.stat_name) == "damage":
+					b += float(e.value) * STACK_REF
+	return b
+
+
 static func overkill(d: float, tier: int = 3) -> float:
 	var hp = OVERKILL_HP[clamp(tier, 0, 3)]
 	if d <= hp:
@@ -175,7 +192,7 @@ static func power(st, effects: Array, tier: int = 3) -> float:
 	for e in effects:
 		if effect_key(e) == "reload_when_pickup_gold":
 			cd = min(cd, GOLD_RELOAD_CD)
-	var hit = hit_damage(float(st.damage), st.scaling_stats, tier)
+	var hit = hit_damage(float(st.damage) + flat_damage_bonus(effects), st.scaling_stats, tier)
 	var per_hit = overkill(hit * crit_factor(st), tier) * range_factor(st)
 	var hits = hits_per_attack(st)
 	var mult = 1.0
