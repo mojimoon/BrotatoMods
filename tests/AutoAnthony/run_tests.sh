@@ -4,6 +4,7 @@
 #   core（默认）：道具与共通部分的逻辑测试；battle：真实战斗场景；audit：价值 / 分布统计审计；
 #   weapons：武器重组的全部测试；items = core,battle,audit；all = 全部
 #   AA_ONLY=<名字片段> 只跑名字含该片段的测试
+#   AA_AUDIT=1 运行只打印数据的审计测试（武器组 test_156 / 157 / 163）；AA_SEARCH=<次数> 运行参数搜索（test_160 / 164）
 #
 # - 在反编译的游戏工程（本仓库的上一级目录）里运行，使用真实的 ItemService / RunData / ModLoader
 # - 先把 mods/<MOD> 同步到 mods-unpacked/<MOD>（编辑器模式下 ModLoader 只加载这里的 mod）

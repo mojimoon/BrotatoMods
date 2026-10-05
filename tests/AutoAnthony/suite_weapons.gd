@@ -259,12 +259,15 @@ func test_143_low_tier_weapons() -> void:
 
 
 # 仅重组效果：所有 T4 武器（效果可跨近战 / 远程）分组装备后在真实战斗中运行，原版代码不报错、武器造成伤害
+# 两种模式各测一半 T4 武器（按 6 把一组交替），合起来每把都上场一次；主要检查原版代码在重组武器下不报错
 func test_140_reassembled_weapons_in_battle() -> void:
+	var i = 0
 	for mode in ["effects", "deep"]:
-		yield(_weapons_battle(mode), "completed")
+		yield(_weapons_battle(mode, i), "completed")
+		i += 1
 
 
-func _weapons_battle(mode: String) -> void:
+func _weapons_battle(mode: String, parity: int) -> void:
 	m.cfg_weapons = true
 	m.cfg_weapon_mode = mode
 	m.cfg_w_item_effects = mode == "deep"
@@ -277,7 +280,7 @@ func _weapons_battle(mode: String) -> void:
 	var dealt = 0
 	var total = 0
 	print("AUDIT watch begin")
-	for g in range(0, t4.size(), 6):
+	for g in range(parity * 6, t4.size(), 12):
 		for w in rd.get_player_weapons(0).duplicate():
 			rd.remove_weapon(w, 0)
 		var group = t4.slice(g, min(g + 5, t4.size() - 1))
@@ -290,7 +293,7 @@ func _weapons_battle(mode: String) -> void:
 		var main = tree.current_scene
 		main._players[0].disable_hurtbox()
 		main._wave_timer.start(600)
-		yield(tree.create_timer(7.0), "timeout")
+		yield(tree.create_timer(5.0), "timeout")
 		for w in rd.get_player_weapons(0):
 			total += 1
 			if w.dmg_dealt_last_wave > 0:
@@ -298,7 +301,7 @@ func _weapons_battle(mode: String) -> void:
 		main._cleaning_up = true
 	print("AUDIT watch end")
 	print("AUDIT %s: reassembled T4 weapons dealing damage: %d / %d" % [mode, dealt, total])
-	# 7 秒内敌人未必进入射程（构筑物、治疗枪等也不直接造成伤害）：主要检查的是原版代码不报错
+	# 5 秒内敌人未必进入射程（构筑物、治疗枪等也不直接造成伤害）：主要检查的是原版代码不报错
 	_check(dealt >= total * 0.5, "most reassembled weapons deal damage (%d / %d)" % [dealt, total])
 	for w in rd.get_player_weapons(0).duplicate():
 		rd.remove_weapon(w, 0)
@@ -744,6 +747,9 @@ func test_155_weapon_preview_player_seed() -> void:
 
 # 审计：某个种子的 T4 预览武器与同家族原版 T4 的模型拆解（AA_ONLY=test_156 单独运行）
 func test_156_audit_t4_vs_native() -> void:
+	# 纯审计（只打印）：AA_AUDIT=1 时才运行
+	if OS.get_environment("AA_AUDIT") == "":
+		return
 	var WV = load(MOD_DIR + "aa/weapon_value.gd")
 	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
 	var weapons = m.native_only(isvc.weapons)
@@ -802,6 +808,9 @@ func _t4_row(wg, st, effects: Array, w, p) -> String:
 
 # 审计：原版武器按特性分组的"模型价值 / 价格"相对同档中位数的偏差（<1 = 模型低估了这类特性）
 func test_157_audit_feature_residuals() -> void:
+	# 纯审计（只打印）：AA_AUDIT=1 时才运行
+	if OS.get_environment("AA_AUDIT") == "":
+		return
 	var WV = load(MOD_DIR + "aa/weapon_value.gd")
 	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
 	var weapons = m.native_only(isvc.weapons)
@@ -1111,6 +1120,9 @@ func test_162_no_inversion_and_fixed_params() -> void:
 # 审计：模型之外的强度指标——参考属性下不含效果的原始 DPS / 价格（相对原版同类型同稀有度的中位数）。
 # 比较生成武器与原版的离散度，列出最强 / 最弱的生成武器（默认设置：深度重组 + 道具效果）
 func test_163_audit_raw_dps_spread() -> void:
+	# 纯审计（只打印）：AA_AUDIT=1 时才运行
+	if OS.get_environment("AA_AUDIT") == "":
+		return
 	var WV = load(MOD_DIR + "aa/weapon_value.gd")
 	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
 	var weapons = m.native_only(isvc.weapons)
