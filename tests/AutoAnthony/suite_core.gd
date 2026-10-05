@@ -2651,3 +2651,23 @@ func test_165_char_mechanic_scaled_by_item_unit() -> void:
 		for mm in g.mechanics_by_tier[t]:
 			_check(mm.source != "character_jack", "no mechanic comes from Jack: " + str(mm.effect.key))
 	_check(n > 0, "gold_drops lines appear")
+
+
+
+# 从 100% 往下减的效果（-% 商品 / 刷新 / 武器价格、-% 升级所需经验）：道具限制件数，总降幅不超过上限（单件超过上限时限制 1 = 独特）
+func test_166_reduction_items_limited() -> void:
+	var n = 0
+	for sd in range(1, 21):
+		var plan = _gen(sd)
+		for id in plan.items:
+			var p = plan.items[id]
+			for e in p.effects:
+				var k = e.custom_key if e.custom_key != "" else e.key
+				if k in Catalog.REDUCTION_KEYS and e.value < 0:
+					n += 1
+					var lim = int(p.get("limit", 0))
+					_check(lim >= 1 and lim <= 5, "%s %s %d has a limit (%d)" % [id, k, e.value, lim])
+					_check(lim == 1 or lim * abs(e.value) <= Catalog.REDUCTION_TOTAL_CAP, "%s total reduction within cap (%d x %d)" % [id, lim, abs(e.value)])
+					_check(lim != 1 or p.unique, id + " limit 1 is unique")
+	print("AUDIT reduction lines %d" % n)
+	_check(n > 0, "reduction effects appear")

@@ -137,7 +137,12 @@ func generate(items: Array, all_characters: Array, selected: Array, weapons: Arr
 		cur_tier = -1
 		for id in plan.items:
 			var uq = has_unique_effect(plan.items[id].effects)
-			# 成长型道具的限制 (1) = 独特
+			# 从 100% 往下减的效果（-% 商品 / 刷新 / 武器价格、-% 升级所需经验）：限制件数，避免叠到接近 0
+			var rl = reduction_limit(plan.items[id].effects)
+			var cur = int(plan.items[id].get("limit", 0))
+			if rl > 0 and (cur <= 0 or rl < cur):
+				plan.items[id]["limit"] = rl
+			# 限制 (1) = 独特
 			if int(plan.items[id].get("limit", 0)) == 1:
 				uq = true
 			plan.items[id]["unique"] = uq
@@ -1098,6 +1103,17 @@ func _generate_growth_item(item) -> Dictionary:
 		"growth": true,
 		"limit": int(_pick_weighted(Catalog.GROWTH_LIMITS)),
 	}
+
+
+# 限制件数 = 总降幅上限 / 单件降幅（1–5；上限参考原版望远镜的 -50% 刷新价格）；没有这类效果时为 0
+static func reduction_limit(effects: Array) -> int:
+	var lim = 0
+	for e in effects:
+		var k = e.custom_key if e.custom_key != "" else e.key
+		if k in Catalog.REDUCTION_KEYS and e.value < 0:
+			var l = int(clamp(floor(Catalog.REDUCTION_TOTAL_CAP / abs(float(e.value))), 1, 5))
+			lim = l if lim == 0 else int(min(lim, l))
+	return lim
 
 
 func _generate_item_once(item, force_special: bool) -> Dictionary:

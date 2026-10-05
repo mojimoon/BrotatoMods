@@ -631,6 +631,9 @@ const COUNTER_REF = {
 #   可选的 +[属性 A] 行（数值像副属性）+ 高转化率的"每有 [属性 A] 获得 [属性 B]" + 可选的代价，带限制 (X)
 #   B 只取 %伤害 / 攻速 / 最大生命（2 : 2 : 1）；A 取主 / 次要属性与诅咒
 # ============================================================
+# 从 100% 往下减的效果：带它的道具限制件数（见 Generator.reduction_limit）
+const REDUCTION_KEYS = ["items_price", "reroll_price", "weapons_price", "next_level_xp_needed", "specific_items_price"]
+const REDUCTION_TOTAL_CAP = 50.0
 const GROWTH_ITEM_CHANCE = 0.06
 # 成长型道具只出现在 T3 及以上（原版的属性转化道具全是 T3–T4；T2 便宜、买得早、持有久，最容易超模）
 const GROWTH_MIN_TIER = 2
