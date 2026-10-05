@@ -255,7 +255,7 @@ func _apply_donor(f: String, target: Dictionary, donor: Dictionary, mult: float,
 
 
 # 效果搬到新武器上的改写：棍子的"每有 1 把同名武器"指向新武器
-# 固定参数的效果按家族随机（各稀有度共用一次抽取）：砖头的碎裂几率（掉落材料同比放大）、磁轨炮的加成、自伤
+# 固定参数的效果按家族随机（各稀有度共用一次抽取）：砖头碎裂掉落的材料、磁轨炮的加成、自伤（至多原版的 3）
 func _vary_fixed(e, f: String):
 	var key = WeaponValue.effect_key(e)
 	if not key in ["break_on_hit", "effect_no_hit_boost", "lose_hp_per_second"]:
@@ -265,19 +265,24 @@ func _vary_fixed(e, f: String):
 	var ne = e.duplicate()
 	match key:
 		"break_on_hit":
-			var c = r.randi_range(1, 3)
+			# 碎裂几率不变，掉落材料随机
 			if "value2" in ne:
-				ne.value2 = int(round(float(ne.value2) * c / max(1.0, float(ne.value))))
-			ne.value = c
+				ne.value2 = int(max(1, round(float(ne.value2) * r.randf_range(0.5, 1.5))))
 		"effect_no_hit_boost":
 			ne.value = int(max(1, round(float(ne.value) * r.randf_range(0.5, 1.5))))
 		"lose_hp_per_second":
-			ne.value = r.randi_range(1, 4)
+			ne.value = r.randi_range(1, 3)
 	return ne
 
 
-# 高一级的基础伤害与每项加成系数不低于低一级（效果价值逐级增长时，按价值解出的伤害可能倒挂）；
-# 抬高后价值超出目标时缩小效果数值补回（让效果让步，而不是伤害）
+# 逐级强化（同一家族，从低到高）：
+#   1. 特效数值必须强于低一级（至少一步；已到上限的除外；代价与固定参数的效果不动）
+#   2. 基础伤害与正加成系数不低于低一级
+#   3. 因此超出目标价值时，先放慢攻速（不慢于低一级）、再降暴击（不低于低一级）；仍超出则不管
+const TIER_FIT_TOL = 1.05
+const NO_STRENGTHEN_KEYS = ["break_on_hit", "lose_hp_per_second", "effect_slow_in_zone"]
+
+
 func _no_inversion(out: Dictionary) -> void:
 	for f in fam_names:
 		var tiers = families[f].tiers.keys()
@@ -287,37 +292,141 @@ func _no_inversion(out: Dictionary) -> void:
 			var id = families[f].tiers[t].my_id
 			if not out.has(id) or not out[id].has("stats"):
 				continue
-			var st = out[id].stats
+			var p = out[id]
 			if prev != null:
-				var lifted = st.damage < prev.damage
-				st.damage = int(max(st.damage, prev.damage))
+				var before = wv.value(p.stats, p.effects, t)
+				p.effects = _strengthen_effects(p.effects, prev.effects)
+				var st = p.stats
+				st.damage = int(max(st.damage, prev.stats.damage))
 				var sc = []
 				for x in st.scaling_stats:
 					var c = float(x[1])
-					for y in prev.scaling_stats:
+					for y in prev.stats.scaling_stats:
 						if y[0] == x[0] and c >= 0 and float(y[1]) > c:
 							c = float(y[1])
-							lifted = true
 					sc.push_back([x[0], c])
 				st.scaling_stats = sc
-				if lifted:
-					out[id]["lifted"] = true
-					_fit_effects(out[id], t)
-			prev = st
+				if wv.value(st, p.effects, t) > before + 0.01:
+					p["lifted"] = true
+					if p.has("want"):
+						_slow_down(p, prev.stats, t)
+			prev = p
 
 
-func _fit_effects(p: Dictionary, tier: int) -> void:
-	if not p.has("want"):
+func _strengthen_effects(effects: Array, prev_effects: Array) -> Array:
+	var used = []
+	var res = []
+	for e in effects:
+		var key = WeaponValue.effect_key(e)
+		var pe = null
+		for q in prev_effects:
+			if WeaponValue.effect_key(q) == key and not q in used:
+				pe = q
+				break
+		if pe == null:
+			res.push_back(e)
+			continue
+		used.push_back(pe)
+		res.push_back(_stronger_than(e, pe))
+	return res
+
+
+static func _dup(e):
+	var ne = e.duplicate()
+	for m in e.get_meta_list():
+		ne.set_meta(m, e.get_meta(m))
+	return ne
+
+
+# 返回不弱于 pe 一步的 e（必要时复制后修改）
+static func _stronger_than(e, pe):
+	var key = WeaponValue.effect_key(e)
+	if key in NO_STRENGTHEN_KEYS or key.begins_with("structure:"):
+		return e
+	match WeaponValue.effect_id(e):
+		"weapon_exploding":
+			if float(pe.chance) >= 1.0 or float(e.chance) > float(pe.chance):
+				return e
+			var ne = _dup(e)
+			ne.chance = min(1.0, float(pe.chance) + 0.05)
+			return ne
+		"weapon_burning":
+			if e.burning_data == null or pe.burning_data == null or int(e.burning_data.damage) > int(pe.burning_data.damage):
+				return e
+			var ne = _dup(e)
+			ne.burning_data = e.burning_data.duplicate()
+			ne.burning_data.damage = int(pe.burning_data.damage) + 1
+			return ne
+		"weapon_projectiles_on_hit":
+			if e.weapon_stats == null or pe.weapon_stats == null:
+				return e
+			if int(e.value) > int(pe.value) or (int(e.value) == int(pe.value) and int(e.weapon_stats.damage) > int(pe.weapon_stats.damage)):
+				return e
+			var ne = _dup(e)
+			ne.value = int(max(int(e.value), int(pe.value)))
+			ne.weapon_stats = e.weapon_stats.duplicate()
+			ne.weapon_stats.damage = int(pe.weapon_stats.damage) + 1
+			return ne
+	# 没有数值的开关型效果（对燃烧目标必定暴击：value = 0）不强化
+	if not "value" in e or (float(e.value) == 0 and float(pe.value) == 0):
+		return e
+	var m0 = WeaponValue.magnitude(pe)
+	# 代价（负值）不强化；已强于低一级的不动
+	if m0 < 0 or float(pe.value) < 0 or WeaponValue.magnitude(e) > m0:
+		return e
+	var ne = _dup(e)
+	for v in [int(pe.value) + 1, int(pe.value) - 1]:
+		if v < 1 or (v > int(pe.value) and int(pe.value) >= 100):
+			continue
+		ne.value = v
+		if WeaponValue.magnitude(ne) > m0:
+			if e.has_meta("aa_value") and float(e.value) > 0:
+				ne.set_meta("aa_value", float(e.get_meta("aa_value")) * float(v) / float(e.value))
+			return ne
+	return e
+
+
+# 价值超出目标：冷却最多放慢到低一级的冷却，暴击最多降到低一级的暴击
+func _slow_down(p: Dictionary, prev_st, tier: int) -> void:
+	var want = float(p.want) * TIER_FIT_TOL
+	var st = p.stats
+	if wv.value(st, p.effects, tier) <= want:
 		return
-	var want = float(p.want)
-	var got = wv.value(p.stats, p.effects, tier)
-	if got <= want * 1.05:
+	var cd0 = int(st.cooldown)
+	var cd1 = int(max(cd0, int(prev_st.cooldown)))
+	var lo = cd0
+	var hi = cd1
+	st.cooldown = cd1
+	if wv.value(st, p.effects, tier) <= want:
+		while hi - lo > 1:
+			var mid = (lo + hi) / 2
+			st.cooldown = mid
+			if wv.value(st, p.effects, tier) <= want:
+				hi = mid
+			else:
+				lo = mid
+		st.cooldown = hi
 		return
-	var bare = wv.value(p.stats, [], tier)
-	var fx = got - bare
-	if fx <= 0:
+	var c0 = float(st.crit_chance)
+	var c1 = min(c0, float(prev_st.crit_chance))
+	var d0 = float(st.crit_damage)
+	var d1 = min(d0, float(prev_st.crit_damage))
+	var a_lo = 0.0
+	var a_hi = 1.0
+	st.crit_chance = c1
+	st.crit_damage = d1
+	if wv.value(st, p.effects, tier) > want:
 		return
-	p.effects = _shrink_effects(p.effects, clamp((want - bare) / fx, 0.0, 1.0))
+	for _i in 12:
+		var a = (a_lo + a_hi) / 2.0
+		st.crit_chance = c0 + (c1 - c0) * a
+		st.crit_damage = d0 + (d1 - d0) * a
+		if wv.value(st, p.effects, tier) <= want:
+			a_hi = a
+		else:
+			a_lo = a
+	st.crit_chance = max(c1, stepify(c0 + (c1 - c0) * a_hi, 0.01))
+	st.crit_damage = max(d1, stepify(d0 + (d1 - d0) * a_hi, 0.05))
 
 
 static func _adapt(e, tw):
@@ -776,6 +885,9 @@ func _deep_family(fam: Dictionary, mult: float, stats: Array) -> Dictionary:
 	bp.crit_damage = b.crit_damage
 	b = _pick_base(ty).stats
 	bp.max_range = b.max_range
+	# 有最小攻击范围的武器（鱼叉枪）：最大范围再加上最小范围
+	if int(bp.min_range) > 0:
+		bp.max_range = int(b.max_range) + int(bp.min_range)
 	# 击退：原版大多很小（中位数 2），远程常为 0；截到近战 15 / 远程 8（原版拳、双管霰弹枪）（太高把怪打飞往往是负面作用），不计入价值
 	bp.knockback = int(min(b.knockback, KB_CAP[ty]))
 	bp.lifesteal = _pick_base(ty).stats.lifesteal

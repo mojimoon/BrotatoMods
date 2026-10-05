@@ -1008,7 +1008,20 @@ func _eval_value_params(WV, all: Array, rows: Array, c: Array) -> Array:
 
 
 # 伤害不倒挂（两种模式）：同一家族高一级的基础伤害与每项加成系数不低于低一级；
-# 固定参数的效果按家族随机（砖头碎裂几率 1–3%，各级相同）；原版砖头按寿命折扣估值后与按价格的估值相近
+# 特效逐级强化；固定参数的效果按家族随机（砖头碎裂几率保持 1%、自伤 1–3）；有最小范围的武器范围足够大；原版砖头按寿命折扣估值后与按价格的估值相近
+func _stronger(WV, e, q) -> bool:
+	match WV.effect_id(e):
+		"weapon_exploding":
+			return float(e.chance) > float(q.chance) or float(q.chance) >= 1.0
+		"weapon_burning":
+			return e.burning_data == null or int(e.burning_data.damage) > int(q.burning_data.damage)
+		"weapon_projectiles_on_hit":
+			return int(e.value) > int(q.value) or int(e.weapon_stats.damage) > int(q.weapon_stats.damage)
+	if not "value" in e or WV.magnitude(q) < 0 or float(q.value) < 0 or (float(e.value) == 0 and float(q.value) == 0):
+		return true
+	return WV.magnitude(e) > WV.magnitude(q) or int(q.value) >= 100
+
+
 func test_162_no_inversion_and_fixed_params() -> void:
 	var WV = load(MOD_DIR + "aa/weapon_value.gd")
 	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
@@ -1021,6 +1034,7 @@ func test_162_no_inversion_and_fixed_params() -> void:
 			var wg = WG.new(cfg, sd)
 			var out = wg.generate(weapons)
 			var bad = 0
+			var weak = 0
 			for f in wg.fam_names:
 				var tiers = wg.families[f].tiers.keys()
 				tiers.sort()
@@ -1041,12 +1055,22 @@ func test_162_no_inversion_and_fixed_params() -> void:
 									print("AUDIT inversion %s T%d coef %s < %s" % [f, t + 1, str(x[1]), str(y[1])])
 					for e in p.effects:
 						if WV.effect_key(e) == "break_on_hit":
-							_check(int(e.value) >= 1 and int(e.value) <= 3, f + " break chance 1-3%")
-							if chance >= 0:
-								_eq(int(e.value), chance, f + " break chance same on every tier")
-							chance = int(e.value)
+							_eq(int(e.value), 1, f + " break chance stays 1%")
+						if WV.effect_key(e) == "lose_hp_per_second":
+							_check(int(e.value) >= 1 and int(e.value) <= 3, f + " self damage 1-3")
+						# 特效逐级强化：与低一级同 key 的效果更强（已到上限的除外）
+						if prev != null:
+							for q in prev.effects:
+								if WV.effect_key(q) == WV.effect_key(e) and not WV.effect_key(e) in WG.NO_STRENGTHEN_KEYS and not WV.effect_key(e).begins_with("structure:"):
+									if not _stronger(WV, e, q):
+										weak += 1
+										print("AUDIT not strengthened %s T%d %s %s vs %s mag %s vs %s" % [f, t + 1, WV.effect_key(e), str(e.value), str(q.value), str(WV.magnitude(e)), str(WV.magnitude(q))])
+									break
+					if int(p.stats.min_range) > 0:
+						_check(int(p.stats.max_range) >= int(p.stats.min_range) + 100, "%s range %d-%d is wide" % [f, int(p.stats.min_range), int(p.stats.max_range)])
 					prev = p
 			_eq(bad, 0, "%s seed %d: no tier has lower damage / scaling than the tier below" % [mode, sd])
+			_eq(weak, 0, "%s seed %d: effects get stronger every tier" % [mode, sd])
 	var wv = WV.new()
 	wv.calibrate(weapons)
 	var wg2 = WG.new(_cfg(), 1)
