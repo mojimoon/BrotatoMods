@@ -51,6 +51,9 @@ func test_31_weapons_swap_within_type() -> void:
 		var want = wg._want(w) * wg._family_mult(WG.family_of(w))
 		var got = wg.wv.value(p.stats, p.effects, w.tier)
 		# 为不倒挂而抬高伤害的武器会超出目标，单独计数
+		# 负面效果抵扣封顶的武器价值低于目标，不计
+		if p.get("capped", false):
+			continue
 		if p.get("lifted", false):
 			lifted += 1
 			if got > want * 1.3:
@@ -100,7 +103,7 @@ func test_141_weapon_deep_reassembly() -> void:
 			var want = wg._want(w, true) * wg._family_mult(WG.family_of(w))
 			var got = wg.wv.value(p.stats, p.effects, w.tier)
 			# 为不倒挂而抬高伤害的武器会超出目标，不计
-			if not p.get("lifted", false) and abs(got - want) > max(3.0, want * 0.15):
+			if not p.get("lifted", false) and not p.get("capped", false) and abs(got - want) > max(3.0, want * 0.15):
 				off += 1
 			var f = WG.family_of(w)
 			if fams.has(f):
@@ -1081,3 +1084,75 @@ func test_162_no_inversion_and_fixed_params() -> void:
 			var r = wv.value(w.stats, w.effects, w.tier) / by_price
 			print("AUDIT brick %s value / by-price %.2f (brick_k %.2f)" % [w.my_id, r, wv.brick_k])
 			_check(r > 0.4 and r < 2.5, w.my_id + " valued near its price after the life discount (%.2f)" % r)
+
+
+# 审计：模型之外的强度指标——参考属性下不含效果的原始 DPS / 价格（相对原版同类型同稀有度的中位数）。
+# 比较生成武器与原版的离散度，列出最强 / 最弱的生成武器（默认设置：深度重组 + 道具效果）
+func test_163_audit_raw_dps_spread() -> void:
+	var WV = load(MOD_DIR + "aa/weapon_value.gd")
+	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
+	var weapons = m.native_only(isvc.weapons)
+	var cfg = _cfg()
+	cfg.weapons = true
+	cfg.weapon_mode = "deep"
+	cfg.w_item_effects = true
+	var med = {}
+	var nat = []
+	for w in weapons:
+		var key = str(w.type) + "/" + str(w.tier)
+		var r = _raw_dps(WV, w.stats, w.tier) / float(w.value)
+		if not med.has(key):
+			med[key] = []
+		med[key].push_back(r)
+	for key in med:
+		med[key].sort()
+		med[key] = med[key][med[key].size() / 2]
+	for w in weapons:
+		nat.push_back(log(_raw_dps(WV, w.stats, w.tier) / float(w.value) / med[str(w.type) + "/" + str(w.tier)]))
+	var rows = []
+	var gen = []
+	var fxs = []
+	for sd in [3, 23, 333729899]:
+		var g = Generator.new(cfg, sd)
+		g.generate(m.native_only(isvc.items), m.native_only(isvc.characters), [], [])
+		var wg = WG.new(cfg, sd, g)
+		var out = wg.generate(weapons)
+		for id in out:
+			var w = isvc.get_element_safe(isvc.weapons, id)
+			var p = out[id]
+			var price = float(p.get("price", w.value))
+			var r = _raw_dps(WV, p.stats, w.tier) / price / med[str(w.type) + "/" + str(w.tier)]
+			gen.push_back(log(r))
+			var val = wg.wv.value(p.stats, p.effects, w.tier)
+			var fx = val - wg.wv.value(p.stats, [], w.tier)
+			fxs.push_back(fx / max(1.0, val))
+			var keys = []
+			for e in p.effects:
+				keys.push_back("%s(%.0f)" % [WV.effect_key(e), wg.wv.effect_value(e)])
+			rows.push_back([r, "%s T%d price %d raw x%.2f value/want %.2f fx %.0f%% %s%s cd %.2f crit %.2f hits %.2f %s" % [id, w.tier + 1, int(price), r, val / max(1.0, float(p.get("want", val))), fx / max(1.0, val) * 100, "lifted " if p.get("lifted", false) else "", str(p.stats.scaling_stats), WV.cooldown_seconds(p.stats), WV.crit_factor(p.stats), WV.hits_per_attack(p.stats), str(keys)]])
+	print("AUDIT raw DPS / price log-sd: native %.3f  generated %.3f (n %d / %d)" % [_sd(nat), _sd(gen), nat.size(), gen.size()])
+	rows.sort_custom(self, "_sort_first_num")
+	print("AUDIT weakest:")
+	for r in rows.slice(0, 9):
+		print("AUDIT   " + r[1])
+	print("AUDIT strongest:")
+	for i in range(rows.size() - 1, rows.size() - 11, -1):
+		print("AUDIT   " + rows[i][1])
+
+
+func _sort_first_num(a, b) -> bool:
+	return a[0] < b[0]
+
+
+func _sd(a: Array) -> float:
+	var s = 0.0
+	var s2 = 0.0
+	for x in a:
+		s += x
+		s2 += x * x
+	var n = float(a.size())
+	return sqrt(max(0.0, s2 / n - pow(s / n, 2)))
+
+
+func _raw_dps(WV, st, tier: int) -> float:
+	return max(0.01, WV.hit_damage(float(st.damage), st.scaling_stats, tier) * WV.crit_factor(st) * WV.hits_per_attack(st) / max(0.05, WV.cooldown_seconds(st)))

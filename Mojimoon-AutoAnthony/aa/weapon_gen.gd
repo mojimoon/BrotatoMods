@@ -18,8 +18,8 @@ const Valuation = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/valuation
 const FAMILY_BOUND_KEYS = ["weapon_slow_in_zone", "effect_no_hit_boost", "break_on_hit"]
 # 只对远程武器有效的效果（暴击时贯穿 / 弹跳、每 X 发投射物、捡材料时换弹）
 const RANGED_ONLY_KEYS = ["pierce_on_crit", "bounce_on_crit", "modify_every_x_projectile", "reload_when_pickup_gold"]
-# 原版武器价值 / 价格的对数离散度（浮动范围 100% 的参考）
-const NATIVE_SIGMA = 0.2
+# 浮动范围 100% 时家族强度倍率的对数标准差（原版"价值 / 价格"的离散度约 0.36，但大部分是模型误差，不照搬）
+const NATIVE_SIGMA = 0.1
 # 伤害缩放的可接受范围：超出则换下一个候选家族
 const MIN_SCALE = 0.3
 const MAX_SCALE = 3.5
@@ -246,11 +246,13 @@ func _apply_donor(f: String, target: Dictionary, donor: Dictionary, mult: float,
 		var line = _item_effect(spec, tier, want)
 		if line != null:
 			effects.push_back(line)
+		var excess = _downside_excess(want, effects)
+		want -= excess
 		var r = _solve_scale(tw.stats, effects, tier, want)
 		if not force and (r < MIN_SCALE or r > MAX_SCALE):
 			return {}
 		var st = scaled_stats(tw.stats, r)
-		out[tw.my_id] = {"effects": effects, "stats": st, "donor": dw.my_id, "scale": r, "want": want}
+		out[tw.my_id] = {"effects": effects, "stats": st, "donor": dw.my_id, "scale": r, "want": want, "capped": excess > 0}
 	return out
 
 
@@ -427,6 +429,20 @@ func _slow_down(p: Dictionary, prev_st, tier: int) -> void:
 			a_lo = a
 	st.crit_chance = max(c1, stepify(c0 + (c1 - c0) * a_hi, 0.01))
 	st.crit_damage = max(d1, stepify(d0 + (d1 - d0) * a_hi, 0.05))
+
+
+# 负面效果（自伤、-属性、每把武器 -属性……）抵扣的价值至多为目标价值的 DOWNSIDE_CAP：
+# 代价按绝对量估值，放在便宜武器上可能远超武器本身，全部换成伤害会补出离谱的面板。返回超出的部分（从目标价值中扣除）
+const DOWNSIDE_CAP = 0.25
+
+
+func _downside_excess(want: float, effects: Array) -> float:
+	var neg = 0.0
+	for e in effects:
+		var v = wv.effect_value(e)
+		if v < 0:
+			neg -= v
+	return max(0.0, neg - DOWNSIDE_CAP * want)
 
 
 static func _adapt(e, tw):
@@ -967,6 +983,8 @@ func _deep_family(fam: Dictionary, mult: float, stats: Array) -> Dictionary:
 		var line = _item_effect(spec, tier, want)
 		if line != null:
 			effects.push_back(line)
+		var excess = _downside_excess(want, effects)
+		want -= excess
 		var plan = {
 			"stats": stats, "s": _share_at(ty, tier, q), "sec": sec_base * min(pow(shape.sec, d), SEC_GROWTH_CAP),
 			"c1_lo": c1_prev if c1_prev > 0 else 0.0, "c1_hi": c1_prev * MAIN_STEP_CAP if c1_prev > 0 else INF,
@@ -1002,7 +1020,7 @@ func _deep_family(fam: Dictionary, mult: float, stats: Array) -> Dictionary:
 			score += 3.0 * log(heavy)
 		c1_prev = float(final.scaling_stats[0][1])
 		var donor_id = _closest_tier(donors[0].tiers, tier).my_id if not donors.empty() else ""
-		out[tw.my_id] = {"effects": effects, "stats": final, "donor": donor_id, "scale": h, "want": want}
+		out[tw.my_id] = {"effects": effects, "stats": final, "donor": donor_id, "scale": h, "want": want, "capped": excess > 0}
 	return {"out": out, "score": score}
 
 
