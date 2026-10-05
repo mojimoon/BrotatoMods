@@ -2342,6 +2342,8 @@ func test_134_growth_items() -> void:
 			if sc == null:
 				continue
 			_check(Catalog.GROWTH_TARGETS.has(sc.key), id + " target stat is %damage / attack speed / max hp: " + sc.key)
+			# 计数期望按武器参考属性表与稀有度估值（估值时读这个标记）
+			_eq(int(sc.get_meta("aa_growth_tier")) if sc.has_meta("aa_growth_tier") else -1, _item(id).tier, id + " scaling line carries its growth tier")
 			_check(sc.stat_scaled in Catalog.GROWTH_COUNTERS and sc.stat_scaled != sc.key, id + " counter: " + sc.stat_scaled)
 			targets[sc.key] = targets.get(sc.key, 0) + 1
 			counters[sc.stat_scaled] = counters.get(sc.stat_scaled, 0) + 1

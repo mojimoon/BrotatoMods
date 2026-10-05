@@ -4,6 +4,7 @@ extends Reference
 # 生成器和测试共用同一套公式，保证"生成时预算"与"审计时估值"不会漂移。
 
 const Catalog = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/catalog.gd")
+const WeaponValue = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/weapon_value.gd")
 
 
 # 每波"原始"事件数（已计入每 N 次与几率，未计入每波上限）
@@ -125,8 +126,24 @@ static func stat_line_value(stat: String, value: int) -> float:
 
 
 # 计数型："每有 nb 个 counter 获得 value 个 stat"
-static func scaling_value(stat: String, value: int, counter: String, nb: int) -> float:
-	return Catalog.stat_w(stat) * value * Catalog.counter_ref(counter) / max(1, nb)
+static func scaling_value(stat: String, value: int, counter: String, nb: int, growth_tier: int = -1) -> float:
+	var ref = growth_counter_ref(counter, growth_tier) if growth_tier >= 0 else Catalog.counter_ref(counter)
+	return Catalog.stat_w(stat) * value * ref / max(1, nb)
+
+
+# 成长型道具的计数期望：武器参考属性表（终局）× 持有期的平均属性阶段（(购买时 + 终局) / 2）。
+# 会买"每有 A 获得 B"的玩家通常在堆 A，道具又是永久的；表里没有的属性（%伤害、经验……）沿用 counter_ref
+static func growth_counter_ref(counter: String, tier: int) -> float:
+	if WeaponValue.REF_STATS.has(counter):
+		var f = float(WeaponValue.TIER_STAT_FRAC[clamp(tier, 0, 3)])
+		return float(WeaponValue.REF_STATS[counter]) * (f + 1.0) / 2.0
+	return Catalog.counter_ref(counter)
+
+
+# 计数型效果的价值（成长型道具的计数效果带 aa_growth_tier 标记）
+static func scaling_effect_value(e) -> float:
+	var gt = int(e.get_meta("aa_growth_tier")) if e.has_meta("aa_growth_tier") else -1
+	return scaling_value(e.key, e.value, e.stat_scaled, e.nb_stat_scaled, gt)
 
 
 # 属性修改 ±pct%

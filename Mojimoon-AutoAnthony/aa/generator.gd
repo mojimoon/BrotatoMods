@@ -1059,11 +1059,12 @@ func _generate_growth_item(item) -> Dictionary:
 	var best = {}
 	for k in range(1, 6):
 		for nb in NICE_NB:
-			var val = Valuation.scaling_value(b_stat, k * unit, a_stat, nb)
+			var val = Valuation.scaling_value(b_stat, k * unit, a_stat, nb, item.tier)
 			var err = abs(log(max(0.01, val) / target))
 			if best.empty() or err < best.err:
 				best = {"v": k * unit, "nb": nb, "err": err}
 	var sc = _scaling_effect(b_stat, best.v, a_stat, best.nb, Catalog.STATS.has(a_stat) and rng.randf() < 0.5)
+	sc.set_meta("aa_growth_tier", item.tier)
 	var ordered = lines + [sc] + _preserved_lines(item) + downsides
 	pos_cat = ""
 	neg_cat = ""
@@ -1606,7 +1607,7 @@ func main_stats(effects: Array) -> Array:
 		elif is_plain_stat(e):
 			vals[e.key] = vals.get(e.key, 0.0) + Catalog.stat_w(e.key) * e.value
 		elif is_scaling(e):
-			vals[e.key] = vals.get(e.key, 0.0) + Valuation.scaling_value(e.key, e.value, e.stat_scaled, e.nb_stat_scaled)
+			vals[e.key] = vals.get(e.key, 0.0) + Valuation.scaling_effect_value(e)
 		elif is_gain_mod(e) and e.stats_modified.size() > 0:
 			vals[e.stats_modified[0]] = vals.get(e.stats_modified[0], 0.0) + Valuation.gain_mod_value(e.stats_modified[0], e.value)
 		elif e.key == "weapon_slot" or e.key == "weapon_slot_upgrades":

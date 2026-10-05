@@ -255,7 +255,7 @@ func _value_of(gen, effects: Array, tier: int) -> float:
 		elif gen.is_plain_stat(e):
 			v += gen.line_value(e.key, e.value)
 		elif gen.is_scaling(e):
-			var sv = Valuation.scaling_value(e.key, e.value, e.stat_scaled, e.nb_stat_scaled)
+			var sv = Valuation.scaling_effect_value(e)
 			v += sv if sv >= 0 else sv / Catalog.DOWNSIDE_DIVISOR
 		elif gen.is_gain_mod(e):
 			var gv = Valuation.gain_mod_value(e.stats_modified[0], e.value)
@@ -312,7 +312,7 @@ func _item_metrics(gen, effects: Array, tier: int) -> Array:
 			v = Valuation.stat_line_value(e.key, e.value)
 			rv = v
 		elif gen.is_scaling(e):
-			v = Valuation.scaling_value(e.key, e.value, e.stat_scaled, e.nb_stat_scaled)
+			v = Valuation.scaling_effect_value(e)
 			rv = v
 		elif gen.is_gain_mod(e):
 			v = Valuation.gain_mod_value(e.stats_modified[0], e.value)
