@@ -792,7 +792,8 @@ const CLASS_BONUS_KINDS = {
 	"stat_damage": {"name": "damage", "w": 1.8, "unit": 5, "max": 15},
 	"stat_crit_damage": {"name": "crit_damage", "w": 0.45, "unit": 25, "max": 200},
 	"stat_crit_chance": {"name": "crit_chance", "w": 1.85, "unit": 5, "max": 25},
-	"piercing": {"name": "piercing", "w": 15.0, "unit": 1, "max": 2, "ranged_only": true},
+	# 贯通：按武器估值（打满计），原版枪械 +1 贯通约等于 +25% 伤害 ⇒ 每点 ≈ %伤害权重 1.5 × 25
+	"piercing": {"name": "piercing", "w": 37.5, "unit": 1, "max": 2, "ranged_only": true},
 }
 # （旧表，武器类型加成的权重见 CLASS_BONUS_KINDS）
 const BURN_BONUS_W = 0.12		# 燃烧目标额外伤害，每 1%

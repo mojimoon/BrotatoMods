@@ -148,7 +148,7 @@ func _weapon_adj(p: Dictionary) -> String:
 				cats.push_back("splinter")
 	if float(st.lifesteal) > 0:
 		cats.push_back("stat_lifesteal")
-	if float(st.crit_chance) >= HIGH_CRIT_CHANCE or float(st.crit_damage) >= HIGH_CRIT_DAMAGE:
+	if is_high_crit(st):
 		cats.push_back("crit")
 	var cd = WeaponValue.cooldown_seconds(st)
 	if cd < 0.55:
@@ -242,16 +242,17 @@ func _apply_donor(f: String, target: Dictionary, donor: Dictionary, mult: float,
 					continue
 				return {}
 			effects.push_back(_vary_fixed(_adapt(_convert_explosion(e.duplicate(), target.type), tw), f))
+		var base_st = _bind_javelin(tw.stats, effects, float(dw.stats.crit_damage))
 		var want = _want(tw) * mult
 		var line = _item_effect(spec, tier, want)
 		if line != null:
 			effects.push_back(line)
 		var excess = _downside_excess(want, effects)
 		want -= excess
-		var r = _solve_scale(tw.stats, effects, tier, want)
+		var r = _solve_scale(base_st, effects, tier, want)
 		if not force and (r < MIN_SCALE or r > MAX_SCALE):
 			return {}
-		var st = scaled_stats(tw.stats, r)
+		var st = scaled_stats(base_st, r)
 		out[tw.my_id] = {"effects": effects, "stats": st, "donor": dw.my_id, "scale": r, "want": want, "capped": excess > 0}
 	return out
 
@@ -550,6 +551,28 @@ const TIER_BUDGET_MULT = [1.0, 0.95, 0.9, 0.85]
 const BASE_DMG_MIN = [3.0, 5.0, 7.0, 10.0]
 # 高暴击：暴击率 / 暴击伤害达到此值的武器带"暴击"词条（必定精准类）
 const HIGH_CRIT_CHANCE = 0.15
+# 标枪效果（每 X 发投射物 +100% 暴击率）：绑定 0% 暴击率 + 高暴伤（标枪自己的暴击模板），这样的武器不算高暴击
+const JAVELIN_KEY = "modify_every_x_projectile"
+
+
+# 高暴击：暴击率高，或暴伤高且有暴击率（0% 暴击率的高暴伤是标枪模板，靠效果暴击）
+static func is_high_crit(st) -> bool:
+	return float(st.crit_chance) >= HIGH_CRIT_CHANCE or (float(st.crit_damage) >= HIGH_CRIT_DAMAGE and float(st.crit_chance) > 0)
+
+
+static func is_javelin_template(st) -> bool:
+	return float(st.crit_chance) <= 0 and float(st.crit_damage) >= HIGH_CRIT_DAMAGE
+
+
+# 带标枪效果：暴击改为 0% + 来源标枪的暴伤
+static func _bind_javelin(st, effects: Array, crit_damage: float):
+	for e in effects:
+		if WeaponValue.effect_key(e) == JAVELIN_KEY:
+			var s = st.duplicate()
+			s.crit_chance = 0.0
+			s.crit_damage = crit_damage
+			return s
+	return st
 const HIGH_CRIT_DAMAGE = 2.5
 
 # 词条 -> 武器类别：must = 必定、high = 优先（必定之后、名额未满时先取）、may = 可能（重复出现 = 权重更高）。词条包括原版角色的偏好词条（含全部主要属性）与武器自身特性；
@@ -897,6 +920,13 @@ func _deep_family(fam: Dictionary, mult: float, stats: Array) -> Dictionary:
 	var b
 	# 暴击直接套用原版武器的模板（低暴击 / 标准 3% ×2 / 高暴击）
 	b = _pick_base(ty).stats
+	# 标枪的 0% 暴击 + 高暴伤模板只随标枪效果出现
+	for _i in 10:
+		if not is_javelin_template(b):
+			break
+		b = _pick_base(ty).stats
+	if is_javelin_template(b):
+		b = {"crit_chance": 0.03, "crit_damage": 2.0}
 	bp.crit_chance = b.crit_chance
 	bp.crit_damage = b.crit_damage
 	b = _pick_base(ty).stats
@@ -969,6 +999,7 @@ func _deep_family(fam: Dictionary, mult: float, stats: Array) -> Dictionary:
 		for e in tw.effects:
 			if bound_key(e):
 				effects.push_back(_vary_fixed(e, family_of(tw)))
+		var jav_cd = 0.0
 		for dn in donors:
 			var dw = _closest_tier(dn.tiers, tier)
 			for e in dw.effects:
@@ -976,8 +1007,10 @@ func _deep_family(fam: Dictionary, mult: float, stats: Array) -> Dictionary:
 				if bound_key(e) or key in keys or (ranged_only(e) and ty == 0):
 					continue
 				keys.push_back(key)
+				if key == JAVELIN_KEY:
+					jav_cd = float(dw.stats.crit_damage)
 				effects.push_back(_vary_fixed(_adapt(_convert_explosion(e.duplicate(), ty), tw), family_of(tw)))
-		var st = bp.duplicate()
+		var st = _bind_javelin(bp.duplicate(), effects, jav_cd)
 		st.cooldown = int(max(2, round(bp.cooldown * pow(shape.cd, d))))
 		var want = _want(tw, true) * mult
 		var line = _item_effect(spec, tier, want)
@@ -1186,7 +1219,7 @@ func weapon_tags(ty: int, st, effects: Array) -> Array:
 	for sc in st.scaling_stats:
 		if float(sc[1]) > 0:
 			tags.push_back(WeaponValue.stat_name(sc[0]))
-	if float(st.crit_chance) >= HIGH_CRIT_CHANCE or float(st.crit_damage) >= HIGH_CRIT_DAMAGE:
+	if is_high_crit(st):
 		tags.push_back("stat_crit_chance")
 	if float(st.lifesteal) > 0:
 		tags.push_back("stat_lifesteal")

@@ -700,7 +700,7 @@ func test_154_effect_crit_elemental_no_tag() -> void:
 			fams[f] = true
 			var p = out[id]
 			var tags = wg.weapon_tags(w.type, p.stats, p.effects)
-			var high_crit = float(p.stats.crit_chance) >= WG.HIGH_CRIT_CHANCE or float(p.stats.crit_damage) >= WG.HIGH_CRIT_DAMAGE
+			var high_crit = WG.is_high_crit(p.stats)
 			for sc in p.stats.scaling_stats:
 				if WV.stat_name(sc[0]) == "stat_crit_chance" and float(sc[1]) > 0:
 					high_crit = true
@@ -1025,6 +1025,20 @@ func _stronger(WV, e, q) -> bool:
 	return WV.magnitude(e) > WV.magnitude(q) or int(q.value) >= 100
 
 
+func _has_key(WV, effects: Array, key: String) -> bool:
+	for e in effects:
+		if WV.effect_key(e) == key:
+			return true
+	return false
+
+
+func _crit_scaling(WV, st) -> bool:
+	for sc in st.scaling_stats:
+		if WV.stat_name(sc[0]) == "stat_crit_chance" and float(sc[1]) > 0:
+			return true
+	return false
+
+
 func test_162_no_inversion_and_fixed_params() -> void:
 	var WV = load(MOD_DIR + "aa/weapon_value.gd")
 	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
@@ -1069,6 +1083,14 @@ func test_162_no_inversion_and_fixed_params() -> void:
 										weak += 1
 										print("AUDIT not strengthened %s T%d %s %s vs %s mag %s vs %s" % [f, t + 1, WV.effect_key(e), str(e.value), str(q.value), str(WV.magnitude(e)), str(WV.magnitude(q))])
 									break
+					# 标枪效果绑定 0% 暴击 + 高暴伤；没有标枪效果的武器不用这个模板（深度重组）；0% 暴击不算精准
+					var has_jav = _has_key(WV, p.effects, WG.JAVELIN_KEY)
+					if has_jav:
+						_check(float(p.stats.crit_chance) == 0 and float(p.stats.crit_damage) >= WG.HIGH_CRIT_DAMAGE, "%s javelin effect binds 0%% crit x%.2f" % [f, float(p.stats.crit_damage)])
+					elif mode == "deep":
+						_check(not WG.is_javelin_template(p.stats), "%s has no javelin crit template without the javelin effect" % f)
+					if float(p.stats.crit_chance) == 0:
+						_check(not "stat_crit_chance" in wg.weapon_tags(wg.families[f].type, p.stats, p.effects) or _crit_scaling(WV, p.stats), "%s 0%% crit has no crit tag" % f)
 					if int(p.stats.min_range) > 0:
 						_check(int(p.stats.max_range) >= int(p.stats.min_range) + 100, "%s range %d-%d is wide" % [f, int(p.stats.min_range), int(p.stats.max_range)])
 					prev = p
