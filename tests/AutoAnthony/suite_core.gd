@@ -2329,7 +2329,7 @@ func test_134_growth_items() -> void:
 			if not p.get("growth", false):
 				continue
 			n += 1
-			_check(_item(id).tier >= 1, id + " growth items are T2+")
+			_check(_item(id).tier >= Catalog.GROWTH_MIN_TIER, id + " growth items are T3+")
 			var lim = int(p.get("limit", 0))
 			_check(lim >= 1 and lim <= 3, id + " has a limit (%d)" % lim)
 			# 限制 1 = 独特（代价是独特型机制时也会独特）
@@ -2537,3 +2537,89 @@ func test_149_tier_chaos() -> void:
 			odd += 1
 	print("AUDIT items named 'Odd': %d / %d" % [odd, plan.items.size()])
 	_check(odd < plan.items.size() / 12, "fallback adjective 'Odd' is not frequent (%d)" % odd)
+
+
+
+# 成长型道具计数期望的参数搜索（AA_SEARCH=<次数> 时才运行）：用原版属性转化道具做锚点，
+# 预测转化率 =（道具预算 - 其余效果价值）/（B 的权重 × 计数期望），目标 = 原版转化率 × GROWTH_TARGET
+const GROWTH_TARGET = 0.85
+const GROWTH_ANCHORS = ["item_bloody_hand", "item_power_generator", "item_retromations_hoodie", "item_stone_skin", "item_strange_book", "item_lucky_coin", "item_coil", "item_padding", "item_community_support", "item_fried_rice"]
+
+
+func test_164_search_growth_ref() -> void:
+	# 想要该属性的原版角色比例
+	var chars = m.native_only(isvc.characters)
+	var cov = {}
+	for ch in chars:
+		for t in ch.wanted_tags:
+			cov[t] = cov.get(t, 0.0) + 1.0 / chars.size()
+	var keys = cov.keys()
+	keys.sort()
+	var line = ""
+	for k in keys:
+		if Catalog.STATS.has(k):
+			line += '"%s": %.2f, ' % [k, cov[k]]
+	print("AUDIT coverage {" + line + "}")
+	# 各稀有度的转化率（每 1 点 A 换多少 B；预算取原版同稀有度道具的中位数，不含 +A 行与代价）
+	var gb = Generator.new(_cfg(), 1)
+	gb.generate(m.native_only(isvc.items), m.native_only(isvc.characters), [], [])
+	for t in [2, 3]:
+		var b = []
+		for it in m.native_only(isvc.items):
+			if it.tier == t:
+				b.push_back(gb.item_budget(it) * Catalog.HIDDEN_TIER_MULT[t])
+		b.sort()
+		var budget = b[b.size() / 2]
+		var rl = "T%d budget %.0f |" % [t + 1, budget]
+		for a in ["stat_melee_damage", "stat_ranged_damage", "stat_elemental_damage", "stat_max_hp", "stat_armor", "stat_hp_regeneration", "stat_lifesteal", "stat_crit_chance", "stat_dodge", "stat_speed", "stat_luck", "stat_engineering", "stat_harvesting", "stat_range", "stat_attack_speed", "stat_curse"]:
+			rl += " %s %.2f (ref %.0f) |" % [a.replace("stat_", ""), budget / (Catalog.stat_w("stat_percent_damage") * Valuation.growth_counter_ref(a, t)), Valuation.growth_counter_ref(a, t)]
+		print("AUDIT %damage per A " + rl)
+	var n_try = int(OS.get_environment("AA_SEARCH")) if OS.get_environment("AA_SEARCH").is_valid_integer() else 0
+	if n_try <= 0:
+		return
+	var g = Generator.new(_cfg(), 1)
+	g.generate(m.native_only(isvc.items), m.native_only(isvc.characters), [], [])
+	var rows = []
+	for id in GROWTH_ANCHORS:
+		var it = _item(id)
+		if it == null:
+			continue
+		var sc = null
+		var others = []
+		for e in it.effects:
+			if g.is_scaling(e) and e.value > 0 and e.nb_stat_scaled > 0 and sc == null:
+				sc = e
+			else:
+				others.push_back(e)
+		if sc == null:
+			continue
+		var budget = g.item_budget(it) * Catalog.HIDDEN_TIER_MULT[it.tier]
+		var rest = budget - _value_of(g, others, it.tier)
+		rows.push_back([id, it.tier, sc.key, sc.stat_scaled, float(sc.value) / sc.nb_stat_scaled, rest])
+	var params: Dictionary = Catalog.GROWTH_REF
+	var base = params.duplicate()
+	var rng = RandomNumberGenerator.new()
+	rng.seed = 11
+	var results = []
+	for i in n_try + 1:
+		if i > 0:
+			params.kappa = rng.randf_range(0.0, 1.0)
+			params.mult = rng.randf_range(0.4, 2.5)
+		var err = 0.0
+		var detail = ""
+		for r in rows:
+			var pred = max(0.01, r[5]) / (Catalog.stat_w(r[2]) * Valuation.growth_counter_ref(r[3], r[1]))
+			var l = log(pred / (r[4] * GROWTH_TARGET))
+			err += l * l
+			detail += "%s %.2f/%.2f " % [r[0].replace("item_", ""), pred, r[4]]
+		results.push_back([err / rows.size(), params.kappa, params.mult, detail])
+	params.kappa = base.kappa
+	params.mult = base.mult
+	print("AUDIT growth search baseline err %.3f kappa %.2f mult %.2f | %s" % results[0])
+	results.sort_custom(self, "_sort_first_num_asc")
+	for r in results.slice(0, 5):
+		print("AUDIT growth search err %.3f kappa %.2f mult %.2f | %s" % r)
+
+
+func _sort_first_num_asc(a, b) -> bool:
+	return a[0] < b[0]

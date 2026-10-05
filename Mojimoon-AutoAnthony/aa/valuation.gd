@@ -131,13 +131,23 @@ static func scaling_value(stat: String, value: int, counter: String, nb: int, gr
 	return Catalog.stat_w(stat) * value * ref / max(1, nb)
 
 
-# 成长型道具的计数期望：武器参考属性表（终局）× 持有期的平均属性阶段（(购买时 + 终局) / 2）。
-# 会买"每有 A 获得 B"的玩家通常在堆 A，道具又是永久的；表里没有的属性（%伤害、经验……）沿用 counter_ref
+# 成长型道具的计数期望 = 买家持有的 A：一般值^(1-κ) × 专精值^κ × 全局倍率
+#   一般值 = counter_ref（由原版转化道具反推）；专精值 = 武器参考属性表（终局）× 持有期的平均属性阶段（(购买时 + 终局) / 2），不低于一般值
+#   κ = 强度 × 属性的小众程度（1 - 想要它的原版角色比例 / 最大比例）：小众属性（收获、工程……）的买家几乎都在专精它
+#   强度与全局倍率由原版转化道具拟合（suite_core test_164）；表里没有的属性（%伤害、经验……）只乘全局倍率
 static func growth_counter_ref(counter: String, tier: int) -> float:
-	if WeaponValue.REF_STATS.has(counter):
-		var f = float(WeaponValue.TIER_STAT_FRAC[clamp(tier, 0, 3)])
-		return float(WeaponValue.REF_STATS[counter]) * (f + 1.0) / 2.0
-	return Catalog.counter_ref(counter)
+	var gen = Catalog.counter_ref(counter)
+	var mult = float(Catalog.GROWTH_REF["mult"])
+	if not WeaponValue.REF_STATS.has(counter):
+		return gen * mult
+	var f = float(WeaponValue.TIER_STAT_FRAC[clamp(tier, 0, 3)])
+	var spec = max(gen, float(WeaponValue.REF_STATS[counter]) * (f + 1.0) / 2.0)
+	var cov: Dictionary = Catalog.GROWTH_COVERAGE
+	var top = 0.0
+	for c in cov:
+		top = max(top, float(cov[c]))
+	var k = float(Catalog.GROWTH_REF["kappa"]) * (1.0 - float(cov.get(counter, 0.0)) / max(0.01, top))
+	return pow(gen, 1.0 - k) * pow(spec, k) * mult
 
 
 # 计数型效果的价值（成长型道具的计数效果带 aa_growth_tier 标记）

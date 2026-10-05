@@ -1004,7 +1004,7 @@ func generate_item(item, core_stat: String = "") -> Dictionary:
 	cur_stat_bans = Catalog.ITEM_STAT_BANS.get(item.my_id, [])
 	if core_stat != "":
 		return _generate_core_item(item, core_stat)
-	if item.tier >= 1 and rng.randf() < Catalog.GROWTH_ITEM_CHANCE:
+	if item.tier >= Catalog.GROWTH_MIN_TIER and rng.randf() < Catalog.GROWTH_ITEM_CHANCE:
 		var g = _generate_growth_item(item)
 		if not g.empty():
 			return g
