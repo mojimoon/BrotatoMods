@@ -692,3 +692,25 @@ func test_154_effect_crit_elemental_no_tag() -> void:
 				elem += 1
 		print("AUDIT default sets seed %d %s; burning %d, elemental scaling %d" % [sd, str(set_count), burning, elem])
 		print("AUDIT native sets %s" % str(wg._set_native_count))
+
+
+# 玩家设置（深度重组 + 道具效果）在固定种子下走设置界面逐页预览武器。
+# 曾因 Array.sort() 比较数组在正式版闪退（调试版只报 "bad comparison function"，run_tests.sh 会把它算作失败）
+func test_155_weapon_preview_player_seed() -> void:
+	m.cfg_items = true
+	m.cfg_weapons = true
+	m.cfg_weapon_mode = "deep"
+	m.cfg_w_item_effects = true
+	m.cfg_w_any_start = true
+	m.cfg_w_low_tiers = false
+	m.cfg_fixed_seed = true
+	m.cfg_seed = 33772723
+	var ui = load(MOD_DIR + "ui/settings_ui.tscn").instance()
+	tree.root.add_child(ui)
+	ui._on_page_pressed("weapons")
+	ui._on_preview_pressed("weapons")
+	for t in 4:
+		ui._on_tier_pressed(t, "weapons")
+		yield(tree, "idle_frame")
+		_check(ui._pv.weapons.grid.get_child_count() > 5, "tier %d rendered" % t)
+	ui.queue_free()

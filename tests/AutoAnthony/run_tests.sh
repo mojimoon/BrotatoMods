@@ -50,6 +50,13 @@ if [ -n "$CRASH" ]; then
 	echo "$CRASH"
 	STATUS=1
 fi
+# 排序比较函数不一致：调试版只报错，正式版会越界闪退
+BADSORT=$(grep -c "bad comparison function" "$LOG")
+if [ "$BADSORT" -gt 0 ]; then
+	echo
+	echo "bad comparison function: $BADSORT (crashes the release build)"
+	STATUS=1
+fi
 ERRORS=$(awk '
 	/SCRIPT ERROR|Parse Error|Script error/ { pending = $0; next }
 	pending != "" {

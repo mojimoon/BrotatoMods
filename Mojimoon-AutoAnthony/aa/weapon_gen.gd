@@ -1040,7 +1040,8 @@ func _ensure_set_minimum(fam_sets: Dictionary) -> void:
 			if cur.size() == 1 and cur[0].my_id == "set_legendary":
 				continue
 			cands.push_back([rng.randf(), f])
-		cands.sort()
+		# 元素是数组：Array.sort() 不能比较数组（正式版游戏会因排序越界闪退），按第一项排序
+		cands.sort_custom(self, "_sort_first")
 		for c in cands:
 			if have >= need:
 				break
