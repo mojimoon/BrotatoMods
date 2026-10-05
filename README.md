@@ -302,6 +302,15 @@ Note: this is an entirely different mod. [pullquote]Do not enable v1 and v2 at t
 GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/url]
 
 -->
+<details>
+
+<summary>Screenshots</summary>
+
+![](img/oitrta-v2-1.jpg)
+
+![](img/oitrta-v2-3.jpg)
+
+</details>
 
 ---
 
@@ -457,13 +466,9 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 
 <details>
 
-<summary>Screenshots</summary>
-
-![](img/oitrta-v2-1.jpg)
+<summary>截图</summary>
 
 ![](img/oitrta-v2-2.jpg)
-
-![](img/oitrta-v2-3.jpg)
 
 ![](img/oitrta-v2-4.jpg)
 
@@ -610,6 +615,18 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 -->
 
+<details>
+
+<summary>Screenshot</summary>
+
+![](img/aa-en-1.jpg)
+
+![](img/aa-en-2.jpg)
+
+![](img/aa-en-3.jpg)
+
+</details>
+
 ---
 
 **每一局，都是全新的道具和武器。** 东尼算法把每件道具和武器拆成零件——属性、触发条件、效果、机制——再按同等价值随机拼回去。图标和稀有度不变，内容却完全不同。
@@ -730,17 +747,15 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 
 <details>
 
-<summary>Screenshots</summary>
+<summary>截图</summary>
 
 ![](img/aa-0.png)
 
-![](img/aa-1.jpg)
+![](img/aa-zh-1.jpg)
 
-![](img/aa-2.jpg)
+![](img/aa-zh-2.jpg)
 
-![](img/aa-3.jpg)
-
-![](img/aa-4.jpg)
+![](img/aa-zh-3.jpg)
 
 </details>
 
