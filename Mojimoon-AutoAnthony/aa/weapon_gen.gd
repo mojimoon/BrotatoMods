@@ -5,7 +5,7 @@ extends Reference
 #     再按价值模型（weapon_value.gd）缩放伤害与属性加成，使新武器的价值 = 原武器价值 × 平均数值 × 浮动
 #   深度重组（deep）：冷却、暴击、射程、击退、吸血、投射物 / 贯穿 / 弹跳 / 换弹、属性加成、效果、武器类别全部重新生成
 #     （各属性从同类型原版武器的分布中抽取）；最低一级随机多组、取价值不超过价格对应目标的最好一组，
-#     更高一级在低一级基础上逐项随机提升、按实际价值重新定价；近战 / 远程、武器场景不变
+#     由它估出最高一级、中间各级按原版逐级比例插值，按实际价值重新定价；近战 / 远程、武器场景不变
 # 输出 { my_id: {effects, stats, sets, donor} }
 
 const Catalog = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/catalog.gd")
@@ -527,7 +527,7 @@ const MIN_SET_FAMILIES = 3
 # 最低一级随机组合的个数上限；价值落在目标的 [1 - PICK_BAND, 1] 内即可采用
 const DEEP_TRIES = 24
 const PICK_BAND = 0.1
-const DEEP_TEMPLATES = 2
+const DEEP_TEMPLATES = 4
 # 慢速武器（平均攻击间隔 ≥ 此值，秒）：手感差、通常不会选用，作为攻击节奏的权重低；可以有更高的加成系数（激光枪、歼灭者）
 const SLOW_COOLDOWN = 1.4
 const SLOW_PROFILE_W = 0.25
@@ -538,14 +538,6 @@ const MAIN_COEF_CAP = 2.0
 const SLOW_COEF_CAP = 4.0
 # 效果（来源家族 + 道具效果）至多占武器目标价值的比例
 const FX_SHARE_CAP = 0.4
-# 更高一级：冷却、贯穿 / 弹跳 / 吸血 / 射程 / 击退各自提升的概率；加成系数提升的概率；基础伤害提升的概率
-const UP_CHANCE = 0.5
-const COEF_UP_CHANCE = 0.75
-const DMG_UP_CHANCE = 0.5
-# 基础伤害没抽中提升、但效果补完后仍比目标价值低这么多：基础伤害仍然提升
-const DMG_FORCE_GAP = 0.15
-# 效果每升一级至多放大的倍数
-const FX_GROWTH_CAP = 2.0
 # 加成系数下限（不分稀有度、不分第几条加成；参考原版，约为终局属性 15 点时加成出的伤害）
 const SCALING_FLOOR = {
 	"stat_max_hp": 0.15, "stat_hp_regeneration": 0.35, "stat_lifesteal": 0.5, "stat_melee_damage": 0.25,
@@ -634,8 +626,7 @@ var _sec_coefs: Dictionary = {}	# 属性 -> [原版附加加成系数（最低�
 var _crit_pool: Dictionary = {}	# 类型 -> {是否高暴击: [[暴击率, 暴伤]]}（原版非传奇武器，不含标枪模板）
 var _hi_crit_share: Dictionary = {}	# 类型 -> 原版高暴击武器的比例
 var _up_r: Array = [1.0, 1.25, 1.5, 2.0]	# 原版 4 级家族逐级基础伤害相对最低一级的倍率（中位数）
-# 更高稀有度的生成方式：step = 逐级随机提升，interp = 由最高一级插值；最低一级随机组合的个数（实验用）
-var upgrade_mode := "interp"
+# 最低一级每套构成随机组合的个数（审计时改）
 var deep_tries := DEEP_TRIES
 var _sets: Dictionary = {}		# set my_id -> SetData
 var _set_native_count: Dictionary = {}
@@ -836,14 +827,9 @@ func generate_deep() -> Dictionary:
 		tiers.sort()
 		var prev = _deep_base(fam, mult, stats, tiers[0])
 		out[fam.tiers[tiers[0]].my_id] = prev
-		if upgrade_mode == "interp":
-			var res = _deep_interp(fam, prev, tiers, mult)
-			for i in tiers.size():
-				out[fam.tiers[tiers[i]].my_id] = res[i]
-		else:
-			for i in range(1, tiers.size()):
-				prev = _deep_up(fam, prev, tiers[i], mult)
-				out[fam.tiers[tiers[i]].my_id] = prev
+		var res = _deep_interp(fam, prev, tiers, mult)
+		for i in tiers.size():
+			out[fam.tiers[tiers[i]].my_id] = res[i]
 		fam_sets[f] = _pick_sets(fam, out)
 	_ensure_set_minimum(fam_sets)
 	for f in fam_names:
@@ -1097,71 +1083,7 @@ func _deep_candidate(fam: Dictionary, tw, tier: int, want: float, stats: Array, 
 	}
 
 
-# 更高一级：在低一级的基础上随机提升——各加成系数以 COEF_UP_CHANCE、冷却与贯穿 / 弹跳 / 吸血 / 射程 / 击退各以 UP_CHANCE 的概率提升（否则不变），
-# 高暴击武器的暴击必定提升（否则不变）；效果按剩余的价值差额必定提升（每条至少强一步），
-# 基础伤害（DMG_UP_CHANCE，或效果补完后仍差得多时）补足其余；最后按实际价值重新定价（砖头价格固定）
-func _deep_up(fam: Dictionary, prev: Dictionary, tier: int, mult: float) -> Dictionary:
-	var tw = fam.tiers[tier]
-	var st = prev.stats.duplicate()
-	var ty: int = fam.type
-	if rng.randf() < UP_CHANCE:
-		st.cooldown = int(max(WeaponValue.MIN_CD_FRAMES, min(int(st.cooldown) - 1, round(float(st.cooldown) * rng.randf_range(0.85, 0.95)))))
-	var sc = []
-	for i in st.scaling_stats.size():
-		var x = st.scaling_stats[i]
-		var c = float(x[1])
-		if c > 0 and rng.randf() < COEF_UP_CHANCE:
-			var cap = INF
-			if i > 0:
-				cap = SEC_COEF_CAP
-			else:
-				cap = SLOW_COEF_CAP if is_slow(st) else MAIN_COEF_CAP
-			cap *= WeaponValue.stat_ref("stat_melee_damage") / WeaponValue.stat_ref(WeaponValue.stat_name(x[0]))
-			c = max(c, min(cap, max(c + 0.05, stepify(c * rng.randf_range(1.1, 1.3), 0.05))))
-		sc.push_back([x[0], c])
-	st.scaling_stats = sc
-	if not WeaponValue.is_melee(st):
-		if int(st.piercing) > 0 and int(st.piercing) < 50 and rng.randf() < UP_CHANCE:
-			st.piercing = int(st.piercing) + 1
-		if int(st.bounce) > 0 and rng.randf() < UP_CHANCE:
-			st.bounce = int(st.bounce) + 1
-	if float(st.lifesteal) > 0 and rng.randf() < UP_CHANCE:
-		st.lifesteal = stepify(float(st.lifesteal) + rng.randf_range(0.01, 0.03), 0.01)
-	if rng.randf() < UP_CHANCE:
-		st.max_range = int(stepify(float(st.max_range) * rng.randf_range(1.05, 1.12), 5.0))
-	if int(st.knockback) > 0 and rng.randf() < UP_CHANCE:
-		st.knockback = int(min(int(st.knockback) + 1, KB_CAP[ty]))
-	if is_high_crit(st):
-		st.crit_chance = min(1.0, stepify(float(st.crit_chance) + rng.randf_range(0.02, 0.05), 0.01))
-		if rng.randf() < 0.5:
-			st.crit_damage = stepify(float(st.crit_damage) + 0.25, 0.05)
-	var dmg_up = rng.randf() < DMG_UP_CHANCE
-	var effects: Array = prev.effects
-	var want = _want(tw, true) * mult
-	var excess = _downside_excess(want, effects)
-	want -= excess
-	if not effects.empty():
-		var cur = wv.value(st, effects, tier)
-		var fx0 = cur - wv.value(st, [], tier)
-		# 基础伤害也提升时，效果按它占当前价值的比例分摊差额；否则效果承担全部差额
-		var share = clamp(fx0 / max(1.0, cur), 0.0, 1.0) if dmg_up else 1.0
-		effects = _grow_effects(st, effects, tier, fx0 + max(0.0, want - cur) * share)
-	# 基础伤害低于该稀有度的下限时也必定提升
-	var names = []
-	for x in st.scaling_stats:
-		names.push_back(WeaponValue.stat_name(x[0]))
-	var bmin = _base_min(st, names, effects, tier)
-	if dmg_up or float(st.damage) < bmin or wv.value(st, effects, tier) < want * (1.0 - DMG_FORCE_GAP):
-		st.damage = _fill_damage(st, effects, tier, want, int(max(int(st.damage) + 1, ceil(bmin))))
-	var got = wv.value(st, effects, tier)
-	var price = _price_of(tw)
-	if not _is_brick(fam):
-		var vp = float(_vp.get(str(ty) + "/" + str(tier), 1.0))
-		price = max(float(prev.price) + 1.0, (got + excess) / max(0.01, vp * mult))
-	return {"effects": effects, "stats": st, "donor": prev.donor, "scale": 1.0, "want": got, "capped": excess > 0, "price": int(round(price))}
-
-
-# 方案 B（插值）：由最低一级估出最高一级——价格按价格阶梯、效果价值按它在最低一级总价值中的占比（至多放大 FX_TOP_CAP 倍，不低于逐级各强一步），
+# 更高稀有度：由最低一级估出最高一级——价格按价格阶梯、效果价值按它在最低一级总价值中的占比（至多放大 FX_TOP_CAP 倍，不低于逐级各强一步），
 # 伤害、加成系数、（高暴击武器的）暴击按同一个增长量 g 放大，使最高一级价值达标；
 # 中间各级按原版逐级的伤害比例（_up_r）插值。攻速每级略快；射程：远程每级 +50，射程大的近战每级 +25；
 # 吸血每级 +5%；弹跳每级 +1、贯穿到最高一级共 +1（原本有的才加），投射物数不变。各级按实际价值重新定价
@@ -1289,48 +1211,6 @@ func _fx_chain(e0: Array, tiers: Array, P: Dictionary, f: float) -> Dictionary:
 		prev = _strengthen_effects(_scale_effects(e0, 1.0 + (f - 1.0) * P[t]), prev)
 		out[t] = prev
 	return out
-
-
-# 基础伤害：至少 dmin，取价值不超过 want 的最大值
-func _fill_damage(st, effects: Array, tier: int, want: float, dmin: int) -> int:
-	var probe = st.duplicate()
-	probe.damage = dmin
-	if wv.value(probe, effects, tier) >= want:
-		return dmin
-	var lo = dmin
-	var hi = dmin * 2 + 10
-	probe.damage = hi
-	while wv.value(probe, effects, tier) < want and hi < 100000:
-		lo = hi
-		hi *= 2
-		probe.damage = hi
-	while hi - lo > 1:
-		var mid = (lo + hi) / 2
-		probe.damage = mid
-		if wv.value(probe, effects, tier) <= want:
-			lo = mid
-		else:
-			hi = mid
-	return lo
-
-
-# 效果放大到效果价值约为 target（至多 FX_GROWTH_CAP 倍），且每条都比低一级强一步以上
-func _grow_effects(st, effects: Array, tier: int, target: float) -> Array:
-	var base = wv.value(st, [], tier)
-	var best = _strengthen_effects(effects, effects)
-	if wv.value(st, best, tier) - base >= target:
-		return best
-	var lo = 1.0
-	var hi = FX_GROWTH_CAP
-	for _i in 10:
-		var mid = (lo + hi) / 2.0
-		var cand = _strengthen_effects(_scale_effects(effects, mid), effects)
-		if wv.value(st, cand, tier) - base <= target:
-			lo = mid
-			best = cand
-		else:
-			hi = mid
-	return best
 
 
 func _base_min(st, stats: Array, effects: Array, tier: int) -> float:
@@ -1697,15 +1577,16 @@ func _item_effect(spec: Dictionary, tier: int, weapon_value: float):
 # 武器的目标价值（未乘浮动）：仅重组效果时按原武器的模型估值（属性不变，模型误差相互抵消）；
 # 深度重组与补出的低级武器 = 价格 × 同档原版武器"模型价值 / 价格"的中位数（属性全部重抽，不沿用原武器的模型误差）
 var _vp: Dictionary = {}
+const LEGENDARY_PREMIUM = 1.15
 
 
 func _want(w, by_price := false) -> float:
 	# 砖头也按价格：碎裂在估值里按寿命折扣计（WeaponValue.life_mult）
 	if by_price or w.has_meta("aa_low_of"):
 		var v = _price_of(w) * float(_vp.get(str(w.type) + "/" + str(w.tier), 1.0))
-		# 传奇武器（只有 T4 的原版武器）普遍超模、程度不等：取模型价值与按价格换算值的几何平均（链枪约 ×2）
+		# 传奇武器（只有 T4 的原版武器）：比同价格的普通武器略强
 		if not w.has_meta("aa_low_of") and wv.legendary_families.has(family_of(w)):
-			v = sqrt(v * max(1.0, wv.value(w.stats, w.effects, w.tier)))
+			v *= LEGENDARY_PREMIUM
 		return v
 	return wv.value(w.stats, w.effects, w.tier)
 

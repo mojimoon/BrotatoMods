@@ -1208,7 +1208,7 @@ func _raw_dps(WV, st, tier: int) -> float:
 	return max(0.01, WV.hit_damage(float(st.damage), st.scaling_stats, tier) * WV.crit_factor(st) * WV.hits_per_attack(st) / max(0.05, WV.cooldown_seconds(st)))
 
 
-# 审计（AA_AUDIT=1）：深度重组两种升级方案（逐级随机提升 step / 由最高一级插值 interp）的武器表，
+# 审计（AA_AUDIT=1）：深度重组的武器表（各级插值），
 # 以及最低一级"随机多组取最高"（24 组）与只抽 1 组的分布对比
 func test_167_audit_upgrade_schemes() -> void:
 	if OS.get_environment("AA_AUDIT") == "":
@@ -1222,9 +1222,8 @@ func test_167_audit_upgrade_schemes() -> void:
 	var g = Generator.new(cfg, 3)
 	g.generate(isvc.items, isvc.characters, [], [])
 	cfg.w_item_effects = true
-	for mode in ["step", "interp"]:
+	for mode in ["interp"]:
 		var wg = WG.new(cfg, 3, g)
-		wg.upgrade_mode = mode
 		var out = wg.generate(natives)
 		print("AUDIT ===== scheme %s (up_r %s) =====" % [mode, str(wg._up_r)])
 		var smooth = []
