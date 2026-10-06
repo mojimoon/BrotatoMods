@@ -1206,3 +1206,112 @@ func _sd(a: Array) -> float:
 
 func _raw_dps(WV, st, tier: int) -> float:
 	return max(0.01, WV.hit_damage(float(st.damage), st.scaling_stats, tier) * WV.crit_factor(st) * WV.hits_per_attack(st) / max(0.05, WV.cooldown_seconds(st)))
+
+
+# 审计（AA_AUDIT=1）：深度重组两种升级方案（逐级随机提升 step / 由最高一级插值 interp）的武器表，
+# 以及最低一级"随机多组取最高"（24 组）与只抽 1 组的分布对比
+func test_167_audit_upgrade_schemes() -> void:
+	if OS.get_environment("AA_AUDIT") == "":
+		return
+	var WV = load(MOD_DIR + "aa/weapon_value.gd")
+	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
+	var natives = m.native_only(isvc.weapons)
+	var cfg = _cfg()
+	cfg.weapons = true
+	cfg.weapon_mode = "deep"
+	var g = Generator.new(cfg, 3)
+	g.generate(isvc.items, isvc.characters, [], [])
+	cfg.w_item_effects = true
+	for mode in ["step", "interp"]:
+		var wg = WG.new(cfg, 3, g)
+		wg.upgrade_mode = mode
+		var out = wg.generate(natives)
+		print("AUDIT ===== scheme %s (up_r %s) =====" % [mode, str(wg._up_r)])
+		var smooth = []
+		var t4r = []
+		for f in wg.fam_names:
+			var tiers = wg.families[f].tiers.keys()
+			tiers.sort()
+			var prev = null
+			for t in tiers:
+				var w = wg.families[f].tiers[t]
+				var p = out[w.my_id]
+				var st = p.stats
+				var sc = ""
+				for x in st.scaling_stats:
+					sc += "%s%d%% " % [WV.stat_name(x[0]).replace("stat_", "").replace("_damage", ""), int(round(float(x[1]) * 100))]
+				var fx = ""
+				for e in p.effects:
+					fx += "%s=%s " % [WV.effect_key(e).replace("effect_", ""), str(e.chance) if WV.effect_id(e) == "weapon_exploding" else (str(e.burning_data.damage) if WV.effect_id(e) == "weapon_burning" and e.burning_data != null else str(e.value))]
+				var val = wg.wv.value(st, p.effects, t)
+				var extra = ""
+				if not WV.is_melee(st):
+					extra = " x%d p%d b%d" % [int(st.nb_projectiles), int(st.piercing), int(st.bounce)]
+				print("AUDIT %s %-26s T%d $%-4d v%-6.0f dmg %-4d %scd %.2f crit %d%%x%.2f rng %d ls %d%%%s | %s" % [mode, f.replace("weapon_", ""), t + 1, int(p.price), val, int(st.damage), sc, WV.cooldown_seconds(st), int(round(float(st.crit_chance) * 100)), float(st.crit_damage), int(st.max_range), int(round(float(st.lifesteal) * 100)), extra, fx])
+				if prev != null:
+					smooth.push_back(float(st.damage) / max(1.0, float(prev.stats.damage)))
+				prev = p
+			var top = tiers[-1]
+			if tiers.size() > 1:
+				var wt = wg.families[f].tiers[top]
+				t4r.push_back(float(out[wt.my_id].price) / max(1.0, wg._price_of(wt)))
+		smooth.sort()
+		t4r.sort()
+		print("AUDIT %s damage step ratio p10 %.2f median %.2f p90 %.2f max %.2f; top price / ladder p10 %.2f median %.2f p90 %.2f" % [mode, smooth[smooth.size() / 10], smooth[smooth.size() / 2], smooth[smooth.size() * 9 / 10], smooth[-1], t4r[t4r.size() / 10], t4r[t4r.size() / 2], t4r[t4r.size() * 9 / 10]])
+	# 最低一级择优的偏向：24 组取最高 vs 1 组（5 个种子合计）
+	for tries in [24, 1]:
+		var n = 0
+		var acc = {"fx1": 0, "fx2": 0, "item": 0, "hicrit": 0, "ls": 0, "pierce": 0, "bounce": 0, "over": 0, "unnatural_dmg": 0}
+		var cds = []
+		var coef = []
+		var share = []
+		var vw = []
+		var keys = {}
+		var mains = {}
+		for sd in [1, 2, 3, 4, 5]:
+			var wg = WG.new(cfg, sd, g)
+			wg.deep_tries = tries
+			var out = wg.generate(natives)
+			for f in wg.fam_names:
+				var tiers = wg.families[f].tiers.keys()
+				tiers.sort()
+				var w = wg.families[f].tiers[tiers[0]]
+				var p = out[w.my_id]
+				var st = p.stats
+				n += 1
+				var nfx = 0
+				for e in p.effects:
+					if WG.bound_key(e):
+						continue
+					nfx += 1
+					if e.has_meta("aa_value"):
+						acc.item += 1
+					else:
+						var k = WV.effect_key(e)
+						keys[k] = keys.get(k, 0) + 1
+				acc.fx1 += 1 if nfx >= 1 else 0
+				acc.fx2 += 1 if nfx >= 2 else 0
+				acc.hicrit += 1 if WG.is_high_crit(st) else 0
+				acc.ls += 1 if float(st.lifesteal) > 0 else 0
+				if not WV.is_melee(st):
+					acc.pierce += 1 if int(st.piercing) > 0 else 0
+					acc.bounce += 1 if int(st.bounce) > 0 else 0
+				var val = wg.wv.value(st, p.effects, tiers[0])
+				acc.over += 1 if val > float(p.want) else 0
+				vw.push_back(val / max(1.0, float(p.want)))
+				cds.push_back(WV.cooldown_seconds(st))
+				var hit = WV.hit_damage(float(st.damage), st.scaling_stats, tiers[0])
+				share.push_back(WV.hit_damage(0.0, st.scaling_stats, tiers[0]) / max(1.0, hit))
+				var m0 = WV.stat_name(st.scaling_stats[0][0])
+				mains[m0] = mains.get(m0, 0) + 1
+				coef.push_back(float(st.scaling_stats[0][1]))
+		for a in [cds, coef, share, vw]:
+			a.sort()
+		var top = []
+		for k in keys:
+			top.push_back([keys[k], k])
+		top.sort_custom(self, "_sort_first_desc")
+		print("AUDIT tries %d: n %d effects>=1 %.2f >=2 %.2f item %.2f hicrit %.2f lifesteal %.2f pierce %d bounce %d over-want %d" % [tries, n, float(acc.fx1) / n, float(acc.fx2) / n, float(acc.item) / n, float(acc.hicrit) / n, float(acc.ls) / n, acc.pierce, acc.bounce, acc.over])
+		print("AUDIT tries %d: cd median %.2f p90 %.2f; main coef median %.2f p90 %.2f; scaling share median %.2f; value/want p10 %.2f median %.2f" % [tries, cds[cds.size() / 2], cds[cds.size() * 9 / 10], coef[coef.size() / 2], coef[coef.size() * 9 / 10], share[share.size() / 2], vw[vw.size() / 10], vw[vw.size() / 2]])
+		print("AUDIT tries %d: mains %s" % [tries, str(mains)])
+		print("AUDIT tries %d: top effects %s" % [tries, str(top.slice(0, min(11, top.size() - 1)))])
