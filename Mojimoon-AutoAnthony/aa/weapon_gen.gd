@@ -534,15 +534,21 @@ const SEC_COEF_CAP = 1.25
 const MAIN_COEF_CAP = 2.0
 # 效果（来源家族 + 道具效果）至多占武器目标价值的比例
 const FX_SHARE_CAP = 0.4
-# 更高一级：冷却、加成系数、贯穿 / 弹跳 / 吸血 / 射程 / 击退各自提升的概率；基础伤害提升的概率
+# 更高一级：冷却、贯穿 / 弹跳 / 吸血 / 射程 / 击退各自提升的概率；加成系数提升的概率；基础伤害提升的概率
 const UP_CHANCE = 0.5
-const DMG_UP_CHANCE = 0.75
+const COEF_UP_CHANCE = 0.75
+const DMG_UP_CHANCE = 0.5
 # 基础伤害没抽中提升、但效果补完后仍比目标价值低这么多：基础伤害仍然提升
 const DMG_FORCE_GAP = 0.15
 # 效果每升一级至多放大的倍数
 const FX_GROWTH_CAP = 2.0
-# 加成系数下限（不分稀有度、不分第几条加成）：终局属性 15 点时加成出的伤害（15 / 终局参考属性），且不高于原版该属性用过的最低系数
-const SCALING_FLOOR_DMG = 15.0
+# 加成系数下限（不分稀有度、不分第几条加成；参考原版，约为终局属性 15 点时加成出的伤害）
+const SCALING_FLOOR = {
+	"stat_max_hp": 0.15, "stat_hp_regeneration": 0.35, "stat_lifesteal": 0.5, "stat_melee_damage": 0.25,
+	"stat_ranged_damage": 0.5, "stat_elemental_damage": 0.4, "stat_attack_speed": 0.15, "stat_crit_chance": 0.2,
+	"stat_engineering": 0.35, "stat_range": 0.1, "stat_armor": 0.95, "stat_dodge": 0.25, "stat_speed": 0.25,
+	"stat_luck": 0.1, "stat_harvesting": 0.1, "stat_levels": 0.75, "stat_curse": 0.15,
+}
 # 单次伤害（含暴击）不宜超过该阶段参考敌人生命的倍数
 const HIT_CAP = 3.0
 const KB_CAP = {0: 15, 1: 8}
@@ -621,7 +627,6 @@ var _second_w: Dictionary = {}	# 属性 -> 权重（第二条 / 非伤害主加�
 var _common: Dictionary = {}	# 类型 -> 非传奇原版武器（暴击、射程、吸血等独立抽取的来源）
 var _shares: Dictionary = {}	# 类型 -> {稀有度: [加成部分 / 每次命中伤害]}（原版非传奇武器，已排序）
 var _sec_coefs: Dictionary = {}	# 属性 -> [原版附加加成系数（最低一级）]
-var _floor: Dictionary = {}		# 属性 -> 加成系数下限
 var _crit_pool: Dictionary = {}	# 类型 -> {是否高暴击: [[暴击率, 暴伤]]}（原版非传奇武器，不含标枪模板）
 var _hi_crit_share: Dictionary = {}	# 类型 -> 原版高暴击武器的比例
 var _sets: Dictionary = {}		# set my_id -> SetData
@@ -646,7 +651,6 @@ func _collect_deep_priors() -> void:
 	_shares = {0: {}, 1: {}}
 	_sec_coefs = {}
 	_crit_pool = {0: {true: [], false: []}, 1: {true: [], false: []}}
-	var native_min = {}
 	var counts = {}
 	for f in fam_names:
 		var fam = families[f]
@@ -660,12 +664,6 @@ func _collect_deep_priors() -> void:
 		var lo = fam.tiers[natives[0]]
 		var hi = fam.tiers[natives[-1]]
 		_bases[fam.type].push_back(lo)
-		for t in natives:
-			for x in fam.tiers[t].stats.scaling_stats:
-				var nm = WeaponValue.stat_name(x[0])
-				# 火焰喷射器的 1% 元素加成只是给燃烧用的，不算
-				if float(x[1]) >= 0.05:
-					native_min[nm] = min(float(x[1]), native_min.get(nm, INF))
 		var sc = lo.stats.scaling_stats
 		# 只有 T4 的传奇武器（王者之剑 +200% 最大生命……）不进系数 / 占比 / 独立抽取的来源
 		if _is_legendary(lo):
@@ -711,10 +709,6 @@ func _collect_deep_priors() -> void:
 	for ty in _crit_pool:
 		var n = _crit_pool[ty][true].size() + _crit_pool[ty][false].size()
 		_hi_crit_share[ty] = float(_crit_pool[ty][true].size()) / max(1, n)
-	_floor = {}
-	for st in SCALING_STATS:
-		var c = min(SCALING_FLOOR_DMG / WeaponValue.stat_ref(st), native_min.get(st, INF))
-		_floor[st] = max(0.05, stepify(c, 0.05))
 	_effectful = []
 	var n_all = 0
 	var n1 = 0
@@ -1050,7 +1044,7 @@ func _deep_candidate(fam: Dictionary, tw, tier: int, want: float, stats: Array, 
 	}
 
 
-# 更高一级：在低一级的基础上随机提升——冷却、各加成系数、贯穿 / 弹跳 / 吸血 / 射程 / 击退各以 UP_CHANCE 的概率提升（否则不变），
+# 更高一级：在低一级的基础上随机提升——各加成系数以 COEF_UP_CHANCE、冷却与贯穿 / 弹跳 / 吸血 / 射程 / 击退各以 UP_CHANCE 的概率提升（否则不变），
 # 高暴击武器的暴击必定提升（否则不变）；效果按剩余的价值差额必定提升（每条至少强一步），
 # 基础伤害（DMG_UP_CHANCE，或效果补完后仍差得多时）补足其余；最后按实际价值重新定价（砖头价格固定）
 func _deep_up(fam: Dictionary, prev: Dictionary, tier: int, mult: float) -> Dictionary:
@@ -1063,7 +1057,7 @@ func _deep_up(fam: Dictionary, prev: Dictionary, tier: int, mult: float) -> Dict
 	for i in st.scaling_stats.size():
 		var x = st.scaling_stats[i]
 		var c = float(x[1])
-		if c > 0 and rng.randf() < UP_CHANCE:
+		if c > 0 and rng.randf() < COEF_UP_CHANCE:
 			var cap = INF
 			if i > 0:
 				cap = SEC_COEF_CAP
@@ -1196,7 +1190,7 @@ func _share_at(ty: int, tier: int, q: float) -> float:
 	return 0.5
 
 
-# 每次命中伤害 H 拆成基础伤害 + 加成：加成部分 = s × H；附加加成至多占一半；系数受上限与下限（_floor）约束
+# 每次命中伤害 H 拆成基础伤害 + 加成：加成部分 = s × H；附加加成至多占一半；系数受上限与下限（SCALING_FLOOR）约束
 func _build(st, plan: Dictionary, tier: int, h: float, into = null):
 	var s = into if into != null else st.duplicate()
 	var stats: Array = plan.stats
@@ -1209,14 +1203,14 @@ func _build(st, plan: Dictionary, tier: int, h: float, into = null):
 		c2 = min(plan.sec, SEC_COEF_CAP * WeaponValue.stat_ref("stat_melee_damage", tier) / ref2)
 		c2 = min(c2, 0.5 * scal / ref2)
 		c2 = min(c2, max(0.0, h - plan.base_min) / ref2)
-		c2 = max(_floor.get(stats[1], 0.05), stepify(c2, 0.01))
+		c2 = max(SCALING_FLOOR.get(stats[1], 0.05), stepify(c2, 0.01))
 		sec_val = c2 * ref2
 	var c1 = max(0.0, scal - sec_val) / ref1
 	if not plan.slow:
 		c1 = min(c1, MAIN_COEF_CAP * WeaponValue.stat_ref("stat_melee_damage", tier) / ref1)
 	# 保证基础伤害下限：加成只能占下限之外的部分（逐级增长约束让位于此）
 	c1 = min(c1, max(0.0, h - plan.base_min - sec_val) / ref1)
-	c1 = max(_floor.get(stats[0], 0.05), stepify(c1, 0.01))
+	c1 = max(SCALING_FLOOR.get(stats[0], 0.05), stepify(c1, 0.01))
 	var sc = [[Keys.generate_hash(stats[0]), c1]]
 	if stats.size() > 1:
 		sc.push_back([Keys.generate_hash(stats[1]), c2])

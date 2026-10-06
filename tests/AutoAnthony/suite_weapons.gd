@@ -108,7 +108,7 @@ func test_141_weapon_deep_reassembly() -> void:
 			var got = wg.wv.value(p.stats, p.effects, w.tier)
 			for sc in p.stats.scaling_stats:
 				if float(sc[1]) > 0:
-					_check(float(sc[1]) >= wg._floor.get(WV.stat_name(sc[0]), 0.0) - 0.001, "%s coef %s %.2f >= floor" % [id, WV.stat_name(sc[0]), float(sc[1])])
+					_check(float(sc[1]) >= WG.SCALING_FLOOR.get(WV.stat_name(sc[0]), 0.0) - 0.001, "%s coef %s %.2f >= floor" % [id, WV.stat_name(sc[0]), float(sc[1])])
 			# 为不倒挂而抬高伤害的武器会超出目标，不计
 			if not p.get("lifted", false) and not p.get("capped", false) and abs(got - want) > max(3.0, want * 0.15):
 				off += 1
@@ -153,7 +153,6 @@ func test_141_weapon_deep_reassembly() -> void:
 			if x != "set_legendary":
 				_check(set_count.get(x, 0) >= min(3, wg._set_native_count.get(x, 0)), "deep: set %s has enough families (%d)" % [x, set_count.get(x, 0)])
 		if sd == 3:
-			print("AUDIT deep scaling floors %s" % str(wg._floor))
 			print("AUDIT deep main scaling melee %s ranged %s" % [str(mains[0]), str(mains[1])])
 			print("AUDIT deep sets %s" % str(set_count))
 
