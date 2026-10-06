@@ -100,17 +100,21 @@ func test_141_weapon_deep_reassembly() -> void:
 			for e in p.effects:
 				if w.type == 0:
 					_check(not WG.ranged_only(e), id + " melee has no ranged-only effect")
+				if e.key in WG.VALUE2_TENTH_KEYS and "value2" in e:
+					_eq(float(e.value2), float(e.value) / 10.0, id + " boss / elite percent follows the value")
 			# 最低一级按抽到的价格定目标价值；更高一级按实际价值重新定价，价值 / 价格同样落在同档原版的比例上
 			var fm = wg._family_mult(WG.family_of(w))
 			var want = wg._want(w, true) * fm
-			if w.tier > wg.families[WG.family_of(w)].tiers.keys().min():
+			# 更高一级：成长受限时价值可以低于价格对应的目标（不降价），只检查不超出
+			var upper = w.tier > wg.families[WG.family_of(w)].tiers.keys().min()
+			if upper:
 				want = float(p.price) * float(wg._vp.get(str(w.type) + "/" + str(w.tier), 1.0)) * fm
 			var got = wg.wv.value(p.stats, p.effects, w.tier)
 			for sc in p.stats.scaling_stats:
 				if float(sc[1]) > 0:
 					_check(float(sc[1]) >= WG.SCALING_FLOOR.get(WV.stat_name(sc[0]), 0.0) - 0.001, "%s coef %s %.2f >= floor" % [id, WV.stat_name(sc[0]), float(sc[1])])
 			# 为不倒挂而抬高伤害的武器会超出目标，不计
-			if not p.get("lifted", false) and not p.get("capped", false) and abs(got - want) > max(3.0, want * 0.15):
+			if not p.get("lifted", false) and not p.get("capped", false) and (got - want if upper else abs(got - want)) > max(3.0, want * 0.15):
 				off += 1
 			var f = WG.family_of(w)
 			if fams.has(f):
@@ -1190,6 +1194,12 @@ func test_163_audit_raw_dps_spread() -> void:
 		print("AUDIT   " + rows[i][1])
 
 
+func _median(a: Array) -> float:
+	var b = a.duplicate()
+	b.sort()
+	return b[b.size() / 2] if not b.empty() else 0.0
+
+
 func _sort_first_num(a, b) -> bool:
 	return a[0] < b[0]
 
@@ -1254,6 +1264,44 @@ func test_167_audit_upgrade_schemes() -> void:
 			if tiers.size() > 1:
 				var wt = wg.families[f].tiers[top]
 				t4r.push_back(float(out[wt.my_id].price) / max(1.0, wg._price_of(wt)))
+		# 原版同类型同档"参考属性下原始 DPS / 价格"的中位数为 1：生成武器相对它的中位数（各档）；T4 / 最低一级的伤害与主加成倍数
+		var med = {}
+		for w in natives:
+			var key = str(w.type) + "/" + str(w.tier)
+			if not med.has(key):
+				med[key] = []
+			med[key].push_back(_raw_dps(WV, w.stats, w.tier) / float(w.value))
+		var rel = {}
+		var dmg_g = []
+		var coef_g = []
+		var nat_dmg_g = []
+		var nat_coef_g = []
+		for f in wg.fam_names:
+			var tiers = wg.families[f].tiers.keys()
+			tiers.sort()
+			for t in tiers:
+				var w = wg.families[f].tiers[t]
+				var key = str(w.type) + "/" + str(t)
+				if not rel.has(key):
+					rel[key] = []
+				rel[key].push_back(_raw_dps(WV, out[w.my_id].stats, t) / float(out[w.my_id].price) / _median(med[key]))
+			if tiers.size() == 4:
+				var a = out[wg.families[f].tiers[0].my_id].stats
+				var b = out[wg.families[f].tiers[3].my_id].stats
+				dmg_g.push_back(float(b.damage) / max(1.0, float(a.damage)))
+				coef_g.push_back(float(b.scaling_stats[0][1]) / max(0.01, float(a.scaling_stats[0][1])))
+				var na = wg.families[f].tiers[0]
+				var nb = wg.families[f].tiers[3]
+				if not na.has_meta("aa_low_of") and float(na.stats.damage) > 0 and not na.stats.scaling_stats.empty():
+					nat_dmg_g.push_back(float(nb.stats.damage) / float(na.stats.damage))
+					nat_coef_g.push_back(float(nb.stats.scaling_stats[0][1]) / max(0.01, float(na.stats.scaling_stats[0][1])))
+		var ks = rel.keys()
+		ks.sort()
+		var txt = ""
+		for key in ks:
+			txt += "%s %.2f  " % [key, _median(rel[key])]
+		print("AUDIT %s raw DPS / price vs native median: %s" % [mode, txt])
+		print("AUDIT %s T4/T1 damage median %.2f (native %.2f), main coef median %.2f (native %.2f)" % [mode, _median(dmg_g), _median(nat_dmg_g), _median(coef_g), _median(nat_coef_g)])
 		smooth.sort()
 		t4r.sort()
 		print("AUDIT %s damage step ratio p10 %.2f median %.2f p90 %.2f max %.2f; top price / ladder p10 %.2f median %.2f p90 %.2f" % [mode, smooth[smooth.size() / 10], smooth[smooth.size() / 2], smooth[smooth.size() * 9 / 10], smooth[-1], t4r[t4r.size() / 10], t4r[t4r.size() / 2], t4r[t4r.size() * 9 / 10]])

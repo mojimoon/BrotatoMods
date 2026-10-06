@@ -92,7 +92,20 @@ func generate(weapons: Array) -> Dictionary:
 	var out = generate_deep() if str(cfg.get("weapon_mode", "effects")) == "deep" else generate_effects_only()
 	_no_inversion(out)
 	_name_families(out)
+	for id in out:
+		for e in out[id].effects:
+			sync_value2(e)
 	return out
+
+
+# 按当前生命百分比的伤害（电锯等）：头目和精英的数值只是写在 value2 里的说明（= value / 10，原版诅咒加成时也这样同步），
+# 改动 value 后要一起改，否则仍显示原来的 1%
+const VALUE2_TENTH_KEYS = ["bonus_current_health_damage", "giant_crit_damage", "burning_enemy_hp_percent_damage"]
+
+
+static func sync_value2(e) -> void:
+	if e.key in VALUE2_TENTH_KEYS and "value2" in e:
+		e.value2 = float(e.value) / 10.0
 
 
 # 相邻稀有度价格比例（低 / 高），按类型取中位数：{类型: [T1/T2, T2/T3, T3/T4]}
@@ -508,10 +521,10 @@ const SCALING_STATS = [
 const DAMAGE_STATS = ["stat_melee_damage", "stat_ranged_damage", "stat_elemental_damage"]
 # 主加成（第一条加成属性）的伤害类型分布，按武器类型。原版：近战武器 46/47 以近战伤害为主（元素伤害只作为附加），
 # 远程武器 23/31 远程、6/31 元素、3/31 近战；没有伤害类主加成的只有尖刺盾（护甲）。
-# 这里没有伤害类主加成的比例比原版略高（none -> 主加成从其他属性中抽）
+# 这里没有伤害类主加成的比例与原版相近（none -> 主加成从其他属性中抽）
 const MAIN_SCALING = {
-	0: {"stat_melee_damage": 0.84, "stat_elemental_damage": 0.07, "stat_ranged_damage": 0.02, "none": 0.07},
-	1: {"stat_ranged_damage": 0.70, "stat_elemental_damage": 0.17, "stat_melee_damage": 0.06, "none": 0.07},
+	0: {"stat_melee_damage": 0.87, "stat_elemental_damage": 0.07, "stat_ranged_damage": 0.02, "none": 0.04},
+	1: {"stat_ranged_damage": 0.73, "stat_elemental_damage": 0.17, "stat_melee_damage": 0.06, "none": 0.04},
 }
 # 第二条加成属性的概率（原版近战约一半、远程约三成）
 const SECOND_SCALING_CHANCE = {0: 0.45, 1: 0.3}
@@ -1098,15 +1111,16 @@ func _deep_interp(fam: Dictionary, base: Dictionary, tiers: Array, mult: float) 
 	var P = {}
 	for t in tiers:
 		P[t] = (float(_up_r[t]) - float(_up_r[lo])) / max(0.01, float(_up_r[top]) - float(_up_r[lo]))
-	var cd_step = rng.randf_range(0.93, 0.97)
+	var cd_step = rng.randf_range(CD_STEP[0], CD_STEP[1])
+	var dmg_cap = DMG_TOP_SCALE * float(_up_r[top]) / float(_up_r[lo])
 	var g = 0.0
 	var f = 1.0
 	var chain = _fx_chain(e0, tiers, P, f)
 	for _round in 2:
-		g = _solve_g(st0, lo, top, P[top], cd_step, chain[top], want_top)
+		g = _solve_g(st0, lo, top, P[top], cd_step, dmg_cap, chain[top], want_top)
 		if e0.empty():
 			break
-		var st_top = _interp_stats(st0, lo, top, P[top], g, cd_step)
+		var st_top = _interp_stats(st0, lo, top, P[top], g, cd_step, dmg_cap)
 		var base_v = wv.value(st_top, [], top)
 		var target = share * want_top
 		var f_lo = 1.0
@@ -1119,12 +1133,12 @@ func _deep_interp(fam: Dictionary, base: Dictionary, tiers: Array, mult: float) 
 				f_hi = mid
 		f = f_lo
 		chain = _fx_chain(e0, tiers, P, f)
-	g = _solve_g(st0, lo, top, P[top], cd_step, chain[top], want_top)
+	g = _solve_g(st0, lo, top, P[top], cd_step, dmg_cap, chain[top], want_top)
 	var res = [base]
 	var prev = base
 	for i in range(1, tiers.size()):
 		var t: int = tiers[i]
-		var st = _interp_stats(st0, lo, t, P[t], g, cd_step)
+		var st = _interp_stats(st0, lo, t, P[t], g, cd_step, dmg_cap)
 		var effects: Array = chain[t]
 		var names = []
 		for x in st.scaling_stats:
@@ -1135,27 +1149,32 @@ func _deep_interp(fam: Dictionary, base: Dictionary, tiers: Array, mult: float) 
 		var price = _price_of(fam.tiers[t])
 		if not _is_brick(fam):
 			var vp = float(_vp.get(str(fam.type) + "/" + str(t), 1.0))
-			price = max(float(prev.price) + 1.0, (got + excess) / max(0.01, vp * mult))
+			# 伤害 / 加成成长受限、价值达不到价格阶梯时不降价（同价格下比原先弱一些）
+			price = max(max(float(prev.price) + 1.0, price), (got + excess) / max(0.01, vp * mult))
 		prev = {"effects": effects, "stats": st, "donor": base.donor, "scale": g, "want": got, "capped": excess > 0, "price": int(round(price))}
 		res.push_back(prev)
 	return res
 
 
 # 加成系数、暴击率的相对增长 = 伤害相对增长 × 此值（原版升级主要加伤害，系数与暴击涨得慢）
-const COEF_G = 0.5
+const COEF_G = 0.25
 const CRIT_G = 0.5
 # 效果从最低一级到最高一级至多放大的倍数（原版效果逐级增长不多：爆炸 25%→40%、点燃 3→8）；暴击率每级至多 +10%
-const FX_TOP_CAP = 3.0
-# 加成系数从最低一级到最高一级至多放大的倍数（原版主加成最多约 ×1.5（左轮）、附加加成 ×2.5（镰刀收获））
-const MAIN_TOP_GROWTH = 1.5
-const SEC_TOP_GROWTH = 2.5
+const FX_TOP_CAP = 4.0
+# 加成系数从最低一级到最高一级至多放大的倍数（原版主加成大多不变，最多约 ×1.5（左轮）；附加加成最多 ×2.5（镰刀收获））
+const MAIN_TOP_GROWTH = 1.25
+const SEC_TOP_GROWTH = 2.0
+# 基础伤害从最低一级到最高一级至多放大到原版逐级伤害倍数（_up_r，中位数约 ×3）的这一比例
+const DMG_TOP_SCALE = 0.85
+# 冷却每级乘以此范围内的随机值（攻速每级略快）
+const CD_STEP = [0.9, 0.95]
 const CRIT_STEP_CAP = 0.1
 
 
-func _interp_stats(st0, lo: int, t: int, p: float, g: float, cd_step: float):
+func _interp_stats(st0, lo: int, t: int, p: float, g: float, cd_step: float, dmg_cap: float):
 	var st = st0.duplicate()
 	var d = t - lo
-	st.damage = int(max(1, round(float(st0.damage) * (1.0 + g * p))))
+	st.damage = int(max(1, round(float(st0.damage) * (1.0 + min(g, dmg_cap - 1.0) * p))))
 	var sc = []
 	for i in st0.scaling_stats.size():
 		var x = st0.scaling_stats[i]
@@ -1188,14 +1207,14 @@ func _interp_stats(st0, lo: int, t: int, p: float, g: float, cd_step: float):
 	return st
 
 
-func _solve_g(st0, lo: int, top: int, p: float, cd_step: float, effects: Array, want: float) -> float:
-	if wv.value(_interp_stats(st0, lo, top, p, 0.0, cd_step), effects, top) >= want:
+func _solve_g(st0, lo: int, top: int, p: float, cd_step: float, dmg_cap: float, effects: Array, want: float) -> float:
+	if wv.value(_interp_stats(st0, lo, top, p, 0.0, cd_step, dmg_cap), effects, top) >= want:
 		return 0.0
 	var g_lo = 0.0
 	var g_hi = 50.0
 	for _i in 20:
 		var mid = (g_lo + g_hi) / 2.0
-		if wv.value(_interp_stats(st0, lo, top, p, mid, cd_step), effects, top) <= want:
+		if wv.value(_interp_stats(st0, lo, top, p, mid, cd_step, dmg_cap), effects, top) <= want:
 			g_lo = mid
 		else:
 			g_hi = mid
@@ -1646,5 +1665,6 @@ static func _scaled_effects(effects: Array, ratio: float) -> Array:
 			ne.value = int(sign(v) * max(1, round(abs(v) * ratio)))
 		else:
 			ne.set_meta("aa_eff_scale", ratio)
+		sync_value2(ne)
 		out.push_back(ne)
 	return out
