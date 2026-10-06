@@ -4,7 +4,8 @@ extends Reference
 #   仅重组效果（effects）：每个家族换用另一个随机家族的效果（可跨近战 / 远程），
 #     再按价值模型（weapon_value.gd）缩放伤害与属性加成，使新武器的价值 = 原武器价值 × 平均数值 × 浮动
 #   深度重组（deep）：冷却、暴击、射程、击退、吸血、投射物 / 贯穿 / 弹跳 / 换弹、属性加成、效果、武器类别全部重新生成
-#     （各属性从同类型原版武器的分布中抽取），再按价值模型解出伤害与加成系数；近战 / 远程、武器场景不变
+#     （各属性从同类型原版武器的分布中抽取）；最低一级随机多组、取价值不超过价格对应目标的最好一组，
+#     更高一级在低一级基础上逐项随机提升、按实际价值重新定价；近战 / 远程、武器场景不变
 # 输出 { my_id: {effects, stats, sets, donor} }
 
 const Catalog = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/catalog.gd")
@@ -523,29 +524,28 @@ const ITEM_SLOT_SHARE = 0.4
 const SECOND_SET_CHANCE = 0.6
 # 每个类别至少这么多个武器家族（不超过原版数量）
 const MIN_SET_FAMILIES = 3
+# 最低一级随机组合的个数
 const DEEP_TRIES = 24
-# 抽取的组合罚分低于此值即采用（省时间）
-const GOOD_SCORE = 0.6
 # 慢速武器（平均攻击间隔 ≥ 此值，秒）：手感差、通常不会选用，作为攻击节奏的权重低；可以有更高的加成系数（激光枪、歼灭者）
 const SLOW_COOLDOWN = 1.4
 const SLOW_PROFILE_W = 0.25
-# 原版家族没有附加加成时，附加加成每升一级的相对倍率（原版约 1.2–1.4：镰刀收获 10%->25%、尖刺盾护甲 100%->200%）
-const SEC_GROWTH_DEFAULT = 1.3
-# 从最低一级到最高一级，加成系数的总增长上限（相对倍率）：主加成 ×1.5（原版左轮 100%->200% 为最高），附加 ×2.5（镰刀收获 10%->25%）
-const MAIN_GROWTH_CAP = 1.5
-const SEC_GROWTH_CAP = 2.5
 # 系数上限（折算成近战伤害的系数）：附加加成 1.25（镰刀收获 25% 约 1.25）；正常节奏武器的主加成 2.0（锤子 T4）；慢速武器不限
 const SEC_COEF_CAP = 1.25
 const MAIN_COEF_CAP = 2.0
 # 效果（来源家族 + 道具效果）至多占武器目标价值的比例
 const FX_SHARE_CAP = 0.4
-# 主加成系数逐级至多增长的倍数（原版主加成逐级基本不变，左轮最高约 ×1.26）
-const MAIN_STEP_CAP = 1.15
+# 更高一级：冷却、加成系数、贯穿 / 弹跳 / 吸血 / 射程 / 击退各自提升的概率；基础伤害提升的概率
+const UP_CHANCE = 0.5
+const DMG_UP_CHANCE = 0.75
+# 基础伤害没抽中提升、但效果补完后仍比目标价值低这么多：基础伤害仍然提升
+const DMG_FORCE_GAP = 0.15
+# 效果每升一级至多放大的倍数
+const FX_GROWTH_CAP = 2.0
+# 加成系数下限（不分稀有度、不分第几条加成）：终局属性 15 点时加成出的伤害（15 / 终局参考属性），且不高于原版该属性用过的最低系数
+const SCALING_FLOOR_DMG = 15.0
 # 单次伤害（含暴击）不宜超过该阶段参考敌人生命的倍数
 const HIT_CAP = 3.0
 const KB_CAP = {0: 15, 1: 8}
-# 各稀有度武器的目标价值倍率（含传奇；暂定，后续按实战调整）
-const TIER_BUDGET_MULT = [1.0, 0.95, 0.9, 0.85]
 # 基础伤害下限（按稀有度；多发武器按发数开方折算）：1 点基础伤害前期没有战斗力，宁可降低加成与攻速也要保证。
 # 点燃敌人的武器、以收获为加成的武器（原版掌、火炬、魔杖）不受限
 const BASE_DMG_MIN = [3.0, 5.0, 7.0, 10.0]
@@ -621,7 +621,9 @@ var _second_w: Dictionary = {}	# 属性 -> 权重（第二条 / 非伤害主加�
 var _common: Dictionary = {}	# 类型 -> 非传奇原版武器（暴击、射程、吸血等独立抽取的来源）
 var _shares: Dictionary = {}	# 类型 -> {稀有度: [加成部分 / 每次命中伤害]}（原版非传奇武器，已排序）
 var _sec_coefs: Dictionary = {}	# 属性 -> [原版附加加成系数（最低一级）]
-var _shapes: Dictionary = {}	# 类型 -> [{cd, dmg, main, sec}]：原版家族每升一级的相对倍率
+var _floor: Dictionary = {}		# 属性 -> 加成系数下限
+var _crit_pool: Dictionary = {}	# 类型 -> {是否高暴击: [[暴击率, 暴伤]]}（原版非传奇武器，不含标枪模板）
+var _hi_crit_share: Dictionary = {}	# 类型 -> 原版高暴击武器的比例
 var _sets: Dictionary = {}		# set my_id -> SetData
 var _set_native_count: Dictionary = {}
 var _fx_share: Array = [1.0, 0.6, 0.1]	# 原版（非传奇）武器家族：[-, 至少 1 条效果的比例, 2 条以上的比例]
@@ -643,7 +645,8 @@ func _collect_deep_priors() -> void:
 	_common = {0: [], 1: []}
 	_shares = {0: {}, 1: {}}
 	_sec_coefs = {}
-	_shapes = {0: [], 1: []}
+	_crit_pool = {0: {true: [], false: []}, 1: {true: [], false: []}}
+	var native_min = {}
 	var counts = {}
 	for f in fam_names:
 		var fam = families[f]
@@ -657,12 +660,20 @@ func _collect_deep_priors() -> void:
 		var lo = fam.tiers[natives[0]]
 		var hi = fam.tiers[natives[-1]]
 		_bases[fam.type].push_back(lo)
+		for t in natives:
+			for x in fam.tiers[t].stats.scaling_stats:
+				var nm = WeaponValue.stat_name(x[0])
+				# 火焰喷射器的 1% 元素加成只是给燃烧用的，不算
+				if float(x[1]) >= 0.05:
+					native_min[nm] = min(float(x[1]), native_min.get(nm, INF))
 		var sc = lo.stats.scaling_stats
 		# 只有 T4 的传奇武器（王者之剑 +200% 最大生命……）不进系数 / 占比 / 独立抽取的来源
 		if _is_legendary(lo):
 			sc = []
 		else:
 			_common[fam.type].push_back(lo)
+			if not is_javelin_template(lo.stats):
+				_crit_pool[fam.type][is_high_crit(lo.stats)].push_back([float(lo.stats.crit_chance), float(lo.stats.crit_damage)])
 			for t in natives:
 				var w = fam.tiers[t]
 				var hit = WeaponValue.hit_damage(float(w.stats.damage), w.stats.scaling_stats, t)
@@ -680,20 +691,6 @@ func _collect_deep_priors() -> void:
 					_sec_coefs[st] = []
 				_sec_coefs[st].push_back(c)
 				counts[st] = counts.get(st, 0) + 1
-		# 升级形状：冷却、伤害、主加成、附加加成每级的相对倍率
-		var d = natives[-1] - natives[0]
-		if d > 0:
-			var shape = {
-				"cd": pow(float(hi.stats.cooldown) / max(1.0, float(lo.stats.cooldown)), 1.0 / d),
-				"dmg": pow(max(1.0, float(hi.stats.damage)) / max(1.0, float(lo.stats.damage)), 1.0 / d),
-				"main": 1.0, "sec": SEC_GROWTH_DEFAULT,
-			}
-			var hsc = hi.stats.scaling_stats
-			if sc.size() > 0 and hsc.size() > 0 and float(sc[0][1]) > 0 and float(hsc[0][1]) > 0:
-				shape.main = pow(float(hsc[0][1]) / float(sc[0][1]), 1.0 / d)
-			if sc.size() > 1 and hsc.size() > 1 and float(sc[1][1]) > 0 and float(hsc[1][1]) > 0:
-				shape.sec = pow(float(hsc[1][1]) / float(sc[1][1]), 1.0 / d)
-			_shapes[fam.type].push_back(shape)
 		for set in lo.sets:
 			_sets[set.my_id] = set
 			_set_native_count[set.my_id] = _set_native_count.get(set.my_id, 0) + 1
@@ -711,6 +708,13 @@ func _collect_deep_priors() -> void:
 	for ty in _shares:
 		for t in _shares[ty]:
 			_shares[ty][t].sort()
+	for ty in _crit_pool:
+		var n = _crit_pool[ty][true].size() + _crit_pool[ty][false].size()
+		_hi_crit_share[ty] = float(_crit_pool[ty][true].size()) / max(1, n)
+	_floor = {}
+	for st in SCALING_STATS:
+		var c = min(SCALING_FLOOR_DMG / WeaponValue.stat_ref(st), native_min.get(st, INF))
+		_floor[st] = max(0.05, stepify(c, 0.05))
 	_effectful = []
 	var n_all = 0
 	var n1 = 0
@@ -807,29 +811,22 @@ func generate_deep() -> Dictionary:
 		var fam = families[f]
 		var mult = _family_mult(f)
 		rng.seed = hash(str(seed_value) + "/wdeep/" + f)
-		# 加成属性先定（避免下面择优时偏向系数小的属性），再多次抽取数值，
-		# 取伤害最自然的一组（最低一级的伤害缩放最接近 1、逐级增长最接近所抽的原版形状）
+		# 加成属性先定（避免择优时偏向系数小的属性）
 		var stats = _pick_scaling_stats(fam.type)
-		var res = {}
-		var best = INF
-		for _k in DEEP_TRIES:
-			var cand = _deep_family(fam, mult, stats)
-			if cand.score < best:
-				best = cand.score
-				res = cand.out
-			# 已经足够自然：不必再抽
-			if best < GOOD_SCORE:
-				break
-		for id in res:
-			out[id] = res[id]
-		fam_sets[f] = _pick_sets(fam, res)
+		var tiers = fam.tiers.keys()
+		tiers.sort()
+		var prev = _deep_base(fam, mult, stats, tiers[0])
+		out[fam.tiers[tiers[0]].my_id] = prev
+		for i in range(1, tiers.size()):
+			prev = _deep_up(fam, prev, tiers[i], mult)
+			out[fam.tiers[tiers[i]].my_id] = prev
+		fam_sets[f] = _pick_sets(fam, out)
 	_ensure_set_minimum(fam_sets)
 	for f in fam_names:
 		for tier in families[f].tiers:
 			var id = families[f].tiers[tier].my_id
 			if out.has(id):
 				out[id]["sets"] = fam_sets[f]
-				out[id]["price"] = int(round(_price_of(families[f].tiers[tier])))
 	return out
 
 
@@ -904,32 +901,49 @@ func _sample_prices() -> void:
 				_price[fam.tiers[t].my_id] = max(1.0, _price_of(fam.tiers[t + 1]) * float(ratios[fam.type][t]))
 
 
-# 一个家族的一次抽取。先定预算，再定数值：
-#   效果（来源家族 + 道具效果）至多占目标价值的 FX_SHARE_CAP，超出时按比例缩小效果数值；
-#   其余预算是"每次命中的伤害" H：其中加成部分占比 s 按原版同类型同稀有度武器的分布抽（每个家族一个分位数，各级共用），
-#   附加加成至多占加成部分的一半，主加成系数逐级至多增长 MAIN_STEP_CAP 倍（原版主加成逐级基本不变），其余是基础伤害；
-#   H 按价值解出。攻击节奏带着定义它的效果（爆炸、点燃、命中射出投射物、捡材料换弹）一起取
-func _deep_family(fam: Dictionary, mult: float, stats: Array) -> Dictionary:
+# 最低一级：价格已定（_sample_prices），先定攻击节奏（价格相近的原版武器）与高 / 低暴击，
+# 再随机 DEEP_TRIES 组其余数值（基础伤害与加成的比例、加成系数、暴击、射程 / 贯穿 / 弹跳 / 吸血、效果），
+# 每组按价值解出每次命中伤害（攻速越慢、每次伤害越高）；取价值不超过目标中最高的一组（面板自然的优先），都超过时取价值最低的
+func _deep_base(fam: Dictionary, mult: float, stats: Array, tier: int) -> Dictionary:
+	var tw = fam.tiers[tier]
+	var want = _want(tw, true) * mult
+	var prof_w = _pick_profile(fam.type, _price_of(tw))
+	var hi_crit = rng.randf() < float(_hi_crit_share[fam.type])
+	var cands = []
+	for _k in DEEP_TRIES:
+		cands.push_back(_deep_candidate(fam, tw, tier, want, stats, prof_w, hi_crit))
+	var pick = null
+	for natural_only in [true, false]:
+		for c in cands:
+			if (natural_only and not c.natural) or c.value > c.out.want:
+				continue
+			if pick == null or c.value > pick.value:
+				pick = c
+		if pick != null:
+			break
+	if pick == null:
+		for c in cands:
+			if pick == null or c.value < pick.value:
+				pick = c
+	pick.out["price"] = int(round(_price_of(tw)))
+	return pick.out
+
+
+func _deep_candidate(fam: Dictionary, tw, tier: int, want: float, stats: Array, prof_w, hi_crit: bool) -> Dictionary:
 	var ty: int = fam.type
-	var lo = _closest_tier(fam.tiers, 0)
-	var bp = lo.stats.duplicate()
-	var prof_w = _pick_profile(ty, _price_of(lo))
+	var f = family_of(tw)
 	var prof = prof_w.stats
+	var bp = tw.stats.duplicate()
 	bp.cooldown = prof.cooldown
 	bp.recoil_duration = prof.recoil_duration
-	var b
-	# 暴击直接套用原版武器的模板（低暴击 / 标准 3% ×2 / 高暴击）
-	b = _pick_base(ty).stats
-	# 标枪的 0% 暴击 + 高暴伤模板只随标枪效果出现
-	for _i in 10:
-		if not is_javelin_template(b):
-			break
-		b = _pick_base(ty).stats
-	if is_javelin_template(b):
-		b = {"crit_chance": 0.03, "crit_damage": 2.0}
-	bp.crit_chance = b.crit_chance
-	bp.crit_damage = b.crit_damage
-	b = _pick_base(ty).stats
+	# 暴击：同类型原版武器的高 / 低暴击模板（标枪的 0% 暴击 + 高暴伤模板只随标枪效果出现）
+	var pool: Array = _crit_pool[ty][hi_crit]
+	if pool.empty():
+		pool = _crit_pool[ty][not hi_crit]
+	var cr = pool[rng.randi() % pool.size()] if not pool.empty() else [0.03, 2.0]
+	bp.crit_chance = cr[0]
+	bp.crit_damage = cr[1]
+	var b = _pick_base(ty).stats
 	bp.max_range = b.max_range
 	# 有最小攻击范围的武器（鱼叉枪）：最大范围再加上最小范围
 	if int(bp.min_range) > 0:
@@ -956,10 +970,6 @@ func _deep_family(fam: Dictionary, mult: float, stats: Array) -> Dictionary:
 		b = _pick_base(ty).stats
 		bp.bounce = b.bounce
 		bp.bounce_dmg_reduction = b.bounce_dmg_reduction
-	var shape = {"cd": 0.9, "dmg": 1.6, "main": 1.0, "sec": SEC_GROWTH_DEFAULT}
-	if not _shapes[ty].empty():
-		shape = _shapes[ty][rng.randi() % _shapes[ty].size()]
-	var q = rng.randf()
 	var sec_base = 0.0
 	if stats.size() > 1:
 		sec_base = _coef_from(_sec_coefs.get(stats[1], []), stats[1], 0.3)
@@ -985,76 +995,165 @@ func _deep_family(fam: Dictionary, mult: float, stats: Array) -> Dictionary:
 			donors.push_back(families[_effectful[rng.randi() % _effectful.size()]])
 		else:
 			break
-	var out = {}
-	var spec = _item_spec(family_of(lo), _spec_scaling(stats), true) if want_item else {}
-	var tiers = fam.tiers.keys()
-	tiers.sort()
-	var score = 0.0
-	var c1_prev = -1.0
-	for tier in tiers:
-		var tw = fam.tiers[tier]
-		var d = tier - tiers[0]
-		var effects = []
-		var keys = []
-		for e in tw.effects:
-			if bound_key(e):
-				effects.push_back(_vary_fixed(e, family_of(tw)))
-		var jav_cd = 0.0
-		for dn in donors:
-			var dw = _closest_tier(dn.tiers, tier)
-			for e in dw.effects:
-				var key = WeaponValue.effect_key(e)
-				if bound_key(e) or key in keys or (ranged_only(e) and ty == 0):
-					continue
-				keys.push_back(key)
-				if key == JAVELIN_KEY:
-					jav_cd = float(dw.stats.crit_damage)
-				effects.push_back(_vary_fixed(_adapt(_convert_explosion(e.duplicate(), ty), tw), family_of(tw)))
-		var st = _bind_javelin(bp.duplicate(), effects, jav_cd)
-		st.cooldown = int(max(2, round(bp.cooldown * pow(shape.cd, d))))
-		var want = _want(tw, true) * mult
-		var line = _item_effect(spec, tier, want)
+	var effects = []
+	var keys = []
+	for e in tw.effects:
+		if bound_key(e):
+			effects.push_back(_vary_fixed(e, f))
+	var jav_cd = 0.0
+	for dn in donors:
+		var dw = _closest_tier(dn.tiers, tier)
+		for e in dw.effects:
+			var key = WeaponValue.effect_key(e)
+			if bound_key(e) or key in keys or (ranged_only(e) and ty == 0):
+				continue
+			keys.push_back(key)
+			if key == JAVELIN_KEY:
+				jav_cd = float(dw.stats.crit_damage)
+			effects.push_back(_vary_fixed(_adapt(_convert_explosion(e.duplicate(), ty), tw), f))
+	var st = _bind_javelin(bp, effects, jav_cd)
+	if want_item:
+		var line = _item_effect(_item_spec(f, _spec_scaling(stats), true), tier, want)
 		if line != null:
 			effects.push_back(line)
-		var excess = _downside_excess(want, effects)
-		want -= excess
-		var plan = {
-			"stats": stats, "s": _share_at(ty, tier, q), "sec": sec_base * min(pow(shape.sec, d), SEC_GROWTH_CAP),
-			"c1_lo": c1_prev if c1_prev > 0 else 0.0, "c1_hi": c1_prev * MAIN_STEP_CAP if c1_prev > 0 else INF,
-			"slow": is_slow(st),
-			"base_min": _base_min(st, stats, effects, tier),
-		}
-		# 效果占比超出上限：缩小效果数值（一次），仍超出则记罚分
-		var h = _solve_hit(st, plan, effects, tier, want)
-		var final = _build(st, plan, tier, h)
-		var fx = wv.value(final, effects, tier) - wv.value(final, [], tier)
-		if fx > FX_SHARE_CAP * want:
-			effects = _shrink_effects(effects, FX_SHARE_CAP * want / fx)
-			h = _solve_hit(st, plan, effects, tier, want)
-			final = _build(st, plan, tier, h)
-			fx = wv.value(final, effects, tier) - wv.value(final, [], tier)
-			if fx > FX_SHARE_CAP * want * 1.2:
-				score += 5.0
-		# 基础伤害仍不到下限：再缩小一次效果
-		if float(final.damage) < plan.base_min and fx > 0:
-			effects = _shrink_effects(effects, 0.5)
-			h = _solve_hit(st, plan, effects, tier, want)
-			final = _build(st, plan, tier, h)
-		# 价值仍超出目标（伤害到 1、加成到下限也嫌多）
-		var got = wv.value(final, effects, tier)
-		if got > want * 1.15:
-			score += 5.0 * log(got / want)
-		# 基础伤害不到下限（预算太少：效果 / 节奏占得太多），倾向于选别的组合
-		if float(final.damage) < plan.base_min:
-			score += 2.0 * log(plan.base_min / max(1.0, float(final.damage)))
-		# 单次伤害远超该阶段敌人生命：面板离谱、价值上也不划算
-		var heavy = WeaponValue.hit_damage(float(final.damage), final.scaling_stats, tier) * WeaponValue.crit_factor(final) / (HIT_CAP * WeaponValue.OVERKILL_HP[clamp(tier, 0, 3)])
-		if heavy > 1.0:
-			score += 3.0 * log(heavy)
-		c1_prev = float(final.scaling_stats[0][1])
-		var donor_id = _closest_tier(donors[0].tiers, tier).my_id if not donors.empty() else ""
-		out[tw.my_id] = {"effects": effects, "stats": final, "donor": donor_id, "scale": h, "want": want, "capped": excess > 0}
-	return {"out": out, "score": score}
+	var excess = _downside_excess(want, effects)
+	want -= excess
+	var plan = {
+		"stats": stats, "s": _share_at(ty, tier, rng.randf()), "sec": sec_base,
+		"slow": is_slow(st), "base_min": _base_min(st, stats, effects, tier),
+	}
+	var natural = true
+	# 效果占比超出上限：缩小效果数值（一次）
+	var h = _solve_hit(st, plan, effects, tier, want)
+	var final = _build(st, plan, tier, h)
+	var fx = wv.value(final, effects, tier) - wv.value(final, [], tier)
+	if fx > FX_SHARE_CAP * want:
+		effects = _scale_effects(effects, FX_SHARE_CAP * want / fx)
+		h = _solve_hit(st, plan, effects, tier, want)
+		final = _build(st, plan, tier, h)
+		fx = wv.value(final, effects, tier) - wv.value(final, [], tier)
+		natural = fx <= FX_SHARE_CAP * want * 1.2
+	# 基础伤害仍不到下限：再缩小一次效果
+	if float(final.damage) < plan.base_min and fx > 0:
+		effects = _scale_effects(effects, 0.5)
+		h = _solve_hit(st, plan, effects, tier, want)
+		final = _build(st, plan, tier, h)
+	# 基础伤害不到下限、单次伤害远超该阶段敌人生命：面板不自然
+	if float(final.damage) < plan.base_min:
+		natural = false
+	if WeaponValue.hit_damage(float(final.damage), final.scaling_stats, tier) * WeaponValue.crit_factor(final) > HIT_CAP * WeaponValue.OVERKILL_HP[clamp(tier, 0, 3)]:
+		natural = false
+	var donor_id = _closest_tier(donors[0].tiers, tier).my_id if not donors.empty() else ""
+	return {
+		"value": wv.value(final, effects, tier), "natural": natural,
+		"out": {"effects": effects, "stats": final, "donor": donor_id, "scale": h, "want": want, "capped": excess > 0},
+	}
+
+
+# 更高一级：在低一级的基础上随机提升——冷却、各加成系数、贯穿 / 弹跳 / 吸血 / 射程 / 击退各以 UP_CHANCE 的概率提升（否则不变），
+# 高暴击武器的暴击必定提升（否则不变）；效果按剩余的价值差额必定提升（每条至少强一步），
+# 基础伤害（DMG_UP_CHANCE，或效果补完后仍差得多时）补足其余；最后按实际价值重新定价（砖头价格固定）
+func _deep_up(fam: Dictionary, prev: Dictionary, tier: int, mult: float) -> Dictionary:
+	var tw = fam.tiers[tier]
+	var st = prev.stats.duplicate()
+	var ty: int = fam.type
+	if rng.randf() < UP_CHANCE:
+		st.cooldown = int(max(WeaponValue.MIN_CD_FRAMES, min(int(st.cooldown) - 1, round(float(st.cooldown) * rng.randf_range(0.85, 0.95)))))
+	var sc = []
+	for i in st.scaling_stats.size():
+		var x = st.scaling_stats[i]
+		var c = float(x[1])
+		if c > 0 and rng.randf() < UP_CHANCE:
+			var cap = INF
+			if i > 0:
+				cap = SEC_COEF_CAP
+			elif not is_slow(st):
+				cap = MAIN_COEF_CAP
+			cap *= WeaponValue.stat_ref("stat_melee_damage") / WeaponValue.stat_ref(WeaponValue.stat_name(x[0]))
+			c = max(c, min(cap, max(c + 0.05, stepify(c * rng.randf_range(1.1, 1.3), 0.05))))
+		sc.push_back([x[0], c])
+	st.scaling_stats = sc
+	if not WeaponValue.is_melee(st):
+		if int(st.piercing) > 0 and int(st.piercing) < 50 and rng.randf() < UP_CHANCE:
+			st.piercing = int(st.piercing) + 1
+		if int(st.bounce) > 0 and rng.randf() < UP_CHANCE:
+			st.bounce = int(st.bounce) + 1
+	if float(st.lifesteal) > 0 and rng.randf() < UP_CHANCE:
+		st.lifesteal = stepify(float(st.lifesteal) + rng.randf_range(0.01, 0.03), 0.01)
+	if rng.randf() < UP_CHANCE:
+		st.max_range = int(stepify(float(st.max_range) * rng.randf_range(1.05, 1.12), 5.0))
+	if int(st.knockback) > 0 and rng.randf() < UP_CHANCE:
+		st.knockback = int(min(int(st.knockback) + 1, KB_CAP[ty]))
+	if is_high_crit(st):
+		st.crit_chance = min(1.0, stepify(float(st.crit_chance) + rng.randf_range(0.02, 0.05), 0.01))
+		if rng.randf() < 0.5:
+			st.crit_damage = stepify(float(st.crit_damage) + 0.25, 0.05)
+	var dmg_up = rng.randf() < DMG_UP_CHANCE
+	var effects: Array = prev.effects
+	var want = _want(tw, true) * mult
+	var excess = _downside_excess(want, effects)
+	want -= excess
+	if not effects.empty():
+		var cur = wv.value(st, effects, tier)
+		var fx0 = cur - wv.value(st, [], tier)
+		# 基础伤害也提升时，效果按它占当前价值的比例分摊差额；否则效果承担全部差额
+		var share = clamp(fx0 / max(1.0, cur), 0.0, 1.0) if dmg_up else 1.0
+		effects = _grow_effects(st, effects, tier, fx0 + max(0.0, want - cur) * share)
+	# 基础伤害低于该稀有度的下限时也必定提升
+	var names = []
+	for x in st.scaling_stats:
+		names.push_back(WeaponValue.stat_name(x[0]))
+	var bmin = _base_min(st, names, effects, tier)
+	if dmg_up or float(st.damage) < bmin or wv.value(st, effects, tier) < want * (1.0 - DMG_FORCE_GAP):
+		st.damage = _fill_damage(st, effects, tier, want, int(max(int(st.damage) + 1, ceil(bmin))))
+	var got = wv.value(st, effects, tier)
+	var price = _price_of(tw)
+	if not _is_brick(fam):
+		var vp = float(_vp.get(str(ty) + "/" + str(tier), 1.0))
+		price = max(float(prev.price) + 1.0, (got + excess) / max(0.01, vp * mult))
+	return {"effects": effects, "stats": st, "donor": prev.donor, "scale": 1.0, "want": got, "capped": excess > 0, "price": int(round(price))}
+
+
+# 基础伤害：至少 dmin，取价值不超过 want 的最大值
+func _fill_damage(st, effects: Array, tier: int, want: float, dmin: int) -> int:
+	var probe = st.duplicate()
+	probe.damage = dmin
+	if wv.value(probe, effects, tier) >= want:
+		return dmin
+	var lo = dmin
+	var hi = dmin * 2 + 10
+	probe.damage = hi
+	while wv.value(probe, effects, tier) < want and hi < 100000:
+		lo = hi
+		hi *= 2
+		probe.damage = hi
+	while hi - lo > 1:
+		var mid = (lo + hi) / 2
+		probe.damage = mid
+		if wv.value(probe, effects, tier) <= want:
+			lo = mid
+		else:
+			hi = mid
+	return lo
+
+
+# 效果放大到效果价值约为 target（至多 FX_GROWTH_CAP 倍），且每条都比低一级强一步以上
+func _grow_effects(st, effects: Array, tier: int, target: float) -> Array:
+	var base = wv.value(st, [], tier)
+	var best = _strengthen_effects(effects, effects)
+	if wv.value(st, best, tier) - base >= target:
+		return best
+	var lo = 1.0
+	var hi = FX_GROWTH_CAP
+	for _i in 10:
+		var mid = (lo + hi) / 2.0
+		var cand = _strengthen_effects(_scale_effects(effects, mid), effects)
+		if wv.value(st, cand, tier) - base <= target:
+			lo = mid
+			best = cand
+		else:
+			hi = mid
+	return best
 
 
 func _base_min(st, stats: Array, effects: Array, tier: int) -> float:
@@ -1097,7 +1196,7 @@ func _share_at(ty: int, tier: int, q: float) -> float:
 	return 0.5
 
 
-# 每次命中伤害 H 拆成基础伤害 + 加成：加成部分 = s × H；附加加成至多占一半；主加成系数受逐级增长限制与上限约束
+# 每次命中伤害 H 拆成基础伤害 + 加成：加成部分 = s × H；附加加成至多占一半；系数受上限与下限（_floor）约束
 func _build(st, plan: Dictionary, tier: int, h: float, into = null):
 	var s = into if into != null else st.duplicate()
 	var stats: Array = plan.stats
@@ -1110,15 +1209,14 @@ func _build(st, plan: Dictionary, tier: int, h: float, into = null):
 		c2 = min(plan.sec, SEC_COEF_CAP * WeaponValue.stat_ref("stat_melee_damage", tier) / ref2)
 		c2 = min(c2, 0.5 * scal / ref2)
 		c2 = min(c2, max(0.0, h - plan.base_min) / ref2)
-		c2 = max(0.01, stepify(c2, 0.01))
+		c2 = max(_floor.get(stats[1], 0.05), stepify(c2, 0.01))
 		sec_val = c2 * ref2
 	var c1 = max(0.0, scal - sec_val) / ref1
-	c1 = clamp(c1, plan.c1_lo, plan.c1_hi)
 	if not plan.slow:
 		c1 = min(c1, MAIN_COEF_CAP * WeaponValue.stat_ref("stat_melee_damage", tier) / ref1)
 	# 保证基础伤害下限：加成只能占下限之外的部分（逐级增长约束让位于此）
 	c1 = min(c1, max(0.0, h - plan.base_min - sec_val) / ref1)
-	c1 = max(0.01, stepify(c1, 0.01))
+	c1 = max(_floor.get(stats[0], 0.05), stepify(c1, 0.01))
 	var sc = [[Keys.generate_hash(stats[0]), c1]]
 	if stats.size() > 1:
 		sc.push_back([Keys.generate_hash(stats[1]), c2])
@@ -1146,18 +1244,22 @@ func _solve_hit(st, plan: Dictionary, effects: Array, tier: int, want: float) ->
 	return sqrt(lo * hi)
 
 
-# 按比例缩小效果的数值（属性 / 几率 / 次数等线性数值；爆炸几率、点燃伤害、命中射出投射物的数量）；道具效果不缩
-static func _shrink_effects(effects: Array, f: float) -> Array:
+# 按比例缩放效果的数值（属性 / 几率 / 次数等线性数值；爆炸几率、点燃伤害、命中射出投射物的数量）
+#   缩小时道具效果不缩；放大时道具效果一起放大（记下的价值按比例）；代价（负值、碎裂、自伤）、开关、建筑不动
+static func _scale_effects(effects: Array, f: float) -> Array:
 	var out = []
 	for e in effects:
-		# 道具效果不缩；碎裂、自伤是代价，也不缩
-		if e.has_meta("aa_value") or WeaponValue.effect_key(e) in ["break_on_hit", "lose_hp_per_second"]:
+		var key = WeaponValue.effect_key(e)
+		if (f < 1.0 and e.has_meta("aa_value")) or key in NO_STRENGTHEN_KEYS or key.begins_with("structure:") or not "value" in e:
 			out.push_back(e)
 			continue
-		var ne = e.duplicate()
+		if f > 1.0 and int(e.value) < 0:
+			out.push_back(e)
+			continue
+		var ne = _dup(e)
 		var id = WeaponValue.effect_id(ne)
 		if id == "weapon_exploding":
-			ne.chance = max(0.05, stepify(float(ne.chance) * f, 0.05))
+			ne.chance = clamp(stepify(float(ne.chance) * f, 0.05), 0.05, max(1.0, float(e.chance)))
 		elif id == "weapon_burning" and ne.burning_data != null:
 			ne.burning_data = ne.burning_data.duplicate()
 			ne.burning_data.damage = int(max(1, round(ne.burning_data.damage * f)))
@@ -1166,8 +1268,10 @@ static func _shrink_effects(effects: Array, f: float) -> Array:
 		elif WeaponValue.effect_key(ne) in ["effect_gain_stat_every_killed_enemies", "modify_every_x_projectile"]:
 			# "每 X 次"：X 越大越弱
 			ne.value = int(max(1, round(ne.value / max(0.05, f))))
-		elif abs(int(ne.value)) >= 2:
+		elif abs(int(ne.value)) >= 2 or (f > 1.0 and int(ne.value) != 0):
 			ne.value = int(sign(ne.value) * max(1, round(abs(ne.value) * f)))
+		if e.has_meta("aa_value") and int(e.value) != 0:
+			ne.set_meta("aa_value", float(e.get_meta("aa_value")) * float(ne.value) / float(e.value))
 		out.push_back(ne)
 	return out
 
@@ -1420,15 +1524,14 @@ var _vp: Dictionary = {}
 
 
 func _want(w, by_price := false) -> float:
-	var m = TIER_BUDGET_MULT[clamp(w.tier, 0, 3)]
 	# 砖头也按价格：碎裂在估值里按寿命折扣计（WeaponValue.life_mult）
 	if by_price or w.has_meta("aa_low_of"):
 		var v = _price_of(w) * float(_vp.get(str(w.type) + "/" + str(w.tier), 1.0))
 		# 传奇武器（只有 T4 的原版武器）普遍超模、程度不等：取模型价值与按价格换算值的几何平均（链枪约 ×2）
 		if not w.has_meta("aa_low_of") and wv.legendary_families.has(family_of(w)):
 			v = sqrt(v * max(1.0, wv.value(w.stats, w.effects, w.tier)))
-		return v * m
-	return wv.value(w.stats, w.effects, w.tier) * m
+		return v
+	return wv.value(w.stats, w.effects, w.tier)
 
 
 # ============================================================

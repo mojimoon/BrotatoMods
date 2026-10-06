@@ -100,8 +100,15 @@ func test_141_weapon_deep_reassembly() -> void:
 			for e in p.effects:
 				if w.type == 0:
 					_check(not WG.ranged_only(e), id + " melee has no ranged-only effect")
-			var want = wg._want(w, true) * wg._family_mult(WG.family_of(w))
+			# 最低一级按抽到的价格定目标价值；更高一级按实际价值重新定价，价值 / 价格同样落在同档原版的比例上
+			var fm = wg._family_mult(WG.family_of(w))
+			var want = wg._want(w, true) * fm
+			if w.tier > wg.families[WG.family_of(w)].tiers.keys().min():
+				want = float(p.price) * float(wg._vp.get(str(w.type) + "/" + str(w.tier), 1.0)) * fm
 			var got = wg.wv.value(p.stats, p.effects, w.tier)
+			for sc in p.stats.scaling_stats:
+				if float(sc[1]) > 0:
+					_check(float(sc[1]) >= wg._floor.get(WV.stat_name(sc[0]), 0.0) - 0.001, "%s coef %s %.2f >= floor" % [id, WV.stat_name(sc[0]), float(sc[1])])
 			# 为不倒挂而抬高伤害的武器会超出目标，不计
 			if not p.get("lifted", false) and not p.get("capped", false) and abs(got - want) > max(3.0, want * 0.15):
 				off += 1
@@ -146,6 +153,7 @@ func test_141_weapon_deep_reassembly() -> void:
 			if x != "set_legendary":
 				_check(set_count.get(x, 0) >= min(3, wg._set_native_count.get(x, 0)), "deep: set %s has enough families (%d)" % [x, set_count.get(x, 0)])
 		if sd == 3:
+			print("AUDIT deep scaling floors %s" % str(wg._floor))
 			print("AUDIT deep main scaling melee %s ranged %s" % [str(mains[0]), str(mains[1])])
 			print("AUDIT deep sets %s" % str(set_count))
 
@@ -898,6 +906,15 @@ func test_158_deep_price_resample() -> void:
 	for i in 4:
 		means.push_back(sums[i] / max(1, ns[i]))
 	print("AUDIT T4 mean price by lowest tier %s (n %s)" % [str(means), str(ns)])
+	# 更高一级按实际价值重新定价：相对抽到的价格阶梯（各稀有度的中位数）
+	var rel = [[], [], [], []]
+	for id in out:
+		var w = isvc.get_element_safe(isvc.weapons, id)
+		rel[w.tier].push_back(float(out[id].price) / max(1.0, wg._price_of(w)))
+	for t in 4:
+		rel[t].sort()
+		if not rel[t].empty():
+			print("AUDIT T%d repriced / ladder: p10 %.2f median %.2f p90 %.2f" % [t + 1, rel[t][rel[t].size() / 10], rel[t][rel[t].size() / 2], rel[t][rel[t].size() * 9 / 10]])
 	for i in 3:
 		if ns[i] > 0 and ns[i + 1] > 0:
 			_check(means[i] < means[i + 1], "T4 lowest T%d cheaper than lowest T%d" % [i + 1, i + 2])
