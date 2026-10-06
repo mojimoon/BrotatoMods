@@ -1050,13 +1050,17 @@ func _deep_candidate(fam: Dictionary, tw, tier: int, want: float, stats: Array, 
 	for dn in donors:
 		var dw = _closest_tier(dn.tiers, tier)
 		for e in dw.effects:
-			var key = WeaponValue.effect_key(e)
-			if bound_key(e) or key in keys or (ranged_only(e) and ty == 0):
+			if bound_key(e) or (ranged_only(e) and ty == 0):
+				continue
+			# 按换成本武器类型后的 key 去重（远程爆炸到近战上也是近战爆炸）
+			var ne = _convert_explosion(e.duplicate(), ty)
+			var key = WeaponValue.effect_key(ne)
+			if key in keys:
 				continue
 			keys.push_back(key)
 			if key == JAVELIN_KEY:
 				jav_cd = float(dw.stats.crit_damage)
-			effects.push_back(_vary_fixed(_adapt(_convert_explosion(e.duplicate(), ty), tw), f))
+			effects.push_back(_vary_fixed(_adapt(ne, tw), f))
 	var st = _bind_javelin(bp, effects, jav_cd)
 	if want_item:
 		var line = _item_effect(_item_spec(f, _spec_scaling(stats), true), tier, want)
@@ -1175,6 +1179,8 @@ func _interp_stats(st0, lo: int, t: int, p: float, g: float, cd_step: float, dmg
 	var st = st0.duplicate()
 	var d = t - lo
 	st.damage = int(max(1, round(float(st0.damage) * (1.0 + min(g, dmg_cap - 1.0) * p))))
+	# 先定冷却：加成上限按这一级是否慢速（升级变快后不再按慢速放宽）
+	st.cooldown = int(max(WeaponValue.MIN_CD_FRAMES, round(float(st0.cooldown) * pow(cd_step, d))))
 	var sc = []
 	for i in st0.scaling_stats.size():
 		var x = st0.scaling_stats[i]
@@ -1184,7 +1190,7 @@ func _interp_stats(st0, lo: int, t: int, p: float, g: float, cd_step: float, dmg
 			if i > 0:
 				cap = SEC_COEF_CAP
 			else:
-				cap = SLOW_COEF_CAP if is_slow(st0) else MAIN_COEF_CAP
+				cap = SLOW_COEF_CAP if is_slow(st) else MAIN_COEF_CAP
 			cap *= WeaponValue.stat_ref("stat_melee_damage") / WeaponValue.stat_ref(WeaponValue.stat_name(x[0]))
 			cap = min(cap, float(x[1]) * (SEC_TOP_GROWTH if i > 0 else MAIN_TOP_GROWTH))
 			c = max(c, min(cap, stepify(c * (1.0 + COEF_G * g * p), 0.05)))
@@ -1192,7 +1198,6 @@ func _interp_stats(st0, lo: int, t: int, p: float, g: float, cd_step: float, dmg
 	st.scaling_stats = sc
 	if is_high_crit(st0):
 		st.crit_chance = min(min(1.0, float(st0.crit_chance) + CRIT_STEP_CAP * d), stepify(float(st0.crit_chance) * (1.0 + CRIT_G * g * p), 0.01))
-	st.cooldown = int(max(WeaponValue.MIN_CD_FRAMES, round(float(st0.cooldown) * pow(cd_step, d))))
 	if WeaponValue.is_melee(st0):
 		if int(st0.max_range) >= 200:
 			st.max_range = int(st0.max_range) + 25 * d
