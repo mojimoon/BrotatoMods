@@ -14,9 +14,10 @@ const TriggerEffect = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/trigg
 const Valuation = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/valuation.gd")
 
 # 绑定在武器场景 / 家族上的效果：只留在原家族（不给别的武器，也不从原家族拿走）
-#   电击枪 / 鱼叉枪的区域减速由投射物场景实现（效果只是说明文字）；磁轨炮的未受伤加成只在它的场景脚本里生效；
-#   砖头的"命中后碎裂并替换为新武器"只适合砖头这种消耗型武器
-const FAMILY_BOUND_KEYS = ["weapon_slow_in_zone", "effect_no_hit_boost", "break_on_hit"]
+#   电击枪 / 鱼叉枪的区域减速由投射物场景实现（效果只是说明文字）；
+#   砖头的"命中后碎裂并替换为新武器"只适合砖头这种消耗型武器。
+#   磁轨炮的未受伤加成原版只在它的场景脚本里生效，其他武器上由 aa/no_hit_boost.gd 实现，不绑定
+const FAMILY_BOUND_KEYS = ["weapon_slow_in_zone", "break_on_hit"]
 # 只对远程武器有效的效果（暴击时贯穿 / 弹跳、每 X 发投射物、捡材料时换弹）
 const RANGED_ONLY_KEYS = ["pierce_on_crit", "bounce_on_crit", "modify_every_x_projectile", "reload_when_pickup_gold"]
 # 浮动范围 100% 时家族强度倍率的对数标准差（原版"价值 / 价格"的离散度约 0.36，但大部分是模型误差，不照搬）
@@ -1050,13 +1051,17 @@ func _deep_candidate(fam: Dictionary, tw, tier: int, want: float, stats: Array, 
 	for dn in donors:
 		var dw = _closest_tier(dn.tiers, tier)
 		for e in dw.effects:
-			var key = WeaponValue.effect_key(e)
-			if bound_key(e) or key in keys or (ranged_only(e) and ty == 0):
+			if bound_key(e) or (ranged_only(e) and ty == 0):
+				continue
+			# 按换成本武器类型后的 key 去重（远程爆炸到近战上也是近战爆炸）
+			var ne = _convert_explosion(e.duplicate(), ty)
+			var key = WeaponValue.effect_key(ne)
+			if key in keys:
 				continue
 			keys.push_back(key)
 			if key == JAVELIN_KEY:
 				jav_cd = float(dw.stats.crit_damage)
-			effects.push_back(_vary_fixed(_adapt(_convert_explosion(e.duplicate(), ty), tw), f))
+			effects.push_back(_vary_fixed(_adapt(ne, tw), f))
 	var st = _bind_javelin(bp, effects, jav_cd)
 	if want_item:
 		var line = _item_effect(_item_spec(f, _spec_scaling(stats), true), tier, want)
@@ -1157,12 +1162,12 @@ func _deep_interp(fam: Dictionary, base: Dictionary, tiers: Array, mult: float) 
 
 
 # 加成系数、暴击率的相对增长 = 伤害相对增长 × 此值（原版升级主要加伤害，系数与暴击涨得慢）
-const COEF_G = 0.25
+const COEF_G = 0.33
 const CRIT_G = 0.5
 # 效果从最低一级到最高一级至多放大的倍数（原版效果逐级增长不多：爆炸 25%→40%、点燃 3→8）；暴击率每级至多 +10%
 const FX_TOP_CAP = 4.0
 # 加成系数从最低一级到最高一级至多放大的倍数（原版主加成大多不变，最多约 ×1.5（左轮）；附加加成最多 ×2.5（镰刀收获））
-const MAIN_TOP_GROWTH = 1.25
+const MAIN_TOP_GROWTH = 1.5
 const SEC_TOP_GROWTH = 2.0
 # 基础伤害从最低一级到最高一级至多放大到原版逐级伤害倍数（_up_r，中位数约 ×3）的这一比例
 const DMG_TOP_SCALE = 0.85
@@ -1175,6 +1180,8 @@ func _interp_stats(st0, lo: int, t: int, p: float, g: float, cd_step: float, dmg
 	var st = st0.duplicate()
 	var d = t - lo
 	st.damage = int(max(1, round(float(st0.damage) * (1.0 + min(g, dmg_cap - 1.0) * p))))
+	# 先定冷却：加成上限按这一级是否慢速（升级变快后不再按慢速放宽）
+	st.cooldown = int(max(WeaponValue.MIN_CD_FRAMES, round(float(st0.cooldown) * pow(cd_step, d))))
 	var sc = []
 	for i in st0.scaling_stats.size():
 		var x = st0.scaling_stats[i]
@@ -1184,7 +1191,7 @@ func _interp_stats(st0, lo: int, t: int, p: float, g: float, cd_step: float, dmg
 			if i > 0:
 				cap = SEC_COEF_CAP
 			else:
-				cap = SLOW_COEF_CAP if is_slow(st0) else MAIN_COEF_CAP
+				cap = SLOW_COEF_CAP if is_slow(st) else MAIN_COEF_CAP
 			cap *= WeaponValue.stat_ref("stat_melee_damage") / WeaponValue.stat_ref(WeaponValue.stat_name(x[0]))
 			cap = min(cap, float(x[1]) * (SEC_TOP_GROWTH if i > 0 else MAIN_TOP_GROWTH))
 			c = max(c, min(cap, stepify(c * (1.0 + COEF_G * g * p), 0.05)))
@@ -1192,7 +1199,6 @@ func _interp_stats(st0, lo: int, t: int, p: float, g: float, cd_step: float, dmg
 	st.scaling_stats = sc
 	if is_high_crit(st0):
 		st.crit_chance = min(min(1.0, float(st0.crit_chance) + CRIT_STEP_CAP * d), stepify(float(st0.crit_chance) * (1.0 + CRIT_G * g * p), 0.01))
-	st.cooldown = int(max(WeaponValue.MIN_CD_FRAMES, round(float(st0.cooldown) * pow(cd_step, d))))
 	if WeaponValue.is_melee(st0):
 		if int(st0.max_range) >= 200:
 			st.max_range = int(st0.max_range) + 25 * d

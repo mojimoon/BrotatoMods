@@ -1110,7 +1110,7 @@ func test_162_no_inversion_and_fixed_params() -> void:
 								if WV.effect_key(q) == WV.effect_key(e) and not WV.effect_key(e) in WG.NO_STRENGTHEN_KEYS and not WV.effect_key(e).begins_with("structure:"):
 									if not _stronger(WV, e, q):
 										weak += 1
-										print("AUDIT not strengthened %s T%d %s %s vs %s mag %s vs %s" % [f, t + 1, WV.effect_key(e), str(e.value), str(q.value), str(WV.magnitude(e)), str(WV.magnitude(q))])
+										print("AUDIT not strengthened %s T%d %s %s vs %s mag %s vs %s (%s %s %s)" % [f, t + 1, WV.effect_key(e), str(e.value), str(q.value), str(WV.magnitude(e)), str(WV.magnitude(q)), WV.effect_id(e), str(e.get("chance")), str(q.get("chance"))])
 									break
 					# 标枪效果绑定 0% 暴击 + 高暴伤；没有标枪效果的武器不用这个模板（深度重组）；0% 暴击不算精准
 					var has_jav = _has_key(WV, p.effects, WG.JAVELIN_KEY)
@@ -1362,3 +1362,36 @@ func test_167_audit_upgrade_schemes() -> void:
 		print("AUDIT tries %d: cd median %.2f p90 %.2f; main coef median %.2f p90 %.2f; scaling share median %.2f; value/want p10 %.2f median %.2f" % [tries, cds[cds.size() / 2], cds[cds.size() * 9 / 10], coef[coef.size() / 2], coef[coef.size() * 9 / 10], share[share.size() / 2], vw[vw.size() / 10], vw[vw.size() / 2]])
 		print("AUDIT tries %d: mains %s" % [tries, str(mains)])
 		print("AUDIT tries %d: top effects %s" % [tries, str(top.slice(0, min(11, top.size() - 1)))])
+
+
+# 磁轨炮的不受伤加成放到其他武器上也生效（aa/no_hit_boost.gd）：手枪带"每 1 秒 +5 伤害"，不受伤 3 秒后基础伤害增加
+func test_168_no_hit_boost_on_other_weapons() -> void:
+	m.cfg_weapons = true
+	m.start_new_run()
+	for w in rd.get_player_weapons(0).duplicate():
+		rd.remove_weapon(w, 0)
+	var pistol = isvc.get_element_safe(isvc.weapons, "weapon_pistol_1")
+	var w = pistol.duplicate()
+	var e = PlayerNoHitEffect.new()
+	e.key = "effect_no_hit_boost"
+	e.value = 5
+	e.interval = 1
+	w.effects = [e]
+	var _nw = rd.add_weapon(w, 0)
+	rd.current_wave = 3
+	TempStats.reset()
+	var _e = tree.change_scene("res://main.tscn")
+	yield(_wait_frames(10), "completed")
+	var main = tree.current_scene
+	main._players[0].disable_hurtbox()
+	main._wave_timer.start(600)
+	var node = main._players[0].current_weapons[0]
+	var base = int(node.stats.damage)
+	yield(tree.create_timer(3.5), "timeout")
+	_check(int(node.stats.damage) >= base + 10, "pistol with the no-hit boost gains damage (%d -> %d)" % [base, int(node.stats.damage)])
+	_check(int(node.current_stats.damage) > base, "boost reaches the current stats (%d)" % int(node.current_stats.damage))
+	main._cleaning_up = true
+	for x in rd.get_player_weapons(0).duplicate():
+		rd.remove_weapon(x, 0)
+	m.on_menu_reset()
+	m.cfg_weapons = false

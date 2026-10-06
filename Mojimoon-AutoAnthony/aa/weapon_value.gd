@@ -256,7 +256,7 @@ static func magnitude(e) -> float:
 		"modify_every_x_projectile":
 			return 1.0 / max(1.0, v)
 		"gain_stat_for_every_step_after_equip":
-			return 1.0 / max(1.0, float(e.value2))
+			return v / max(1.0, float(e.value2))
 		"enemy_percent_damage_taken":
 			return v * float(e.max_stacks)
 		"temp_stats_per_interval":
@@ -269,7 +269,7 @@ static func magnitude(e) -> float:
 			return -v
 		"stat_lifesteal":
 			if effect_id(e) == "gain_stat_for_every_stat":
-				return 1.0 / max(1.0, float(e.nb_stat_scaled))
+				return v / max(1.0, float(e.nb_stat_scaled))
 	if k.begins_with("structure:"):
 		if "spawn_cooldown" in e and int(e.spawn_cooldown) > 0:
 			return 1.0 / float(e.spawn_cooldown)

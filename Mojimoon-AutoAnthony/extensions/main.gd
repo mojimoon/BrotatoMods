@@ -5,6 +5,7 @@ extends "res://main.gd"
 const AAMain = preload("res://mods-unpacked/Mojimoon-AutoAnthony/mod_main.gd")
 const AARuntime = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/runtime.gd")
 const AABehavior = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/enemy_behavior.gd")
+const AANoHitBoost = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/no_hit_boost.gd")
 
 var _aa_runtime = null
 
@@ -26,6 +27,16 @@ func _on_EntitySpawner_players_spawned(players: Array) -> void:
 	for player in players:
 		if player != null:
 			var _e = player.connect("took_damage", _aa_runtime, "on_player_took_damage")
+			# 重组后其他武器也可能带磁轨炮的不受伤加成：原版只在磁轨炮的脚本里实现，这里补上
+			for w in player.current_weapons:
+				if w is RailGun:
+					continue
+				for e in w.effects:
+					if e is PlayerNoHitEffect:
+						var b = AANoHitBoost.new()
+						w.add_child(b)
+						b.setup(w, e)
+						break
 	for p in RunData.get_player_count():
 		_aa_runtime.fire("wave_start", p)
 
