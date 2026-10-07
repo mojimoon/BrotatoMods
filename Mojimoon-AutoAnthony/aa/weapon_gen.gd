@@ -552,7 +552,8 @@ const MAIN_COEF_CAP = 2.0
 # 慢速武器的主加成系数上限（折算成近战伤害）：原版激光枪等慢速武器的系数较高，但不能无限制（否则传奇慢速武器会解出 2000%+）
 const SLOW_COEF_CAP = 4.0
 # 效果（来源家族 + 道具效果）至多占武器目标价值的比例
-const FX_SHARE_CAP = 0.4
+const FX_SHARE_CAP = 0.55
+const FX_UP_MAX = 1.5
 # 加成系数下限（不分稀有度、不分第几条加成；参考原版，约为终局属性 15 点时加成出的伤害）
 const SCALING_FLOOR = {
 	"stat_max_hp": 0.15, "stat_hp_regeneration": 0.35, "stat_lifesteal": 0.5, "stat_melee_damage": 0.25,
@@ -644,8 +645,9 @@ var _hi_crit_share: Dictionary = {}	# 类型 -> 原版高暴击武器的比例
 var deep_tries := DEEP_TRIES
 var _sets: Dictionary = {}		# set my_id -> SetData
 var _set_native_count: Dictionary = {}
-var _fx_share: Array = [1.0, 0.6, 0.1]	# 原版（非传奇）武器家族：[-, 至少 1 条效果的比例, 2 条以上的比例]
+var _fx_share: Dictionary = {0: [1.0, 0.7, 0.1], 1: [1.0, 0.5, 0.1]}	# 类型 -> 原版（非传奇）武器家族：[-, 至少 1 条效果的比例, 2 条以上的比例]
 var _effectful: Array = []		# 有（可搬运的）效果的家族
+var _fx_targets: Dictionary = {0: [], 1: []}	# 类型 -> 原版有效果的（非传奇）最低一级武器里效果价值的占比
 
 
 # 原版只有 T4 的传奇武器家族（补出低级版本时不算）
@@ -723,9 +725,10 @@ func _collect_deep_priors() -> void:
 		var n = _crit_pool[ty][true].size() + _crit_pool[ty][false].size()
 		_hi_crit_share[ty] = float(_crit_pool[ty][true].size()) / max(1, n)
 	_effectful = []
-	var n_all = 0
-	var n1 = 0
-	var n2 = 0
+	_fx_targets = {0: [], 1: []}
+	var n_all = {0: 0, 1: 0}
+	var n1 = {0: 0, 1: 0}
+	var n2 = {0: 0, 1: 0}
 	for f in fam_names:
 		var lo2 = _closest_tier(families[f].tiers, 0)
 		if lo2.has_meta("aa_low_of"):
@@ -736,14 +739,22 @@ func _collect_deep_priors() -> void:
 				n += 1
 		if n > 0:
 			_effectful.push_back(f)
-		if not _is_legendary(lo2):
-			n_all += 1
+		var ty = int(families[f].type)
+		if n > 0 and not _is_legendary(lo2) and _fx_targets.has(ty):
+			var t2 = int(lo2.tier)
+			var v2 = wv.value(lo2.stats, lo2.effects, t2)
+			if v2 > 0:
+				_fx_targets[ty].push_back(clamp((v2 - wv.value(lo2.stats, [], t2)) / v2, 0.0, FX_SHARE_CAP))
+		if not _is_legendary(lo2) and n_all.has(ty):
+			n_all[ty] += 1
 			if n >= 1:
-				n1 += 1
+				n1[ty] += 1
 			if n >= 2:
-				n2 += 1
-	if n_all > 0:
-		_fx_share = [1.0, float(n1) / n_all, float(n2) / n_all]
+				n2[ty] += 1
+	# 按类型统计（原版近战约 72% 有效果、远程约 53%）
+	for ty in n_all:
+		if n_all[ty] > 0:
+			_fx_share[ty] = [1.0, float(n1[ty]) / n_all[ty], float(n2[ty]) / n_all[ty]]
 
 
 func _pick_base(ty: int):
@@ -993,9 +1004,9 @@ func _deep_template(fam: Dictionary, tw, tier: int) -> Dictionary:
 	var fx_mult = float(cfg.get("w_effects", 125)) / 100.0
 	var n_fx = 0
 	var u = rng.randf()
-	if u < min(0.95, _fx_share[1] * fx_mult):
+	if u < min(0.95, _fx_share[ty][1] * fx_mult):
 		n_fx = 1
-		if u < min(0.5, _fx_share[2] * fx_mult):
+		if u < min(0.5, _fx_share[ty][2] * fx_mult):
 			n_fx = 2
 	var prof_fam = families.get(family_of(prof_w))
 	var defining = prof_fam != null and _has_defining_effect(prof_w)
@@ -1010,7 +1021,8 @@ func _deep_template(fam: Dictionary, tw, tier: int) -> Dictionary:
 			n_donor += 1
 		else:
 			break
-	return {"bp": bp, "prof_fam": prof_fam if defining else null, "n_donor": n_donor, "want_item": want_item, "hi_crit": rng.randf() < float(_hi_crit_share[ty])}
+	return {"bp": bp, "prof_fam": prof_fam if defining else null, "n_donor": n_donor, "want_item": want_item, "hi_crit": rng.randf() < float(_hi_crit_share[ty]),
+		"fx_target": float(_fx_targets[ty][rng.randi() % _fx_targets[ty].size()]) if not _fx_targets[ty].empty() else 0.0}
 
 
 func _deep_candidate(fam: Dictionary, tw, tier: int, want: float, stats: Array, tpl: Dictionary) -> Dictionary:
@@ -1070,6 +1082,14 @@ func _deep_candidate(fam: Dictionary, tw, tier: int, want: float, stats: Array, 
 	var h = _solve_hit(st, plan, effects, tier, want)
 	var final = _build(st, plan, tier, h)
 	var fx = wv.value(final, effects, tier) - wv.value(final, [], tier)
+	# 近战：效果价值占比低于从原版近战（有效果的最低一级）里抽到的占比时，放大效果数值（至多 FX_UP_MAX 倍）。
+	# 原版近战有效果的武器效果约占 4 成价值，来源家族的效果直接搬过来偏弱，价值就挤到了面板伤害上；
+	# 远程按额外效果 125% 已比原版有效果的多，不放大
+	if fam.type == 0 and fx > 0.01 and fx < float(tpl.fx_target) * want:
+		effects = _scale_effects(effects, min(FX_UP_MAX, float(tpl.fx_target) * want / fx))
+		h = _solve_hit(st, plan, effects, tier, want)
+		final = _build(st, plan, tier, h)
+		fx = wv.value(final, effects, tier) - wv.value(final, [], tier)
 	if fx > FX_SHARE_CAP * want:
 		effects = _scale_effects(effects, FX_SHARE_CAP * want / fx)
 		h = _solve_hit(st, plan, effects, tier, want)
@@ -1268,6 +1288,10 @@ func _upgrade_stats(ty: int, tier: int, st) -> Dictionary:
 	var r_cd = _draw(ty, tier, "cooldown", 1.0)
 	if r_cd < 1.0:
 		s.cooldown = _cooldown_for(st, WeaponValue.cooldown_seconds(st) * r_cd)
+		# 加成系数超过普通武器上限的慢速武器：攻速不快过慢速线（否则就成了带慢速级加成的普通武器）
+		if is_slow(st) and _over_normal_cap(st):
+			while not is_slow(s) and int(s.cooldown) < int(st.cooldown):
+				s.cooldown = int(s.cooldown) + 1
 	var sc = []
 	for i in st.scaling_stats.size():
 		var x = st.scaling_stats[i]
@@ -1295,6 +1319,15 @@ func _upgrade_stats(ty: int, tier: int, st) -> Dictionary:
 		if int(st.bounce) > 0:
 			s.bounce = int(st.bounce) + int(round(_draw(ty, tier, "bounce", 0.0)))
 	return {"stats": s, "damage_r": _draw(ty, tier, "damage", 1.0)}
+
+
+static func _over_normal_cap(st) -> bool:
+	for i in st.scaling_stats.size():
+		var x = st.scaling_stats[i]
+		var cap = (SEC_COEF_CAP if i > 0 else MAIN_COEF_CAP) * WeaponValue.stat_ref("stat_melee_damage") / WeaponValue.stat_ref(WeaponValue.stat_name(x[0]))
+		if float(x[1]) > cap + 0.001:
+			return true
+	return false
 
 
 # 实际攻击间隔（含换弹等）不超过 secs 的最大冷却帧数
