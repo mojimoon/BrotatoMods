@@ -1040,7 +1040,7 @@ func _eval_value_params(WV, all: Array, rows: Array, c: Array) -> Array:
 
 
 # 伤害不倒挂（两种模式）：同一家族高一级的基础伤害与每项加成系数不低于低一级；
-# 特效逐级强化；固定参数的效果按家族随机（砖头碎裂几率保持 1%、自伤 1–3）；有最小范围的武器范围足够大；原版砖头按寿命折扣估值后与按价格的估值相近
+# effects 模式特效逐级强化，deep 模式允许持平但不倒挂；固定参数的效果按家族随机（砖头碎裂几率保持 1%、自伤 1–3）；有最小范围的武器范围足够大；原版砖头按寿命折扣估值后与按价格的估值相近
 func _stronger(WV, e, q) -> bool:
 	match WV.effect_id(e):
 		"weapon_exploding":
@@ -1052,6 +1052,17 @@ func _stronger(WV, e, q) -> bool:
 	if not "value" in e or WV.magnitude(q) < 0 or float(q.value) < 0 or (float(e.value) == 0 and float(q.value) == 0):
 		return true
 	return WV.magnitude(e) > WV.magnitude(q) or int(q.value) >= 100
+
+
+func _effect_non_decreasing(WV, e, q) -> bool:
+	match WV.effect_id(e):
+		"weapon_exploding":
+			return float(e.chance) + 0.000001 >= float(q.chance)
+		"weapon_burning":
+			return q.burning_data == null or (e.burning_data != null and int(e.burning_data.damage) >= int(q.burning_data.damage))
+		"weapon_projectiles_on_hit":
+			return int(e.value) >= int(q.value) and (q.weapon_stats == null or (e.weapon_stats != null and int(e.weapon_stats.damage) >= int(q.weapon_stats.damage)))
+	return WV.magnitude(e) + 0.000001 >= WV.magnitude(q)
 
 
 func _has_key(WV, effects: Array, key: String) -> bool:
@@ -1104,11 +1115,11 @@ func test_162_no_inversion_and_fixed_params() -> void:
 							_eq(int(e.value), 1, f + " break chance stays 1%")
 						if WV.effect_key(e) == "lose_hp_per_second":
 							_check(int(e.value) >= 1 and int(e.value) <= 3, f + " self damage 1-3")
-						# 特效逐级强化：与低一级同 key 的效果更强（已到上限的除外）
+						# 同 key：effects 严格增强（已到上限的除外），deep 允许原版 no-op。
 						if prev != null:
 							for q in prev.effects:
 								if WV.effect_key(q) == WV.effect_key(e) and not WV.effect_key(e) in WG.NO_STRENGTHEN_KEYS and not WV.effect_key(e).begins_with("structure:"):
-									if not _stronger(WV, e, q):
+									if not (_stronger(WV, e, q) if mode == "effects" else _effect_non_decreasing(WV, e, q)):
 										weak += 1
 										print("AUDIT not strengthened %s T%d %s %s vs %s mag %s vs %s" % [f, t + 1, WV.effect_key(e), str(e.value), str(q.value), str(WV.magnitude(e)), str(WV.magnitude(q))])
 									break
@@ -1124,7 +1135,7 @@ func test_162_no_inversion_and_fixed_params() -> void:
 						_check(int(p.stats.max_range) >= int(p.stats.min_range) + 100, "%s range %d-%d is wide" % [f, int(p.stats.min_range), int(p.stats.max_range)])
 					prev = p
 			_eq(bad, 0, "%s seed %d: no tier has lower damage / scaling than the tier below" % [mode, sd])
-			_eq(weak, 0, "%s seed %d: effects get stronger every tier" % [mode, sd])
+			_eq(weak, 0, "%s seed %d: effects %s" % [mode, sd, "get stronger every tier" if mode == "effects" else "never decrease (ties allowed)"])
 	var wv = WV.new()
 	wv.calibrate(weapons)
 	var wg2 = WG.new(_cfg(), 1)
@@ -1229,15 +1240,29 @@ func test_167_audit_upgrade_schemes() -> void:
 	var cfg = _cfg()
 	cfg.weapons = true
 	cfg.weapon_mode = "deep"
-	var g = Generator.new(cfg, 3)
+	var sd0 = int(OS.get_environment("AA_SEED")) if OS.get_environment("AA_SEED") != "" else 3
+	var g = Generator.new(cfg, sd0)
 	g.generate(isvc.items, isvc.characters, [], [])
 	cfg.w_item_effects = true
 	for mode in ["interp"]:
-		var wg = WG.new(cfg, 3, g)
+		var wg = WG.new(cfg, sd0, g)
 		var out = wg.generate(natives)
-		print("AUDIT ===== scheme %s (up_r %s) =====" % [mode, str(wg._up_r)])
+		print("AUDIT ===== scheme %s (native adjacent sampling) =====" % mode)
+		for ty in wg._upgrade_priors:
+			for t in wg._upgrade_priors[ty]:
+				var txt = ""
+				for field in ["damage", "cooldown", "main", "secondary"]:
+					var a = wg._upgrade_priors[ty][t].get(field, [])
+					if not a.empty():
+						txt += "%s n%d p10 %.2f med %.2f p90 %.2f max %.2f  " % [field, a.size(), a[a.size() / 10], a[a.size() / 2], a[a.size() * 9 / 10], a[-1]]
+				print("AUDIT native step type %d T%d->T%d %s" % [ty, t + 1, t + 2, txt])
 		var smooth = []
 		var t4r = []
+		var vw_top = []
+		var vw_tier = {}
+		var ks_top = []
+		var cd_top = []
+		var fx_top = []
 		for f in wg.fam_names:
 			var tiers = wg.families[f].tiers.keys()
 			tiers.sort()
@@ -1259,11 +1284,23 @@ func test_167_audit_upgrade_schemes() -> void:
 				print("AUDIT %s %-26s T%d $%-4d v%-6.0f dmg %-4d %scd %.2f crit %d%%x%.2f rng %d ls %d%%%s | %s" % [mode, f.replace("weapon_", ""), t + 1, int(p.price), val, int(st.damage), sc, WV.cooldown_seconds(st), int(round(float(st.crit_chance) * 100)), float(st.crit_damage), int(st.max_range), int(round(float(st.lifesteal) * 100)), extra, fx])
 				if prev != null:
 					smooth.push_back(float(st.damage) / max(1.0, float(prev.stats.damage)))
+					var vk = "%d/%d" % [int(wg.families[f].type), t]
+					if not vw_tier.has(vk):
+						vw_tier[vk] = []
+					vw_tier[vk].push_back(val / (wg._want(w, true) * wg._family_mult(f)))
 				prev = p
 			var top = tiers[-1]
 			if tiers.size() > 1:
 				var wt = wg.families[f].tiers[top]
 				t4r.push_back(float(out[wt.my_id].price) / max(1.0, wg._price_of(wt)))
+				var pt = out[wt.my_id]
+				vw_top.push_back(wg.wv.value(pt.stats, pt.effects, top) / (wg._want(wt, true) * wg._family_mult(f)))
+				ks_top.push_back(float(pt.scale))
+				var a0 = out[wg.families[f].tiers[tiers[0]].my_id]
+				cd_top.push_back(WV.cooldown_seconds(pt.stats) / WV.cooldown_seconds(a0.stats))
+				var v_fx0 = wg.wv.value(a0.stats, a0.effects, tiers[0]) - wg.wv.value(a0.stats, [], tiers[0])
+				if v_fx0 > 0.01:
+					fx_top.push_back((wg.wv.value(pt.stats, pt.effects, top) - wg.wv.value(pt.stats, [], top)) / v_fx0)
 		# 原版同类型同档"参考属性下原始 DPS / 价格"的中位数为 1：生成武器相对它的中位数（各档）；T4 / 最低一级的伤害与主加成倍数
 		var med = {}
 		for w in natives:
@@ -1304,6 +1341,15 @@ func test_167_audit_upgrade_schemes() -> void:
 		print("AUDIT %s T4/T1 damage median %.2f (native %.2f), main coef median %.2f (native %.2f)" % [mode, _median(dmg_g), _median(nat_dmg_g), _median(coef_g), _median(nat_coef_g)])
 		smooth.sort()
 		t4r.sort()
+		for arr in [vw_top, ks_top, cd_top, fx_top]:
+			arr.sort()
+		var vt = ""
+		var vks = vw_tier.keys()
+		vks.sort()
+		for vk in vks:
+			vt += "%s %.2f  " % [vk, _median(vw_tier[vk])]
+		print("AUDIT %s upper tiers value / ladder want median: %s" % [mode, vt])
+		print("AUDIT %s top value / want p10 %.2f median %.2f p90 %.2f (<0.9: %d / %d); k p10 %.2f median %.2f p90 %.2f; top/lowest attack interval median %.2f; effect value top/lowest p10 %.2f median %.2f p90 %.2f" % [mode, vw_top[vw_top.size() / 10], _median(vw_top), vw_top[vw_top.size() * 9 / 10], _count_below(vw_top, 0.9), vw_top.size(), ks_top[ks_top.size() / 10], _median(ks_top), ks_top[ks_top.size() * 9 / 10], _median(cd_top), fx_top[fx_top.size() / 10], _median(fx_top), fx_top[fx_top.size() * 9 / 10]])
 		print("AUDIT %s damage step ratio p10 %.2f median %.2f p90 %.2f max %.2f; top price / ladder p10 %.2f median %.2f p90 %.2f" % [mode, smooth[smooth.size() / 10], smooth[smooth.size() / 2], smooth[smooth.size() * 9 / 10], smooth[-1], t4r[t4r.size() / 10], t4r[t4r.size() / 2], t4r[t4r.size() * 9 / 10]])
 	# 最低一级择优的偏向：24 组取最高 vs 1 组（5 个种子合计）
 	for tries in [24, 1]:
@@ -1362,3 +1408,418 @@ func test_167_audit_upgrade_schemes() -> void:
 		print("AUDIT tries %d: cd median %.2f p90 %.2f; main coef median %.2f p90 %.2f; scaling share median %.2f; value/want p10 %.2f median %.2f" % [tries, cds[cds.size() / 2], cds[cds.size() * 9 / 10], coef[coef.size() / 2], coef[coef.size() * 9 / 10], share[share.size() / 2], vw[vw.size() / 10], vw[vw.size() / 2]])
 		print("AUDIT tries %d: mains %s" % [tries, str(mains)])
 		print("AUDIT tries %d: top effects %s" % [tries, str(top.slice(0, min(11, top.size() - 1)))])
+
+
+const UPGRADE_FIELDS = ["damage", "cooldown", "main", "secondary", "crit_chance", "crit_damage", "range", "knockback", "nb_projectiles", "piercing", "bounce", "lifesteal"]
+const UPGRADE_AUDIT_SEEDS = [1, 2, 3, 11, 42]
+
+
+func _upgrade_cfg() -> Dictionary:
+	var cfg = _cfg()
+	cfg.weapons = true
+	cfg.weapon_mode = "deep"
+	cfg.w_item_effects = false
+	return cfg
+
+
+func _upgrade_api(wg) -> bool:
+	for method in ["_collect_upgrade_priors", "_upgrade_stats", "_upgrade_effects", "_upgrade_plan"]:
+		if not wg.has_method(method):
+			_check(false, "generator API missing: " + method)
+			return false
+	return true
+
+
+# 所有档位放同一分布，避免把测试绑死在 prior 的 source/target tier 索引约定上。
+func _controlled_upgrade_priors(damage_ratio: float) -> Dictionary:
+	var priors = {0: {}, 1: {}}
+	for ty in [0, 1]:
+		for tier in range(4):
+			var row = {}
+			for field in UPGRADE_FIELDS:
+				row[field] = [1.0] if field in ["damage", "cooldown", "main", "secondary"] else [0.0]
+			row.damage = [damage_ratio]
+			priors[ty][tier] = row
+	return priors
+
+
+func _upgrade_full_family(wg):
+	for f in wg.fam_names:
+		var fam = wg.families[f]
+		if fam.tiers.has(0) and fam.tiers.has(1) and fam.tiers.has(2) and fam.tiers.has(3) and fam.type == 0 and fam.tiers[0].stats.scaling_stats.size() > 0:
+			return fam
+	return null
+
+
+func test_168_native_upgrade_priors_include_noops() -> void:
+	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
+	var natives = m.native_only(isvc.weapons)
+	var wg = WG.new(_upgrade_cfg(), 11)
+	if not _upgrade_api(wg):
+		return
+	wg.generate(natives)
+	var noops = 0
+	var positive = 0
+	var samples = 0
+	for ty in wg._upgrade_priors:
+		for tier in wg._upgrade_priors[ty]:
+			for field in wg._upgrade_priors[ty][tier]:
+				_check(field in UPGRADE_FIELDS, "known native upgrade field " + str(field))
+				for raw in wg._upgrade_priors[ty][tier][field]:
+					var x = float(raw)
+					var neutral = 1.0 if field in ["damage", "cooldown", "main", "secondary"] else 0.0
+					_check(x > 0 and x <= 1.000001 if field == "cooldown" else x >= neutral - 0.000001, "%s native sample in improvement domain: %s" % [field, str(raw)])
+					samples += 1
+					noops += 1 if abs(x - neutral) < 0.000001 else 0
+					positive += 1 if abs(x - neutral) > 0.000001 else 0
+	_check(samples > 0, "collected real native adjacent samples")
+	_check(noops > 0, "native priors retain no-op samples")
+	_check(positive > 0, "native priors retain positive samples (not required for every field)")
+	var fx_samples = 0
+	var fx_noops = 0
+	var fx_positive = 0
+	for key in wg._effect_upgrades:
+		for tier in wg._effect_upgrades[key]:
+			for x in wg._effect_upgrades[key][tier]:
+				_check(float(x) >= 1.0, "%s effect prior never weakens" % str(key))
+				fx_samples += 1
+				fx_noops += 1 if abs(float(x) - 1.0) < 0.000001 else 0
+				fx_positive += 1 if float(x) > 1.000001 else 0
+	_check(fx_samples > 0, "collected same-key native effect ratios")
+	_check(fx_noops > 0, "same-key native effect priors retain no-ops")
+	_check(fx_positive > 0, "same-key native effect priors retain positive upgrades (not every key)")
+		# aa_low_of 伪造完整家族：必须不污染任何原版升级分布（含 effect）。
+	var fam = _upgrade_full_family(wg)
+	_check(fam != null, "native four-tier melee fixture available")
+	if fam == null:
+		return
+	var before = _upgrade_snapshot([wg._upgrade_priors, wg._effect_upgrades])
+	var augmented = natives.duplicate()
+	for tier in range(4):
+		var w = fam.tiers[tier].duplicate()
+		w.stats = fam.tiers[tier].stats.duplicate()
+		w.my_id = "aa_upgrade_prior_fixture_" + str(tier)
+		w.weapon_id = "aa_upgrade_prior_fixture"
+		w.set_meta("aa_low_of", fam.tiers[tier])
+		w.stats.damage = 1000 * (tier + 1)
+		augmented.push_back(w)
+	wg.generate(augmented)
+	_eq(_upgrade_snapshot([wg._upgrade_priors, wg._effect_upgrades]), before, "aa_low_of adjacent pairs excluded from native priors")
+
+
+func test_169_upgrade_noops_and_uncapped_damage() -> void:
+	var WV = load(MOD_DIR + "aa/weapon_value.gd")
+	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
+	var wg = WG.new(_upgrade_cfg(), 3)
+	if not _upgrade_api(wg):
+		return
+	wg.generate(m.native_only(isvc.weapons))
+	var fam = _upgrade_full_family(wg)
+	_check(fam != null, "four-tier fixture available")
+	if fam == null:
+		return
+	var st = fam.tiers[0].stats.duplicate(true)
+	st.damage = 100
+	st.cooldown = 90
+	st.additional_cooldown_every_x_shots = 3
+	st.additional_cooldown_multiplier = 2.0
+	var main_key = st.scaling_stats[0][0]
+	var secondary_key = null
+	for w in m.native_only(isvc.weapons):
+		for sc in w.stats.scaling_stats:
+			if sc[0] != main_key:
+				secondary_key = sc[0]
+	_check(secondary_key != null, "distinct secondary scaling fixture available")
+	if secondary_key == null:
+		return
+	st.scaling_stats = [[main_key, 0.5], [secondary_key, 0.25]]
+	var cd0 = WV.cooldown_seconds(st)
+	var scaling0 = _upgrade_snapshot(st.scaling_stats)
+	wg._upgrade_priors = _controlled_upgrade_priors(1.0)
+	wg._effect_upgrades = {}
+	var plan = wg._upgrade_plan(fam.type, [0, 1, 2, 3], st, [])
+	for tier in range(4):
+		_check(plan.has(tier), "plan contains T%d" % (tier + 1))
+		if not plan.has(tier):
+			return
+		_eq(float(plan[tier].damage_weight), 0.0, "no damage draw has zero cumulative weight")
+		_check(not plan[tier].damage_up, "no damage draw marks damage_up false")
+		_check(abs(WV.cooldown_seconds(plan[tier].stats) - cd0) < 0.000001, "cooldown no-op preserves real average attack interval including reload")
+		_eq(_upgrade_snapshot(plan[tier].stats.cooldown), _upgrade_snapshot(st.cooldown), "cooldown no-op preserves raw cooldown frames")
+		_eq(_upgrade_snapshot(plan[tier].stats.scaling_stats), scaling0, "main/secondary no-ops preserve coefficients")
+	var base = {"stats": st, "effects": [], "donor": fam.tiers[0].my_id, "price": int(fam.tiers[0].value), "want": wg.wv.value(st, [], 0)}
+	var flat = wg._deep_interp(fam, base, [0, 1, 2, 3], 100.0)
+	_eq(flat.size(), 4, "deep interpolation returns all tiers")
+	for p in flat:
+		_eq(int(p.stats.damage), int(st.damage), "damage no-op stays flat even with huge value budget")
+		_check(abs(WV.cooldown_seconds(p.stats) - cd0) < 0.000001, "deep solve does not force faster cooldown")
+		_eq(_upgrade_snapshot(p.stats.scaling_stats), scaling0, "deep solve does not force main/secondary growth")
+	wg._upgrade_priors = _controlled_upgrade_priors(1.5)
+	wg.rng.seed = 3
+	var growing = wg._deep_interp(fam, base, [0, 1, 2, 3], 100.0)
+	_eq(growing.size(), 4, "uncapped solve returns all tiers")
+	if growing.size() != 4:
+		return
+	var ratio = float(growing[-1].stats.damage) / float(st.damage)
+	_check(ratio > 2.55, "high value budget allows damage beyond old 2.55 cap (x%.3f)" % ratio)
+	for p in growing:
+		_check(abs(WV.cooldown_seconds(p.stats) - cd0) < 0.000001, "damage budget cannot force cooldown growth")
+		_eq(_upgrade_snapshot(p.stats.scaling_stats), scaling0, "damage budget cannot force coefficient growth")
+	# 单个 no-op 插在 positive steps 中，不能被累计预算或取整强制 +1。
+	wg._upgrade_priors[fam.type][1].damage = [1.0]
+	wg.rng.seed = 3
+	plan = wg._upgrade_plan(fam.type, [0, 1, 2, 3], st, [])
+	var mixed = wg._deep_interp(fam, base, [0, 1, 2, 3], 100.0)
+	_eq(mixed.size(), 4, "mixed solve returns all tiers")
+	if mixed.size() != 4:
+		return
+	var held = 0
+	for i in range(1, 4):
+		if not plan[i].damage_up:
+			_eq(int(mixed[i].stats.damage), int(mixed[i - 1].stats.damage), "unsampled damage step stays flat among positive steps")
+			held += 1
+	_check(held > 0, "mixed upgrade plan actually includes a damage no-op")
+
+
+# Resource 身份 / instance_id 不能用于确定性比较；递归比较存储属性及 metadata。
+func _upgrade_snapshot(value) -> String:
+	if value is Array:
+		var parts = []
+		for x in value:
+			parts.push_back(_upgrade_snapshot(x))
+		return "[" + PoolStringArray(parts).join(",") + "]"
+	if value is Dictionary:
+		var keys = value.keys()
+		keys.sort()
+		var parts = []
+		for key in keys:
+			parts.push_back(var2str(key) + ":" + _upgrade_snapshot(value[key]))
+		return "{" + PoolStringArray(parts).join(",") + "}"
+	if value is Resource:
+		if value is Texture or value is Script:
+			return value.resource_path
+		var stored = {}
+		for prop in value.get_property_list():
+			if int(prop.usage) & PROPERTY_USAGE_STORAGE and not prop.name in ["resource_path", "resource_name", "resource_local_to_scene"]:
+				stored[prop.name] = value.get(prop.name)
+		var metadata = {}
+		for key in value.get_meta_list():
+			metadata[key] = value.get_meta(key)
+		stored["_metadata"] = metadata
+		return _upgrade_snapshot(stored)
+	return var2str(value)
+
+
+func test_170_upgrade_seed_determinism_and_distribution() -> void:
+	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
+	var natives = m.native_only(isvc.weapons)
+	var cfg = _upgrade_cfg()
+	var wg = WG.new(cfg, 11)
+	if not _upgrade_api(wg):
+		return
+	var first = wg.generate(natives)
+	var snapshot = _upgrade_snapshot(first)
+	_eq(_upgrade_snapshot(wg.generate(natives)), snapshot, "same instance / seed regenerates identical complete output")
+	var same = WG.new(cfg, 11)
+	_eq(_upgrade_snapshot(same.generate(natives)), snapshot, "fresh instance / same seed has identical stats, effects, prices and metadata")
+	var distributions = {}
+	var flat_damage = 0
+	var raised_damage = 0
+	for sd in UPGRADE_AUDIT_SEEDS:
+		var other = WG.new(cfg, sd)
+		var out = other.generate(natives)
+		var acc = {}
+		for f in other.fam_names:
+			var fam = other.families[f]
+			for tier in range(3):
+				if not fam.tiers.has(tier) or not fam.tiers.has(tier + 1):
+					continue
+				var a = out.get(fam.tiers[tier].my_id)
+				var b = out.get(fam.tiers[tier + 1].my_id)
+				if a == null or b == null:
+					continue
+				_upgrade_record_stats(acc, fam.type, tier, a.stats, b.stats)
+				flat_damage += 1 if int(a.stats.damage) == int(b.stats.damage) else 0
+				raised_damage += 1 if int(b.stats.damage) > int(a.stats.damage) else 0
+		distributions[_upgrade_snapshot(acc)] = true
+	_check(distributions.size() > 1, "different seeds yield different adjacent improvement distributions, not just different bases")
+	_check(flat_damage > 0, "real generation has a chance of flat adjacent damage")
+	_check(raised_damage > 0, "real generation also has positive adjacent damage upgrades")
+
+
+func _upgrade_record(acc: Dictionary, key: String, before: float, after: float, lower_better := false) -> void:
+	if not acc.has(key):
+		acc[key] = {"n": 0, "up": 0, "flat": 0, "down": 0}
+	var row = acc[key]
+	row.n += 1
+	var delta = (before - after) if lower_better else (after - before)
+	if delta > 0.000001:
+		row.up += 1
+	elif delta < -0.000001:
+		row.down += 1
+	else:
+		row.flat += 1
+
+
+func _upgrade_stat_sample(acc: Dictionary, ty: int, tier: int, field: String, before: float, after: float) -> void:
+	_upgrade_record(acc, field, before, after, field == "cooldown")
+	_upgrade_record(acc, "%d/%d/%s" % [ty, tier, field], before, after, field == "cooldown")
+
+
+func _upgrade_record_stats(acc: Dictionary, ty: int, tier: int, a, b) -> void:
+	var WV = load(MOD_DIR + "aa/weapon_value.gd")
+	if float(a.damage) > 0:
+		_upgrade_stat_sample(acc, ty, tier, "damage", float(a.damage), float(b.damage))
+	_upgrade_stat_sample(acc, ty, tier, "cooldown", WV.cooldown_seconds(a), WV.cooldown_seconds(b))
+	for i in a.scaling_stats.size():
+		var sc = a.scaling_stats[i]
+		if float(sc[1]) <= 0:
+			continue
+		for next in b.scaling_stats:
+			if next[0] == sc[0]:
+				_upgrade_stat_sample(acc, ty, tier, "main" if i == 0 else "secondary", float(sc[1]), float(next[1]))
+				break
+	for field in ["crit_chance", "crit_damage", "knockback"]:
+		_upgrade_stat_sample(acc, ty, tier, field, float(a.get(field)), float(b.get(field)))
+	_upgrade_stat_sample(acc, ty, tier, "range", float(a.max_range), float(b.max_range))
+	if float(a.lifesteal) > 0:
+		_upgrade_stat_sample(acc, ty, tier, "lifesteal", float(a.lifesteal), float(b.lifesteal))
+	if ty == 1:
+		_upgrade_stat_sample(acc, ty, tier, "nb_projectiles", float(a.nb_projectiles), float(b.nb_projectiles))
+		for field in ["piercing", "bounce"]:
+			if int(a.get(field)) > 0:
+				_upgrade_stat_sample(acc, ty, tier, field, float(a.get(field)), float(b.get(field)))
+
+
+func _upgrade_rate(acc: Dictionary, field: String) -> String:
+	if not acc.has(field) or int(acc[field].n) == 0:
+		return "n=0"
+	var row = acc[field]
+	return "n=%d up=%.2f%% flat=%.2f%% down=%.2f%%" % [row.n, 100.0 * row.up / row.n, 100.0 * row.flat / row.n, 100.0 * row.down / row.n]
+
+
+func _upgrade_merge(target: Dictionary, source: Dictionary) -> void:
+	for key in source:
+		if not target.has(key):
+			target[key] = {"n": 0, "up": 0, "flat": 0, "down": 0}
+		for field in ["n", "up", "flat", "down"]:
+			target[key][field] += source[key][field]
+
+
+# 效果价值是边际 value(st,[effect],tier)-value(st,[],tier)，覆盖 power 建模的效果。
+# fixed 两边都用低档面板与低档 tier；actual 两边各用真实升级的面板和 tier，单列而不混入 prior ratio。
+func _upgrade_record_effects(wg, WV, WG, ratios: Dictionary, tier: int, a, b) -> void:
+	var used = []
+	for e in a.effects:
+		var key = WV.effect_key(e)
+		if key in WG.NO_STRENGTHEN_KEYS or key.begins_with("structure:"):
+			continue
+		for i in b.effects.size():
+			var q = b.effects[i]
+			if i in used or WV.effect_key(q) != key:
+				continue
+			used.push_back(i)
+			var label = "%s/T%d" % [key, tier + 1]
+			if not ratios.has(label):
+				ratios[label] = {"fixed": [], "actual": [], "skipped": 0}
+			var row = ratios[label]
+			var v0 = wg.wv.value(a.stats, [e], tier) - wg.wv.value(a.stats, [], tier)
+			var fixed = wg.wv.value(a.stats, [q], tier) - wg.wv.value(a.stats, [], tier)
+			var actual = wg.wv.value(b.stats, [q], tier + 1) - wg.wv.value(b.stats, [], tier + 1)
+			if v0 > 0.000001 and fixed > 0 and actual > 0:
+				row.fixed.push_back(fixed / v0)
+				row.actual.push_back(actual / v0)
+			else:
+				row.skipped += 1
+			break
+
+
+func _upgrade_ratio_summary(values: Array) -> String:
+	if values.empty():
+		return "n=0"
+	var sorted = values.duplicate()
+	sorted.sort()
+	var sum_value = 0.0
+	var up = 0
+	for x in sorted:
+		sum_value += x
+		up += 1 if float(x) > 1.000001 else 0
+	return "n=%d up=%.2f%% mean=%.4f p10=%.4f median=%.4f p90=%.4f" % [sorted.size(), 100.0 * up / sorted.size(), sum_value / sorted.size(), sorted[sorted.size() / 10], _median(sorted), sorted[sorted.size() * 9 / 10]]
+
+
+# 精确独立入口：AA_AUDIT=1 AA_ONLY=test_171_audit_native_adjacent_upgrades
+# 不打印全武器表；原版只计一次，生成计五种子，缺档家族不跨级比较，aa_low_of 不参与。
+func test_171_audit_native_adjacent_upgrades() -> void:
+	if OS.get_environment("AA_AUDIT") == "":
+		return
+	var WV = load(MOD_DIR + "aa/weapon_value.gd")
+	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
+	var natives = m.native_only(isvc.weapons)
+	var cfg = _upgrade_cfg()
+	cfg.w_item_effects = true
+	var native_rates = {}
+	var generated_rates = {}
+	var native_fx = {}
+	var generated_fx = {}
+	for sd in UPGRADE_AUDIT_SEEDS:
+		var g = Generator.new(cfg, sd)
+		g.generate(m.native_only(isvc.items), m.native_only(isvc.characters), [], [])
+		var wg = WG.new(cfg, sd, g)
+		if sd == UPGRADE_AUDIT_SEEDS[0]:
+			print("AUDIT adjacent generator=%s" % ("native-adjacent API" if wg.has_method("_upgrade_plan") else "legacy API (baseline only)"))
+		var out = wg.generate(natives)
+		var seed_rates = {}
+		for f in wg.fam_names:
+			var fam = wg.families[f]
+			for tier in range(3):
+				if not fam.tiers.has(tier) or not fam.tiers.has(tier + 1):
+					continue
+				var lo = fam.tiers[tier]
+				var hi = fam.tiers[tier + 1]
+				if lo.has_meta("aa_low_of") or hi.has_meta("aa_low_of"):
+					continue
+				if sd == UPGRADE_AUDIT_SEEDS[0]:
+					_upgrade_record_stats(native_rates, fam.type, tier, lo.stats, hi.stats)
+					_upgrade_record_effects(wg, WV, WG, native_fx, tier, lo, hi)
+				var a = out.get(lo.my_id)
+				var b = out.get(hi.my_id)
+				if a != null and b != null:
+					_upgrade_record_stats(seed_rates, fam.type, tier, a.stats, b.stats)
+					_upgrade_record_effects(wg, WV, WG, generated_fx, tier, a, b)
+		_upgrade_merge(generated_rates, seed_rates)
+		var summary = []
+		for field in UPGRADE_FIELDS:
+			summary.push_back(field + "{" + _upgrade_rate(seed_rates, field) + "}")
+		print("AUDIT adjacent seed=%d %s" % [sd, PoolStringArray(summary).join("; ")])
+	print("AUDIT adjacent pooled seeds=%s; conditional samples: positive same-key scaling, existing lifesteal, ranged projectiles/existing pierce/bounce; cooldown=average attack interval" % str(UPGRADE_AUDIT_SEEDS))
+	for field in UPGRADE_FIELDS:
+		print("AUDIT adjacent %s NATIVE{%s} GENERATED{%s}" % [field, _upgrade_rate(native_rates, field), _upgrade_rate(generated_rates, field)])
+	# 分层报告避免类型/档位的样本量变化把 pooled rate 伪装成 prior 不匹配。
+	for ty in [0, 1]:
+		for tier in range(3):
+			var summary = []
+			for field in UPGRADE_FIELDS:
+				var key = "%d/%d/%s" % [ty, tier, field]
+				summary.push_back("%s N{%s} G{%s}" % [field, _upgrade_rate(native_rates, key), _upgrade_rate(generated_rates, key)])
+			print("AUDIT adjacent type=%d T%d->T%d %s" % [ty, tier + 1, tier + 2, PoolStringArray(summary).join("; ")])
+	print("AUDIT effects fixed=identical lower panel + lower tier; actual=each native/generated upgrade's own panel + tier; nonpositive marginal values excluded, skips reported")
+	for pair in [["NATIVE", native_fx], ["GENERATED", generated_fx]]:
+		var fixed_all = []
+		var actual_all = []
+		var skipped = 0
+		var keys = pair[1].keys()
+		keys.sort()
+		for key in keys:
+			var row = pair[1][key]
+			fixed_all += row.fixed
+			actual_all += row.actual
+			skipped += row.skipped
+			print("AUDIT effects %s %s fixed{%s} actual{%s} skipped=%d" % [pair[0], key, _upgrade_ratio_summary(row.fixed), _upgrade_ratio_summary(row.actual), row.skipped])
+		print("AUDIT effects %s TOTAL fixed{%s} actual{%s} skipped=%d" % [pair[0], _upgrade_ratio_summary(fixed_all), _upgrade_ratio_summary(actual_all), skipped])
+
+
+func _count_below(a: Array, x: float) -> int:
+	var n = 0
+	for v in a:
+		n += 1 if v < x else 0
+	return n

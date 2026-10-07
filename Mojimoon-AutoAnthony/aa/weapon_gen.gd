@@ -312,7 +312,9 @@ func _no_inversion(out: Dictionary) -> void:
 			var p = out[id]
 			if prev != null:
 				var before = wv.value(p.stats, p.effects, t)
-				p.effects = _strengthen_effects(p.effects, prev.effects)
+				# 深度重组按原版概率升级效果（允许持平）
+				if str(cfg.get("weapon_mode", "effects")) != "deep":
+					p.effects = _strengthen_effects(p.effects, prev.effects)
 				var st = p.stats
 				st.damage = int(max(st.damage, prev.stats.damage))
 				var sc = []
@@ -638,7 +640,6 @@ var _shares: Dictionary = {}	# 类型 -> {稀有度: [加成部分 / 每次命�
 var _sec_coefs: Dictionary = {}	# 属性 -> [原版附加加成系数（最低一级）]
 var _crit_pool: Dictionary = {}	# 类型 -> {是否高暴击: [[暴击率, 暴伤]]}（原版非传奇武器，不含标枪模板）
 var _hi_crit_share: Dictionary = {}	# 类型 -> 原版高暴击武器的比例
-var _up_r: Array = [1.0, 1.25, 1.5, 2.0]	# 原版 4 级家族逐级基础伤害相对最低一级的倍率（中位数）
 # 最低一级每套构成随机组合的个数（审计时改）
 var deep_tries := DEEP_TRIES
 var _sets: Dictionary = {}		# set my_id -> SetData
@@ -721,15 +722,6 @@ func _collect_deep_priors() -> void:
 	for ty in _crit_pool:
 		var n = _crit_pool[ty][true].size() + _crit_pool[ty][false].size()
 		_hi_crit_share[ty] = float(_crit_pool[ty][true].size()) / max(1, n)
-	var rs = [[], [], [], []]
-	for f in fam_names:
-		var tw = families[f].tiers
-		if tw.size() == 4 and not tw[0].has_meta("aa_low_of") and int(tw[0].stats.damage) > 0:
-			for t in 4:
-				rs[t].push_back(float(tw[t].stats.damage) / float(tw[0].stats.damage))
-	if not rs[3].empty():
-		for t in 4:
-			_up_r[t] = _median_of(rs[t])
 	_effectful = []
 	var n_all = 0
 	var n1 = 0
@@ -827,6 +819,7 @@ func _pick_scaling_stats(ty: int) -> Array:
 
 func generate_deep() -> Dictionary:
 	_collect_deep_priors()
+	_collect_upgrade_priors()
 	_sample_prices()
 	var out = {}
 	var fam_sets = {}
@@ -1100,141 +1093,311 @@ func _deep_candidate(fam: Dictionary, tw, tier: int, want: float, stats: Array, 
 	}
 
 
-# 更高稀有度：由最低一级估出最高一级——价格按价格阶梯、效果价值按它在最低一级总价值中的占比（至多放大 FX_TOP_CAP 倍，不低于逐级各强一步），
-# 伤害、加成系数、（高暴击武器的）暴击按同一个增长量 g 放大，使最高一级价值达标；
-# 中间各级按原版逐级的伤害比例（_up_r）插值。攻速每级略快；射程：远程每级 +50，射程大的近战每级 +25；
-# 吸血每级 +5%；弹跳每级 +1、贯穿到最高一级共 +1（原本有的才加），投射物数不变。各级按实际价值重新定价
+# 更高稀有度：逐级按原版相邻两级的变化抽样（_collect_upgrade_priors）。基础伤害、加成系数、攻速、暴击、射程、击退、
+# 吸血、投射物 / 贯穿 / 弹跳、各条效果各自从原版同类型、同起始稀有度的样本里独立抽取，样本包含"不变"，所以每项都是一定概率提升。
+# 抽到的基础伤害与效果的增量统一乘系数 k（K_RANGE 内），使最高一级价值接近价格阶梯的目标；攻速、加成等其余属性不随 k 变。
+# 伤害不另设上限。最高一级价值偏离目标超过 UPGRADE_OK 时重抽升级方案，至多 UPGRADE_TRIES 次，取最接近的。各级按实际价值重新定价
+const UPGRADE_TRIES = 4
+const UPGRADE_OK = 0.95
+const K_RANGE = [0.0, 2.0]
+var _upgrade_priors: Dictionary = {}	# 类型 -> {起始稀有度: {属性: [原版相邻两级的比值（伤害 / 冷却 / 加成）或增量（其余）]}}
+var _effect_upgrades: Dictionary = {}	# 效果 key（"*" 为全部）-> {起始稀有度: [原版同 key 效果相邻两级的数值比]}
+
+
 func _deep_interp(fam: Dictionary, base: Dictionary, tiers: Array, mult: float) -> Array:
-	var lo: int = tiers[0]
+	if tiers.size() < 2:
+		return [base]
 	var top: int = tiers[-1]
 	var st0 = base.stats
 	var e0: Array = base.effects
-	var v0 = wv.value(st0, e0, lo)
-	var share = clamp((v0 - wv.value(st0, [], lo)) / max(1.0, v0), 0.0, 1.0)
 	var want_top = _want(fam.tiers[top], true) * mult
-	var P = {}
-	for t in tiers:
-		P[t] = (float(_up_r[t]) - float(_up_r[lo])) / max(0.01, float(_up_r[top]) - float(_up_r[lo]))
-	var cd_step = rng.randf_range(CD_STEP[0], CD_STEP[1])
-	var dmg_cap = DMG_TOP_SCALE * float(_up_r[top]) / float(_up_r[lo])
-	var g = 0.0
-	var f = 1.0
-	var chain = _fx_chain(e0, tiers, P, f)
-	for _round in 2:
-		g = _solve_g(st0, lo, top, P[top], cd_step, dmg_cap, chain[top], want_top)
-		if e0.empty():
+	var best = null
+	var best_err = INF
+	var best_k = 1.0
+	for _try in UPGRADE_TRIES:
+		var plan = _upgrade_plan(fam.type, tiers, st0, e0)
+		var k = _solve_k(plan, tiers, st0, e0, want_top)
+		var chain = _upgrade_chain(plan, tiers, st0, e0, k)
+		var v = wv.value(chain[top].stats, chain[top].effects, top)
+		var err = abs(log(max(0.01, v) / max(0.01, want_top)))
+		if err < best_err:
+			best_err = err
+			best = chain
+			best_k = k
+		# 只因价值不足重抽（价值超出时按价值提价）：因超出也重抽会偏向不涨攻速 / 加成的方案
+		if v >= want_top * UPGRADE_OK:
 			break
-		var st_top = _interp_stats(st0, lo, top, P[top], g, cd_step, dmg_cap)
-		var base_v = wv.value(st_top, [], top)
-		var target = share * want_top
-		var f_lo = 1.0
-		var f_hi = FX_TOP_CAP
-		for _i in 10:
-			var mid = (f_lo + f_hi) / 2.0
-			if wv.value(st_top, _fx_chain(e0, tiers, P, mid)[top], top) - base_v <= target:
-				f_lo = mid
-			else:
-				f_hi = mid
-		f = f_lo
-		chain = _fx_chain(e0, tiers, P, f)
-	g = _solve_g(st0, lo, top, P[top], cd_step, dmg_cap, chain[top], want_top)
 	var res = [base]
 	var prev = base
 	for i in range(1, tiers.size()):
 		var t: int = tiers[i]
-		var st = _interp_stats(st0, lo, t, P[t], g, cd_step, dmg_cap)
-		var effects: Array = chain[t]
-		var names = []
-		for x in st.scaling_stats:
-			names.push_back(WeaponValue.stat_name(x[0]))
-		st.damage = int(max(max(int(st.damage), int(prev.stats.damage) + 1), ceil(_base_min(st, names, effects, t))))
+		var st = best[t].stats
+		var effects: Array = best[t].effects
 		var got = wv.value(st, effects, t)
 		var excess = _downside_excess(_want(fam.tiers[t], true) * mult, effects)
 		var price = _price_of(fam.tiers[t])
 		if not _is_brick(fam):
 			var vp = float(_vp.get(str(fam.type) + "/" + str(t), 1.0))
-			# 伤害 / 加成成长受限、价值达不到价格阶梯时不降价（同价格下比原先弱一些）
+			# 价值达不到价格阶梯时不降价（同价格下比原先弱一些）
 			price = max(max(float(prev.price) + 1.0, price), (got + excess) / max(0.01, vp * mult))
-		prev = {"effects": effects, "stats": st, "donor": base.donor, "scale": g, "want": got, "capped": excess > 0, "price": int(round(price))}
+		prev = {"effects": effects, "stats": st, "donor": base.donor, "scale": best_k, "want": got, "capped": excess > 0, "price": int(round(price))}
 		res.push_back(prev)
 	return res
 
 
-# 加成系数、暴击率的相对增长 = 伤害相对增长 × 此值（原版升级主要加伤害，系数与暴击涨得慢）
-const COEF_G = 0.25
-const CRIT_G = 0.5
-# 效果从最低一级到最高一级至多放大的倍数（原版效果逐级增长不多：爆炸 25%→40%、点燃 3→8）；暴击率每级至多 +10%
-const FX_TOP_CAP = 4.0
-# 加成系数从最低一级到最高一级至多放大的倍数（原版主加成大多不变，最多约 ×1.5（左轮）；附加加成最多 ×2.5（镰刀收获））
-const MAIN_TOP_GROWTH = 1.25
-const SEC_TOP_GROWTH = 2.0
-# 基础伤害从最低一级到最高一级至多放大到原版逐级伤害倍数（_up_r，中位数约 ×3）的这一比例
-const DMG_TOP_SCALE = 0.85
-# 冷却每级乘以此范围内的随机值（攻速每级略快）
-const CD_STEP = [0.9, 0.95]
-const CRIT_STEP_CAP = 0.1
+func _collect_upgrade_priors() -> void:
+	_upgrade_priors = {0: {}, 1: {}}
+	_effect_upgrades = {}
+	for f in fam_names:
+		var fam = families[f]
+		for t in fam.tiers:
+			if not fam.tiers.has(t + 1):
+				continue
+			var a = fam.tiers[t]
+			var b = fam.tiers[t + 1]
+			if a.has_meta("aa_low_of") or b.has_meta("aa_low_of") or a.stats == null or b.stats == null:
+				continue
+			_record_upgrade(int(fam.type), t, a, b)
+	for ty in _upgrade_priors:
+		for t in _upgrade_priors[ty]:
+			for field in _upgrade_priors[ty][t]:
+				_upgrade_priors[ty][t][field].sort()
+	for key in _effect_upgrades:
+		for t in _effect_upgrades[key]:
+			_effect_upgrades[key][t].sort()
 
 
-func _interp_stats(st0, lo: int, t: int, p: float, g: float, cd_step: float, dmg_cap: float):
-	var st = st0.duplicate()
-	var d = t - lo
-	st.damage = int(max(1, round(float(st0.damage) * (1.0 + min(g, dmg_cap - 1.0) * p))))
-	# 先定冷却：加成上限按这一级是否慢速（升级变快后不再按慢速放宽）
-	st.cooldown = int(max(WeaponValue.MIN_CD_FRAMES, round(float(st0.cooldown) * pow(cd_step, d))))
-	var sc = []
-	for i in st0.scaling_stats.size():
-		var x = st0.scaling_stats[i]
-		var c = float(x[1])
-		if c > 0:
-			var cap = INF
-			if i > 0:
-				cap = SEC_COEF_CAP
-			else:
-				cap = SLOW_COEF_CAP if is_slow(st) else MAIN_COEF_CAP
-			cap *= WeaponValue.stat_ref("stat_melee_damage") / WeaponValue.stat_ref(WeaponValue.stat_name(x[0]))
-			cap = min(cap, float(x[1]) * (SEC_TOP_GROWTH if i > 0 else MAIN_TOP_GROWTH))
-			c = max(c, min(cap, stepify(c * (1.0 + COEF_G * g * p), 0.05)))
-		sc.push_back([x[0], c])
-	st.scaling_stats = sc
-	if is_high_crit(st0):
-		st.crit_chance = min(min(1.0, float(st0.crit_chance) + CRIT_STEP_CAP * d), stepify(float(st0.crit_chance) * (1.0 + CRIT_G * g * p), 0.01))
-	if WeaponValue.is_melee(st0):
-		if int(st0.max_range) >= 200:
-			st.max_range = int(st0.max_range) + 25 * d
-	else:
-		st.max_range = int(st0.max_range) + 50 * d
-		if int(st0.bounce) > 0:
-			st.bounce = int(st0.bounce) + d
-		if int(st0.piercing) > 0 and int(st0.piercing) < 50:
-			st.piercing = int(st0.piercing) + int(round(p))
-	if float(st0.lifesteal) > 0:
-		st.lifesteal = float(st0.lifesteal) + 0.05 * d
-	return st
+func _record_upgrade(ty: int, t: int, a, b) -> void:
+	if not _upgrade_priors.has(ty):
+		_upgrade_priors[ty] = {}
+	if not _upgrade_priors[ty].has(t):
+		_upgrade_priors[ty][t] = {}
+	var row = _upgrade_priors[ty][t]
+	var sa = a.stats
+	var sb = b.stats
+	if float(sa.damage) > 0:
+		_add_sample(row, "damage", max(1.0, float(sb.damage) / float(sa.damage)))
+	_add_sample(row, "cooldown", clamp(WeaponValue.cooldown_seconds(sb) / WeaponValue.cooldown_seconds(sa), 0.01, 1.0))
+	for i in sa.scaling_stats.size():
+		var x = sa.scaling_stats[i]
+		if float(x[1]) <= 0:
+			continue
+		for y in sb.scaling_stats:
+			if y[0] == x[0]:
+				_add_sample(row, "main" if i == 0 else "secondary", max(1.0, float(y[1]) / float(x[1])))
+				break
+	for field in ["crit_chance", "crit_damage", "knockback"]:
+		_add_sample(row, field, max(0.0, float(sb.get(field)) - float(sa.get(field))))
+	_add_sample(row, "range", max(0.0, float(sb.max_range) - float(sa.max_range)))
+	if float(sa.lifesteal) > 0:
+		_add_sample(row, "lifesteal", max(0.0, float(sb.lifesteal) - float(sa.lifesteal)))
+	if ty == 1:
+		if int(sa.nb_projectiles) > 1:
+			_add_sample(row, "nb_projectiles", max(0.0, float(sb.nb_projectiles) - float(sa.nb_projectiles)))
+		for field in ["piercing", "bounce"]:
+			if int(sa.get(field)) > 0:
+				_add_sample(row, field, max(0.0, float(sb.get(field)) - float(sa.get(field))))
+	var used = []
+	for e in a.effects:
+		var key = WeaponValue.effect_key(e)
+		if key in NO_STRENGTHEN_KEYS or key.begins_with("structure:"):
+			continue
+		for q in b.effects:
+			if q in used or WeaponValue.effect_key(q) != key:
+				continue
+			used.push_back(q)
+			var r = _fx_ratio(e, q)
+			if r > 0:
+				for k in [key, "*"]:
+					if not _effect_upgrades.has(k):
+						_effect_upgrades[k] = {}
+					_add_sample(_effect_upgrades[k], t, max(1.0, r))
+			break
 
 
-func _solve_g(st0, lo: int, top: int, p: float, cd_step: float, dmg_cap: float, effects: Array, want: float) -> float:
-	if wv.value(_interp_stats(st0, lo, top, p, 0.0, cd_step, dmg_cap), effects, top) >= want:
+static func _add_sample(row: Dictionary, field, x: float) -> void:
+	if not row.has(field):
+		row[field] = []
+	row[field].push_back(x)
+
+
+# 同 key 效果相邻两级的数值比（与 _scale_effects 缩放的量一致）；无法比较时为 0
+static func _fx_ratio(e, q) -> float:
+	match WeaponValue.effect_id(e):
+		"weapon_exploding":
+			return float(q.chance) / float(e.chance) if float(e.chance) > 0 else 0.0
+		"weapon_burning":
+			if e.burning_data == null or q.burning_data == null or int(e.burning_data.damage) <= 0:
+				return 0.0
+			return float(q.burning_data.damage) / float(e.burning_data.damage)
+		"weapon_projectiles_on_hit":
+			return float(q.value) / float(e.value) if int(e.value) > 0 else 0.0
+	if not "value" in e:
 		return 0.0
-	var g_lo = 0.0
-	var g_hi = 50.0
-	for _i in 20:
-		var mid = (g_lo + g_hi) / 2.0
-		if wv.value(_interp_stats(st0, lo, top, p, mid, cd_step, dmg_cap), effects, top) <= want:
-			g_lo = mid
-		else:
-			g_hi = mid
-	return g_lo
+	var m0 = WeaponValue.magnitude(e)
+	return WeaponValue.magnitude(q) / m0 if m0 > 0 else 0.0
 
 
-# 各级效果：最低一级的效果按 1 + (f - 1) × P 放大，且比低一级强一步以上
-func _fx_chain(e0: Array, tiers: Array, P: Dictionary, f: float) -> Dictionary:
-	var out = {tiers[0]: e0}
-	var prev = e0
+# 原版样本：同类型、起始稀有度最接近的
+func _prior(ty: int, tier: int, field) -> Array:
+	var by: Dictionary = _upgrade_priors.get(ty, {})
+	var best = null
+	for t in by:
+		if by[t].has(field) and not by[t][field].empty() and (best == null or abs(t - tier) < abs(best - tier)):
+			best = t
+	return [] if best == null else by[best][field]
+
+
+# 每个家族每项属性一个分位数 _u[field]（各级共用）：与原版一样，涨的家族每级都涨、不涨的一直不涨，
+# 而不是每级独立抽（那样"至少有一级提升"的家族会比原版多得多）
+var _u: Dictionary = {}
+
+
+func _draw(ty: int, tier: int, field, neutral: float) -> float:
+	var arr = _prior(ty, tier, field)
+	if arr.empty():
+		return neutral
+	if not _u.has(field):
+		_u[field] = rng.randf()
+	return float(arr[min(arr.size() - 1, int(_u[field] * arr.size()))])
+
+
+# 一级升级（tier -> 下一级）：除基础伤害外的属性按抽到的样本改好；基础伤害只返回抽到的比值
+func _upgrade_stats(ty: int, tier: int, st) -> Dictionary:
+	var s = st.duplicate()
+	var r_cd = _draw(ty, tier, "cooldown", 1.0)
+	if r_cd < 1.0:
+		s.cooldown = _cooldown_for(st, WeaponValue.cooldown_seconds(st) * r_cd)
+	var sc = []
+	for i in st.scaling_stats.size():
+		var x = st.scaling_stats[i]
+		var c = float(x[1])
+		var r = _draw(ty, tier, "main" if i == 0 else "secondary", 1.0)
+		if c > 0 and r > 1.0:
+			var cap = SEC_COEF_CAP if i > 0 else (SLOW_COEF_CAP if is_slow(s) else MAIN_COEF_CAP)
+			cap *= WeaponValue.stat_ref("stat_melee_damage") / WeaponValue.stat_ref(WeaponValue.stat_name(x[0]))
+			c = max(c, min(cap, stepify(c * r, 0.05)))
+		sc.push_back([x[0], c])
+	s.scaling_stats = sc
+	# 暴击率为 0 的（标枪模板等）不加暴击
+	if float(st.crit_chance) > 0:
+		s.crit_chance = min(1.0, float(st.crit_chance) + _draw(ty, tier, "crit_chance", 0.0))
+		s.crit_damage = float(st.crit_damage) + _draw(ty, tier, "crit_damage", 0.0)
+	s.knockback = int(st.knockback) + int(round(_draw(ty, tier, "knockback", 0.0)))
+	s.max_range = int(st.max_range) + int(round(_draw(ty, tier, "range", 0.0)))
+	if float(st.lifesteal) > 0:
+		s.lifesteal = float(st.lifesteal) + _draw(ty, tier, "lifesteal", 0.0)
+	if ty == 1:
+		if int(st.nb_projectiles) > 1:
+			s.nb_projectiles = int(st.nb_projectiles) + int(round(_draw(ty, tier, "nb_projectiles", 0.0)))
+		if int(st.piercing) > 0 and int(st.piercing) < 50:
+			s.piercing = int(st.piercing) + int(round(_draw(ty, tier, "piercing", 0.0)))
+		if int(st.bounce) > 0:
+			s.bounce = int(st.bounce) + int(round(_draw(ty, tier, "bounce", 0.0)))
+	return {"stats": s, "damage_r": _draw(ty, tier, "damage", 1.0)}
+
+
+# 实际攻击间隔（含换弹等）不超过 secs 的最大冷却帧数
+static func _cooldown_for(st, secs: float) -> int:
+	var probe = st.duplicate()
+	var f = int(st.cooldown)
+	while f > WeaponValue.MIN_CD_FRAMES:
+		probe.cooldown = f
+		if WeaponValue.cooldown_seconds(probe) <= secs + 0.000001:
+			break
+		f -= 1
+	return f
+
+
+func _upgrade_effects(effects: Array, tier: int) -> Array:
+	var out = []
+	for e in effects:
+		var by: Dictionary = _effect_upgrades.get(WeaponValue.effect_key(e), {})
+		if by.empty():
+			by = _effect_upgrades.get("*", {})
+		var best = null
+		for t in by:
+			if best == null or abs(t - tier) < abs(best - tier):
+				best = t
+		var arr = [] if best == null else by[best]
+		var u_key = "fx%d" % out.size()
+		if not _u.has(u_key):
+			_u[u_key] = rng.randf()
+		out.push_back(1.0 if arr.empty() else float(arr[min(arr.size() - 1, int(_u[u_key] * arr.size()))]))
+	return out
+
+
+# 逐级抽样：{稀有度: {stats（k = 1 时）, damage_up, damage_r, damage_max（原版单级最大倍率）, damage_weight（累计伤害增量）, fx_r（各效果的数值比）}}
+func _upgrade_plan(ty: int, tiers: Array, st, effects: Array) -> Dictionary:
+	var ones = []
+	for _e in effects:
+		ones.push_back(1.0)
+	var plan = {tiers[0]: {"stats": st, "damage_up": false, "damage_r": 1.0, "damage_weight": 0.0, "fx_r": ones}}
+	_u = {}
+	var cur = st
+	var w = 0.0
+	for i in range(1, tiers.size()):
+		var step = _upgrade_stats(ty, tiers[i - 1], cur)
+		var r = float(step.damage_r)
+		var up = r > 1.000001
+		if up:
+			w += r - 1.0
+			step.stats.damage = int(max(int(cur.damage) + 1, round(float(cur.damage) * r)))
+		var dmg_prior = _prior(ty, tiers[i - 1], "damage")
+		var r_max = float(dmg_prior[-1]) if not dmg_prior.empty() else r
+		plan[tiers[i]] = {"stats": step.stats, "damage_up": up, "damage_r": r, "damage_max": max(r, r_max), "damage_weight": w, "fx_r": _upgrade_effects(effects, tiers[i - 1])}
+		cur = step.stats
+	return plan
+
+
+# 按系数 k 放大抽到的基础伤害与效果增量（相对最低一级累乘，避免逐级取整漂移）；没抽到提升的一级保持不变
+func _upgrade_chain(plan: Dictionary, tiers: Array, st0, e0: Array, k: float) -> Dictionary:
+	var out = {tiers[0]: {"stats": st0, "effects": e0}}
+	var dmg = float(st0.damage)
+	var prev_d = int(st0.damage)
+	var fx_f = []
+	for _e in e0:
+		fx_f.push_back(1.0)
 	for i in range(1, tiers.size()):
 		var t = tiers[i]
-		prev = _strengthen_effects(_scale_effects(e0, 1.0 + (f - 1.0) * P[t]), prev)
-		out[t] = prev
+		var p = plan[t]
+		var st = p.stats.duplicate()
+		st.damage = prev_d
+		if p.damage_up:
+			# 单级伤害倍率不超过原版同类型、同起始稀有度的最大值
+			dmg *= min(float(p.damage_max), 1.0 + k * (float(p.damage_r) - 1.0))
+			st.damage = int(max(prev_d + 1, round(dmg)))
+		var effects = []
+		for j in e0.size():
+			fx_f[j] *= 1.0 + k * (float(p.fx_r[j]) - 1.0)
+			effects.push_back(_scale_effects([e0[j]], fx_f[j])[0] if fx_f[j] > 1.000001 else e0[j])
+		var names = []
+		for x in st.scaling_stats:
+			names.push_back(WeaponValue.stat_name(x[0]))
+		st.damage = int(max(int(st.damage), ceil(_base_min(st, names, effects, t))))
+		prev_d = int(st.damage)
+		out[t] = {"stats": st, "effects": effects}
 	return out
+
+
+func _solve_k(plan: Dictionary, tiers: Array, st0, e0: Array, want: float) -> float:
+	var top = tiers[-1]
+	var k_lo = float(K_RANGE[0])
+	var k_hi = float(K_RANGE[1])
+	var c = _upgrade_chain(plan, tiers, st0, e0, k_lo)
+	if wv.value(c[top].stats, c[top].effects, top) >= want:
+		return k_lo
+	c = _upgrade_chain(plan, tiers, st0, e0, k_hi)
+	if wv.value(c[top].stats, c[top].effects, top) <= want:
+		return k_hi
+	for _i in 14:
+		var mid = (k_lo + k_hi) / 2.0
+		c = _upgrade_chain(plan, tiers, st0, e0, mid)
+		if wv.value(c[top].stats, c[top].effects, top) <= want:
+			k_lo = mid
+		else:
+			k_hi = mid
+	return k_lo
 
 
 func _base_min(st, stats: Array, effects: Array, tier: int) -> float:
