@@ -688,6 +688,9 @@ func _backup(res) -> void:
 
 
 func restore() -> void:
+	# 商店分档池按稀有度建好后不会自己更新：稀有度被改过（混沌）或补过低级武器时，还原后要重建，
+	# 否则之后不混沌的生成（关闭重组道具、返回角色选择、重新开始）会沿用混沌时的分档池（第 1 波刷出 T4 道具）
+	var repool = not _low_weapons.empty()
 	for id in _backups:
 		var b = _backups[id]
 		var res = b.res
@@ -700,6 +703,7 @@ func restore() -> void:
 		if b.has("stats"):
 			res.stats = b.stats
 			res.sets = b.sets
+			repool = repool or res.tier != b.w_tier
 			res.tier = b.w_tier
 			res.value = b.w_value
 		if b.has("tags"):
@@ -708,12 +712,15 @@ func restore() -> void:
 			res.tracking_text = b.tracking_text
 			res.max_nb = b.max_nb
 			res.replaced_by = b.replaced_by
+			repool = repool or res.tier != b.tier
 			res.tier = b.tier
 			res.icon = b.icon
 	_backups.clear()
 	_unregister_low_weapons()
+	var isvc = _autoload("ItemService")
+	if repool and isvc != null and isvc.has_method("init_unlocked_pool"):
+		isvc.init_unlocked_pool()
 	if _groups_backup != null:
-		var isvc = _autoload("ItemService")
 		if isvc != null:
 			isvc.item_groups = _groups_backup
 		_groups_backup = null

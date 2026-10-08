@@ -2671,3 +2671,27 @@ func test_166_reduction_items_limited() -> void:
 					_check(lim != 1 or p.unique, id + " limit 1 is unique")
 	print("AUDIT reduction lines %d" % n)
 	_check(n > 0, "reduction effects appear")
+
+
+# 混沌生成后改成不混沌（关闭重组道具 / 关闭混沌）再生成、撤销、重新开始：商店分档池必须与道具当前的稀有度一致
+# （反馈：关闭重组道具后第 1 波商店刷到 T4 夜视镜——之前混沌生成时重建的分档池没有随稀有度还原而重建）
+func test_172_tier_pool_follows_restored_tiers() -> void:
+	_setup_player("character_well_rounded")
+	for step in ["chaos", "items_off", "chaos", "menu_reset"]:
+		m.cfg_items = step != "items_off"
+		m.cfg_chaos = step == "chaos"
+		if step == "menu_reset":
+			m.on_menu_reset()
+		else:
+			m.start_new_run()
+		var bad = 0
+		for t in 4:
+			for it in isvc._tiers_data[t][isvc.TierData.ITEMS]:
+				if int(it.tier) != t:
+					bad += 1
+					if bad <= 3:
+						print("AUDIT stale pool after %s: %s tier %d in pool %d" % [step, it.my_id, it.tier, t])
+		_eq(bad, 0, "shop tier pools match item tiers after " + step)
+	m.cfg_items = true
+	m.cfg_chaos = false
+	m.on_menu_reset()
