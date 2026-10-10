@@ -742,14 +742,18 @@ func _register_translations() -> void:
 		var t = Translation.new()
 		t.locale = locale
 		translations[locale] = t
+	var en_col = locales.find("en") + 1 if "en" in locales else -1
 	for li in range(1, lines.size()):
 		var row = _parse_csv_line(lines[li].strip_edges())
 		if row.size() < 2 or row[0].strip_edges() == "":
 			continue
 		for i in range(1, header.size()):
 			var value = row[i].c_unescape() if i < row.size() else ""
+			# 缺少翻译：中文系回退到中文，其他语言回退到英文（没有英文时用第一列）
 			if value == "":
-				value = row[1].c_unescape()
+				var locale = locales[i - 1]
+				var fb = 1 if locale.begins_with("zh") or en_col < 0 or en_col >= row.size() or row[en_col] == "" else en_col
+				value = row[fb].c_unescape()
 			translations[locales[i - 1]].add_message(row[0].strip_edges(), value)
 	for locale in locales:
 		TranslationServer.add_translation(translations[locale])

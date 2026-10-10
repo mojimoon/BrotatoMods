@@ -890,3 +890,30 @@ func test_111_stat_names() -> void:
 	_eq(m.stat_name("gain_stat_lifesteal"), "%生命窃取修改", "gain modifier strips %")
 	_eq(m.stat_name("loot_alien_speed"), "%战利品外星人速度", "loot alien term")
 	TranslationServer.set_locale("en")
+
+
+func test_112_all_locales() -> void:
+	var f = File.new()
+	f.open(MOD_DIR + "translations/broeditor.csv", File.READ)
+	var keys = []
+	var first = true
+	while not f.eof_reached():
+		var line = f.get_line()
+		if first:
+			_eq(line.split(",").size(), 14, "13 languages + key")
+			first = false
+			continue
+		if line != "":
+			keys.push_back(line.split(",")[0])
+	f.close()
+	for loc in ["en", "fr", "zh", "ja", "ko", "zh_TW", "ru", "pl", "es", "pt", "de", "tr", "it"]:
+		TranslationServer.set_locale(loc)
+		var raw = []
+		for k in keys:
+			if TranslationServer.translate(k) == k:
+				raw.push_back(k)
+		_eq(raw, [], loc + ": every key translated")
+		var t = _path_line([["kill", {}], ["chance", {"pct": 20}], ["every", {"n": 3}], ["cap", {"n": 2}], ["hp_below", {"pct": 50}], ["temp_stat", {"stat": "stat_armor", "value": 1}]])
+		_check(t.find("BE_") < 0 and t.find("{") < 0 and t.find("20%") >= 0, loc + ": path text " + t)
+		_check(m.stat_name("gain_stat_max_hp").find("BE_") < 0, loc + ": gain stat name")
+	TranslationServer.set_locale("en")

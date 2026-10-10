@@ -1,425 +1,425 @@
-key,zh,en
-BE_BTN_OPEN,角色编辑器,
-BE_TITLE,BroEditor 角色编辑器,
-BE_IMPORT,导入,
-BE_EXPORT,导出,
-BE_IMPORTED,已导入分享码,
-BE_IMPORT_FAILED,剪贴板里没有可识别的分享码（原版角色的档案只能导入到原版角色）,
-BE_EXPORTED,分享码已复制到剪贴板,
-BE_EXPORT_NOTHING,当前角色没有任何修改，无需导出,
-BE_CHARACTERS,角色,
-BE_CHARACTERS_DESC,紫框 = 自定义角色，绿框 = 已修改的原版角色。,
-BE_SEARCH,搜索名称或 ID,
-BE_NEW_CUSTOM,新建自定义角色,
-BE_DELETE,删除,
-BE_DELETE_CONFIRM,确认删除？,
-BE_CUSTOM_CREATED,已新建自定义角色,
-BE_CUSTOM_DELETED,已删除自定义角色,
-BE_CUSTOM_IN_USE,存档中进行中的一局正在使用这个角色，结束那一局后才能删除,
-BE_NEW_CHARACTER,自定义土豆,
-BE_CUSTOM_TAG,自定义角色,
-BE_MODIFIED_TAG,已修改,
-BE_DISABLED_TAG,修改已停用,
-BE_ORIGINAL_TAG,原版,
-BE_BASE,基底：{0},
-BE_PROFILE_ENABLED,应用修改,
-BE_RESET,重置,
-BE_RESET_DONE,已恢复原版,
-BE_TAB_OVERVIEW,概览,
-BE_TAB_STATS,初始属性,
-BE_TAB_EFFECTS,效果,
-BE_TAB_GEAR,初始装备,
-BE_TAB_BANS,禁用,
-BE_SEC_BASIC,基本信息,
-BE_NAME,名称,
-BE_NAME_DESC,留空则使用原名。,
-BE_DESCRIPTION,介绍,
-BE_DESCRIPTION_DESC,显示在角色效果列表的第一行，不影响游戏。,
-BE_SEC_LOOK,外观,
-BE_PICK_BASE,选择基底角色,
-BE_PICK_ICON,选择图标,
-BE_LOOK_DESC,基底角色决定战斗中的外观；图标可以取任意角色或道具的图标（右下角会标上编号以便区分），也可以导入自己的图片。,
-BE_SEC_TAGS,偏好词条,
-BE_TAGS_DESC,商店有更高几率刷出带这些词条的道具。点击启用/禁用。,
-BE_SEC_PREVIEW,效果预览,
-BE_PREVIEW_WEAPONS,可选初始武器：,
-BE_PREVIEW_BANS,禁用：{0} 个道具、{1} 个武器系列,
-BE_PREVIEW_DISABLED,（修改已停用，游戏中使用原版角色）,
-BE_GRP_PRIMARY,基础属性,
-BE_GRP_SECONDARY,次要属性,
-BE_GRP_SHOP,商店与材料,
-BE_GRP_MAP,地图与敌人,
-BE_GRP_RULES,规则开关（填 1 开启）,
-BE_STATS_DESC,开局时额外获得的属性（与原有效果叠加）。0 = 不修改。,
-BE_STATS_CLEAR,全部清零,
-BE_SEC_EFFECTS,角色效果,
-BE_EFFECTS_DESC,角色的全部效果，从上到下显示。点“编辑”修改数值、属性或条件；▲▼ 调整顺序。,
-BE_EFFECTS_EMPTY,没有效果。从右侧蓝图或效果库添加。,
-BE_EFFECTS_ORIGINAL,恢复原版效果,
-BE_EFFECTS_CLEAR,清空,
-BE_EDIT,编辑,
-BE_EFFECT_ADDED,已添加效果,
-BE_EFFECT_MISSING,（无来源）,
-BE_EFFECT_NO_TEXT,（无描述：{0}）,
-BE_SRC_PLAIN,属性,
-BE_FIELD_TRIGGER,扳机,
-BE_FIELD_KEY,属性 / 键,
-BE_FIELD_VALUE,数值,
-BE_FIELD_CHANCE,几率,
-BE_FIELD_INTERVAL,间隔,
-BE_FIELD_STAT,属性,
-BE_FIELD_STAT_SCALED,按此属性,
-BE_FIELD_NB_STAT_SCALED,每多少点,
-BE_FIELD_STAT_NB,数量,
-BE_FIELD_PERM_STATS_ONLY,只计永久属性,
-BE_FIELD_STAT_DISPLAYED,显示属性,
-BE_FIELD_STAT_NAME,属性名,
-BE_FIELD_STAT_DISPLAYED_NAME,显示属性名,
-BE_FIELD_DURATION,持续时间,
-BE_FIELD_DURATION_SECS,持续秒数,
-BE_FIELD_COOLDOWN,冷却,
-BE_FIELD_MAX_STACKS,最大层数,
-BE_FIELD_MAX_PROCS,最多触发次数,
-BE_FIELD_HP_THRESHOLD,生命阈值,
-BE_FIELD_RESET_ON_HIT,受到伤害时重置,
-BE_FIELD_TO_STAT,转换为属性,
-BE_FIELD_TO_VALUE,转换数值,
-BE_FIELD_PCT_CONVERTED,转换比例,
-BE_FIELD_SCALING_STAT,缩放属性,
-BE_FIELD_DAMAGE,伤害,
-BE_FIELD_SCALE,缩放,
-BE_FIELD_SPREAD,散布,
-BE_FIELD_TRACKING_KEY,统计键,
-BE_FIELD_SET_ID,套装,
-BE_FIELD_WEAPON_TYPE,武器类型,
-BE_FIELD_MIN_VALUE,最小值,
-BE_FIELD_IS_SPAWNING,生成型,
-BE_FIELD_AUTO_TARGET_ENEMY,自动瞄准敌人,
-BE_FIELD_INVERT_SCALING,反向缩放,
-BE_FIELD_SCALE_WITH_MISSING_HEALTH,随已损失生命缩放,
-BE_FIELD_FOR_EVERY_HEALTH_PERCENT,每损失多少 % 生命,
-BE_FIELD_SET_CAP_TO_CURRENT_STAT,上限设为当前值,
-BE_FIELD_DOUBLE_CHANCE,翻倍几率,
-BE_FIELD_HEALTH_BOOST,生命加成,
-BE_ADD,添加,
-BE_SEC_LIBRARY,效果库,
-BE_LIBRARY_DESC,全部原版角色与道具的效果。点 + 添加到角色，再点“编辑”修改数值。,
-BE_LIBRARY_SEARCH,搜索效果文本、来源或键,
-BE_LIBRARY_COUNT,显示 {0} / {1},
-BE_CAT_ALL,全部,
-BE_CAT_STAT,属性,
-BE_CAT_TRIGGER,扳机 / 条件,
-BE_CAT_SCALING,属性联动,
-BE_CAT_COMBAT,战斗,
-BE_CAT_ECONOMY,经济 / 商店,
-BE_CAT_WEAPON,武器规则,
-BE_CAT_START,初始装备,
-BE_CAT_OTHER,其他,
-BE_TRIG_NONE,永久（无扳机）,
-BE_TRIG_LEVEL_UP,升级时,
-BE_TRIG_WAVE_END,敌袭结束时,
-BE_TRIG_NEXT_WAVE,下一波敌袭,
-BE_TRIG_STILL,站立不动时,
-BE_TRIG_MOVING,移动时,
-BE_TRIG_LOW_HP,生命值低于50%时,
-BE_TRIG_HIT,受到伤害时（直至敌袭结束）,
-BE_TRIG_DODGE,闪避时（直至敌袭结束）,
-BE_TRIG_INTERVAL,每隔一段时间（直至敌袭结束）,
-BE_TRIG_DECAY_HIT,受到伤害时（逐渐衰减）,
-BE_TRIG_DECAY_CONSUMABLE,捡起消耗品时（逐渐衰减）,
-BE_TRIG_CONSUMABLE_MAX,处于最大生命值时捡起消耗品（永久）,
-BE_TRIG_TEMP_CONSUMABLE_MAX,处于最大生命值时捡起消耗品（直至敌袭结束）,
-BE_TRIG_FRUIT,捡起水果时,
-BE_TRIG_REROLL,刷新商店时,
-BE_TRIG_STEPS,每前进一定步数,
-BE_TRIG_BURNING_KILL,杀死燃烧的敌人时,
-BE_SEC_START_WEAPONS,可选初始武器,
-BE_START_WEAPONS_DESC,开局在武器选择界面可以选的武器。,
-BE_START_WEAPONS_EMPTY,没有可选武器：自定义角色会以拳头开局。,
-BE_PICK_WEAPONS,选择武器,
-BE_RESTORE_ORIGINAL,恢复原版,
-BE_SEC_START_ITEMS,额外初始装备,
-BE_START_ITEMS_DESC,开局直接获得的道具 / 武器。勾选“诅咒”需要 Abyssal Terrors DLC。,
-BE_ADD_ITEMS,添加道具,
-BE_ADD_WEAPONS,添加武器,
-BE_COUNT,数量,
-BE_CURSED,诅咒,
-BE_BANS_DESC,被禁用的道具 / 武器不会出现在商店和箱子里（禁用一种武器会禁用其所有等级）。点击图标禁用 / 启用。,
-BE_BANS_CLEAR,清空,
-BE_BAN_ITEMS,禁用道具（{0}）,
-BE_BAN_WEAPONS,禁用武器系列（{0}）,
-BE_PICKER_START_WEAPONS,选择可选初始武器,
-BE_PICKER_START_ITEMS,添加初始道具,
-BE_PICKER_START_ITEMS_W,添加初始武器,
-BE_PICKER_BASE,选择基底角色,
-BE_PICKER_ICON,选择图标,
-BE_PICKER_MULTI_DESC,点击图标选中 / 取消，确认后生效。,
-BE_PICKER_SINGLE_DESC,点击图标即选中。,
-BE_PICKER_CLEAR,清空选择,
-BE_PICKER_COUNT,已选 {0},
-BE_CANCEL,取消,
-BE_CONFIRM,确认,
-BE_K_XP_GAIN,获得%经验,
-BE_K_PICKUP_RANGE,%拾取范围,
-BE_K_KNOCKBACK,击退,
-BE_K_CONSUMABLE_HEAL,消耗性治疗,
-BE_K_EXPLOSION_DAMAGE,%爆炸伤害,
-BE_K_EXPLOSION_SIZE,%爆炸范围,
-BE_K_PIERCING,贯通,
-BE_K_PIERCING_DAMAGE,%贯通伤害,
-BE_K_BOUNCE,反弹,
-BE_K_BOUNCE_DAMAGE,%反弹伤害,
-BE_K_PROJECTILES,投射物,
-BE_K_DAMAGE_AGAINST_BOSSES,%对头目伤害,
-BE_K_BURNING_SPREAD,燃烧蔓延,
-BE_K_BURNING_COOLDOWN_REDUCTION,%燃烧速度,
-BE_K_STRUCTURE_ATTACK_SPEED,%构筑物的攻击速度,
-BE_K_STRUCTURE_PERCENT_DAMAGE,%构筑物伤害,
-BE_K_STRUCTURE_RANGE,构筑物范围,
-BE_K_ACCURACY,%命中率,
-BE_K_HARVESTING_GROWTH,%收获成长,
-BE_K_WEAPON_SLOT,武器栏,
-BE_K_ITEMS_PRICE,%道具价格,
-BE_K_WEAPONS_PRICE,%武器价格,
-BE_K_REROLL_PRICE,%刷新价格,
-BE_K_FREE_REROLLS,免费刷新,
-BE_K_GOLD_DROPS,%材料掉落,
-BE_K_ENEMY_GOLD_DROPS,%敌人材料掉落,
-BE_K_NEUTRAL_GOLD_DROPS,%树木材料掉落,
-BE_K_CRATE_CHANCE,%树木掉落箱子几率,
-BE_K_LOOT_ALIEN_CHANCE,%战利品外星人几率,
-BE_K_RECYCLING_GAINS,%回收收益,
-BE_K_MAP_SIZE,%地图尺寸,
-BE_K_NUMBER_OF_ENEMIES,%敌人数量,
-BE_K_ENEMY_HEALTH,%敌人生命值,
-BE_K_ENEMY_DAMAGE,%敌人伤害,
-BE_K_ENEMY_SPEED,%敌人速度,
-BE_K_BOSS_STRENGTH,%头目强度,
-BE_K_TREES,树木,
-BE_K_TREES_START_WAVE,每波敌袭开始时的树木,
-BE_K_HP_START_WAVE,%敌袭开始时的生命值,
-BE_K_HP_START_NEXT_WAVE,%下一波敌袭开始时的生命值,
-BE_K_DODGE_CAP,闪避上限,
-BE_K_SPEED_CAP,速度上限,
-BE_K_HP_CAP,最大生命值上限,
-BE_K_CRIT_CHANCE_CAP,暴击率上限,
-BE_K_NO_MELEE_WEAPONS,禁止近战武器,
-BE_K_NO_RANGED_WEAPONS,禁止远程武器,
-BE_K_NO_DUPLICATE_WEAPONS,禁止重复武器,
-BE_K_MIN_WEAPON_TIER,最低武器稀有度,
-BE_K_MAX_WEAPON_TIER,最高武器稀有度,
-BE_K_MAX_MELEE_WEAPONS,近战武器上限,
-BE_K_MAX_RANGED_WEAPONS,远程武器上限,
-BE_K_CAN_ATTACK_WHILE_MOVING,移动时可攻击,
-BE_K_ONE_SHOT_TREES,一击砍倒树木,
-BE_K_DOUBLE_BOSS,同时出现两个头目,
-BE_K_STRUCTURES_CAN_CRIT,构筑物可以暴击,
-BE_K_INSTANT_GOLD_ATTRACTING,立即吸取材料,
-BE_K_HP_SHOP,用生命购买,
-BE_K_NO_HEAL,无法恢复生命值,
-BE_K_PACIFIST,和平主义者,
-BE_K_TORTURE,折磨,
-BE_K_CONSUMABLE,消耗品,
-BE_K_ECONOMY,经济,
-BE_K_EXPLORATION,探索,
-BE_K_EXPLOSIVE,爆炸,
-BE_K_LESS_ENEMIES,更少敌人,
-BE_K_LESS_ENEMY_SPEED,敌人更慢,
-BE_K_LOCK,锁定,
-BE_K_MORE_ENEMIES,更多敌人,
-BE_K_PET,宠物,
-BE_K_PICKUP,拾取,
-BE_K_STAND_STILL,静止,
-BE_K_STRUCTURE,构筑物,
-BE_K_STRUCTURE_REAL,构筑物（实体）,
-BE_TAB_BLUEPRINT,蓝图,
-BE_ADD_TRIGGER,+ 扳机,
-BE_ADD_COND,+ 条件,
-BE_ADD_EFFECT,+ 效果,
-BE_GRAPH_CLEAR,清空蓝图,
-BE_GRAPH_DESC,从扳机的右端口拖线到条件 / 效果的左端口连成路径；条件可以串联、分叉。点击节点右上角的 X 删除，Ctrl + 滚轮缩放。,
-BE_GRAPH_PATHS,路径预览,
-BE_GRAPH_EMPTY,还没有完整的路径（扳机 → … → 效果）。,
-BE_TYPE_TRIGGER,扳机,
-BE_TYPE_COND,条件,
-BE_TYPE_EFFECT,效果,
-BE_P_SECS,秒,
-BE_P_PCT,百分比,
-BE_P_N,数量,
-BE_P_STAT,属性,
-BE_P_VALUE,数值,
-BE_P_REF,效果,
-BE_P_MODE,持续,
-BE_MODE_TEMP,直至敌袭结束,
-BE_MODE_PERM,永久,
-BE_GRANT_PICK,选择效果…,
-BE_GRANT_NONE,（未选择效果）,
-BE_PICK,选择,
-BE_SPLIT,拆解,
-BE_SPLIT_DONE,已拆解为蓝图路径（见“蓝图”页）,
-BE_N_WAVE_START,敌袭开始时,
-BE_N_WAVE_END,敌袭结束时,
-BE_N_HALF_WAVE,敌袭进行到一半时,
-BE_N_INTERVAL,每隔 N 秒,
-BE_N_LEVEL_UP,升级时,
-BE_N_KILL,杀死敌人时,
-BE_N_CRIT,暴击时,
-BE_N_CRIT_KILL,以暴击杀死敌人时,
-BE_N_BURNING_KILL,杀死燃烧的敌人时,
-BE_N_CURSED_KILL,击杀被诅咒的敌人时,
-BE_N_TREE_KILL,砍倒树木时,
-BE_N_HIT,受到伤害时,
-BE_N_DODGE,闪避时,
-BE_N_HEAL,治疗时,
-BE_N_GOLD,拾取材料时,
-BE_N_CONSUMABLE,捡起消耗品时,
-BE_N_CRATE,拾取箱子时,
-BE_N_STEPS,每走一步,
-BE_N_REROLL,刷新商店时,
-BE_N_BUY,购买道具时,
-BE_N_STILL,站立不动时（状态）,
-BE_N_MOVING,移动时（状态）,
-BE_N_LOW_HP,生命值低于50%时（状态）,
-BE_N_FULL_HP,处于最大生命值时（状态）,
-BE_N_CHANCE,几率,
-BE_N_EVERY,每 N 次,
-BE_N_CAP,每波最多 N 次,
-BE_N_COOLDOWN,冷却,
-BE_N_HP_BELOW,生命值低于,
-BE_N_HP_ABOVE,生命值不低于,
-BE_N_WAVE_MIN,从第 N 波敌袭起,
-BE_N_WAVE_MAX,到第 N 波敌袭为止,
-BE_N_STAT_MIN,属性不低于,
-BE_N_STAT_MAX,属性不高于,
-BE_N_IF_MOVING,正在移动,
-BE_N_IF_STILL,正在站立不动,
-BE_N_TEMP_STAT,属性（直至敌袭结束）,
-BE_N_PERM_STAT,永久属性,
-BE_N_TIMED_STAT,属性（持续 N 秒）,
-BE_N_HEAL_HP,恢复生命值,
-BE_N_ADD_GOLD,获得材料,
-BE_N_XP,获得经验,
-BE_N_DAMAGE,对随机敌人造成伤害,
-BE_N_EXPLODE,爆炸,
-BE_N_HP_DMG,按敌人当前生命值造成伤害,
-BE_N_IGNITE,点燃敌人,
-BE_N_SLOW,减速敌人,
-BE_N_RAND_STATS,随机主要属性,
-BE_N_FRUIT,掉落水果,
-BE_N_GRANT,获得效果,
-BE_GRP_START,开局状态,
-BE_START_MATERIALS,初始材料,
-BE_START_LEVELS,初始等级,
-BE_START_LEVEL_SETTLE,初始等级在第一波结束时结算（可以选择升级）,
-BE_START_CRATES,开局箱子,
-BE_START_LEGENDARY_CRATES,开局传奇箱子,
-BE_START_BAN_TOKENS,额外禁用次数,
-BE_START_WAVE,起始波次,
-BE_START_WAVE_DELTA,敌袭时长增减（秒）,
-BE_START_WAVE_LOCK,固定敌袭时长（秒）,
-BE_START_DESC,开局箱子在第一波敌袭结束时打开。固定敌袭时长为 0 = 遵循原版，起始波次超过最后一波即为无尽模式。额外禁用次数需要开启禁用模式。,
-BE_GRP_GAIN,属性修改,
-BE_GRP_CAPS,属性上限（设定值）,
-BE_GAIN_FMT,%{0}修改,
-BE_K_STAT_CURSE,诅咒,
-BE_K_CHANCE_DOUBLE_GOLD,%几率获得双倍材料,
-BE_K_ITEM_BOX_GOLD,箱子里的材料,
-BE_K_HEAL_WHEN_PICKUP_GOLD,%拾取材料时恢复生命值几率,
-BE_K_BURNING_COOLDOWN_INCREASE,%燃烧速度降低,
-BE_K_HIT_PROTECTION,免疫伤害次数,
-BE_K_LOSE_HP_PER_SECOND,每秒失去生命值,
-BE_K_NEXT_LEVEL_XP_NEEDED,%升级所需经验,
-BE_K_GAIN_PCT_GOLD_START_WAVE,%每波敌袭开始时获得材料,
-BE_K_INCREASE_MATERIAL_VALUE,%材料价值,
-BE_K_MINIMUM_WEAPONS_IN_SHOP,商店最少武器数,
-BE_K_ITEM_STEALS,偷取道具,
-BE_K_ENEMY_FRUIT_DROPS,%敌人掉落水果,
-BE_K_EXTRA_LOOT_ALIENS,每波额外战利品外星人,
-BE_K_LOOT_ALIEN_SPEED,%战利品外星人速度,
-BE_K_STRONGER_ELITES_ON_KILL,%击杀精英怪后精英怪强化,
-BE_K_STRONGER_LOOT_ALIENS_ON_KILL,%击杀战利品外星人后其强化,
-BE_K_GAIN_EXPLOSION_DAMAGE,%爆炸伤害,
-BE_K_GAIN_PIERCING_DAMAGE,%贯通伤害,
-BE_K_GAIN_BOUNCE_DAMAGE,%反弹伤害,
-BE_K_GAIN_DAMAGE_AGAINST_BOSSES,%对头目伤害,
-BE_GRP_STATS,属性,
-BE_IMPORT_ICON,导入图片,
-BE_IMPORT_ICON_FAILED,无法读取这张图片（支持 png / jpg / webp）,
-BE_IMPORT_ICON_DONE,已导入图片作为图标,
-BE_ALL_TIER,全部 T{0},
-BE_CAT_STAT_MOD,属性修改,
-BE_CAT_STRUCTURE,构筑物,
-BE_CAT_PET,宠物,
-BE_TX_WAVE_START,敌袭开始时, at the start of a wave
-BE_TX_WAVE_END,敌袭结束时, at the end of a wave
-BE_TX_HALF_WAVE,敌袭进行到一半时, halfway through a wave
-BE_TX_INTERVAL,每{0}秒, every {0} seconds
-BE_TX_LEVEL_UP,升级时, when you level up
-BE_TX_KILL,杀死敌人时, when you kill an enemy
-BE_TX_KILL_EVERY,每杀死{0}个敌人，, for every {0} enemies you kill
-BE_TX_CRIT,暴击时, on critical hits
-BE_TX_CRIT_EVERY,每暴击{0}次，, for every {0} critical hits
-BE_TX_CRIT_KILL,以暴击杀死敌人时，, when killing an enemy with a critical hit
-BE_TX_CRIT_KILL_EVERY,每以暴击杀死{0}个敌人，, for every {0} enemies you kill with a critical hit
-BE_TX_BURNING_KILL,杀死燃烧的敌人时，, when you kill a burning enemy
-BE_TX_BURNING_KILL_EVERY,每杀死{0}个燃烧的敌人，, for every {0} burning enemies you kill
-BE_TX_CURSED_KILL,击杀被诅咒的敌人时, when you kill a cursed enemy
-BE_TX_CURSED_KILL_EVERY,每击杀{0}个被诅咒的敌人，, for every {0} cursed enemies you kill
-BE_TX_TREE_KILL,砍倒树木时, when you destroy a tree
-BE_TX_TREE_KILL_EVERY,每砍倒{0}棵树木，, for every {0} trees you destroy
-BE_TX_HIT,受到伤害时, when you take damage
-BE_TX_HIT_EVERY,每受到{0}次伤害，, for every {0} times you take damage
-BE_TX_DODGE,闪避时, when you dodge an attack
-BE_TX_DODGE_EVERY,每闪避{0}次，, for every {0} attacks you dodge
-BE_TX_HEAL,治疗时, when you heal
-BE_TX_GOLD,拾取材料时, when you pick up a material
-BE_TX_GOLD_EVERY,每拾取{0}个材料，, for every {0} materials you pick up
-BE_TX_CONSUMABLE,捡起消耗品时, when you pick up a consumable
-BE_TX_CONSUMABLE_EVERY,每捡起{0}个消耗品，, for every {0} consumables you pick up
-BE_TX_CRATE,拾取箱子时, when you pick up a crate
-BE_TX_STEPS,每前进1步，, for every step you take
-BE_TX_STEPS_EVERY,每前进{0}步，, for every {0} steps you take
-BE_TX_REROLL,刷新商店时, when rerolling in the shop
-BE_TX_REROLL_EVERY,每刷新{0}次商店，, for every {0} rerolls in the shop
-BE_TX_BUY,购买道具时, when you buy an item
-BE_TX_BUY_EVERY,每购买{0}个道具，, for every {0} items you buy
-BE_TX_STILL,站立不动时, while standing still
-BE_TX_MOVING,移动时, while moving
-BE_TX_LOW_HP,生命值低于50%时, when you have less than 50% health
-BE_TX_FULL_HP,处于最大生命值时, while at maximum health
-BE_PX_TEMP_STAT,{0}{1}，直至敌袭结束,{0} {1} until the end of the wave
-BE_PX_STATE_STAT,{0}{1},{0} {1}
-BE_PX_PERM_STAT,{0}{1},{0} {1}
-BE_PX_TIMED_STAT,{0}{1}，持续{2}秒,{0} {1} for {2} seconds
-BE_PX_HEAL,恢复{0}点生命值,Heal {0} HP
-BE_PX_GOLD,获得{0}个材料,+{0} materials
-BE_PX_LOSE_GOLD,失去{0}个材料,-{0} materials
-BE_PX_XP,获得{0}经验,+{0} XP
-BE_PX_DAMAGE,对随机1名敌人造成相当于{0}{1}的伤害,Deal damage equal to {0} of {1} to a random enemy
-BE_PX_EXPLODE,爆炸，造成相当于{0}{1}的伤害,Explode for damage equal to {0} of {1}
-BE_PX_HP_DMG,造成敌人当前生命值的{0}以作为奖励伤害（头目和精英怪的{1}）,Deal {0} of the enemy’s current health as bonus damage ({1} for bosses and elites)
-BE_PX_IGNITE,使其燃烧，造成{1}x{0}（+100%元素伤害）的燃烧伤害,Inflict {1}x{0} (+100% Elemental Damage) burning damage on the enemy
-BE_PX_SLOW,使其降低{0}速度，最高{1},Slow the enemy by {0} (max {1})
-BE_PX_FRUIT,掉落{0}个水果,Drop {0} fruits
-BE_PX_FRUIT_1,掉落1个水果,Drop a fruit
-BE_PX_RAND_STATS,将{0}点属性点随机分配到你的主要属性上,{0} points randomly split between your primary stats
-BE_PX_RAND_STATS_1,将{0}点属性点随机分配到你的主要属性上,{0} point randomly assigned to one of your primary stats
-BE_PX_GRANT_TEMP,{0}，直至敌袭结束,{0} (until the end of the wave)
-BE_PX_GRANT_PERM,永久获得“{0}”,"permanently gain ""{0}"""
-BE_PX_GRANT_STATE,{0},{0}
-BE_FMT,{t}{p},{p}{t}
-BE_FMT_CHANCE,{t}有{c}概率{p},{p}{t} ({c} chance)
-BE_FMT_GRANT,{t}{p},{T}: {p}
-BE_FMT_GRANT_CHANCE,{t}有{c}概率{p},{T} ({c} chance): {p}
-BE_CAP,（每波最多{0}次）, (max {0} times per wave)
-BE_CAP_1,（每波最多1次）, (max once per wave)
-BE_CX_EVERY,（每{n}次）, (every {n} times)
-BE_CX_COOLDOWN,（冷却{secs}秒）, ({secs}s cooldown)
-BE_CX_HP_BELOW,（生命值低于{pct}%时）, (while below {pct}% HP)
-BE_CX_HP_ABOVE,（生命值不低于{pct}%时）, (while at {pct}% HP or more)
-BE_CX_WAVE_MIN,（从第{n}波敌袭起）, (from wave {n})
-BE_CX_WAVE_MAX,（到第{n}波敌袭为止）, (until wave {n})
-BE_CX_STAT_MIN,（{stat}不低于{n}时）, (while {stat} is at least {n})
-BE_CX_STAT_MAX,（{stat}不高于{n}时）, (while {stat} is at most {n})
-BE_CX_IF_MOVING,（移动时）, (while moving)
-BE_CX_IF_STILL,（站立不动时）, (while standing still)
+key,zh,en,fr,ja,ko,zh_TW,ru,pl,es,pt,de,tr,it
+BE_BTN_OPEN,角色编辑器,Character Editor,Éditeur de personnage,キャラクターエディター,캐릭터 편집기,角色編輯器,Редактор персонажей,Edytor postaci,Editor de personajes,Editor de personagens,Charakter-Editor,Karakter Düzenleyici,Editor personaggi
+BE_TITLE,BroEditor 角色编辑器,BroEditor Character Editor,BroEditor – Éditeur de personnage,BroEditor キャラクターエディター,BroEditor 캐릭터 편집기,BroEditor 角色編輯器,BroEditor — редактор персонажей,BroEditor – edytor postaci,BroEditor: editor de personajes,BroEditor – Editor de personagens,BroEditor – Charakter-Editor,BroEditor Karakter Düzenleyici,BroEditor – Editor personaggi
+BE_IMPORT,导入,Import,Importer,インポート,가져오기,匯入,Импорт,Importuj,Importar,Importar,Importieren,İçe Aktar,Importa
+BE_EXPORT,导出,Export,Exporter,エクスポート,내보내기,匯出,Экспорт,Eksportuj,Exportar,Exportar,Exportieren,Dışa Aktar,Esporta
+BE_IMPORTED,已导入分享码,Share code imported,Code de partage importé,共有コードをインポートしました,공유 코드를 가져왔습니다,已匯入分享碼,Код импортирован,Zaimportowano kod,Código para compartir importado,Código de compartilhamento importado,Teilen-Code importiert,Paylaşım kodu içe aktarıldı,Codice di condivisione importato
+BE_IMPORT_FAILED,剪贴板里没有可识别的分享码（原版角色的档案只能导入到原版角色）,No valid share code in the clipboard (a vanilla character's profile can only be imported onto a vanilla character),Aucun code de partage valide dans le presse-papiers (le profil d'un personnage de base ne peut être importé que sur un personnage de base),クリップボードに有効な共有コードがありません（オリジナルキャラクターのプロフィールはオリジナルキャラクターにのみインポートできます）,클립보드에 올바른 공유 코드가 없습니다 (기본 캐릭터의 프로필은 기본 캐릭터에만 가져올 수 있습니다),剪貼簿中沒有可辨識的分享碼（原版角色的設定檔只能匯入到原版角色）,В буфере обмена нет подходящего кода (профиль стандартного персонажа можно импортировать только на стандартного персонажа),W schowku nie ma poprawnego kodu (profil podstawowej postaci można zaimportować tylko na podstawową postać),No hay un código válido en el portapapeles (el perfil de un personaje original solo se puede importar en un personaje original),Nenhum código válido na área de transferência (o perfil de um personagem original só pode ser importado em um personagem original),Kein gültiger Teilen-Code in der Zwischenablage (das Profil eines Original-Charakters kann nur auf einen Original-Charakter importiert werden),Panoda geçerli bir paylaşım kodu yok (orijinal bir karakterin profili yalnızca orijinal bir karaktere aktarılabilir),Nessun codice valido negli appunti (il profilo di un personaggio originale può essere importato solo su un personaggio originale)
+BE_EXPORTED,分享码已复制到剪贴板,Share code copied to the clipboard,Code de partage copié dans le presse-papiers,共有コードをクリップボードにコピーしました,공유 코드를 클립보드에 복사했습니다,分享碼已複製到剪貼簿,Код скопирован в буфер обмена,Skopiowano kod do schowka,Código copiado al portapapeles,Código copiado para a área de transferência,Teilen-Code in die Zwischenablage kopiert,Paylaşım kodu panoya kopyalandı,Codice copiato negli appunti
+BE_EXPORT_NOTHING,当前角色没有任何修改，无需导出,This character has no changes to export,Ce personnage n'a aucune modification à exporter,このキャラクターにはエクスポートする変更がありません,이 캐릭터에는 내보낼 변경 사항이 없습니다,目前角色沒有任何修改，無需匯出,У этого персонажа нет изменений для экспорта,Ta postać nie ma zmian do wyeksportowania,Este personaje no tiene cambios que exportar,Este personagem não tem alterações para exportar,Dieser Charakter hat keine Änderungen zum Exportieren,Bu karakterde dışa aktarılacak değişiklik yok,Questo personaggio non ha modifiche da esportare
+BE_CHARACTERS,角色,Characters,Personnages,キャラクター,캐릭터,角色,Персонажи,Postacie,Personajes,Personagens,Charaktere,Karakterler,Personaggi
+BE_CHARACTERS_DESC,紫框 = 自定义角色，绿框 = 已修改的原版角色。,"Purple frame = custom character, green frame = modified vanilla character.","Cadre violet = personnage personnalisé, cadre vert = personnage de base modifié.",紫の枠 = カスタムキャラクター、緑の枠 = 変更したオリジナルキャラクター。,"보라색 테두리 = 사용자 캐릭터, 초록색 테두리 = 변경된 기본 캐릭터.",紫框 = 自訂角色，綠框 = 已修改的原版角色。,"Фиолетовая рамка — свой персонаж, зелёная — изменённый стандартный персонаж.","Fioletowa ramka = własna postać, zielona ramka = zmodyfikowana podstawowa postać.","Marco morado = personaje personalizado, marco verde = personaje original modificado.","Moldura roxa = personagem personalizado, moldura verde = personagem original modificado.","Lila Rahmen = eigener Charakter, grüner Rahmen = geänderter Original-Charakter.","Mor çerçeve = özel karakter, yeşil çerçeve = değiştirilmiş orijinal karakter.","Cornice viola = personaggio personalizzato, cornice verde = personaggio originale modificato."
+BE_SEARCH,搜索名称或 ID,Search name or ID,Rechercher un nom ou un ID,名前またはIDで検索,이름 또는 ID 검색,搜尋名稱或 ID,Поиск по имени или ID,Szukaj nazwy lub ID,Buscar nombre o ID,Buscar nome ou ID,Name oder ID suchen,Ad veya kimlik ara,Cerca nome o ID
+BE_NEW_CUSTOM,新建自定义角色,New Custom Character,Nouveau personnage,カスタムキャラクターを作成,새 사용자 캐릭터,新增自訂角色,Новый персонаж,Nowa postać,Nuevo personaje,Novo personagem,Neuer eigener Charakter,Yeni Özel Karakter,Nuovo personaggio
+BE_DELETE,删除,Delete,Supprimer,削除,삭제,刪除,Удалить,Usuń,Eliminar,Excluir,Löschen,Sil,Elimina
+BE_DELETE_CONFIRM,确认删除？,Confirm delete?,Confirmer ?,削除しますか？,삭제할까요?,確認刪除？,Точно удалить?,Na pewno usunąć?,¿Confirmar?,Confirmar?,Wirklich löschen?,Silinsin mi?,Confermi?
+BE_CUSTOM_CREATED,已新建自定义角色,Custom character created,Personnage personnalisé créé,カスタムキャラクターを作成しました,사용자 캐릭터를 만들었습니다,已新增自訂角色,Свой персонаж создан,Utworzono własną postać,Personaje personalizado creado,Personagem personalizado criado,Eigener Charakter erstellt,Özel karakter oluşturuldu,Personaggio personalizzato creato
+BE_CUSTOM_DELETED,已删除自定义角色,Custom character deleted,Personnage personnalisé supprimé,カスタムキャラクターを削除しました,사용자 캐릭터를 삭제했습니다,已刪除自訂角色,Свой персонаж удалён,Usunięto własną postać,Personaje personalizado eliminado,Personagem personalizado excluído,Eigener Charakter gelöscht,Özel karakter silindi,Personaggio personalizzato eliminato
+BE_CUSTOM_IN_USE,存档中进行中的一局正在使用这个角色，结束那一局后才能删除,A saved run in progress uses this character; finish that run before deleting it,Une partie sauvegardée en cours utilise ce personnage ; terminez-la avant de le supprimer,セーブ中の進行中のランがこのキャラクターを使用しています。そのランを終えてから削除してください,저장된 진행 중인 런에서 이 캐릭터를 사용 중입니다. 그 런을 끝낸 뒤 삭제하세요,存檔中進行中的一局正在使用這個角色，結束那一局後才能刪除,"Этот персонаж используется в сохранённом незавершённом забеге; завершите его, прежде чем удалять","Ta postać jest używana w zapisanej, trwającej rozgrywce; zakończ ją przed usunięciem",Una partida guardada en curso usa este personaje; termínala antes de eliminarlo,Uma partida salva em andamento usa este personagem; termine-a antes de excluí-lo,"Ein gespeicherter laufender Run nutzt diesen Charakter; beende ihn, bevor du den Charakter löschst","Kayıtlı, devam eden bir oyun bu karakteri kullanıyor; silmeden önce o oyunu bitir",Una partita salvata in corso usa questo personaggio; terminala prima di eliminarlo
+BE_NEW_CHARACTER,自定义土豆,Custom Potato,Patate personnalisée,カスタムポテト,사용자 감자,自訂馬鈴薯,Своя картошка,Własny ziemniak,Patata personalizada,Batata personalizada,Eigene Kartoffel,Özel Patates,Patata personalizzata
+BE_CUSTOM_TAG,自定义角色,Custom character,Personnage personnalisé,カスタムキャラクター,사용자 캐릭터,自訂角色,Свой персонаж,Własna postać,Personaje personalizado,Personagem personalizado,Eigener Charakter,Özel karakter,Personaggio personalizzato
+BE_MODIFIED_TAG,已修改,Modified,Modifié,変更済み,변경됨,已修改,Изменён,Zmodyfikowana,Modificado,Modificado,Geändert,Değiştirildi,Modificato
+BE_DISABLED_TAG,修改已停用,Changes disabled,Modifications désactivées,変更は無効,변경 사항 꺼짐,修改已停用,Изменения отключены,Zmiany wyłączone,Cambios desactivados,Alterações desativadas,Änderungen deaktiviert,Değişiklikler kapalı,Modifiche disattivate
+BE_ORIGINAL_TAG,原版,Vanilla,Original,オリジナル,기본,原版,Стандартный,Podstawowa,Original,Original,Original,Orijinal,Originale
+BE_BASE,基底：{0},Base: {0},Base : {0},ベース：{0},기반: {0},基底：{0},Основа: {0},Baza: {0},Base: {0},Base: {0},Basis: {0},Temel: {0},Base: {0}
+BE_PROFILE_ENABLED,应用修改,Apply changes,Appliquer les modifications,変更を適用,변경 사항 적용,套用修改,Применять изменения,Zastosuj zmiany,Aplicar cambios,Aplicar alterações,Änderungen anwenden,Değişiklikleri uygula,Applica modifiche
+BE_RESET,重置,Reset,Réinitialiser,リセット,초기화,重設,Сбросить,Resetuj,Restablecer,Redefinir,Zurücksetzen,Sıfırla,Ripristina
+BE_RESET_DONE,已恢复原版,Restored to vanilla,Personnage original restauré,オリジナルに戻しました,기본 캐릭터로 복원했습니다,已恢復原版,Стандартный персонаж восстановлен,Przywrócono podstawową postać,Original restaurado,Original restaurado,Original wiederhergestellt,Orijinale döndürüldü,Originale ripristinato
+BE_TAB_OVERVIEW,概览,Overview,Aperçu,概要,개요,概覽,Обзор,Przegląd,Resumen,Visão geral,Übersicht,Genel Bakış,Panoramica
+BE_TAB_STATS,初始属性,Starting Stats,Stats de départ,初期ステータス,시작 능력치,初始屬性,Начальные характеристики,Statystyki startowe,Estadísticas iniciales,Atributos iniciais,Startwerte,Başlangıç İstatistikleri,Statistiche iniziali
+BE_TAB_EFFECTS,效果,Effects,Effets,効果,효과,效果,Эффекты,Efekty,Efectos,Efeitos,Effekte,Efektler,Effetti
+BE_TAB_GEAR,初始装备,Starting Gear,Équipement de départ,初期装備,시작 장비,初始裝備,Начальное снаряжение,Wyposażenie startowe,Equipo inicial,Equipamento inicial,Startausrüstung,Başlangıç Ekipmanı,Equipaggiamento iniziale
+BE_TAB_BANS,禁用,Bans,Bannissements,BAN,차단,禁用,Запреты,Zakazy,Vetos,Banimentos,Verbannungen,Yasaklar,Ban
+BE_SEC_BASIC,基本信息,Basic Info,Informations,基本情報,기본 정보,基本資訊,Основное,Podstawowe informacje,Información básica,Informações básicas,Grundlagen,Temel Bilgiler,Informazioni di base
+BE_NAME,名称,Name,Nom,名前,이름,名稱,Имя,Nazwa,Nombre,Nome,Name,Ad,Nome
+BE_NAME_DESC,留空则使用原名。,Leave empty to keep the original name.,Laisser vide pour garder le nom d'origine.,空欄なら元の名前を使用します。,비워 두면 원래 이름을 사용합니다.,留空則使用原名。,"Оставьте пустым, чтобы сохранить исходное имя.","Zostaw puste, aby zachować oryginalną nazwę.",Déjalo vacío para mantener el nombre original.,Deixe vazio para manter o nome original.,"Leer lassen, um den Originalnamen zu behalten.",Orijinal adı korumak için boş bırak.,Lascia vuoto per mantenere il nome originale.
+BE_DESCRIPTION,介绍,Description,Description,説明,설명,介紹,Описание,Opis,Descripción,Descrição,Beschreibung,Açıklama,Descrizione
+BE_DESCRIPTION_DESC,显示在角色效果列表的第一行，不影响游戏。,Shown as the first line of the character's effects; has no gameplay effect.,Affichée en première ligne des effets du personnage ; sans effet en jeu.,キャラクター効果の1行目に表示されます。ゲームには影響しません。,캐릭터 효과의 첫 줄에 표시되며 게임에는 영향이 없습니다.,顯示在角色效果列表的第一行，不影響遊戲。,Показывается первой строкой эффектов персонажа; на игру не влияет.,Wyświetlany jako pierwsza linia efektów postaci; nie wpływa na grę.,Se muestra como primera línea de los efectos del personaje; no afecta al juego.,Exibida como primeira linha dos efeitos do personagem; não afeta o jogo.,Wird als erste Zeile der Charaktereffekte angezeigt; ohne Spielwirkung.,Karakter efektlerinin ilk satırında gösterilir; oyuna etkisi yoktur.,Mostrata come prima riga degli effetti del personaggio; non influisce sul gioco.
+BE_SEC_LOOK,外观,Appearance,Apparence,外見,외형,外觀,Внешний вид,Wygląd,Apariencia,Aparência,Aussehen,Görünüm,Aspetto
+BE_PICK_BASE,选择基底角色,Choose Base Character,Choisir le personnage de base,ベースキャラクターを選択,기반 캐릭터 선택,選擇基底角色,Выбрать основу,Wybierz postać bazową,Elegir personaje base,Escolher personagem base,Basis-Charakter wählen,Temel Karakter Seç,Scegli personaggio base
+BE_PICK_ICON,选择图标,Choose Icon,Choisir l'icône,アイコンを選択,아이콘 선택,選擇圖示,Выбрать значок,Wybierz ikonę,Elegir icono,Escolher ícone,Symbol wählen,Simge Seç,Scegli icona
+BE_LOOK_DESC,基底角色决定战斗中的外观；图标可以取任意角色或道具的图标（右下角会标上编号以便区分），也可以导入自己的图片。,"The base character sets the in-game look; the icon can be any character or item icon (numbered in the bottom-right corner to tell them apart), or an imported image.",Le personnage de base définit l'apparence en jeu ; l'icône peut être celle de n'importe quel personnage ou objet (numérotée en bas à droite pour les distinguer) ou une image importée.,ベースキャラクターがゲーム内の見た目を決めます。アイコンには任意のキャラクターやアイテムのアイコン（区別のため右下に番号付き）、または取り込んだ画像を使えます。,기반 캐릭터가 게임 속 외형을 정합니다. 아이콘은 아무 캐릭터나 아이템의 아이콘(구분을 위해 오른쪽 아래에 번호 표시) 또는 가져온 이미지를 쓸 수 있습니다.,基底角色決定戰鬥中的外觀；圖示可以取任意角色或道具的圖示（右下角會標上編號以便區分），也可以匯入自己的圖片。,Персонаж-основа определяет внешний вид в игре; значком может быть значок любого персонажа или предмета (с номером в правом нижнем углу для различия) или импортированное изображение.,Postać bazowa określa wygląd w grze; ikoną może być ikona dowolnej postaci lub przedmiotu (z numerem w prawym dolnym rogu dla odróżnienia) albo zaimportowany obraz.,El personaje base define el aspecto en el juego; el icono puede ser el de cualquier personaje u objeto (numerado abajo a la derecha para distinguirlos) o una imagen importada.,O personagem base define a aparência no jogo; o ícone pode ser o de qualquer personagem ou item (numerado no canto inferior direito para diferenciá-los) ou uma imagem importada.,Der Basis-Charakter bestimmt das Aussehen im Spiel; als Symbol dient ein beliebiges Charakter- oder Gegenstandssymbol (unten rechts nummeriert zur Unterscheidung) oder ein importiertes Bild.,Temel karakter oyundaki görünümü belirler; simge herhangi bir karakter veya eşya simgesi (ayırt etmek için sağ alt köşede numaralı) ya da içe aktarılan bir görsel olabilir.,Il personaggio base determina l'aspetto in gioco; l'icona può essere quella di qualsiasi personaggio o oggetto (numerata in basso a destra per distinguerle) oppure un'immagine importata.
+BE_SEC_TAGS,偏好词条,Wanted Tags,Tags recherchés,優先タグ,선호 태그,偏好標籤,Желаемые теги,Pożądane tagi,Etiquetas deseadas,Etiquetas desejadas,Gewünschte Tags,İstenen Etiketler,Tag desiderati
+BE_TAGS_DESC,商店有更高几率刷出带这些词条的道具。点击启用/禁用。,The shop is more likely to offer items with these tags. Click to toggle.,La boutique propose plus souvent des objets avec ces tags. Cliquez pour activer / désactiver.,ショップでこれらのタグを持つアイテムが出やすくなります。クリックで切り替え。,상점에서 이 태그가 있는 아이템이 더 자주 나옵니다. 클릭하여 켜기 / 끄기.,商店有更高機率出現帶有這些標籤的道具。點擊啟用 / 停用。,"Магазин чаще предлагает предметы с этими тегами. Нажмите, чтобы включить / выключить.","Sklep częściej oferuje przedmioty z tymi tagami. Kliknij, aby włączyć / wyłączyć.",La tienda ofrece más a menudo objetos con estas etiquetas. Haz clic para activar / desactivar.,A loja oferece itens com essas etiquetas com mais frequência. Clique para ativar / desativar.,Der Shop bietet Gegenstände mit diesen Tags häufiger an. Zum Umschalten klicken.,Mağaza bu etiketlere sahip eşyaları daha sık sunar. Açmak / kapatmak için tıkla.,Il negozio offre più spesso oggetti con questi tag. Clicca per attivare / disattivare.
+BE_SEC_PREVIEW,效果预览,Effect Preview,Aperçu des effets,効果プレビュー,효과 미리보기,效果預覽,Предпросмотр эффектов,Podgląd efektów,Vista previa de efectos,Prévia dos efeitos,Effektvorschau,Efekt Önizlemesi,Anteprima effetti
+BE_PREVIEW_WEAPONS,可选初始武器：,Starting weapons:,Armes de départ :,初期武器：,시작 무기:,可選初始武器：,Начальное оружие:,Bronie startowe:,Armas iniciales:,Armas iniciais:,Startwaffen:,Başlangıç silahları:,Armi iniziali:
+BE_PREVIEW_BANS,禁用：{0} 个道具、{1} 个武器系列,"Banned: {0} items, {1} weapon families","Bannis : {0} objets, {1} familles d'armes",BAN：アイテム {0} 個、武器系統 {1} 種,"차단: 아이템 {0}개, 무기 계열 {1}개",禁用：{0} 個道具、{1} 個武器系列,"Запрещено: предметов — {0}, семейств оружия — {1}","Zakazane: przedmioty – {0}, rodziny broni – {1}","Vetados: {0} objetos, {1} familias de armas","Banidos: {0} itens, {1} famílias de armas","Verbannt: {0} Gegenstände, {1} Waffenfamilien","Yasaklı: {0} eşya, {1} silah ailesi","Bannati: {0} oggetti, {1} famiglie di armi"
+BE_PREVIEW_DISABLED,（修改已停用，游戏中使用原版角色）,(Changes disabled; the vanilla character is used in game),(Modifications désactivées ; le personnage original est utilisé en jeu),（変更は無効。ゲームではオリジナルのキャラクターが使われます）,(변경 사항 꺼짐; 게임에서는 기본 캐릭터를 사용합니다),（修改已停用，遊戲中使用原版角色）,(Изменения отключены; в игре используется стандартный персонаж),(Zmiany wyłączone; w grze używana jest podstawowa postać),(Cambios desactivados; en el juego se usa el personaje original),(Alterações desativadas; o personagem original é usado no jogo),(Änderungen deaktiviert; im Spiel wird der Original-Charakter verwendet),(Değişiklikler kapalı; oyunda orijinal karakter kullanılır),(Modifiche disattivate; in gioco si usa il personaggio originale)
+BE_GRP_PRIMARY,基础属性,Primary Stats,Stats principales,基本ステータス,주요 능력치,基礎屬性,Основные характеристики,Statystyki główne,Estadísticas principales,Atributos primários,Primärwerte,Birincil İstatistikler,Statistiche primarie
+BE_GRP_SECONDARY,次要属性,Secondary Stats,Stats secondaires,サブステータス,보조 능력치,次要屬性,Второстепенные характеристики,Statystyki dodatkowe,Estadísticas secundarias,Atributos secundários,Sekundärwerte,İkincil İstatistikler,Statistiche secondarie
+BE_GRP_SHOP,商店与材料,Shop & Materials,Boutique et matériaux,ショップとマテリアル,상점 및 재료,商店與材料,Магазин и материалы,Sklep i materiały,Tienda y materiales,Loja e materiais,Shop & Material,Mağaza ve Malzemeler,Negozio e materiali
+BE_GRP_MAP,地图与敌人,Map & Enemies,Carte et ennemis,マップと敵,맵 및 적,地圖與敵人,Карта и враги,Mapa i wrogowie,Mapa y enemigos,Mapa e inimigos,Karte & Gegner,Harita ve Düşmanlar,Mappa e nemici
+BE_GRP_RULES,规则开关（填 1 开启）,Rules (set to 1 to enable),Règles (1 pour activer),ルール（1で有効）,규칙 (1 = 켜기),規則開關（填 1 開啟）,Правила (1 — включено),Zasady (1 = włączone),Reglas (1 para activar),Regras (1 para ativar),Regeln (1 = aktiv),Kurallar (açmak için 1),Regole (1 per attivare)
+BE_STATS_DESC,开局时额外获得的属性（与原有效果叠加）。0 = 不修改。,Extra stats at the start of a run (added on top of existing effects). 0 = unchanged.,Stats supplémentaires au début de la partie (cumulées avec les effets existants). 0 = inchangé.,ラン開始時に追加で得るステータス（既存の効果に加算）。0 = 変更なし。,런 시작 시 추가로 얻는 능력치 (기존 효과에 더해짐). 0 = 변경 없음.,開局時額外獲得的屬性（與原有效果疊加）。0 = 不修改。,Дополнительные характеристики в начале забега (суммируются с имеющимися эффектами). 0 — без изменений.,Dodatkowe statystyki na początku rozgrywki (sumowane z istniejącymi efektami). 0 = bez zmian.,Estadísticas adicionales al inicio de la partida (se suman a los efectos existentes). 0 = sin cambios.,Atributos extras no início da partida (somados aos efeitos existentes). 0 = sem alteração.,Zusätzliche Werte zu Beginn des Runs (zu den vorhandenen Effekten addiert). 0 = unverändert.,Oyun başında ek istatistikler (mevcut efektlere eklenir). 0 = değişiklik yok.,Statistiche extra all'inizio della partita (sommate agli effetti esistenti). 0 = invariato.
+BE_STATS_CLEAR,全部清零,Reset All to 0,Tout remettre à 0,すべて0にする,모두 0으로,全部歸零,Обнулить всё,Wyzeruj wszystko,Todo a 0,Zerar tudo,Alle auf 0,Hepsini Sıfırla,Azzera tutto
+BE_SEC_EFFECTS,角色效果,Character Effects,Effets du personnage,キャラクター効果,캐릭터 효과,角色效果,Эффекты персонажа,Efekty postaci,Efectos del personaje,Efeitos do personagem,Charaktereffekte,Karakter Efektleri,Effetti del personaggio
+BE_EFFECTS_DESC,角色的全部效果，从上到下显示。点“编辑”修改数值、属性或条件；▲▼ 调整顺序。,"All effects of the character, shown top to bottom. Click ""Edit"" to change values, stats or conditions; ▲▼ to reorder.","Tous les effets du personnage, de haut en bas. « Modifier » pour changer valeurs, stats ou conditions ; ▲▼ pour réordonner.",キャラクターのすべての効果を上から順に表示します。「編集」で数値・ステータス・条件を変更、▲▼で並べ替え。,"캐릭터의 모든 효과를 위에서 아래로 표시합니다. ""편집""으로 수치·능력치·조건 변경, ▲▼로 순서 변경.",角色的全部效果，由上而下顯示。點「編輯」修改數值、屬性或條件；▲▼ 調整順序。,"Все эффекты персонажа сверху вниз. «Изменить» — значения, характеристики или условия; ▲▼ — порядок.","Wszystkie efekty postaci od góry do dołu. „Edytuj” zmienia wartości, statystyki lub warunki; ▲▼ zmienia kolejność.","Todos los efectos del personaje, de arriba abajo. «Editar» cambia valores, estadísticas o condiciones; ▲▼ para reordenar.","Todos os efeitos do personagem, de cima para baixo. ""Editar"" altera valores, atributos ou condições; ▲▼ reordena.","Alle Effekte des Charakters von oben nach unten. „Bearbeiten“ ändert Werte, Statuswerte oder Bedingungen; ▲▼ ändert die Reihenfolge.","Karakterin tüm efektleri, yukarıdan aşağıya. Değer, istatistik veya koşulu değiştirmek için ""Düzenle""; sıralamak için ▲▼.","Tutti gli effetti del personaggio, dall'alto in basso. ""Modifica"" cambia valori, statistiche o condizioni; ▲▼ riordina."
+BE_EFFECTS_EMPTY,没有效果。从右侧蓝图或效果库添加。,No effects. Add some from the blueprint or the effect library.,Aucun effet. Ajoutez-en depuis le plan ou la bibliothèque d'effets.,効果がありません。設計図や効果ライブラリから追加してください。,효과가 없습니다. 설계도나 효과 라이브러리에서 추가하세요.,沒有效果。可從藍圖或效果庫新增。,Эффектов нет. Добавьте их из схемы или библиотеки эффектов.,Brak efektów. Dodaj je ze schematu lub biblioteki efektów.,Sin efectos. Añade alguno desde el plano o la biblioteca de efectos.,Nenhum efeito. Adicione pelo projeto ou pela biblioteca de efeitos.,Keine Effekte. Füge welche aus dem Bauplan oder der Effektbibliothek hinzu.,Efekt yok. Şemadan veya efekt kütüphanesinden ekle.,Nessun effetto. Aggiungine dal progetto o dalla libreria degli effetti.
+BE_EFFECTS_ORIGINAL,恢复原版效果,Restore Vanilla Effects,Restaurer les effets d'origine,オリジナルの効果に戻す,기본 효과로 복원,恢復原版效果,Вернуть стандартные эффекты,Przywróć podstawowe efekty,Restaurar efectos originales,Restaurar efeitos originais,Original-Effekte wiederherstellen,Orijinal Efektlere Dön,Ripristina effetti originali
+BE_EFFECTS_CLEAR,清空,Clear,Vider,クリア,비우기,清空,Очистить,Wyczyść,Vaciar,Limpar,Leeren,Temizle,Svuota
+BE_EDIT,编辑,Edit,Modifier,編集,편집,編輯,Изменить,Edytuj,Editar,Editar,Bearbeiten,Düzenle,Modifica
+BE_EFFECT_ADDED,已添加效果,Effect added,Effet ajouté,効果を追加しました,효과를 추가했습니다,已新增效果,Эффект добавлен,Dodano efekt,Efecto añadido,Efeito adicionado,Effekt hinzugefügt,Efekt eklendi,Effetto aggiunto
+BE_EFFECT_MISSING,（无来源）,(missing source),(source introuvable),（元データなし）,(원본 없음),（無來源）,(источник не найден),(brak źródła),(sin origen),(sem origem),(Quelle fehlt),(kaynak yok),(fonte mancante)
+BE_EFFECT_NO_TEXT,（无描述：{0}）,(no description: {0}),(sans description : {0}),（説明なし：{0}）,(설명 없음: {0}),（無描述：{0}）,(без описания: {0}),(bez opisu: {0}),(sin descripción: {0}),(sem descrição: {0}),(ohne Beschreibung: {0}),(açıklama yok: {0}),(senza descrizione: {0})
+BE_SRC_PLAIN,属性,Stat,Stat,ステータス,능력치,屬性,Характеристика,Statystyka,Estadística,Atributo,Wert,İstatistik,Statistica
+BE_FIELD_TRIGGER,扳机,Trigger,Déclencheur,トリガー,트리거,觸發,Триггер,Wyzwalacz,Activador,Gatilho,Auslöser,Tetikleyici,Innesco
+BE_FIELD_KEY,属性 / 键,Stat / Key,Stat / clé,ステータス / キー,능력치 / 키,屬性 / 鍵,Характеристика / ключ,Statystyka / klucz,Estadística / clave,Atributo / chave,Wert / Schlüssel,İstatistik / anahtar,Statistica / chiave
+BE_FIELD_VALUE,数值,Value,Valeur,数値,수치,數值,Значение,Wartość,Valor,Valor,Wert,Değer,Valore
+BE_FIELD_CHANCE,几率,Chance,Chance,確率,확률,機率,Шанс,Szansa,Probabilidad,Chance,Chance,Şans,Probabilità
+BE_FIELD_INTERVAL,间隔,Interval,Intervalle,間隔,간격,間隔,Интервал,Odstęp,Intervalo,Intervalo,Intervall,Aralık,Intervallo
+BE_FIELD_STAT,属性,Stat,Stat,ステータス,능력치,屬性,Характеристика,Statystyka,Estadística,Atributo,Wert,İstatistik,Statistica
+BE_FIELD_STAT_SCALED,按此属性,Scales with,Selon la stat,参照ステータス,기준 능력치,依據屬性,Зависит от,Skaluje się z,Escala con,Escala com,Skaliert mit,Ölçeklendiği istatistik,Scala con
+BE_FIELD_NB_STAT_SCALED,每多少点,Per points,Par points,何ポイントごと,몇 포인트마다,每多少點,За каждые,Za każde punkty,Por puntos,Por pontos,Pro Punkte,Her kaç puanda,Per punti
+BE_FIELD_STAT_NB,数量,Amount,Quantité,数量,수량,數量,Количество,Ilość,Cantidad,Quantidade,Anzahl,Miktar,Quantità
+BE_FIELD_PERM_STATS_ONLY,只计永久属性,Permanent stats only,Stats permanentes seulement,永続ステータスのみ,영구 능력치만,只計永久屬性,Только постоянные,Tylko stałe statystyki,Solo estadísticas permanentes,Só atributos permanentes,Nur permanente Werte,Yalnızca kalıcı istatistikler,Solo statistiche permanenti
+BE_FIELD_STAT_DISPLAYED,显示属性,Displayed stat,Stat affichée,表示ステータス,표시 능력치,顯示屬性,Отображаемая характеристика,Wyświetlana statystyka,Estadística mostrada,Atributo exibido,Angezeigter Wert,Gösterilen istatistik,Statistica mostrata
+BE_FIELD_STAT_NAME,属性名,Stat name,Nom de la stat,ステータス名,능력치 이름,屬性名,Название характеристики,Nazwa statystyki,Nombre de estadística,Nome do atributo,Wertname,İstatistik adı,Nome statistica
+BE_FIELD_STAT_DISPLAYED_NAME,显示属性名,Displayed stat name,Nom de la stat affichée,表示名,표시 이름,顯示屬性名,Отображаемое название,Wyświetlana nazwa,Nombre mostrado,Nome exibido,Angezeigter Wertname,Gösterilen ad,Nome mostrato
+BE_FIELD_DURATION,持续时间,Duration,Durée,持続時間,지속 시간,持續時間,Длительность,Czas trwania,Duración,Duração,Dauer,Süre,Durata
+BE_FIELD_DURATION_SECS,持续秒数,Duration (s),Durée (s),持続時間（秒）,지속 시간(초),持續秒數,Длительность (с),Czas trwania (s),Duración (s),Duração (s),Dauer (s),Süre (sn),Durata (s)
+BE_FIELD_COOLDOWN,冷却,Cooldown,Délai,クールダウン,재사용 대기시간,冷卻,Перезарядка,Odnowienie,Enfriamiento,Recarga,Abklingzeit,Bekleme süresi,Ricarica
+BE_FIELD_MAX_STACKS,最大层数,Max stacks,Cumul max,最大スタック,최대 중첩,最大層數,Макс. стаков,Maks. kumulacji,Acumulaciones máx.,Acúmulos máx.,Max. Stapel,Maks. yığın,Accumuli max
+BE_FIELD_MAX_PROCS,最多触发次数,Max procs,Déclenchements max,最大発動回数,최대 발동 횟수,最多觸發次數,Макс. срабатываний,Maks. aktywacji,Activaciones máx.,Ativações máx.,Max. Auslösungen,Maks. tetiklenme,Attivazioni max
+BE_FIELD_HP_THRESHOLD,生命阈值,HP threshold,Seuil de PV,HPしきい値,HP 기준치,HP 門檻,Порог ОЗ,Próg PZ,Umbral de PS,Limite de PV,HP-Schwelle,Sağlık eşiği,Soglia di PS
+BE_FIELD_RESET_ON_HIT,受到伤害时重置,Reset when hit,Réinitialisé en cas de dégâts,被ダメージでリセット,피해를 받으면 초기화,受到傷害時重設,Сбрасывается при уроне,Zerowane po otrzymaniu obrażeń,Se reinicia al recibir daño,Reinicia ao sofrer dano,Bei Schaden zurückgesetzt,Hasar alınca sıfırlanır,Si azzera quando subisci danni
+BE_FIELD_TO_STAT,转换为属性,Convert to stat,Convertir en stat,変換先ステータス,변환할 능력치,轉換為屬性,В характеристику,Zamień na statystykę,Convertir en estadística,Converter em atributo,In Wert umwandeln,Dönüştürülecek istatistik,Converti in statistica
+BE_FIELD_TO_VALUE,转换数值,Converted value,Valeur convertie,変換後の数値,변환 수치,轉換數值,Значение после преобразования,Wartość po zamianie,Valor convertido,Valor convertido,Umgewandelter Wert,Dönüşen değer,Valore convertito
+BE_FIELD_PCT_CONVERTED,转换比例,Conversion %,% converti,変換率,변환 비율,轉換比例,% преобразования,% zamiany,% convertido,% convertido,Umwandlung %,Dönüşüm %,% convertita
+BE_FIELD_SCALING_STAT,缩放属性,Scaling stat,Stat d'échelle,スケールステータス,비례 능력치,縮放屬性,Характеристика масштабирования,Statystyka skalowania,Estadística de escala,Atributo de escala,Skalierungswert,Ölçek istatistiği,Statistica di scala
+BE_FIELD_DAMAGE,伤害,Damage,Dégâts,ダメージ,대미지,傷害,Урон,Obrażenia,Daño,Dano,Schaden,Hasar,Danni
+BE_FIELD_SCALE,缩放,Scale,Échelle,スケール,배율,縮放,Масштаб,Skala,Escala,Escala,Skalierung,Ölçek,Scala
+BE_FIELD_SPREAD,散布,Spread,Dispersion,拡散,확산,散布,Разброс,Rozrzut,Dispersión,Dispersão,Streuung,Saçılma,Dispersione
+BE_FIELD_TRACKING_KEY,统计键,Tracking key,Clé de suivi,記録キー,기록 키,統計鍵,Ключ учёта,Klucz śledzenia,Clave de seguimiento,Chave de rastreio,Tracking-Schlüssel,Takip anahtarı,Chiave di tracciamento
+BE_FIELD_SET_ID,套装,Class,Classe,クラス,클래스,類別,Класс,Klasa,Clase,Classe,Klasse,Sınıf,Classe
+BE_FIELD_WEAPON_TYPE,武器类型,Weapon type,Type d'arme,武器タイプ,무기 종류,武器類型,Тип оружия,Typ broni,Tipo de arma,Tipo de arma,Waffentyp,Silah türü,Tipo di arma
+BE_FIELD_MIN_VALUE,最小值,Min value,Valeur min,最小値,최소값,最小值,Мин. значение,Wartość min.,Valor mínimo,Valor mínimo,Mindestwert,Min. değer,Valore minimo
+BE_FIELD_IS_SPAWNING,生成型,Spawning,Génère,生成型,생성형,生成型,Создаёт объекты,Przywołuje,Genera,Gera,Erzeugend,Oluşturucu,Genera
+BE_FIELD_AUTO_TARGET_ENEMY,自动瞄准敌人,Auto-target enemy,Cible auto,自動照準,자동 조준,自動瞄準敵人,Автонаведение,Automatyczne celowanie,Apuntado automático,Mira automática,Automatisch zielen,Otomatik nişan,Mira automatica
+BE_FIELD_INVERT_SCALING,反向缩放,Invert scaling,Échelle inversée,スケールを反転,비례 반전,反向縮放,Обратное масштабирование,Odwróć skalowanie,Invertir escala,Inverter escala,Skalierung umkehren,Ölçeği ters çevir,Inverti scala
+BE_FIELD_SCALE_WITH_MISSING_HEALTH,随已损失生命缩放,Scale with missing HP,Selon les PV manquants,失ったHPでスケール,잃은 HP에 비례,隨已損失 HP 縮放,Зависит от потерянных ОЗ,Skaluje się z brakującymi PZ,Escala con PS perdidos,Escala com PV perdidos,Mit fehlenden HP skalieren,Eksik sağlıkla ölçeklenir,Scala con i PS mancanti
+BE_FIELD_FOR_EVERY_HEALTH_PERCENT,每损失多少 % 生命,Per % of missing HP,Par % de PV manquants,失ったHP何%ごと,잃은 HP 몇 %마다,每損失多少 % HP,За каждый % потерянных ОЗ,Za każdy % brakujących PZ,Por % de PS perdidos,Por % de PV perdidos,Pro % fehlender HP,Her % eksik sağlık için,Per % di PS mancanti
+BE_FIELD_SET_CAP_TO_CURRENT_STAT,上限设为当前值,Cap at current value,Plafonner à la valeur actuelle,現在値を上限にする,현재 값을 상한으로,上限設為目前值,Ограничить текущим значением,Ogranicz do obecnej wartości,Limitar al valor actual,Limitar ao valor atual,Auf aktuellen Wert begrenzen,Mevcut değerle sınırla,Limita al valore attuale
+BE_FIELD_DOUBLE_CHANCE,翻倍几率,Double chance,Chance de doubler,倍化確率,두 배 확률,加倍機率,Шанс удвоения,Szansa na podwojenie,Probabilidad de duplicar,Chance de dobrar,Verdopplungschance,İki katına çıkma şansı,Probabilità di raddoppio
+BE_FIELD_HEALTH_BOOST,生命加成,HP bonus,Bonus de PV,HPボーナス,HP 보너스,HP 加成,Бонус ОЗ,Premia PZ,Bonificación de PS,Bônus de PV,HP-Bonus,Sağlık bonusu,Bonus PS
+BE_ADD,添加,Add,Ajouter,追加,추가,新增,Добавить,Dodaj,Añadir,Adicionar,Hinzufügen,Ekle,Aggiungi
+BE_SEC_LIBRARY,效果库,Effect Library,Bibliothèque d'effets,効果ライブラリ,효과 라이브러리,效果庫,Библиотека эффектов,Biblioteka efektów,Biblioteca de efectos,Biblioteca de efeitos,Effektbibliothek,Efekt Kütüphanesi,Libreria effetti
+BE_LIBRARY_DESC,全部原版角色与道具的效果。点 + 添加到角色，再点“编辑”修改数值。,"Effects of every vanilla character and item. Click + to add one, then ""Edit"" to change its values.","Les effets de tous les personnages et objets du jeu. + pour ajouter, puis « Modifier » pour changer les valeurs.",すべてのオリジナルキャラクターとアイテムの効果。+ で追加し、「編集」で数値を変更します。,"모든 기본 캐릭터와 아이템의 효과입니다. + 로 추가하고 ""편집""으로 수치를 바꾸세요.",全部原版角色與道具的效果。點 + 新增到角色，再點「編輯」修改數值。,"Эффекты всех стандартных персонажей и предметов. «+» добавляет эффект, «Изменить» меняет значения.","Efekty wszystkich podstawowych postaci i przedmiotów. „+” dodaje efekt, „Edytuj” zmienia wartości.","Efectos de todos los personajes y objetos originales. + para añadir, luego «Editar» para cambiar valores.","Efeitos de todos os personagens e itens originais. + adiciona, depois ""Editar"" altera os valores.","Effekte aller Original-Charaktere und -Gegenstände. + fügt hinzu, „Bearbeiten“ ändert die Werte.","Tüm orijinal karakter ve eşyaların efektleri. Eklemek için +, değerleri değiştirmek için ""Düzenle"".","Gli effetti di tutti i personaggi e oggetti originali. + per aggiungere, poi ""Modifica"" per cambiare i valori."
+BE_LIBRARY_SEARCH,搜索效果文本、来源或键,"Search effect text, source or key","Rechercher texte, source ou clé",効果テキスト・出典・キーで検索,"효과 문구, 출처 또는 키 검색",搜尋效果文字、來源或鍵,"Поиск по тексту, источнику или ключу","Szukaj tekstu, źródła lub klucza","Buscar texto, origen o clave","Buscar texto, origem ou chave","Effekttext, Quelle oder Schlüssel suchen","Efekt metni, kaynak veya anahtar ara","Cerca testo, fonte o chiave"
+BE_LIBRARY_COUNT,显示 {0} / {1},Showing {0} / {1},{0} / {1} affichés,{0} / {1} 件表示,{0} / {1} 표시,顯示 {0} / {1},Показано {0} / {1},Wyświetlono {0} / {1},Mostrando {0} / {1},Mostrando {0} / {1},{0} / {1} angezeigt,{0} / {1} gösteriliyor,{0} / {1} mostrati
+BE_CAT_ALL,全部,All,Tout,すべて,전체,全部,Все,Wszystko,Todo,Tudo,Alle,Tümü,Tutti
+BE_CAT_STAT,属性,Stats,Stats,ステータス,능력치,屬性,Характеристики,Statystyki,Estadísticas,Atributos,Werte,İstatistikler,Statistiche
+BE_CAT_TRIGGER,扳机 / 条件,Triggers / Conditions,Déclencheurs / conditions,トリガー / 条件,트리거 / 조건,觸發 / 條件,Триггеры / условия,Wyzwalacze / warunki,Activadores / condiciones,Gatilhos / condições,Auslöser / Bedingungen,Tetikleyiciler / Koşullar,Inneschi / condizioni
+BE_CAT_SCALING,属性联动,Stat Scaling,Stats liées,ステータス連動,연동 능력치,屬性連動,Связанные характеристики,Powiązane statystyki,Estadísticas vinculadas,Atributos vinculados,Wertkopplung,Bağlı İstatistikler,Statistiche collegate
+BE_CAT_COMBAT,战斗,Combat,Combat,戦闘,전투,戰鬥,Бой,Walka,Combate,Combate,Kampf,Savaş,Combattimento
+BE_CAT_ECONOMY,经济 / 商店,Economy / Shop,Économie / boutique,経済 / ショップ,경제 / 상점,經濟 / 商店,Экономика / магазин,Ekonomia / sklep,Economía / tienda,Economia / loja,Wirtschaft / Shop,Ekonomi / Mağaza,Economia / negozio
+BE_CAT_WEAPON,武器规则,Weapon Rules,Règles d'armes,武器ルール,무기 규칙,武器規則,Правила оружия,Zasady broni,Reglas de armas,Regras de armas,Waffenregeln,Silah Kuralları,Regole delle armi
+BE_CAT_START,初始装备,Starting Gear,Équipement de départ,初期装備,시작 장비,初始裝備,Начальное снаряжение,Wyposażenie startowe,Equipo inicial,Equipamento inicial,Startausrüstung,Başlangıç Ekipmanı,Equipaggiamento iniziale
+BE_CAT_OTHER,其他,Other,Autre,その他,기타,其他,Прочее,Inne,Otros,Outros,Sonstiges,Diğer,Altro
+BE_TRIG_NONE,永久（无扳机）,Permanent (no trigger),Permanent (sans déclencheur),永続（トリガーなし）,영구 (트리거 없음),永久（無觸發）,Постоянно (без триггера),Na stałe (bez wyzwalacza),Permanente (sin activador),Permanente (sem gatilho),Permanent (kein Auslöser),Kalıcı (tetikleyicisiz),Permanente (senza innesco)
+BE_TRIG_LEVEL_UP,升级时,When leveling up,En montant de niveau,レベルアップ時,레벨 업 시,升級時,При повышении уровня,Po awansie na poziom,Al subir de nivel,Ao subir de nível,Beim Stufenaufstieg,Seviye atlayınca,Al passaggio di livello
+BE_TRIG_WAVE_END,敌袭结束时,At the end of a wave,À la fin d'une vague,ウェーブ終了時,웨이브 종료 시,敵襲結束時,В конце волны,Na koniec fali,Al final de una oleada,No fim de uma onda,Am Ende einer Welle,Hücum sonunda,Alla fine di un'ondata
+BE_TRIG_NEXT_WAVE,下一波敌袭,Next wave,Vague suivante,次のウェーブ,다음 웨이브,下一波敵襲,Следующая волна,Następna fala,Siguiente oleada,Próxima onda,Nächste Welle,Sonraki hücum,Ondata successiva
+BE_TRIG_STILL,站立不动时,While standing still,En restant immobile,静止中,가만히 있을 때,站立不動時,Когда стоите на месте,Stojąc w miejscu,Al quedarte quieto,Parado,Beim Stillstehen,Hareketsizken,Stando fermo
+BE_TRIG_MOVING,移动时,While moving,En se déplaçant,移動中,이동 중,移動時,Во время движения,Podczas ruchu,Al moverte,Em movimento,Beim Bewegen,Hareket ederken,Muovendoti
+BE_TRIG_LOW_HP,生命值低于50%时,Below 50% HP,Sous 50 % des PV,HPが50%未満のとき,HP 50% 미만일 때,HP 低於 50% 時,Меньше 50% ОЗ,Poniżej 50% PZ,Con menos del 50 % de PS,Abaixo de 50% de PV,Unter 50 % HP,Sağlık %50'nin altındayken,Sotto il 50% dei PS
+BE_TRIG_HIT,受到伤害时（直至敌袭结束）,When taking damage (until end of wave),En subissant des dégâts (jusqu'à la fin de la vague),ダメージを受けたとき（ウェーブ終了まで）,피해를 받을 때 (웨이브 종료까지),受到傷害時（直到敵襲結束）,При получении урона (до конца волны),Po otrzymaniu obrażeń (do końca fali),Al recibir daño (hasta el final de la oleada),Ao sofrer dano (até o fim da onda),Bei Schaden (bis zum Ende der Welle),Hasar alınca (hücum sonuna kadar),Subendo danni (fino alla fine dell'ondata)
+BE_TRIG_DODGE,闪避时（直至敌袭结束）,When dodging (until end of wave),En esquivant (jusqu'à la fin de la vague),回避したとき（ウェーブ終了まで）,회피할 때 (웨이브 종료까지),閃避時（直到敵襲結束）,При уклонении (до конца волны),Po uniku (do końca fali),Al esquivar (hasta el final de la oleada),Ao esquivar (até o fim da onda),Beim Ausweichen (bis zum Ende der Welle),Kaçınınca (hücum sonuna kadar),Schivando (fino alla fine dell'ondata)
+BE_TRIG_INTERVAL,每隔一段时间（直至敌袭结束）,Periodically (until end of wave),Périodiquement (jusqu'à la fin de la vague),一定間隔ごと（ウェーブ終了まで）,주기적으로 (웨이브 종료까지),每隔一段時間（直到敵襲結束）,Периодически (до конца волны),Okresowo (do końca fali),Periódicamente (hasta el final de la oleada),Periodicamente (até o fim da onda),Regelmäßig (bis zum Ende der Welle),Belirli aralıklarla (hücum sonuna kadar),Periodicamente (fino alla fine dell'ondata)
+BE_TRIG_DECAY_HIT,受到伤害时（逐渐衰减）,When taking damage (decaying),En subissant des dégâts (dégressif),ダメージを受けたとき（徐々に減少）,피해를 받을 때 (점차 감소),受到傷害時（逐漸衰減）,При получении урона (угасает),Po otrzymaniu obrażeń (zanikające),Al recibir daño (decreciente),Ao sofrer dano (decrescente),Bei Schaden (abklingend),Hasar alınca (azalan),Subendo danni (decrescente)
+BE_TRIG_DECAY_CONSUMABLE,捡起消耗品时（逐渐衰减）,When picking up a consumable (decaying),En ramassant un consommable (dégressif),消耗品を拾ったとき（徐々に減少）,소모품을 주울 때 (점차 감소),撿起消耗品時（逐漸衰減）,При подборе расходника (угасает),Po podniesieniu przedmiotu użytkowego (zanikające),Al recoger un consumible (decreciente),Ao pegar um consumível (decrescente),Beim Aufheben eines Verbrauchsguts (abklingend),Sarf malzemesi alınca (azalan),Raccogliendo un consumabile (decrescente)
+BE_TRIG_CONSUMABLE_MAX,处于最大生命值时捡起消耗品（永久）,Consumable at max HP (permanent),Consommable avec PV max (permanent),最大HP時に消耗品（永続）,최대 HP일 때 소모품 (영구),HP 全滿時撿起消耗品（永久）,Расходник при макс. ОЗ (навсегда),Przedmiot użytkowy przy maks. PZ (na stałe),Consumible con PS al máximo (permanente),Consumível com PV no máximo (permanente),Verbrauchsgut bei max. HP (permanent),Maks. sağlıkta sarf malzemesi (kalıcı),Consumabile con PS al massimo (permanente)
+BE_TRIG_TEMP_CONSUMABLE_MAX,处于最大生命值时捡起消耗品（直至敌袭结束）,Consumable at max HP (until end of wave),Consommable avec PV max (jusqu'à la fin de la vague),最大HP時に消耗品（ウェーブ終了まで）,최대 HP일 때 소모품 (웨이브 종료까지),HP 全滿時撿起消耗品（直到敵襲結束）,Расходник при макс. ОЗ (до конца волны),Przedmiot użytkowy przy maks. PZ (do końca fali),Consumible con PS al máximo (hasta el final de la oleada),Consumível com PV no máximo (até o fim da onda),Verbrauchsgut bei max. HP (bis zum Ende der Welle),Maks. sağlıkta sarf malzemesi (hücum sonuna kadar),Consumabile con PS al massimo (fino alla fine dell'ondata)
+BE_TRIG_FRUIT,捡起水果时,When picking up a fruit,En ramassant un fruit,フルーツを拾ったとき,과일을 주울 때,撿起水果時,При подборе фрукта,Po podniesieniu owocu,Al recoger una fruta,Ao pegar uma fruta,Beim Aufheben einer Frucht,Meyve alınca,Raccogliendo un frutto
+BE_TRIG_REROLL,刷新商店时,When rerolling the shop,En randomisant la boutique,ショップをリロールしたとき,상점을 초기화할 때,重骰商店時,При обновлении магазина,Po przerzuceniu sklepu,Al repetir la tienda,Ao renovar a loja,Beim Neuwürfeln im Shop,Mağazayı yenileyince,Cambiando il negozio
+BE_TRIG_STEPS,每前进一定步数,Every few steps,Tous les quelques pas,数歩ごと,몇 걸음마다,每前進一定步數,Каждые несколько шагов,Co kilka kroków,Cada pocos pasos,A cada alguns passos,Alle paar Schritte,Birkaç adımda bir,Ogni pochi passi
+BE_TRIG_BURNING_KILL,杀死燃烧的敌人时,When killing a burning enemy,En tuant un ennemi en feu,燃焼中の敵を倒したとき,불타는 적을 처치할 때,殺死燃燒中的敵人時,При убийстве горящего врага,Po zabiciu płonącego wroga,Al matar a un enemigo en llamas,Ao matar um inimigo em chamas,Beim Töten eines brennenden Gegners,Yanan bir düşmanı öldürünce,Uccidendo un nemico in fiamme
+BE_SEC_START_WEAPONS,可选初始武器,Starting Weapons,Armes de départ,初期武器,시작 무기,可選初始武器,Начальное оружие,Bronie startowe,Armas iniciales,Armas iniciais,Startwaffen,Başlangıç Silahları,Armi iniziali
+BE_START_WEAPONS_DESC,开局在武器选择界面可以选的武器。,Weapons you can pick on the weapon selection screen.,Armes proposées sur l'écran de choix d'arme.,武器選択画面で選べる武器。,무기 선택 화면에서 고를 수 있는 무기.,開局在武器選擇畫面可以選的武器。,"Оружие, доступное на экране выбора оружия.",Bronie dostępne na ekranie wyboru broni.,Armas disponibles en la pantalla de selección de arma.,Armas disponíveis na tela de seleção de arma.,"Waffen, die auf dem Waffenauswahl-Bildschirm wählbar sind.",Silah seçim ekranında seçilebilen silahlar.,Armi selezionabili nella schermata di scelta dell'arma.
+BE_START_WEAPONS_EMPTY,没有可选武器：自定义角色会以拳头开局。,No weapons: a custom character will start with Fist.,Aucune arme : un personnage personnalisé commence avec Poing.,武器なし：カスタムキャラクターは素手で開始します。,무기 없음: 사용자 캐릭터는 주먹으로 시작합니다.,沒有可選武器：自訂角色會以拳頭開局。,Нет оружия: свой персонаж начнёт с Кулака.,Brak broni: własna postać zacznie z Pięścią.,Sin armas: un personaje personalizado empezará con Puño.,Sem armas: um personagem personalizado começará com Punho.,Keine Waffen: ein eigener Charakter startet mit Faust.,Silah yok: özel karakter Yumruk ile başlar.,Nessuna arma: un personaggio personalizzato inizierà con Pugno.
+BE_PICK_WEAPONS,选择武器,Choose Weapons,Choisir les armes,武器を選択,무기 선택,選擇武器,Выбрать оружие,Wybierz bronie,Elegir armas,Escolher armas,Waffen wählen,Silah Seç,Scegli armi
+BE_RESTORE_ORIGINAL,恢复原版,Restore Vanilla,Restaurer l'original,オリジナルに戻す,기본값으로 복원,恢復原版,Вернуть стандартное,Przywróć podstawowe,Restaurar original,Restaurar original,Original wiederherstellen,Orijinale Dön,Ripristina originale
+BE_SEC_START_ITEMS,额外初始装备,Extra Starting Gear,Équipement de départ supplémentaire,追加の初期装備,추가 시작 장비,額外初始裝備,Дополнительное начальное снаряжение,Dodatkowe wyposażenie startowe,Equipo inicial adicional,Equipamento inicial extra,Zusätzliche Startausrüstung,Ek Başlangıç Ekipmanı,Equipaggiamento iniziale extra
+BE_START_ITEMS_DESC,开局直接获得的道具 / 武器。勾选“诅咒”需要 Abyssal Terrors DLC。,"Items / weapons you start the run with. ""Cursed"" requires the Abyssal Terrors DLC.",Objets / armes obtenus au début de la partie. « Maudit » nécessite le DLC Abyssal Terrors.,ラン開始時に所持するアイテム / 武器。「呪い」には Abyssal Terrors DLC が必要です。,"런을 시작할 때 갖고 있는 아이템 / 무기. ""저주""는 Abyssal Terrors DLC가 필요합니다.",開局直接獲得的道具 / 武器。勾選「詛咒」需要 Abyssal Terrors DLC。,"Предметы / оружие, с которыми начинается забег. «Проклятый» требует DLC Abyssal Terrors.","Przedmioty / bronie, z którymi zaczynasz rozgrywkę. „Przeklęte” wymaga DLC Abyssal Terrors.",Objetos / armas con los que empiezas la partida. «Maldito» requiere el DLC Abyssal Terrors.,"Itens / armas com que você começa a partida. ""Amaldiçoado"" requer a DLC Abyssal Terrors.","Gegenstände / Waffen, mit denen du den Run beginnst. „Verflucht“ benötigt den DLC Abyssal Terrors.","Oyuna sahip olarak başladığın eşyalar / silahlar. ""Lanetli"" için Abyssal Terrors DLC gerekir.","Oggetti / armi con cui inizi la partita. ""Maledetto"" richiede il DLC Abyssal Terrors."
+BE_ADD_ITEMS,添加道具,Add Items,Ajouter des objets,アイテムを追加,아이템 추가,新增道具,Добавить предметы,Dodaj przedmioty,Añadir objetos,Adicionar itens,Gegenstände hinzufügen,Eşya Ekle,Aggiungi oggetti
+BE_ADD_WEAPONS,添加武器,Add Weapons,Ajouter des armes,武器を追加,무기 추가,新增武器,Добавить оружие,Dodaj bronie,Añadir armas,Adicionar armas,Waffen hinzufügen,Silah Ekle,Aggiungi armi
+BE_COUNT,数量,Amount,Quantité,数量,수량,數量,Количество,Ilość,Cantidad,Quantidade,Anzahl,Miktar,Quantità
+BE_CURSED,诅咒,Cursed,Maudit,呪い,저주,詛咒,Проклятый,Przeklęte,Maldito,Amaldiçoado,Verflucht,Lanetli,Maledetto
+BE_BANS_DESC,被禁用的道具 / 武器不会出现在商店和箱子里（禁用一种武器会禁用其所有等级）。点击图标禁用 / 启用。,Banned items / weapons never appear in the shop or in crates (banning a weapon bans all of its tiers). Click an icon to ban / unban.,Les objets / armes bannis n'apparaissent ni en boutique ni dans les caisses (bannir une arme bannit tous ses rangs). Cliquez sur une icône pour bannir / rétablir.,BANしたアイテム / 武器はショップや箱に出ません（武器をBANするとすべてのティアが対象）。アイコンをクリックでBAN / 解除。,차단한 아이템 / 무기는 상점과 상자에 나오지 않습니다 (무기를 차단하면 모든 등급이 차단됩니다). 아이콘을 클릭해 차단 / 해제.,被禁用的道具 / 武器不會出現在商店和箱子裡（禁用一種武器會禁用其所有等級）。點擊圖示禁用 / 啟用。,"Запрещённые предметы / оружие не появляются в магазине и ящиках (запрет оружия действует на все его уровни). Нажмите на значок, чтобы запретить / разрешить.","Zakazane przedmioty / bronie nie pojawiają się w sklepie ani w skrzyniach (zakaz broni obejmuje wszystkie jej poziomy). Kliknij ikonę, aby zakazać / dopuścić.",Los objetos / armas vetados no aparecen en la tienda ni en las cajas (vetar un arma veta todos sus niveles). Haz clic en un icono para vetar / permitir.,Itens / armas banidos não aparecem na loja nem em caixas (banir uma arma bane todos os seus níveis). Clique em um ícone para banir / liberar.,Verbannte Gegenstände / Waffen erscheinen weder im Shop noch in Kisten (eine verbannte Waffe ist in allen Stufen verbannt). Zum Verbannen / Freigeben auf ein Symbol klicken.,Yasaklı eşyalar / silahlar mağazada ve sandıklarda çıkmaz (bir silahı yasaklamak tüm kademelerini yasaklar). Yasaklamak / izin vermek için simgeye tıkla.,Oggetti / armi bannati non compaiono nel negozio né nelle casse (bannare un'arma banna tutti i suoi livelli). Clicca un'icona per bannare / riammettere.
+BE_BANS_CLEAR,清空,Clear,Vider,クリア,비우기,清空,Очистить,Wyczyść,Vaciar,Limpar,Leeren,Temizle,Svuota
+BE_BAN_ITEMS,禁用道具（{0}）,Banned Items ({0}),Objets bannis ({0}),BANアイテム（{0}）,차단한 아이템 ({0}),禁用道具（{0}）,Запрещённые предметы ({0}),Zakazane przedmioty ({0}),Objetos vetados ({0}),Itens banidos ({0}),Verbannte Gegenstände ({0}),Yasaklı Eşyalar ({0}),Oggetti bannati ({0})
+BE_BAN_WEAPONS,禁用武器系列（{0}）,Banned Weapons ({0}),Armes bannies ({0}),BAN武器（{0}）,차단한 무기 ({0}),禁用武器系列（{0}）,Запрещённое оружие ({0}),Zakazane bronie ({0}),Armas vetadas ({0}),Armas banidas ({0}),Verbannte Waffen ({0}),Yasaklı Silahlar ({0}),Armi bannate ({0})
+BE_PICKER_START_WEAPONS,选择可选初始武器,Choose Starting Weapons,Choisir les armes de départ,初期武器を選択,시작 무기 선택,選擇可選初始武器,Выбор начального оружия,Wybierz bronie startowe,Elegir armas iniciales,Escolher armas iniciais,Startwaffen wählen,Başlangıç Silahlarını Seç,Scegli armi iniziali
+BE_PICKER_START_ITEMS,添加初始道具,Add Starting Items,Ajouter des objets de départ,初期アイテムを追加,시작 아이템 추가,新增初始道具,Добавить начальные предметы,Dodaj przedmioty startowe,Añadir objetos iniciales,Adicionar itens iniciais,Startgegenstände hinzufügen,Başlangıç Eşyası Ekle,Aggiungi oggetti iniziali
+BE_PICKER_START_ITEMS_W,添加初始武器,Add Starting Weapons,Ajouter des armes de départ,初期武器を追加,시작 무기 추가,新增初始武器,Добавить начальное оружие,Dodaj bronie startowe,Añadir armas iniciales,Adicionar armas iniciais,Startwaffen hinzufügen,Başlangıç Silahı Ekle,Aggiungi armi iniziali
+BE_PICKER_BASE,选择基底角色,Choose Base Character,Choisir le personnage de base,ベースキャラクターを選択,기반 캐릭터 선택,選擇基底角色,Выбор основы,Wybierz postać bazową,Elegir personaje base,Escolher personagem base,Basis-Charakter wählen,Temel Karakter Seç,Scegli personaggio base
+BE_PICKER_ICON,选择图标,Choose Icon,Choisir l'icône,アイコンを選択,아이콘 선택,選擇圖示,Выбор значка,Wybierz ikonę,Elegir icono,Escolher ícone,Symbol wählen,Simge Seç,Scegli icona
+BE_PICKER_MULTI_DESC,点击图标选中 / 取消，确认后生效。,"Click icons to select / deselect, then confirm.","Cliquez sur les icônes pour (dé)sélectionner, puis confirmez.",アイコンをクリックで選択 / 解除し、確定してください。,아이콘을 클릭해 선택 / 해제한 뒤 확인하세요.,點擊圖示選取 / 取消，確認後生效。,"Нажимайте на значки, чтобы выбрать / снять выбор, затем подтвердите.","Klikaj ikony, aby zaznaczyć / odznaczyć, potem potwierdź.",Haz clic en los iconos para seleccionar / quitar y luego confirma.,Clique nos ícones para selecionar / desmarcar e depois confirme.,"Symbole zum (Ab)wählen anklicken, dann bestätigen.","Seçmek / kaldırmak için simgelere tıkla, sonra onayla.","Clicca sulle icone per selezionare / deselezionare, poi conferma."
+BE_PICKER_SINGLE_DESC,点击图标即选中。,Click an icon to select it.,Cliquez sur une icône pour la choisir.,アイコンをクリックすると選択されます。,아이콘을 클릭하면 선택됩니다.,點擊圖示即選取。,"Нажмите на значок, чтобы выбрать его.","Kliknij ikonę, aby ją wybrać.",Haz clic en un icono para elegirlo.,Clique em um ícone para escolhê-lo.,Zum Auswählen auf ein Symbol klicken.,Seçmek için bir simgeye tıkla.,Clicca su un'icona per sceglierla.
+BE_PICKER_CLEAR,清空选择,Clear Selection,Tout désélectionner,選択をクリア,선택 비우기,清空選取,Снять выбор,Wyczyść wybór,Vaciar selección,Limpar seleção,Auswahl leeren,Seçimi Temizle,Svuota selezione
+BE_PICKER_COUNT,已选 {0},{0} selected,{0} sélectionné(s),{0} 件選択中,{0}개 선택됨,已選 {0},Выбрано: {0},Wybrano: {0},{0} seleccionados,{0} selecionados,{0} ausgewählt,{0} seçili,{0} selezionati
+BE_CANCEL,取消,Cancel,Annuler,キャンセル,취소,取消,Отмена,Anuluj,Cancelar,Cancelar,Abbrechen,İptal Et,Annulla
+BE_CONFIRM,确认,Confirm,Confirmer,確定,확인,確認,Подтвердить,Potwierdź,Confirmar,Confirmar,Bestätigen,Onayla,Conferma
+BE_K_XP_GAIN,获得%经验,,,,,,,,,,,,
+BE_K_PICKUP_RANGE,%拾取范围,,,,,,,,,,,,
+BE_K_KNOCKBACK,击退,,,,,,,,,,,,
+BE_K_CONSUMABLE_HEAL,消耗性治疗,,,,,,,,,,,,
+BE_K_EXPLOSION_DAMAGE,%爆炸伤害,,,,,,,,,,,,
+BE_K_EXPLOSION_SIZE,%爆炸范围,,,,,,,,,,,,
+BE_K_PIERCING,贯通,,,,,,,,,,,,
+BE_K_PIERCING_DAMAGE,%贯通伤害,,,,,,,,,,,,
+BE_K_BOUNCE,反弹,,,,,,,,,,,,
+BE_K_BOUNCE_DAMAGE,%反弹伤害,,,,,,,,,,,,
+BE_K_PROJECTILES,投射物,,,,,,,,,,,,
+BE_K_DAMAGE_AGAINST_BOSSES,%对头目伤害,,,,,,,,,,,,
+BE_K_BURNING_SPREAD,燃烧蔓延,,,,,,,,,,,,
+BE_K_BURNING_COOLDOWN_REDUCTION,%燃烧速度,,,,,,,,,,,,
+BE_K_STRUCTURE_ATTACK_SPEED,%构筑物的攻击速度,,,,,,,,,,,,
+BE_K_STRUCTURE_PERCENT_DAMAGE,%构筑物伤害,% Structure Damage,% Dégâts des structures,% 設置物ダメージ,% 구조물 대미지,%構築物傷害,% урона строений,% obrażeń budowli,% Daño de estructuras,% Dano de estruturas,% Struktur-Schaden,% Yapı Hasarı,% Danni delle strutture
+BE_K_STRUCTURE_RANGE,构筑物范围,,,,,,,,,,,,
+BE_K_ACCURACY,%命中率,,,,,,,,,,,,
+BE_K_HARVESTING_GROWTH,%收获成长,% Harvesting Growth,% Croissance de la récolte,% 収穫の成長,% 수확 성장,%收穫成長,% роста сбора урожая,% wzrostu zbierania,% Crecimiento de cosecha,% Crescimento da coleta,% Ernte-Wachstum,% Hasat Büyümesi,% Crescita della raccolta
+BE_K_WEAPON_SLOT,武器栏,,,,,,,,,,,,
+BE_K_ITEMS_PRICE,%道具价格,,,,,,,,,,,,
+BE_K_WEAPONS_PRICE,%武器价格,,,,,,,,,,,,
+BE_K_REROLL_PRICE,%刷新价格,,,,,,,,,,,,
+BE_K_FREE_REROLLS,免费刷新,,,,,,,,,,,,
+BE_K_GOLD_DROPS,%材料掉落,% Material Drops,% Matériaux lâchés,% マテリアルドロップ,% 재료 드롭,%材料掉落,% выпадения материалов,% upuszczanych materiałów,% Materiales soltados,% Materiais derrubados,% Material-Drops,% Malzeme Düşürme,% Materiali rilasciati
+BE_K_ENEMY_GOLD_DROPS,%敌人材料掉落,% Enemy Material Drops,% Matériaux lâchés par les ennemis,% 敵のマテリアルドロップ,% 적 재료 드롭,%敵人材料掉落,% материалов с врагов,% materiałów z wrogów,% Materiales de enemigos,% Materiais de inimigos,% Material-Drops von Gegnern,% Düşmanlardan Malzeme,% Materiali dai nemici
+BE_K_NEUTRAL_GOLD_DROPS,%树木材料掉落,% Tree Material Drops,% Matériaux lâchés par les arbres,% 木のマテリアルドロップ,% 나무 재료 드롭,%樹木材料掉落,% материалов с деревьев,% materiałów z drzew,% Materiales de árboles,% Materiais de árvores,% Material-Drops von Bäumen,% Ağaçlardan Malzeme,% Materiali dagli alberi
+BE_K_CRATE_CHANCE,%树木掉落箱子几率,% Crates Dropped by Trees,% Caisses lâchées par les arbres,% 木から箱が出る確率,% 나무의 상자 드롭,%樹木掉落箱子機率,% ящиков с деревьев,% skrzyń z drzew,% Cajas de árboles,% Caixas de árvores,% Kisten von Bäumen,% Ağaçlardan Sandık,% Casse dagli alberi
+BE_K_LOOT_ALIEN_CHANCE,%战利品外星人几率,% Loot Alien Chance,% Chance de Pillard,% 戦利品エイリアンの出現率,% 전리품 외계인 확률,%戰利品異形機率,% шанс пришельца с добычей,% szansy na obcego z łupami,% Probabilidad de botín alienígena,% Chance de alienígena do tesouro,% Beute-Alien-Chance,% Yağmacı Uzaylı Şansı,% Probabilità di alieno con bottino
+BE_K_RECYCLING_GAINS,%回收收益,% Recycling Gains,% Gains de recyclage,% リサイクル収益,% 재활용 수익,%回收收益,% выгоды от разбора,% zysku z przetwarzania,% Ganancias de reciclaje,% Ganhos de reciclagem,% Verwertungsertrag,% Geri Dönüşüm Kazancı,% Guadagni dal riciclo
+BE_K_MAP_SIZE,%地图尺寸,,,,,,,,,,,,
+BE_K_NUMBER_OF_ENEMIES,%敌人数量,% Number of Enemies,% Nombre d'ennemis,% 敵の数,% 적 수,%敵人數量,% количества врагов,% liczby wrogów,% Número de enemigos,% Número de inimigos,% Anzahl der Gegner,% Düşman Sayısı,% Numero di nemici
+BE_K_ENEMY_HEALTH,%敌人生命值,,,,,,,,,,,,
+BE_K_ENEMY_DAMAGE,%敌人伤害,,,,,,,,,,,,
+BE_K_ENEMY_SPEED,%敌人速度,,,,,,,,,,,,
+BE_K_BOSS_STRENGTH,%头目强度,% Boss Strength,% Force des boss,% ボスの強さ,% 보스 강도,%頭目強度,% силы боссов,% siły bossów,% Fuerza de los jefes,% Força dos chefes,% Boss-Stärke,% Boss Gücü,% Forza dei boss
+BE_K_TREES,树木,,,,,,,,,,,,
+BE_K_TREES_START_WAVE,每波敌袭开始时的树木,Trees at Wave Start,Arbres en début de vague,ウェーブ開始時の木,웨이브 시작 시 나무,每波敵襲開始時的樹木,Деревья в начале волны,Drzewa na początku fali,Árboles al inicio de la oleada,Árvores no início da onda,Bäume zu Wellenbeginn,Hücum Başında Ağaçlar,Alberi a inizio ondata
+BE_K_HP_START_WAVE,%敌袭开始时的生命值,% HP at Wave Start,% PV en début de vague,% ウェーブ開始時のHP,% 웨이브 시작 시 HP,%敵襲開始時的 HP,% ОЗ в начале волны,% PZ na początku fali,% PS al inicio de la oleada,% PV no início da onda,% HP zu Wellenbeginn,% Hücum Başında Sağlık,% PS a inizio ondata
+BE_K_HP_START_NEXT_WAVE,%下一波敌袭开始时的生命值,% HP at Next Wave Start,% PV au début de la vague suivante,% 次のウェーブ開始時のHP,% 다음 웨이브 시작 시 HP,%下一波敵襲開始時的 HP,% ОЗ в начале следующей волны,% PZ na początku następnej fali,% PS al inicio de la siguiente oleada,% PV no início da próxima onda,% HP zu Beginn der nächsten Welle,% Sonraki Hücum Başında Sağlık,% PS all'inizio dell'ondata successiva
+BE_K_DODGE_CAP,闪避上限,Dodge Cap,Plafond d'esquive,回避の上限,회피 상한,閃避上限,Предел уклонения,Limit uniku,Límite de esquiva,Limite de esquiva,Ausweichen-Obergrenze,Kaçınma Sınırı,Limite di schivata
+BE_K_SPEED_CAP,速度上限,Speed Cap,Plafond de vitesse,スピードの上限,속도 상한,速度上限,Предел скорости,Limit szybkości,Límite de velocidad,Limite de velocidade,Tempo-Obergrenze,Hız Sınırı,Limite di velocità
+BE_K_HP_CAP,最大生命值上限,Max HP Cap,Plafond de PV max,最大HPの上限,최대 HP 상한,最大 HP 上限,Предел макс. ОЗ,Limit maks. PZ,Límite de PS máx.,Limite de PV máx.,Max.-HP-Obergrenze,Maks. Sağlık Sınırı,Limite di PS massimi
+BE_K_CRIT_CHANCE_CAP,暴击率上限,Crit Chance Cap,Plafond de chance de critique,クリティカル率の上限,치명타 확률 상한,暴擊率上限,Предел шанса крита,Limit szansy na krytyka,Límite de prob. de crítico,Limite de chance crítica,Krit.-Chance-Obergrenze,Kritik Şansı Sınırı,Limite di probabilità di critico
+BE_K_NO_MELEE_WEAPONS,禁止近战武器,No Melee Weapons,Pas d'armes de mêlée,近接武器なし,근접 무기 금지,禁止近戰武器,Без оружия ближнего боя,Bez broni do walki wręcz,Sin armas cuerpo a cuerpo,Sem armas corpo a corpo,Keine Nahkampfwaffen,Yakın Dövüş Silahı Yok,Niente armi da mischia
+BE_K_NO_RANGED_WEAPONS,禁止远程武器,No Ranged Weapons,Pas d'armes à distance,遠距離武器なし,원거리 무기 금지,禁止遠程武器,Без оружия дальнего боя,Bez broni dystansowej,Sin armas a distancia,Sem armas de longo alcance,Keine Fernkampfwaffen,Menzilli Silah Yok,Niente armi a distanza
+BE_K_NO_DUPLICATE_WEAPONS,禁止重复武器,No Duplicate Weapons,Pas d'armes en double,武器の重複なし,중복 무기 금지,禁止重複武器,Без повторяющегося оружия,Bez powtarzających się broni,Sin armas duplicadas,Sem armas duplicadas,Keine doppelten Waffen,Aynı Silahtan İkinci Yok,Niente armi doppie
+BE_K_MIN_WEAPON_TIER,最低武器稀有度,Min Weapon Tier,Rang d'arme min,武器の最低ティア,최소 무기 등급,最低武器稀有度,Мин. уровень оружия,Min. poziom broni,Nivel de arma mínimo,Nível mínimo de arma,Min. Waffenstufe,Min. Silah Kademesi,Livello arma minimo
+BE_K_MAX_WEAPON_TIER,最高武器稀有度,Max Weapon Tier,Rang d'arme max,武器の最高ティア,최대 무기 등급,最高武器稀有度,Макс. уровень оружия,Maks. poziom broni,Nivel de arma máximo,Nível máximo de arma,Max. Waffenstufe,Maks. Silah Kademesi,Livello arma massimo
+BE_K_MAX_MELEE_WEAPONS,近战武器上限,Max Melee Weapons,Armes de mêlée max,近接武器の最大数,최대 근접 무기 수,近戰武器上限,Макс. оружия ближнего боя,Maks. broni do walki wręcz,Máx. armas cuerpo a cuerpo,Máx. de armas corpo a corpo,Max. Nahkampfwaffen,Maks. Yakın Dövüş Silahı,Max armi da mischia
+BE_K_MAX_RANGED_WEAPONS,远程武器上限,Max Ranged Weapons,Armes à distance max,遠距離武器の最大数,최대 원거리 무기 수,遠程武器上限,Макс. оружия дальнего боя,Maks. broni dystansowych,Máx. armas a distancia,Máx. de armas de longo alcance,Max. Fernkampfwaffen,Maks. Menzilli Silah,Max armi a distanza
+BE_K_CAN_ATTACK_WHILE_MOVING,移动时可攻击,Can Attack While Moving,Attaque en mouvement,移動中に攻撃可能,이동 중 공격 가능,移動時可攻擊,Атака в движении,Atak w ruchu,Atacar en movimiento,Atacar em movimento,Angriff in Bewegung,Hareket Halinde Saldırı,Attacca in movimento
+BE_K_ONE_SHOT_TREES,一击砍倒树木,One-Shot Trees,Arbres abattus en un coup,木を一撃で倒す,나무 한 방에 베기,一擊砍倒樹木,Деревья с одного удара,Drzewa od jednego ciosu,Árboles de un golpe,Árvores em um golpe,Bäume mit einem Schlag,Ağaçlar Tek Vuruşta,Alberi con un colpo
+BE_K_DOUBLE_BOSS,同时出现两个头目,Two Bosses at Once,Deux boss à la fois,ボス2体同時出現,보스 2마리 동시 등장,同時出現兩個頭目,Два босса сразу,Dwóch bossów naraz,Dos jefes a la vez,Dois chefes ao mesmo tempo,Zwei Bosse gleichzeitig,Aynı Anda İki Boss,Due boss insieme
+BE_K_STRUCTURES_CAN_CRIT,构筑物可以暴击,Structures Can Crit,Les structures peuvent critiquer,設置物がクリティカル可能,구조물 치명타 가능,構築物可以暴擊,Строения могут наносить крит,Budowle mogą trafiać krytycznie,Las estructuras pueden hacer críticos,Estruturas podem causar crítico,Strukturen können kritisch treffen,Yapılar Kritik Vurabilir,Le strutture possono fare critici
+BE_K_INSTANT_GOLD_ATTRACTING,立即吸取材料,Instant Material Pickup,Ramassage instantané des matériaux,マテリアル即時回収,재료 즉시 회수,立即吸取材料,Мгновенный сбор материалов,Natychmiastowe zbieranie materiałów,Recogida instantánea de materiales,Coleta instantânea de materiais,Material sofort einsammeln,Anında Malzeme Toplama,Raccolta istantanea dei materiali
+BE_K_HP_SHOP,用生命购买,Pay with HP,Payer en PV,HPで支払う,HP로 구매,用 HP 購買,Оплата здоровьем,Płatność PZ,Pagar con PS,Pagar com PV,Mit HP bezahlen,Sağlıkla Öde,Paga con i PS
+BE_K_NO_HEAL,无法恢复生命值,Cannot Heal,Aucun soin,回復不可,회복 불가,無法回復 HP,Без лечения,Brak leczenia,Sin curación,Sem cura,Keine Heilung,İyileşme Yok,Nessuna cura
+BE_K_PACIFIST,和平主义者,Pacifist,Pacifiste,平和主義,평화주의자,和平主義者,Пацифист,Pacyfista,Pacifista,Pacifista,Pazifist,Pasifist,Pacifista
+BE_K_TORTURE,折磨,Torture,Torture,拷問,고문,折磨,Пытка,Tortury,Tortura,Tortura,Folter,İşkence,Tortura
+BE_K_CONSUMABLE,消耗品,Consumable,Consommable,消耗品,소모품,消耗品,Расходники,Przedmioty użytkowe,Consumible,Consumível,Verbrauchsgut,Sarf Malzemesi,Consumabile
+BE_K_ECONOMY,经济,Economy,Économie,経済,경제,經濟,Экономика,Ekonomia,Economía,Economia,Wirtschaft,Ekonomi,Economia
+BE_K_EXPLORATION,探索,Exploration,Exploration,探索,탐색,探索,Исследование,Eksploracja,Exploración,Exploração,Erkundung,Keşif,Esplorazione
+BE_K_EXPLOSIVE,爆炸,Explosive,Explosif,爆発,폭발,爆炸,Взрывы,Wybuchy,Explosivo,Explosivo,Explosiv,Patlayıcı,Esplosivo
+BE_K_LESS_ENEMIES,更少敌人,Fewer Enemies,Moins d'ennemis,敵が少ない,적 감소,更少敵人,Меньше врагов,Mniej wrogów,Menos enemigos,Menos inimigos,Weniger Gegner,Daha Az Düşman,Meno nemici
+BE_K_LESS_ENEMY_SPEED,敌人更慢,Slower Enemies,Ennemis plus lents,敵が遅い,적 느려짐,敵人更慢,Медленные враги,Wolniejsi wrogowie,Enemigos más lentos,Inimigos mais lentos,Langsamere Gegner,Daha Yavaş Düşmanlar,Nemici più lenti
+BE_K_LOCK,锁定,Lock,Verrouillage,ロック,잠금,鎖定,Блокировка,Blokada,Bloqueo,Bloqueio,Sperren,Kilit,Blocco
+BE_K_MORE_ENEMIES,更多敌人,More Enemies,Plus d'ennemis,敵が多い,적 증가,更多敵人,Больше врагов,Więcej wrogów,Más enemigos,Mais inimigos,Mehr Gegner,Daha Fazla Düşman,Più nemici
+BE_K_PET,宠物,,,,,,,,,,,,
+BE_K_PICKUP,拾取,Pickup,Ramassage,回収,줍기,拾取,Подбор,Zbieranie,Recogida,Coleta,Aufsammeln,Toplama,Raccolta
+BE_K_STAND_STILL,静止,Standing Still,Immobilité,静止,정지,靜止,На месте,Bezruch,Quieto,Parado,Stillstehen,Hareketsizlik,Fermo
+BE_K_STRUCTURE,构筑物,,,,,,,,,,,,
+BE_K_STRUCTURE_REAL,构筑物（实体）,Structure (Real),Structure (réelle),設置物（実体）,구조물 (실체),構築物（實體）,Строение (настоящее),Budowla (prawdziwa),Estructura (real),Estrutura (real),Struktur (echt),Yapı (gerçek),Struttura (reale)
+BE_TAB_BLUEPRINT,蓝图,Blueprint,Plan,設計図,설계도,藍圖,Схема,Schemat,Plano,Projeto,Bauplan,Şema,Progetto
+BE_ADD_TRIGGER,+ 扳机,+ Trigger,+ Déclencheur,+ トリガー,+ 트리거,+ 觸發,+ Триггер,+ Wyzwalacz,+ Activador,+ Gatilho,+ Auslöser,+ Tetikleyici,+ Innesco
+BE_ADD_COND,+ 条件,+ Condition,+ Condition,+ 条件,+ 조건,+ 條件,+ Условие,+ Warunek,+ Condición,+ Condição,+ Bedingung,+ Koşul,+ Condizione
+BE_ADD_EFFECT,+ 效果,+ Effect,+ Effet,+ 効果,+ 효과,+ 效果,+ Эффект,+ Efekt,+ Efecto,+ Efeito,+ Effekt,+ Efekt,+ Effetto
+BE_GRAPH_CLEAR,清空蓝图,Clear Blueprint,Vider le plan,設計図をクリア,설계도 비우기,清空藍圖,Очистить схему,Wyczyść schemat,Vaciar plano,Limpar projeto,Bauplan leeren,Şemayı Temizle,Svuota progetto
+BE_GRAPH_DESC,从扳机的右端口拖线到条件 / 效果的左端口连成路径；条件可以串联、分叉。点击节点右上角的 X 删除，Ctrl + 滚轮缩放。,"Drag from a trigger's right port to a condition / effect's left port to build a path; conditions can be chained and branched. Click the X at a node's top-right to delete it, Ctrl + mouse wheel to zoom.","Glissez du port droit d'un déclencheur vers le port gauche d'une condition / d'un effet pour tracer un chemin ; les conditions peuvent s'enchaîner et se ramifier. Cliquez sur le X d'un nœud pour le supprimer, Ctrl + molette pour zoomer.",トリガーの右端子から条件 / 効果の左端子へドラッグしてパスを作ります。条件は連結・分岐できます。ノード右上の X で削除、Ctrl + ホイールで拡大縮小。,"트리거의 오른쪽 단자에서 조건 / 효과의 왼쪽 단자로 끌어 경로를 만드세요. 조건은 이어 붙이거나 분기할 수 있습니다. 노드 오른쪽 위의 X로 삭제, Ctrl + 휠로 확대/축소.",從觸發的右端口拖線到條件 / 效果的左端口連成路徑；條件可以串聯、分岔。點擊節點右上角的 X 刪除，Ctrl + 滾輪縮放。,"Протяните связь от правого порта триггера к левому порту условия / эффекта, чтобы построить путь; условия можно соединять цепочкой и ветвить. X в правом верхнем углу узла удаляет его, Ctrl + колесо — масштаб.","Przeciągnij od prawego portu wyzwalacza do lewego portu warunku / efektu, aby utworzyć ścieżkę; warunki można łączyć w łańcuchy i rozgałęziać. X w prawym górnym rogu węzła usuwa go, Ctrl + kółko myszy przybliża.","Arrastra desde el puerto derecho de un activador hasta el puerto izquierdo de una condición / efecto para crear una ruta; las condiciones se pueden encadenar y ramificar. Haz clic en la X de un nodo para eliminarlo, Ctrl + rueda para hacer zoom.","Arraste da porta direita de um gatilho até a porta esquerda de uma condição / efeito para criar um caminho; condições podem ser encadeadas e ramificadas. Clique no X de um nó para excluí-lo, Ctrl + roda do mouse para zoom.","Ziehe vom rechten Anschluss eines Auslösers zum linken Anschluss einer Bedingung / eines Effekts, um einen Pfad zu bauen; Bedingungen lassen sich verketten und verzweigen. X oben rechts an einem Knoten löscht ihn, Strg + Mausrad zoomt.","Bir yol oluşturmak için tetikleyicinin sağ bağlantısından koşulun / efektin sol bağlantısına sürükle; koşullar zincirlenebilir ve dallanabilir. Silmek için düğümün sağ üstündeki X'e tıkla, yakınlaştırmak için Ctrl + fare tekerleği.","Trascina dalla porta destra di un innesco alla porta sinistra di una condizione / un effetto per creare un percorso; le condizioni si possono concatenare e ramificare. Clicca la X di un nodo per eliminarlo, Ctrl + rotellina per lo zoom."
+BE_GRAPH_PATHS,路径预览,Path Preview,Aperçu des chemins,パスのプレビュー,경로 미리보기,路徑預覽,Предпросмотр путей,Podgląd ścieżek,Vista previa de rutas,Prévia dos caminhos,Pfadvorschau,Yol Önizlemesi,Anteprima percorsi
+BE_GRAPH_EMPTY,还没有完整的路径（扳机 → … → 效果）。,No complete path yet (trigger → … → effect).,Aucun chemin complet (déclencheur → … → effet).,完成したパス（トリガー → … → 効果）がまだありません。,아직 완성된 경로가 없습니다 (트리거 → … → 효과).,還沒有完整的路徑（觸發 → … → 效果）。,Пока нет полного пути (триггер → … → эффект).,Brak pełnej ścieżki (wyzwalacz → … → efekt).,Aún no hay rutas completas (activador → … → efecto).,Ainda não há caminhos completos (gatilho → … → efeito).,Noch kein vollständiger Pfad (Auslöser → … → Effekt).,Henüz tam bir yol yok (tetikleyici → … → efekt).,Ancora nessun percorso completo (innesco → … → effetto).
+BE_TYPE_TRIGGER,扳机,Trigger,Déclencheur,トリガー,트리거,觸發,Триггер,Wyzwalacz,Activador,Gatilho,Auslöser,Tetikleyici,Innesco
+BE_TYPE_COND,条件,Condition,Condition,条件,조건,條件,Условие,Warunek,Condición,Condição,Bedingung,Koşul,Condizione
+BE_TYPE_EFFECT,效果,Effect,Effet,効果,효과,效果,Эффект,Efekt,Efecto,Efeito,Effekt,Efekt,Effetto
+BE_P_SECS,秒,Seconds,Secondes,秒,초,秒,Секунды,Sekundy,Segundos,Segundos,Sekunden,Saniye,Secondi
+BE_P_PCT,百分比,Percent,Pourcentage,パーセント,퍼센트,百分比,Процент,Procent,Porcentaje,Porcentagem,Prozent,Yüzde,Percentuale
+BE_P_N,数量,Amount,Quantité,数量,수량,數量,Количество,Ilość,Cantidad,Quantidade,Anzahl,Miktar,Quantità
+BE_P_STAT,属性,Stat,Stat,ステータス,능력치,屬性,Характеристика,Statystyka,Estadística,Atributo,Wert,İstatistik,Statistica
+BE_P_VALUE,数值,Value,Valeur,数値,수치,數值,Значение,Wartość,Valor,Valor,Wert,Değer,Valore
+BE_P_REF,效果,Effect,Effet,効果,효과,效果,Эффект,Efekt,Efecto,Efeito,Effekt,Efekt,Effetto
+BE_P_MODE,持续,Duration,Durée,持続,지속,持續,Длительность,Czas trwania,Duración,Duração,Dauer,Süre,Durata
+BE_MODE_TEMP,直至敌袭结束,Until end of wave,Jusqu'à la fin de la vague,ウェーブ終了まで,웨이브 종료까지,直到敵襲結束,До конца волны,Do końca fali,Hasta el final de la oleada,Até o fim da onda,Bis zum Ende der Welle,Hücum sonuna kadar,Fino alla fine dell'ondata
+BE_MODE_PERM,永久,Permanent,Permanent,永続,영구,永久,Навсегда,Na stałe,Permanente,Permanente,Permanent,Kalıcı,Permanente
+BE_GRANT_PICK,选择效果…,Choose effect…,Choisir un effet…,効果を選択…,효과 선택…,選擇效果…,Выбрать эффект…,Wybierz efekt…,Elegir efecto…,Escolher efeito…,Effekt wählen…,Efekt seç…,Scegli effetto…
+BE_GRANT_NONE,（未选择效果）,(no effect chosen),(aucun effet choisi),（効果未選択）,(선택한 효과 없음),（未選擇效果）,(эффект не выбран),(nie wybrano efektu),(ningún efecto elegido),(nenhum efeito escolhido),(kein Effekt gewählt),(efekt seçilmedi),(nessun effetto scelto)
+BE_PICK,选择,Choose,Choisir,選択,선택,選擇,Выбрать,Wybierz,Elegir,Escolher,Wählen,Seç,Scegli
+BE_SPLIT,拆解,Split,Décomposer,分解,분해,拆解,Разобрать,Rozłóż,Descomponer,Decompor,Zerlegen,Ayrıştır,Scomponi
+BE_SPLIT_DONE,已拆解为蓝图路径（见“蓝图”页）,"Split into a blueprint path (see the ""Blueprint"" tab)",Décomposé en chemin de plan (voir l'onglet « Plan »),設計図のパスに分解しました（「設計図」タブを参照）,"설계도 경로로 분해했습니다 (""설계도"" 탭 참고)",已拆解為藍圖路徑（見「藍圖」頁）,Разобрано в путь схемы (см. вкладку «Схема»),Rozłożono na ścieżkę schematu (zob. kartę „Schemat”),Descompuesto en una ruta del plano (ver la pestaña «Plano»),"Decomposto em um caminho do projeto (veja a aba ""Projeto"")",In einen Bauplan-Pfad zerlegt (siehe Reiter „Bauplan“),"Bir şema yoluna ayrıştırıldı (""Şema"" sekmesine bak)","Scomposto in un percorso del progetto (vedi la scheda ""Progetto"")"
+BE_N_WAVE_START,敌袭开始时,At wave start,Début de vague,ウェーブ開始時,웨이브 시작 시,敵襲開始時,Начало волны,Początek fali,Inicio de oleada,Início da onda,Wellenbeginn,Hücum başı,Inizio ondata
+BE_N_WAVE_END,敌袭结束时,At wave end,Fin de vague,ウェーブ終了時,웨이브 종료 시,敵襲結束時,Конец волны,Koniec fali,Final de oleada,Fim da onda,Wellenende,Hücum sonu,Fine ondata
+BE_N_HALF_WAVE,敌袭进行到一半时,Halfway through a wave,Milieu de vague,ウェーブ中盤,웨이브 중반,敵襲進行到一半時,Середина волны,Połowa fali,Mitad de oleada,Metade da onda,Wellenhälfte,Hücumun yarısı,Metà ondata
+BE_N_INTERVAL,每隔 N 秒,Every N seconds,Toutes les N secondes,N秒ごと,N초마다,每隔 N 秒,Каждые N секунд,Co N sekund,Cada N segundos,A cada N segundos,Alle N Sekunden,Her N saniyede,Ogni N secondi
+BE_N_LEVEL_UP,升级时,On level up,Montée de niveau,レベルアップ時,레벨 업 시,升級時,Повышение уровня,Awans na poziom,Subir de nivel,Subir de nível,Stufenaufstieg,Seviye atlama,Passaggio di livello
+BE_N_KILL,杀死敌人时,On kill,En tuant,敵を倒したとき,처치 시,殺死敵人時,Убийство,Zabicie wroga,Al matar,Ao matar,Beim Töten,Öldürünce,Uccisione
+BE_N_CRIT,暴击时,On crit,Coup critique,クリティカル時,치명타 시,暴擊時,Критический удар,Trafienie krytyczne,Golpe crítico,Acerto crítico,Kritischer Treffer,Kritik vuruş,Colpo critico
+BE_N_CRIT_KILL,以暴击杀死敌人时,On crit kill,Mise à mort critique,クリティカルで倒したとき,치명타로 처치 시,以暴擊殺死敵人時,Убийство критом,Zabicie krytykiem,Muerte crítica,Morte crítica,Kritischer Todesstoß,Kritik vuruşla öldürme,Uccisione critica
+BE_N_BURNING_KILL,杀死燃烧的敌人时,On killing a burning enemy,En tuant un ennemi en feu,燃焼中の敵を倒したとき,불타는 적 처치 시,殺死燃燒中的敵人時,Убийство горящего врага,Zabicie płonącego wroga,Matar a un enemigo en llamas,Matar inimigo em chamas,Brennenden Gegner töten,Yanan düşmanı öldürme,Uccidere un nemico in fiamme
+BE_N_CURSED_KILL,击杀被诅咒的敌人时,On killing a cursed enemy,En tuant un ennemi maudit,呪われた敵を倒したとき,저주받은 적 처치 시,擊殺被詛咒的敵人時,Убийство проклятого врага,Zabicie przeklętego wroga,Matar a un enemigo maldito,Matar inimigo amaldiçoado,Verfluchten Gegner töten,Lanetli düşmanı öldürme,Uccidere un nemico maledetto
+BE_N_TREE_KILL,砍倒树木时,On destroying a tree,En détruisant un arbre,木を倒したとき,나무 파괴 시,砍倒樹木時,Уничтожение дерева,Zniszczenie drzewa,Destruir un árbol,Destruir árvore,Baum zerstören,Ağaç yok etme,Distruggere un albero
+BE_N_HIT,受到伤害时,On taking damage,En subissant des dégâts,ダメージを受けたとき,피해를 받을 때,受到傷害時,Получение урона,Otrzymanie obrażeń,Recibir daño,Sofrer dano,Schaden erleiden,Hasar alma,Subire danni
+BE_N_DODGE,闪避时,On dodge,En esquivant,回避時,회피 시,閃避時,Уклонение,Unik,Esquivar,Esquivar,Ausweichen,Kaçınma,Schivare
+BE_N_HEAL,治疗时,On heal,En se soignant,回復時,회복 시,治療時,Лечение,Leczenie,Curarse,Curar-se,Heilen,İyileşme,Curarsi
+BE_N_GOLD,拾取材料时,On picking up a material,En ramassant un matériau,マテリアル回収時,재료 획득 시,拾取材料時,Подбор материала,Podniesienie materiału,Recoger material,Pegar material,Material aufheben,Malzeme toplama,Raccogliere materiale
+BE_N_CONSUMABLE,捡起消耗品时,On picking up a consumable,En ramassant un consommable,消耗品回収時,소모품 획득 시,撿起消耗品時,Подбор расходника,Podniesienie przedmiotu użytkowego,Recoger consumible,Pegar consumível,Verbrauchsgut aufheben,Sarf malzemesi toplama,Raccogliere consumabile
+BE_N_CRATE,拾取箱子时,On picking up a crate,En ramassant une caisse,箱回収時,상자 획득 시,拾取箱子時,Подбор ящика,Podniesienie skrzyni,Recoger caja,Pegar caixa,Kiste aufheben,Sandık toplama,Raccogliere cassa
+BE_N_STEPS,每走一步,Every step,À chaque pas,1歩ごと,한 걸음마다,每走一步,Каждый шаг,Każdy krok,Cada paso,Cada passo,Jeder Schritt,Her adım,Ogni passo
+BE_N_REROLL,刷新商店时,On shop reroll,Randomisation de la boutique,ショップのリロール時,상점 초기화 시,重骰商店時,Обновление магазина,Przerzucenie sklepu,Repetir la tienda,Renovar a loja,Shop neu würfeln,Mağazayı yenileme,Cambiare il negozio
+BE_N_BUY,购买道具时,On buying an item,Achat d'un objet,アイテム購入時,아이템 구매 시,購買道具時,Покупка предмета,Kupno przedmiotu,Comprar un objeto,Comprar item,Gegenstand kaufen,Eşya satın alma,Comprare un oggetto
+BE_N_STILL,站立不动时（状态）,While standing still (state),Immobile (état),静止中（状態）,정지 상태,站立不動時（狀態）,На месте (состояние),Bezruch (stan),Quieto (estado),Parado (estado),Stillstehen (Zustand),Hareketsiz (durum),Fermo (stato)
+BE_N_MOVING,移动时（状态）,While moving (state),En mouvement (état),移動中（状態）,이동 상태,移動時（狀態）,В движении (состояние),Ruch (stan),En movimiento (estado),Em movimento (estado),Bewegen (Zustand),Hareketli (durum),In movimento (stato)
+BE_N_LOW_HP,生命值低于50%时（状态）,Below 50% HP (state),Sous 50 % des PV (état),HP50%未満（状態）,HP 50% 미만 (상태),HP 低於 50% 時（狀態）,Меньше 50% ОЗ (состояние),Poniżej 50% PZ (stan),Menos del 50 % de PS (estado),Abaixo de 50% de PV (estado),Unter 50 % HP (Zustand),Sağlık %50'nin altında (durum),Sotto il 50% dei PS (stato)
+BE_N_FULL_HP,处于最大生命值时（状态）,At max HP (state),PV au maximum (état),最大HP（状態）,최대 HP (상태),HP 全滿時（狀態）,Макс. ОЗ (состояние),Maks. PZ (stan),PS al máximo (estado),PV no máximo (estado),Max. HP (Zustand),Maks. sağlıkta (durum),PS al massimo (stato)
+BE_N_CHANCE,几率,Chance,Chance,確率,확률,機率,Шанс,Szansa,Probabilidad,Chance,Chance,Şans,Probabilità
+BE_N_EVERY,每 N 次,Every N times,Toutes les N fois,N回ごと,N번마다,每 N 次,Каждые N раз,Co N razy,Cada N veces,A cada N vezes,Alle N Male,Her N seferde,Ogni N volte
+BE_N_CAP,每波最多 N 次,Max N times per wave,N fois max par vague,ウェーブごとに最大N回,웨이브당 최대 N번,每波最多 N 次,Не более N раз за волну,Maks. N razy na falę,Máx. N veces por oleada,Máx. N vezes por onda,Max. N-mal pro Welle,Hücum başına en fazla N kez,Max N volte per ondata
+BE_N_COOLDOWN,冷却,Cooldown,Délai,クールダウン,재사용 대기시간,冷卻,Перезарядка,Odnowienie,Enfriamiento,Recarga,Abklingzeit,Bekleme süresi,Ricarica
+BE_N_HP_BELOW,生命值低于,HP below,PV inférieurs à,HPが次未満,HP 미만,HP 低於,ОЗ ниже,PZ poniżej,PS por debajo de,PV abaixo de,HP unter,Sağlık şunun altında,PS sotto
+BE_N_HP_ABOVE,生命值不低于,HP at least,PV d'au moins,HPが次以上,HP 이상,HP 不低於,ОЗ не ниже,PZ co najmniej,PS de al menos,PV de pelo menos,HP mindestens,Sağlık en az,PS almeno
+BE_N_WAVE_MIN,从第 N 波敌袭起,From wave N,À partir de la vague N,第Nウェーブから,N 웨이브부터,從第 N 波敵襲起,С волны N,Od fali N,Desde la oleada N,A partir da onda N,Ab Welle N,N. hücumdan itibaren,Dall'ondata N
+BE_N_WAVE_MAX,到第 N 波敌袭为止,Until wave N,Jusqu'à la vague N,第Nウェーブまで,N 웨이브까지,到第 N 波敵襲為止,До волны N,Do fali N,Hasta la oleada N,Até a onda N,Bis Welle N,N. hücuma kadar,Fino all'ondata N
+BE_N_STAT_MIN,属性不低于,Stat at least,Stat d'au moins,ステータスが次以上,능력치 이상,屬性不低於,Характеристика не ниже,Statystyka co najmniej,Estadística de al menos,Atributo de pelo menos,Wert mindestens,İstatistik en az,Statistica almeno
+BE_N_STAT_MAX,属性不高于,Stat at most,Stat d'au plus,ステータスが次以下,능력치 이하,屬性不高於,Характеристика не выше,Statystyka co najwyżej,Estadística de como máximo,Atributo de no máximo,Wert höchstens,İstatistik en fazla,Statistica al massimo
+BE_N_IF_MOVING,正在移动,Is moving,En mouvement,移動中,이동 중,正在移動,В движении,W ruchu,En movimiento,Em movimento,Bewegt sich,Hareket ediyor,In movimento
+BE_N_IF_STILL,正在站立不动,Is standing still,Immobile,静止中,정지 중,正在站立不動,На месте,W bezruchu,Quieto,Parado,Steht still,Hareketsiz,Fermo
+BE_N_TEMP_STAT,属性（直至敌袭结束）,Stat (until end of wave),Stat (jusqu'à la fin de la vague),ステータス（ウェーブ終了まで）,능력치 (웨이브 종료까지),屬性（直到敵襲結束）,Характеристика (до конца волны),Statystyka (do końca fali),Estadística (hasta el final de la oleada),Atributo (até o fim da onda),Wert (bis Wellenende),İstatistik (hücum sonuna kadar),Statistica (fino a fine ondata)
+BE_N_PERM_STAT,永久属性,Permanent stat,Stat permanente,永続ステータス,영구 능력치,永久屬性,Постоянная характеристика,Stała statystyka,Estadística permanente,Atributo permanente,Permanenter Wert,Kalıcı istatistik,Statistica permanente
+BE_N_TIMED_STAT,属性（持续 N 秒）,Stat (for N seconds),Stat (pendant N secondes),ステータス（N秒間）,능력치 (N초 동안),屬性（持續 N 秒）,Характеристика (на N секунд),Statystyka (przez N sekund),Estadística (durante N segundos),Atributo (por N segundos),Wert (für N Sekunden),İstatistik (N saniye),Statistica (per N secondi)
+BE_N_HEAL_HP,恢复生命值,Heal HP,Soigner des PV,HP回復,HP 회복,回復 HP,Восстановить ОЗ,Przywróć PZ,Curar PS,Curar PV,HP heilen,Sağlık yenile,Cura PS
+BE_N_ADD_GOLD,获得材料,Gain materials,Gagner des matériaux,マテリアル獲得,재료 획득,獲得材料,Получить материалы,Zdobądź materiały,Obtener materiales,Ganhar materiais,Material erhalten,Malzeme kazan,Ottieni materiali
+BE_N_XP,获得经验,Gain XP,Gagner de l'XP,経験値獲得,XP 획득,獲得經驗,Получить опыт,Zdobądź PD,Obtener XP,Ganhar EXP,XP erhalten,TP kazan,Ottieni PE
+BE_N_DAMAGE,对随机敌人造成伤害,Damage a random enemy,Blesser un ennemi aléatoire,ランダムな敵にダメージ,무작위 적에게 대미지,對隨機敵人造成傷害,Урон случайному врагу,Obrażenia losowemu wrogowi,Dañar a un enemigo aleatorio,Ferir inimigo aleatório,Zufälligem Gegner schaden,Rastgele düşmana hasar,Danneggia un nemico casuale
+BE_N_EXPLODE,爆炸,Explosion,Explosion,爆発,폭발,爆炸,Взрыв,Wybuch,Explosión,Explosão,Explosion,Patlama,Esplosione
+BE_N_HP_DMG,按敌人当前生命值造成伤害,Damage by enemy's current HP,Dégâts selon les PV de l'ennemi,敵の現在HPに応じたダメージ,적의 현재 HP 비례 대미지,依敵人目前 HP 造成傷害,Урон от текущих ОЗ врага,Obrażenia wg PZ wroga,Daño según los PS del enemigo,Dano pelo PV do inimigo,Schaden nach Gegner-HP,Düşman sağlığına göre hasar,Danni in base ai PS del nemico
+BE_N_IGNITE,点燃敌人,Ignite enemy,Enflammer l'ennemi,敵を燃焼させる,적 점화,點燃敵人,Поджечь врага,Podpal wroga,Prender fuego al enemigo,Incendiar inimigo,Gegner entzünden,Düşmanı tutuştur,Incendia il nemico
+BE_N_SLOW,减速敌人,Slow enemy,Ralentir l'ennemi,敵を減速させる,적 둔화,減速敵人,Замедлить врага,Spowolnij wroga,Ralentizar al enemigo,Desacelerar inimigo,Gegner verlangsamen,Düşmanı yavaşlat,Rallenta il nemico
+BE_N_RAND_STATS,随机主要属性,Random primary stats,Stats principales aléatoires,ランダムな基本ステータス,무작위 주요 능력치,隨機主要屬性,Случайные основные характеристики,Losowe statystyki główne,Estadísticas principales aleatorias,Atributos primários aleatórios,Zufällige Primärwerte,Rastgele birincil istatistikler,Statistiche primarie casuali
+BE_N_FRUIT,掉落水果,Drop fruit,Lâcher des fruits,フルーツを落とす,과일 떨어뜨리기,掉落水果,Выронить фрукты,Upuść owoce,Soltar fruta,Derrubar fruta,Früchte fallen lassen,Meyve düşür,Rilascia frutti
+BE_N_GRANT,获得效果,Gain effect,Obtenir un effet,効果を獲得,효과 획득,獲得效果,Получить эффект,Zdobądź efekt,Obtener efecto,Ganhar efeito,Effekt erhalten,Efekt kazan,Ottieni effetto
+BE_GRP_START,开局状态,Starting State,État de départ,開始時の状態,시작 상태,開局狀態,Начальное состояние,Stan początkowy,Estado inicial,Estado inicial,Startzustand,Başlangıç Durumu,Stato iniziale
+BE_START_MATERIALS,初始材料,Starting Materials,Matériaux de départ,初期マテリアル,시작 재료,初始材料,Начальные материалы,Materiały startowe,Materiales iniciales,Materiais iniciais,Startmaterial,Başlangıç Malzemesi,Materiali iniziali
+BE_START_LEVELS,初始等级,Starting Levels,Niveaux de départ,初期レベル,시작 레벨,初始等級,Начальные уровни,Poziomy startowe,Niveles iniciales,Níveis iniciais,Startstufen,Başlangıç Seviyesi,Livelli iniziali
+BE_START_LEVEL_SETTLE,初始等级在第一波结束时结算（可以选择升级）,Settle starting levels at the end of wave 1 (choose the upgrades),Appliquer les niveaux de départ à la fin de la vague 1 (choix des améliorations),初期レベルを第1ウェーブ終了時に精算（アップグレードを選択）,시작 레벨을 1웨이브 종료 시 정산 (업그레이드 선택),初始等級在第一波結束時結算（可以選擇升級）,Засчитать начальные уровни в конце 1-й волны (с выбором улучшений),Rozlicz poziomy startowe na koniec 1. fali (wybór ulepszeń),Aplicar los niveles iniciales al final de la oleada 1 (elegir mejoras),Aplicar os níveis iniciais no fim da onda 1 (escolher melhorias),Startstufen am Ende von Welle 1 abrechnen (Upgrades wählen),Başlangıç seviyelerini 1. hücum sonunda hesapla (yükseltme seç),Applica i livelli iniziali alla fine dell'ondata 1 (scegli i potenziamenti)
+BE_START_CRATES,开局箱子,Starting Crates,Caisses de départ,初期の箱,시작 상자,開局箱子,Начальные ящики,Skrzynie startowe,Cajas iniciales,Caixas iniciais,Startkisten,Başlangıç Sandıkları,Casse iniziali
+BE_START_LEGENDARY_CRATES,开局传奇箱子,Starting Legendary Crates,Caisses légendaires de départ,初期のレジェンド箱,시작 전설 상자,開局傳說級箱子,Начальные легендарные ящики,Legendarne skrzynie startowe,Cajas legendarias iniciales,Caixas lendárias iniciais,Legendäre Startkisten,Başlangıç Efsanevi Sandıkları,Casse leggendarie iniziali
+BE_START_BAN_TOKENS,额外禁用次数,Extra Bans,Bannissements supplémentaires,追加BAN回数,추가 차단 횟수,額外禁用次數,Доп. запреты,Dodatkowe zakazy,Vetos adicionales,Banimentos extras,Zusätzliche Verbannungen,Ek Yasaklar,Ban extra
+BE_START_WAVE,起始波次,Starting Wave,Vague de départ,開始ウェーブ,시작 웨이브,起始波次,Начальная волна,Fala startowa,Oleada inicial,Onda inicial,Startwelle,Başlangıç Hücumu,Ondata iniziale
+BE_START_WAVE_DELTA,敌袭时长增减（秒）,Wave Duration +/- (s),Durée des vagues +/- (s),ウェーブ時間の増減（秒）,웨이브 시간 증감 (초),敵襲時長增減（秒）,Длительность волны +/- (с),Czas fali +/- (s),Duración de oleada +/- (s),Duração da onda +/- (s),Wellendauer +/- (s),Hücum Süresi +/- (sn),Durata ondata +/- (s)
+BE_START_WAVE_LOCK,固定敌袭时长（秒）,Fixed Wave Duration (s),Durée des vagues fixe (s),ウェーブ時間を固定（秒）,웨이브 시간 고정 (초),固定敵襲時長（秒）,Фиксированная длительность волны (с),Stały czas fali (s),Duración de oleada fija (s),Duração fixa da onda (s),Feste Wellendauer (s),Sabit Hücum Süresi (sn),Durata ondata fissa (s)
+BE_START_DESC,开局箱子在第一波敌袭结束时打开。固定敌袭时长为 0 = 遵循原版，起始波次超过最后一波即为无尽模式。额外禁用次数需要开启禁用模式。,Starting crates are opened at the end of wave 1. Fixed wave duration 0 = vanilla; a starting wave past the last wave means endless mode. Extra bans require ban mode.,Les caisses de départ s'ouvrent à la fin de la vague 1. Durée fixe 0 = normale ; une vague de départ au-delà de la dernière lance le mode sans fin. Les bannissements supplémentaires nécessitent le mode bannissement.,初期の箱は第1ウェーブ終了時に開きます。固定時間 0 = 通常どおり。最終ウェーブを超える開始ウェーブはエンドレスモードになります。追加BAN回数にはBANモードが必要です。,시작 상자는 1웨이브 종료 시 열립니다. 고정 시간 0 = 기본값; 마지막 웨이브 이후의 시작 웨이브는 무한 모드입니다. 추가 차단 횟수는 차단 모드가 필요합니다.,開局箱子在第一波敵襲結束時開啟。固定敵襲時長為 0 = 遵循原版，起始波次超過最後一波即為無盡模式。額外禁用次數需要開啟禁用模式。,Начальные ящики открываются в конце 1-й волны. Фиксированная длительность 0 — как обычно; начальная волна после последней включает бесконечный режим. Доп. запреты требуют режима запретов.,Skrzynie startowe otwierają się na koniec 1. fali. Stały czas 0 = normalnie; fala startowa po ostatniej oznacza tryb nieskończony. Dodatkowe zakazy wymagają trybu zakazów.,Las cajas iniciales se abren al final de la oleada 1. Duración fija 0 = normal; una oleada inicial posterior a la última activa el modo infinito. Los vetos adicionales requieren el modo de vetos.,As caixas iniciais são abertas no fim da onda 1. Duração fixa 0 = normal; uma onda inicial além da última ativa o modo infinito. Banimentos extras exigem o modo de banimento.,Startkisten werden am Ende von Welle 1 geöffnet. Feste Wellendauer 0 = normal; eine Startwelle nach der letzten Welle bedeutet Endlosmodus. Zusätzliche Verbannungen erfordern den Verbannungsmodus.,Başlangıç sandıkları 1. hücum sonunda açılır. Sabit süre 0 = normal; son hücumdan sonraki bir başlangıç hücumu sonsuz modu başlatır. Ek yasaklar için yasak modu gerekir.,Le casse iniziali si aprono alla fine dell'ondata 1. Durata fissa 0 = normale; un'ondata iniziale oltre l'ultima avvia la modalità infinita. I ban extra richiedono la modalità ban.
+BE_GRP_GAIN,属性修改,Stat Modifications,Modifications de stats,ステータス修正,능력치 수정,屬性修改,Модификации характеристик,Modyfikacje statystyk,Modificaciones de estadísticas,Modificações de atributos,Wert-Modifikationen,İstatistik Değişiklikleri,Modifiche delle statistiche
+BE_GRP_CAPS,属性上限（设定值）,Stat Caps (set value),Plafonds de stats (valeur fixée),ステータス上限（設定値）,능력치 상한 (설정값),屬性上限（設定值）,Пределы характеристик (фиксированное значение),Limity statystyk (stała wartość),Límites de estadísticas (valor fijo),Limites de atributos (valor fixo),Wert-Obergrenzen (fester Wert),İstatistik Sınırları (sabit değer),Limiti delle statistiche (valore fisso)
+BE_GAIN_FMT,%{0}修改,% {0} Modifications,% Modifications de {0},% {0}の修正,% {0} 수정,%{0}修改,% модификаций: {0},% modyfikacji: {0},% Modificaciones de {0},% Modificações de {0},% {0}-Modifikationen,% {0} Değişiklikleri,% Modifiche di {0}
+BE_K_STAT_CURSE,诅咒,,,,,,,,,,,,
+BE_K_CHANCE_DOUBLE_GOLD,%几率获得双倍材料,,,,,,,,,,,,
+BE_K_ITEM_BOX_GOLD,箱子里的材料,,,,,,,,,,,,
+BE_K_HEAL_WHEN_PICKUP_GOLD,%拾取材料时恢复生命值几率,% Chance to Heal on Material Pickup,% Chance de soin en ramassant un matériau,% マテリアル回収時の回復確率,% 재료 획득 시 회복 확률,%拾取材料時回復 HP 機率,% шанс лечения при подборе материалов,% szansy na leczenie przy zbieraniu materiałów,% Prob. de curar al recoger material,% Chance de cura ao pegar material,% Heilchance beim Materialaufheben,% Malzeme Toplarken İyileşme Şansı,% Probabilità di cura raccogliendo materiali
+BE_K_BURNING_COOLDOWN_INCREASE,%燃烧速度降低,% Burning Speed Reduction,% Réduction de la vitesse de brûlure,% 燃焼速度の低下,% 화상 속도 감소,%燃燒速度降低,% замедления горения,% spowolnienia podpalenia,% Reducción de velocidad de quemadura,% Redução da velocidade de queimadura,% Verringerte Brenngeschwindigkeit,% Yanma Hızı Azalması,% Riduzione velocità di bruciatura
+BE_K_HIT_PROTECTION,免疫伤害次数,Hit Protection,Protection contre les coups,被弾無効,피격 보호,免疫傷害次數,Защита от ударов,Ochrona przed ciosami,Protección contra golpes,Proteção contra golpes,Trefferschutz,Vuruş Koruması,Protezione dai colpi
+BE_K_LOSE_HP_PER_SECOND,每秒失去生命值,HP Lost per Second,PV perdus par seconde,毎秒のHP減少,초당 HP 감소,每秒失去 HP,Потеря ОЗ в секунду,Utrata PZ na sekundę,PS perdidos por segundo,PV perdidos por segundo,HP-Verlust pro Sekunde,Saniyede Kaybedilen Sağlık,PS persi al secondo
+BE_K_NEXT_LEVEL_XP_NEEDED,%升级所需经验,% XP Needed per Level,% XP nécessaire par niveau,% レベルアップに必要な経験値,% 레벨 업 필요 XP,%升級所需經驗,% опыта для уровня,% PD potrzebnych na poziom,% XP necesaria por nivel,% EXP necessária por nível,% Benötigte XP pro Stufe,% Seviye Başına Gereken TP,% PE necessari per livello
+BE_K_GAIN_PCT_GOLD_START_WAVE,%每波敌袭开始时获得材料,% Materials Gained at Wave Start,% Matériaux gagnés en début de vague,% ウェーブ開始時のマテリアル獲得,% 웨이브 시작 시 재료 획득,%每波敵襲開始時獲得材料,% материалов в начале волны,% materiałów na początku fali,% Materiales al inicio de la oleada,% Materiais no início da onda,% Material zu Wellenbeginn,% Hücum Başında Malzeme,% Materiali a inizio ondata
+BE_K_INCREASE_MATERIAL_VALUE,%材料价值,% Material Value,% Valeur des matériaux,% マテリアルの価値,% 재료 가치,%材料價值,% ценности материалов,% wartości materiałów,% Valor de los materiales,% Valor dos materiais,% Materialwert,% Malzeme Değeri,% Valore dei materiali
+BE_K_MINIMUM_WEAPONS_IN_SHOP,商店最少武器数,Min Weapons in Shop,Armes min en boutique,ショップの最低武器数,상점 최소 무기 수,商店最少武器數,Мин. оружия в магазине,Min. broni w sklepie,Armas mínimas en la tienda,Mín. de armas na loja,Min. Waffen im Shop,Mağazada Min. Silah,Armi minime nel negozio
+BE_K_ITEM_STEALS,偷取道具,Item Steals,Vols d'objets,アイテム窃盗,아이템 훔치기,偷取道具,Кражи предметов,Kradzieże przedmiotów,Robos de objetos,Roubos de itens,Gegenstandsdiebstähle,Eşya Çalma,Furti di oggetti
+BE_K_ENEMY_FRUIT_DROPS,%敌人掉落水果,% Enemy Fruit Drops,% Fruits lâchés par les ennemis,% 敵のフルーツドロップ,% 적 과일 드롭,%敵人掉落水果,% фруктов с врагов,% owoców z wrogów,% Fruta soltada por enemigos,% Frutas derrubadas por inimigos,% Frucht-Drops von Gegnern,% Düşmanlardan Meyve,% Frutti rilasciati dai nemici
+BE_K_EXTRA_LOOT_ALIENS,每波额外战利品外星人,Extra Loot Aliens per Wave,Pillards supplémentaires par vague,ウェーブごとの追加戦利品エイリアン,웨이브당 추가 전리품 외계인,每波額外戰利品異形,Доп. пришельцы с добычей за волну,Dodatkowi obcy z łupami na falę,Botines alienígenas extra por oleada,Alienígenas do tesouro extras por onda,Zusätzliche Beute-Aliens pro Welle,Hücum Başına Ek Yağmacı Uzaylı,Alieni con bottino extra per ondata
+BE_K_LOOT_ALIEN_SPEED,%战利品外星人速度,% Loot Alien Speed,% Vitesse des Pillards,% 戦利品エイリアンのスピード,% 전리품 외계인 속도,%戰利品異形速度,% скорости пришельцев с добычей,% szybkości obcych z łupami,% Velocidad del botín alienígena,% Velocidade do alienígena do tesouro,% Beute-Alien-Tempo,% Yağmacı Uzaylı Hızı,% Velocità degli alieni con bottino
+BE_K_STRONGER_ELITES_ON_KILL,%击杀精英怪后精英怪强化,% Elites Stronger per Elite Killed,% Élites renforcées par élite tuée,% エリート撃破ごとのエリート強化,% 엘리트 처치당 엘리트 강화,%擊殺菁英怪後菁英怪強化,% усиления элиты за каждого убитого,% silniejszych elit za każdą zabitą,% Élites más fuertes por élite eliminada,% Elites mais fortes por elite morta,% Stärkere Elitegegner pro getötetem Elitegegner,% Öldürülen Her Elit Başına Güçlenme,% Miniboss più forti per miniboss ucciso
+BE_K_STRONGER_LOOT_ALIENS_ON_KILL,%击杀战利品外星人后其强化,% Loot Aliens Stronger per Loot Alien Killed,% Pillards renforcés par Pillard tué,% 戦利品エイリアン撃破ごとの強化,% 전리품 외계인 처치당 강화,%擊殺戰利品異形後其強化,% усиления пришельцев с добычей за каждого убитого,% silniejszych obcych z łupami za każdego zabitego,% Botines alienígenas más fuertes por cada uno eliminado,% Alienígenas do tesouro mais fortes por cada um morto,% Stärkere Beute-Aliens pro getötetem Beute-Alien,% Öldürülen Her Yağmacı Uzaylı Başına Güçlenme,% Alieni con bottino più forti per ognuno ucciso
+BE_K_GAIN_EXPLOSION_DAMAGE,%爆炸伤害,% Explosion Damage,% Dégâts d'explosion,% 爆発ダメージ,% 폭발 대미지,%爆炸傷害,% урона от взрывов,% obrażeń od wybuchów,% Daño de explosión,% Dano de explosão,% Explosionsschaden,% Patlama Hasarı,% Danni da esplosione
+BE_K_GAIN_PIERCING_DAMAGE,%贯通伤害,% Piercing Damage,% Dégâts de perforation,% 貫通ダメージ,% 관통 대미지,%貫穿傷害,% урона от пробивания,% obrażeń od przeszywania,% Daño de perforación,% Dano de perfuração,% Durchbohrschaden,% Delici Hasar,% Danni da perforazione
+BE_K_GAIN_BOUNCE_DAMAGE,%反弹伤害,% Bounce Damage,% Dégâts de rebond,% 跳弾ダメージ,% 튕김 대미지,%反彈傷害,% урона от отскоков,% obrażeń od odbijania,% Daño de rebote,% Dano de rebote,% Abprallschaden,% Sekme Hasarı,% Danni da rimbalzo
+BE_K_GAIN_DAMAGE_AGAINST_BOSSES,%对头目伤害,% Damage against Bosses,% Dégâts contre les boss,% ボスへのダメージ,% 보스 대상 대미지,%對頭目傷害,% урона по боссам,% obrażeń przeciw bossom,% Daño contra jefes,% Dano contra chefes,% Schaden gegen Bosse,% Bosslara Karşı Hasar,% Danni contro i boss
+BE_GRP_STATS,属性,Stats,Stats,ステータス,능력치,屬性,Характеристики,Statystyki,Estadísticas,Atributos,Werte,İstatistikler,Statistiche
+BE_IMPORT_ICON,导入图片,Import Image,Importer une image,画像を取り込む,이미지 가져오기,匯入圖片,Импорт изображения,Importuj obraz,Importar imagen,Importar imagem,Bild importieren,Görsel İçe Aktar,Importa immagine
+BE_IMPORT_ICON_FAILED,无法读取这张图片（支持 png / jpg / webp）,Could not read this image (png / jpg / webp supported),Impossible de lire cette image (png / jpg / webp),画像を読み込めません（png / jpg / webp に対応）,이미지를 읽을 수 없습니다 (png / jpg / webp 지원),無法讀取這張圖片（支援 png / jpg / webp）,Не удалось прочитать изображение (png / jpg / webp),Nie można odczytać obrazu (png / jpg / webp),No se pudo leer la imagen (png / jpg / webp),Não foi possível ler a imagem (png / jpg / webp),Bild konnte nicht gelesen werden (png / jpg / webp),Görsel okunamadı (png / jpg / webp),Impossibile leggere l'immagine (png / jpg / webp)
+BE_IMPORT_ICON_DONE,已导入图片作为图标,Image imported as the icon,Image importée comme icône,画像をアイコンとして取り込みました,이미지를 아이콘으로 가져왔습니다,已匯入圖片作為圖示,Изображение импортировано как значок,Zaimportowano obraz jako ikonę,Imagen importada como icono,Imagem importada como ícone,Bild als Symbol importiert,Görsel simge olarak içe aktarıldı,Immagine importata come icona
+BE_ALL_TIER,全部 T{0},All T{0},Tout R{0},すべてのT{0},모든 T{0},全部 T{0},Всё У{0},Wszystkie P{0},Todo N{0},Todos N{0},Alle S{0},Tüm K{0},Tutti L{0}
+BE_CAT_STAT_MOD,属性修改,Stat Modifications,Modifications de stats,ステータス修正,능력치 수정,屬性修改,Модификации характеристик,Modyfikacje statystyk,Modificaciones de estadísticas,Modificações de atributos,Wert-Modifikationen,İstatistik Değişiklikleri,Modifiche delle statistiche
+BE_CAT_STRUCTURE,构筑物,Structures,Structures,設置物,구조물,構築物,Строения,Budowle,Estructuras,Estruturas,Strukturen,Yapılar,Strutture
+BE_CAT_PET,宠物,Pets,Familiers,ペット,펫,寵物,Питомцы,Zwierzaki,Mascotas,Mascotes,Haustiere,Evcil Hayvanlar,Animali
+BE_TX_WAVE_START,敌袭开始时, at the start of a wave, au début d’une vague,ウェーブ開始時に,웨이브가 시작될 때,敵襲開始時, в начале волны, na początku fali, al comienzo de la oleada, no início de uma onda, zu Beginn einer Welle,Hücum başında, all'inizio di un'ondata
+BE_TX_WAVE_END,敌袭结束时, at the end of a wave, à la fin d’une vague,ウェーブ終了時に,웨이브가 끝날 때,敵襲結束後, в конце волны, na koniec fali, al final de la oleada, ao fim de uma onda, am Ende einer Welle,Hücum sonunda, alla fine di un'ondata
+BE_TX_HALF_WAVE,敌袭进行到一半时, halfway through a wave, à la moitié d'une vague,ウェーブの後半に入ると,웨이브 중간에,敵襲進行到一半時, в середине волны, w połowie fali, en mitad de la oleada, na metade de uma onda, zur Halbzeit der Welle,Hücumun yarısında, a metà di un'ondata
+BE_TX_INTERVAL,每{0}秒, every {0} seconds, toutes les {0} secondes,{0}秒ごとに,매 {0}초마다,每{0}秒, каждые {0} сек., co {0} sekund, cada {0} segundos, a cada {0} segundos, alle {0} Sekunden,Her {0} saniyede, ogni {0} secondi
+BE_TX_LEVEL_UP,升级时, when you level up, lorsque vous gagnez un niveau,レベルアップ時に,레벨 업할 시,升級時, при повышении уровня, po awansie na kolejny poziom, al subir de nivel, quando você sobe de nível, beim Levelaufstieg,Seviye atladığında, quando sali di livello
+BE_TX_KILL,杀死敌人时, when you kill an enemy, en tuant un ennemi,敵を倒した時に,적을 죽일 때,殺死敵人時, при убийстве врага, przy zabiciu przeciwnika, al eliminar a un enemigo, ao eliminar um inimigo,", wenn du einen Gegner tötest",Bir düşmanı öldürdüğünde, quando uccidi un nemico
+BE_TX_KILL_EVERY,每杀死{0}个敌人，, for every {0} enemies you kill, pour tous les {0} ennemis que vous tuez,敵を{0}体倒すごとに,적 {0}마리를 죽일 때마다,每殺死{0}個敵人，, за каждых {0} убитых врагов, za każdych {0} zabitych wrogów, por cada {0} enemigos que elimines, a cada {0} inimigos eliminados," für alle {0} Gegner, die du tötest",Öldürdüğün her {0} düşmanda, ogni {0} nemici uccisi
+BE_TX_CRIT,暴击时, on critical hits, lors d'un coup critique,クリティカルヒット時、,치명타 시,爆擊時, при критическом ударе, przy trafieniach krytycznych, con los golpes críticos, em acertos críticos, bei kritischen Treffern,Kritik vuruş yaptığında, con i colpi critici
+BE_TX_CRIT_EVERY,每暴击{0}次，, for every {0} critical hits, pour tous les {0} coups critiques,クリティカルヒット{0}回ごとに,치명타 {0}회마다,每爆擊{0}次，, за каждые {0} критических ударов, za każde {0} trafień krytycznych, por cada {0} golpes críticos, a cada {0} acertos críticos, für alle {0} kritischen Treffer,Her {0} kritik vuruşta, ogni {0} colpi critici
+BE_TX_CRIT_KILL,以暴击杀死敌人时，, when killing an enemy with a critical hit, en tuant un ennemi avec un coup critique,クリティカルヒットで敵を倒すと,치명타로 적을 처치할 때,以爆擊殺死敵人時，, при убийстве врага критическим ударом, przy zabiciu przeciwnika trafieniem krytycznym, al eliminar a un enemigo con un golpe crítico, ao eliminar um inimigo com um acerto crítico,", wenn du einen Gegner mit einem kritischen Treffer tötest",Düşmanı kritik vuruşla öldürünce, quando uccidi un nemico con un colpo critico
+BE_TX_CRIT_KILL_EVERY,每以暴击杀死{0}个敌人，, for every {0} enemies you kill with a critical hit, pour tous les {0} ennemis que vous tuez avec un coup critique,クリティカルヒットで敵を{0}体倒すごとに,치명타로 적 {0}마리를 처치할 때마다,每以爆擊殺死{0}個敵人，," за каждых {0} врагов, убитых критическим ударом", za każdych {0} wrogów zabitych trafieniem krytycznym, por cada {0} enemigos que elimines con un golpe crítico, a cada {0} inimigos eliminados com um acerto crítico," für alle {0} Gegner, die du mit kritischen Treffern tötest",Kritik vuruşla öldürdüğün her {0} düşmanda, ogni {0} nemici uccisi con un colpo critico
+BE_TX_BURNING_KILL,杀死燃烧的敌人时，, when you kill a burning enemy, en tuant un ennemi qui brûle,炎上している敵を倒すと,불타는 적을 처치할 때,殺死燃燒的敵人時，, при убийстве горящего врага, po zabiciu płonącego wroga, al eliminar a un enemigo bajo el efecto de quemadura, ao eliminar um inimigo com queimadura,", wenn du einen brennenden Gegner tötest",Yanan bir düşmanı öldürdüğünde, quando uccidi un nemico in fiamme
+BE_TX_BURNING_KILL_EVERY,每杀死{0}个燃烧的敌人，, for every {0} burning enemies you kill, pour tous les {0} ennemis qui brûlent que vous tuez,炎上している敵を{0}体倒すごとに,불타는 적 {0}마리를 처치할 때마다,每殺死{0}個燃燒的敵人，, за каждых {0} убитых горящих врагов, za każdych {0} zabitych płonących wrogów, por cada {0} enemigos bajo el efecto de quemadura que elimines, a cada {0} inimigos com queimadura eliminados," für alle {0} brennenden Gegner, die du tötest",Öldürdüğün her {0} yanan düşmanda, ogni {0} nemici in fiamme uccisi
+BE_TX_CURSED_KILL,击杀被诅咒的敌人时, when you kill a cursed enemy, lorsque vous tuez un ennemi maudit,呪い状態の敵を倒した時に,저주받은 적을 죽일 때,殺死受詛咒的敵人時, при убийстве проклятого врага, po zabiciu przeklętego wroga, al eliminar a un enemigo con maldición, ao eliminar um inimigo amaldiçoado,", wenn du einen verfluchten Gegner tötest",Lanetli düşman öldürdüğünde, quando uccidi un nemico maledetto
+BE_TX_CURSED_KILL_EVERY,每击杀{0}个被诅咒的敌人，, for every {0} cursed enemies you kill, pour tous les {0} ennemis maudits que vous tuez,呪い状態の敵を{0}体倒すごとに,저주받은 적 {0}마리를 죽일 때마다,每殺死{0}個受詛咒的敵人，, за каждых {0} убитых проклятых врагов, za każdych {0} zabitych przeklętych wrogów, por cada {0} enemigos con maldición que elimines, a cada {0} inimigos amaldiçoados eliminados," für alle {0} verfluchten Gegner, die du tötest",Öldürdüğün her {0} lanetli düşmanda, ogni {0} nemici maledetti uccisi
+BE_TX_TREE_KILL,砍倒树木时, when you destroy a tree, lorsque vous détruisez un arbre,木を倒した時に,나무를 쓰러뜨릴 때,砍倒樹木時, при уничтожении дерева, po zniszczeniu drzewa, al destruir un árbol, ao destruir uma árvore,", wenn du einen Baum zerstörst",Bir ağacı yok ettiğinde, quando distruggi un albero
+BE_TX_TREE_KILL_EVERY,每砍倒{0}棵树木，, for every {0} trees you destroy, pour tous les {0} arbres que vous détruisez,木を{0}本倒すごとに,나무를 {0}그루 쓰러뜨릴 때마다,每砍倒{0}棵樹木，, за каждые {0} уничтоженных деревьев, za każde {0} zniszczonych drzew, por cada {0} árboles que destruyas, a cada {0} árvores destruídas," für alle {0} Bäume, die du zerstörst",Yok ettiğin her {0} ağaçta, ogni {0} alberi distrutti
+BE_TX_HIT,受到伤害时, when you take damage, lorsque vous recevez des dégâts,ダメージを受けると,대미지를 받을 때,受到傷害時, при получении урона,", gdy otrzymujesz obrażenia", al recibir daño, ao sofrer dano,", wenn du Schaden nimmst",Hasar aldığında, quando subisci danni
+BE_TX_HIT_EVERY,每受到{0}次伤害，, for every {0} times you take damage, toutes les {0} fois que vous recevez des dégâts,ダメージを{0}回受けるごとに,대미지를 {0}회 받을 때마다,每受到{0}次傷害，, за каждые {0} полученных ударов, za każde {0} otrzymanych obrażeń, por cada {0} veces que recibas daño, a cada {0} vezes que sofrer dano," jedes {0}. Mal, wenn du Schaden nimmst",Her {0} kez hasar aldığında, ogni {0} volte che subisci danni
+BE_TX_DODGE,闪避时, when you dodge an attack, lorsque vous esquivez une attaque,攻撃を回避すると,공격을 피할 때,迴避攻擊時, при уклонении от атаки, podczas wykonywania uniku, al esquivar un ataque, ao se esquivar de um ataque,", wenn du einem Angriff ausweichst",Bir saldırıdan kaçındığında, quando schivi un attacco
+BE_TX_DODGE_EVERY,每闪避{0}次，, for every {0} attacks you dodge, pour toutes les {0} attaques que vous esquivez,攻撃を{0}回回避するごとに,공격을 {0}회 피할 때마다,每迴避{0}次攻擊，," за каждые {0} атак, от которых вы уклонились", za każde {0} unikniętych ataków, por cada {0} ataques que esquives, a cada {0} ataques esquivados," für alle {0} Angriffe, denen du ausweichst",Kaçındığın her {0} saldırıda, ogni {0} attacchi schivati
+BE_TX_HEAL,治疗时, when you heal, lorsque vous vous soignez,回復時に,치료할 때,治癒時, при лечении, podczas leczenia, al curar, ao curar-se,", wenn du dich heilst",Can yenilediğinde, quando recuperi salute
+BE_TX_GOLD,拾取材料时, when you pick up a material, en ramassant un matériau,マテリアルを拾った時に,재료를 획득할 때,撿起素材時, при сборе материала, przy podnoszeniu materiałów, al recoger un material, ao coletar um material, beim Aufsammeln von Material,Malzeme topladığında, quando raccogli un materiale
+BE_TX_GOLD_EVERY,每拾取{0}个材料，, for every {0} materials you pick up, pour tous les {0} matériaux que vous ramassez,マテリアルを{0}個拾うごとに,재료 {0}개를 획득할 때마다,每撿起{0}個素材，, за каждые {0} собранных материалов, za każde {0} podniesionych materiałów, por cada {0} materiales que recojas, a cada {0} materiais coletados, für alle {0} aufgesammelten Materialien,Topladığın her {0} malzemede, ogni {0} materiali raccolti
+BE_TX_CONSUMABLE,捡起消耗品时, when you pick up a consumable, lorsque vous ramassez un consommable,消費アイテムを拾うと,소모품을 획득할 때,撿起消耗品時,", когда вы подбираете расходник", po podniesieniu znajdźki, al recoger un consumible, ao coletar um consumível, beim Aufsammeln eines Verbrauchsgegenstands,Tüketilebilir topladığında, quando raccogli un materiale consumabile
+BE_TX_CONSUMABLE_EVERY,每捡起{0}个消耗品，, for every {0} consumables you pick up, pour tous les {0} consommables que vous ramassez,消費アイテムを{0}個拾うごとに,소모품을 {0}개 획득할 때마다,每撿起{0}個消耗品，, за каждые {0} подобранных расходников, za każde {0} podniesionych znajdźek, por cada {0} consumibles que recojas, a cada {0} consumíveis coletados, für alle {0} aufgesammelten Verbrauchsgegenstände,Topladığın her {0} tüketilebilirde, ogni {0} materiali consumabili raccolti
+BE_TX_CRATE,拾取箱子时, when you pick up a crate, lorsque vous récupérez une caisse,宝箱を拾った時に,상자를 획득할 때,撿起木箱時, при поднимании ящика, przy podniesieniu skrzynki, al recoger una caja, ao coletar uma caixa, beim Aufsammeln einer Kiste,Sandık topladığında, quando raccogli una cassa
+BE_TX_STEPS,每前进1步，, for every step you take, pour chaque pas que vous faites,1歩歩くごとに,한 걸음마다,每走1步，, за каждый шаг, za każdy wykonany krok, por cada paso que des, a cada passo dado," für jeden Schritt, den du machst",Attığın her adımda, per ogni passo compiuto
+BE_TX_STEPS_EVERY,每前进{0}步，, for every {0} steps you take, pour tous les {0} pas que vous faites,{0}歩歩くごとに,매 {0}걸음마다,每走{0}步，, за каждые {0} шагов, za każde {0} kroków, por cada {0} pasos que des, a cada {0} passos dados," für alle {0} Schritte, die du machst",Attığın her {0} adımda, ogni {0} passi compiuti
+BE_TX_REROLL,刷新商店时, when rerolling in the shop, lors d'une randomisation dans la boutique,リロール時に,초기화 시 상점에서,重骰時, при замене в магазине, po przerzuceniu w sklepie, al repetir en la tienda, após a renovação na loja," bei ""Neu würfeln"" im Laden",Dükkânda yenileme yaparken, quando cambi oggetti nel negozio
+BE_TX_REROLL_EVERY,每刷新{0}次商店，, for every {0} rerolls in the shop, toutes les {0} randomisations dans la boutique,{0}回リロールするごとに,상점에서 {0}회 초기화할 때마다,每重骰{0}次，, за каждые {0} замен в магазине, za każde {0} przerzuceń w sklepie, por cada {0} repeticiones en la tienda, a cada {0} renovações na loja," jedes {0}. Mal ""Neu würfeln"" im Laden",Dükkânda her {0} yenilemede, ogni {0} cambi di oggetti nel negozio
+BE_TX_BUY,购买道具时, when you buy an item, lorsque vous achetez un objet,アイテムを購入した時に,아이템을 구매할 때,購買道具時, при покупке предмета, po zakupie przedmiotu, al comprar un objeto, ao comprar um item,", wenn du ein Item kaufst",Bir eşya satın aldığında, quando compri un oggetto
+BE_TX_BUY_EVERY,每购买{0}个道具，, for every {0} items you buy, pour tous les {0} objets que vous achetez,アイテムを{0}個購入するごとに,아이템을 {0}개 구매할 때마다,每購買{0}個道具，, за каждые {0} купленных предметов, za każde {0} kupionych przedmiotów, por cada {0} objetos que compres, a cada {0} itens comprados," für alle {0} Items, die du kaufst",Satın aldığın her {0} eşyada, ogni {0} oggetti acquistati
+BE_TX_STILL,站立不动时, while standing still, tant que vous êtes immobile,静止中は,가만히 서 있을 때,站立不動時,", если вы неподвижны",", gdy stoisz bez ruchu", al no moverte, quando estiver imóvel,", wenn du dich nicht bewegst",Kıpırdamadan dururken, mentre non ti muovi
+BE_TX_MOVING,移动时, while moving, tant que vous êtes en mouvement,移動中、,움직일 때,移動時, во время движения, podczas poruszania się, al moverte, em movimento,", wenn du dich bewegst",Hareket ederken, mentre ti muovi
+BE_TX_LOW_HP,生命值低于50%时, when you have less than 50% health, lorsque vous avez moins de 50% points de vie,HPが50%未満になると,체력이 50%보다 낮으면,生命值低於50%時,", если запас здоровья ниже 50%",", jeśli masz mniej niż 50% zdrowia", cuando tu salud baja del 50 %, ao chegar a menos de 50% de vida,", wenn du weniger als 50% Leben hast",Sağlığın %50'nin altına düştüğünde, quando i tuoi PS sono al di sotto del 50%
+BE_TX_FULL_HP,处于最大生命值时, while at maximum health, en étant en pleine santé,HP最大時は,체력이 최대일 때,生命值達上限時,", когда у вас полное здоровье",", jeśli masz pełne zdrowie", con la salud al máximo, com a vida cheia, bei Max. HP,Maksimum sağlıktayken, mentre hai la salute al massimo
+BE_PX_TEMP_STAT,{0}{1}，直至敌袭结束,{0} {1} until the end of the wave,{0} {1} jusqu'à la fin de la vague,ウェーブが終了するまで{1} {0},웨이브가 끝날 때까지 {0} {1},{0}{1}，直到敵襲結束,{0} к параметру «{1}» до конца волны,{0} {1} do końca fali,{0} de {1} hasta el final de la oleada,{0} de {1} até o fim da onda,{0} {1} bis zum Ende der Welle,hücum bitene kadar {0} {1} sağlar,{0} {1} fino alla fine dell'ondata
+BE_PX_STATE_STAT,{0}{1},{0} {1},{0} {1},{1} {0},{0} {1},{0}{1},{0} к параметру «{1}»,{0} {1},{0} de {1},{0} de {1},{0} {1},{0} {1} sağlar,{0} {1}
+BE_PX_PERM_STAT,{0}{1},{0} {1},{0} {1},{1} {0},{0} {1},{0}{1},{0} к параметру «{1}»,{0} {1},{0} de {1},{0} de {1},{0} {1},{0} {1} sağlar,{0} {1}
+BE_PX_TIMED_STAT,{0}{1}，持续{2}秒,{0} {1} for {2} seconds,{0} {1} pendant {2} secondes,{2}秒間 {1} {0},{2}초 동안 {0} {1},{0}{1}，持續{2}秒,{0} к параметру «{1}» на {2} сек.,{0} {1} przez {2} s,{0} de {1} durante {2} segundos,{0} de {1} por {2} segundos,{0} {1} für {2} Sekunden,{2} saniye boyunca {0} {1},{0} {1} per {2} secondi
+BE_PX_HEAL,恢复{0}点生命值,Heal {0} HP,Récupérez {0} PV,HPを{0}回復,{0} HP 치료,治癒{0}HP,Восстановите {0} ОЗ,Odzyskujesz {0} PZ,Recuperas {0} PS,Recupera {0} PV,Heile {0} HP,{0} Sağlık yenilersin,Recuperi {0} PS
+BE_PX_GOLD,获得{0}个材料,+{0} materials,+{0} matériaux,マテリアルを{0}個獲得,재료 {0}개 획득,獲得{0}個素材,+{0} ед. материалов,+{0} materiałów,+{0} materiales,+{0} materiais,+{0} Materialien,{0} malzeme kazanırsın,+{0} materiali
+BE_PX_LOSE_GOLD,失去{0}个材料,-{0} materials,-{0} matériaux,マテリアルを{0}個失う,재료 {0}개 상실,失去{0}個素材,-{0} ед. материалов,-{0} materiałów,-{0} materiales,-{0} materiais,-{0} Materialien,{0} malzeme kaybedersin,-{0} materiali
+BE_PX_XP,获得{0}经验,+{0} XP,+{0} XP,経験値を{0}獲得,XP {0} 획득,獲得{0}XP,+{0} ОО,+{0} PD,+{0} de XP,+{0} de EXP,+{0} XP,{0} TP kazanırsın,+{0} PE
+BE_PX_DAMAGE,对随机1名敌人造成相当于{0}{1}的伤害,Deal damage equal to {0} of {1} to a random enemy,Infligez à un ennemi aléatoire des dégâts égaux à {0} de {1},ランダムな敵に{1}の{0}に相当するダメージを与える,랜덤 적에게 {1}의 {0}에 해당하는 대미지를 가합니다,隨機造成一個敵人相當於{0}{1}的傷害,"Нанесите случайному врагу урон, равный {0} от параметра «{1}»",Zadajesz losowemu wrogowi obrażenia równe {0} {1},Causas a un enemigo aleatorio un daño igual al {0} de {1},Causa dano igual a {0} de {1} a um inimigo aleatório,Verursache bei einem zufälligen Gegner Schaden in Höhe von {0} von {1},rastgele bir düşmana {1} değerinin {0} kadarı hasar verirsin,Infliggi a un nemico a caso danni pari al {0} di {1}
+BE_PX_EXPLODE,爆炸，造成相当于{0}{1}的伤害,Explode for damage equal to {0} of {1},Explosez en infligeant des dégâts égaux à {0} de {1},{1}の{0}に相当するダメージを与える爆発を発生させる,{1}의 {0}에 해당하는 대미지를 주며 폭발,爆炸，造成相當於{0}{1}的傷害,"Взорвитесь и нанесите урон, равный {0} от параметра «{1}»","Wybuchasz, zadając obrażenia równe {0} {1}",Provocas una explosión que causa un daño igual al {0} de {1},"Explode, causando dano igual a {0} de {1}",Explodiere und verursache Schaden in Höhe von {0} von {1},patlayarak etrafına {1} değerinin {0} kadarı hasar verirsin,Esplodi infliggendo danni pari al {0} di {1}
+BE_PX_HP_DMG,造成敌人当前生命值的{0}以作为奖励伤害（头目和精英怪的{1}）,Deal {0} of the enemy’s current health as bonus damage ({1} for bosses and elites),Infligez {0} des points de vie actuels de l’ennemi de dégâts bonus ({1} pour les boss et les élites),敵の現在HPの {0} の追加ダメージを与える（ボスとエリートに対しては {1}）,적의 현재 체력의 {0}만큼을 보너스 대미지로 가합니다(보스 및 엘리트 상대로는 {1}만큼),可施加敵人目前生命值{0}的額外傷害（對頭目及菁英怪則為{1}）,Дополнительно наносите урон в размере {0} от текущего здоровья врага ({1} для боссов и элиты),Zadajesz dodatkowe obrażenia równe {0} aktualnych PZ wroga ({1} dla bossów i pot. elit.),Causas un daño equivalente al {0} de la salud actual del enemigo como daño adicional ({1} para jefes y élites),Causa dano bônus equivalente a {0} da vida atual do inimigo ({1} para chefes e elites),Verursache {0} des aktuellen Gegnerlebens als Bonusschaden ({1} bei Bossen und Elitegegnern),düşmanın mevcut canının {0} oranında bonus hasar verir (boss ve elitler için {1}),Infliggi un {0} dei PS attuali del nemico come danni aggiuntivi ({1} per boss e miniboss)
+BE_PX_IGNITE,使其燃烧，造成{1}x{0}（+100%元素伤害）的燃烧伤害,Inflict {1}x{0} (+100% Elemental Damage) burning damage on the enemy,Infligez {1}x{0} (+100% Dégâts Élémentaires) dégâts de brûlure à l'ennemi,その敵を炎上させ、{1}x{0}（+100% 元素ダメージ）の燃焼ダメージを与える,해당 적에게 {1}x{0}(+100% 원소 대미지)의 화상 대미지를 가함,使其燃燒，造成{1}x{0}（+100%屬性傷害）的燃燒傷害,Нанесите врагу {1}x{0} (+100% «Стихийный урон») ед. урона от горения,Zadajesz wrogowi {1}x{0} (+100% Obrażenia od żywiołów) pkt. obrażeń od podpalenia,Causas al enemigo {1}x{0} (+100% de Daño elemental) de daño por quemadura,Causa {1}x{0} (+100% de Dano elemental) de dano de queimadura ao inimigo,Füge dem Gegner {1}x{0} (+100% Elementarschaden) Brandschaden zu,düşmana {1}x{0} (+100% Element Hasarı) yanma hasarı verirsin,Infliggi al nemico {1}x{0} (+100% Danni elementali) danni da bruciatura
+BE_PX_SLOW,使其降低{0}速度，最高{1},Slow the enemy by {0} (max {1}),Ralentissez l'ennemi de {0} (max {1}),その敵の移動速度を{0}低下させる（最大{1}）,해당 적의 속도를 {0} 감소(최대 {1}),使其降低{0}速度，最多{1},Замедлите врага на {0} (максимум {1}),Spowalniasz wroga o {0} (maks. {1}),Ralentizas al enemigo un {0} (máx. {1}),Desacelera o inimigo em {0} (máx. {1}),Verlangsame den Gegner um {0} (max. {1}),düşmanı {0} yavaşlatırsın (en fazla {1}),Rallenti il nemico del {0} (max {1})
+BE_PX_FRUIT,掉落{0}个水果,Drop {0} fruits,Fait tomber {0} fruits,フルーツを{0}個落とす,과일 {0}개를 떨어뜨림,掉落{0}個水果,Выпадает {0} фруктов,Upuszcza {0} owoców,Suelta {0} frutas,Deixa cair {0} frutas,Lässt {0} Früchte fallen,{0} meyve düşer,Fa cadere {0} frutti
+BE_PX_FRUIT_1,掉落1个水果,Drop a fruit,Fait tomber un fruit,フルーツを1個落とす,과일 1개를 떨어뜨림,掉落1個水果,Выпадает фрукт,Upuszcza owoc,Suelta una fruta,Deixa cair uma fruta,Lässt eine Frucht fallen,1 meyve düşer,Fa cadere un frutto
+BE_PX_RAND_STATS,将{0}点属性点随机分配到你的主要属性上,{0} points randomly split between your primary stats,{0} points répartis aléatoirement entre vos statistiques principales,メインステータスに {0} ポイントがランダムに割り振られる,{0}포인트가 기본적인 능력치에 무작위로 분배됨,將{0}點屬性點隨機分配到你的主要屬性上,"{0} очк., которые случайным образом разделяются между основными показателями",{0} pkt. rozdzielanych losowo między statystyki główne,{0} puntos que se reparten de forma aleatoria entre tus estadísticas principales,{0} pontos distribuídos aleatoriamente entre seus atributos primários,"Erhalte {0} Punkte, zufällig zwischen deinen Primärwerten aufgeteilt",birincil istatistiklerin arasında rastgele dağıtılan {0} puan kazanırsın,{0} punti suddivisi casualmente tra i tuoi parametri primari
+BE_PX_RAND_STATS_1,将{0}点属性点随机分配到你的主要属性上,{0} point randomly assigned to one of your primary stats,{0} point attribué à une statistique principale aléatoire,メインステータスに {0} ポイントがランダムに割り振られる,{0}포인트가 기본적인 능력치에 무작위로 분배됨,將{0}點屬性點隨機分配到你的主要屬性上,{0} очк. к случайному основному показателю,{0} pkt. przydzielony losowej statystyce głównej,{0} punto que se asigna a una estadística principal aleatoria,{0} ponto atribuído a um atributo primário aleatório,Erhalte {0} Punkt in einem zufälligen Primärwert,birincil istatistiklerin arasında rastgele dağıtılan {0} puan kazanırsın,{0} punto assegnato a un parametro primario a caso
+BE_PX_GRANT_TEMP,{0}，直至敌袭结束,{0} (until the end of the wave),{0} (jusqu'à la fin de la vague),ウェーブが終了するまで{0},웨이브가 끝날 때까지 {0},{0}，直到敵襲結束,{0} (до конца волны),{0} (do końca fali),{0} (hasta el final de la oleada),{0} (até o fim da onda),{0} (bis zum Ende der Welle),hücum bitene kadar {0},{0} (fino alla fine dell'ondata)
+BE_PX_GRANT_PERM,永久获得“{0}”,"permanently gain ""{0}""",obtenez « {0} » de façon permanente,「{0}」を永続的に得る,영구적으로 ‘{0}’ 획득,永久獲得“{0}”,получите «{0}» навсегда,zyskujesz „{0}” na stałe,obtienes «{0}» de forma permanente,ganha “{0}” permanentemente,erhalte dauerhaft „{0}“,kalıcı olarak “{0}” kazanırsın,ottieni «{0}» in modo permanente
+BE_PX_GRANT_STATE,{0},{0},{0},{0},{0},{0},{0},{0},{0},{0},{0},{0},{0}
+BE_FMT,{t}{p},{p}{t},{p}{t},{t} {p},{t} {p},{t}{p},{p}{t},{p}{t},{p}{t},{p}{t},{p}{t},{t} {p},{p}{t}
+BE_FMT_CHANCE,{t}有{c}概率{p},{p}{t} ({c} chance),{p}{t} ({c} de chance),{t}{c} の確率で {p},{t} {c} 확률로 {p},{t}有{c}的機率{p},{p}{t} (шанс {c}),{p}{t} ({c} szans),{p}{t} ({c} de probabilidad),{p}{t} ({c} de chance),{p}{t} (Chance von {c}),{t} {c} olasılıkla {p},{p}{t} ({c} di probabilità)
+BE_FMT_GRANT,{t}{p},{T}: {p},{T} : {p},{t} {p},{t} {p},{t}{p},{T}: {p},{T}: {p},{T}: {p},{T}: {p},{T}: {p},{t} {p},{T}: {p}
+BE_FMT_GRANT_CHANCE,{t}有{c}概率{p},{T} ({c} chance): {p},{T} ({c} de chance) : {p},{t}{c} の確率で {p},{t} {c} 확률로 {p},{t}有{c}的機率{p},{T} (шанс {c}): {p},{T} ({c} szans): {p},{T} ({c} de probabilidad): {p},{T} ({c} de chance): {p},{T} (Chance von {c}): {p},{t} {c} olasılıkla {p},{T} ({c} di probabilità): {p}
+BE_CAP,（每波最多{0}次）, (max {0} times per wave), (max {0} fois par vague),（ウェーブごとに最大{0}回）, (웨이브당 최대 {0}회),（每波最多{0}次）, (максимум {0} раз за волну), (maks. {0} razy na falę), (máx. {0} veces por oleada), (máx. {0} vezes por onda), (max. {0}-mal pro Welle), (hücum başına maks. {0} kez), (max {0} volte per ondata)
+BE_CAP_1,（每波最多1次）, (max once per wave), (max 1 fois par vague),（ウェーブごとに最大1回）, (웨이브당 최대 1회),（每波最多1次）, (максимум 1 раз за волну), (maks. 1 raz na falę), (máx. 1 vez por oleada), (máx. 1 vez por onda), (max. 1-mal pro Welle), (hücum başına maks. 1 kez), (max 1 volta per ondata)
+BE_CX_EVERY,（每{n}次）, (every {n} times), (toutes les {n} fois),（{n}回ごと）, ({n}번마다),（每{n}次）, (каждые {n} раз), (co {n} razy), (cada {n} veces), (a cada {n} vezes), (alle {n} Male), (her {n} seferde), (ogni {n} volte)
+BE_CX_COOLDOWN,（冷却{secs}秒）, ({secs}s cooldown), (délai de {secs} s),（クールダウン{secs}秒）, (재사용 대기시간 {secs}초),（冷卻{secs}秒）, (перезарядка {secs} с), (odnowienie {secs} s), (enfriamiento de {secs} s), (recarga de {secs} s), ({secs} s Abklingzeit), ({secs} sn bekleme), (ricarica di {secs} s)
+BE_CX_HP_BELOW,（生命值低于{pct}%时）, (while below {pct}% HP), (sous {pct} % des PV),（HPが{pct}%未満のとき）, (HP {pct}% 미만일 때),（HP 低於{pct}%時）, (при ОЗ ниже {pct}%), (przy PZ poniżej {pct}%), (con menos del {pct} % de PS), (abaixo de {pct}% de PV), (unter {pct} % HP), (sağlık %{pct} altındayken), (sotto il {pct}% dei PS)
+BE_CX_HP_ABOVE,（生命值不低于{pct}%时）, (while at {pct}% HP or more), (à {pct} % des PV ou plus),（HPが{pct}%以上のとき）, (HP {pct}% 이상일 때),（HP 不低於{pct}%時）, (при ОЗ не ниже {pct}%), (przy co najmniej {pct}% PZ), (con al menos el {pct} % de PS), (com pelo menos {pct}% de PV), (ab {pct} % HP), (sağlık en az %{pct} iken), (con almeno il {pct}% dei PS)
+BE_CX_WAVE_MIN,（从第{n}波敌袭起）, (from wave {n}), (à partir de la vague {n}),（第{n}ウェーブから）, ({n} 웨이브부터),（從第{n}波敵襲起）, (с волны {n}), (od fali {n}), (desde la oleada {n}), (a partir da onda {n}), (ab Welle {n}), ({n}. hücumdan itibaren), (dall'ondata {n})
+BE_CX_WAVE_MAX,（到第{n}波敌袭为止）, (until wave {n}), (jusqu'à la vague {n}),（第{n}ウェーブまで）, ({n} 웨이브까지),（到第{n}波敵襲為止）, (до волны {n}), (do fali {n}), (hasta la oleada {n}), (até a onda {n}), (bis Welle {n}), ({n}. hücuma kadar), (fino all'ondata {n})
+BE_CX_STAT_MIN,（{stat}不低于{n}时）, (while {stat} is at least {n}), (si {stat} est d'au moins {n}),（{stat}が{n}以上のとき）, ({stat} {n} 이상일 때),（{stat}不低於{n}時）, (пока {stat} не ниже {n}), (gdy {stat} wynosi co najmniej {n}), (si {stat} es al menos {n}), (se {stat} for pelo menos {n}), (solange {stat} mindestens {n} ist), ({stat} en az {n} iken), (se {stat} è almeno {n})
+BE_CX_STAT_MAX,（{stat}不高于{n}时）, (while {stat} is at most {n}), (si {stat} est d'au plus {n}),（{stat}が{n}以下のとき）, ({stat} {n} 이하일 때),（{stat}不高於{n}時）, (пока {stat} не выше {n}), (gdy {stat} wynosi co najwyżej {n}), (si {stat} es como máximo {n}), (se {stat} for no máximo {n}), (solange {stat} höchstens {n} ist), ({stat} en fazla {n} iken), (se {stat} è al massimo {n})
+BE_CX_IF_MOVING,（移动时）, (while moving), (en mouvement),（移動中）, (이동 중),（移動時）, (в движении), (w ruchu), (en movimiento), (em movimento), (in Bewegung), (hareket ederken), (in movimento)
+BE_CX_IF_STILL,（站立不动时）, (while standing still), (en restant immobile),（静止中）, (정지 중),（站立不動時）, (стоя на месте), (stojąc w miejscu), (quieto), (parado), (beim Stillstehen), (hareketsizken), (stando fermo)
