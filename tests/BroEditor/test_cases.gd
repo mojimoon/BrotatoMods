@@ -70,6 +70,20 @@ func _eq(actual, expected, msg: String) -> void:
 func _reset() -> void:
 	for id in m.custom_ids():
 		m.delete_custom(id)
+	for id in m.item_profiles.keys():
+		if m.item_profiles[id].custom:
+			m.delete_custom_item(id)
+	for wid in m.weapon_families.keys():
+		var f = m.weapon_families[wid]
+		if f.custom:
+			m.delete_custom_weapon(wid)
+		else:
+			for t in f.tiers:
+				m._unregister_weapon(m.tier_id(wid, t, false))
+			m.weapon_families.erase(wid)
+			m._link_family(wid)
+	m.weapon_families = {}
+	m.disabled = {"character": [], "item": [], "weapon": []}
 	m.profiles = {}
 	m.item_profiles = {}
 	m.weapon_profiles = {}
@@ -1157,11 +1171,15 @@ func test_133_ui_items_and_weapons() -> void:
 		ui._on_filter(3, "tier")
 		var ok = true
 		for b in ui._char_grid.get_children():
-			ok = ok and m.find_target(kind, b.get_meta("id")).tier == 3
+			var r = m.find_target(kind, b.get_meta("id"))
+			var has3 = false
+			for x in (m.family_members(r.weapon_id) if kind == "weapon" else [r]):
+				has3 = has3 or x.tier == 3
+			ok = ok and has3
 		_check(ok, kind + " tier filter")
 		ui._on_filter("vanilla", "src")
 		for b in ui._char_grid.get_children():
-			ok = ok and m.source_of(m.find_target(kind, b.get_meta("id"))) == "vanilla"
+			ok = ok and ui._source(m.find_target(kind, b.get_meta("id"))) == "vanilla"
 		_check(ok, kind + " source filter")
 		ui._on_filter(-1, "tier")
 		ui._on_filter("all", "src")
@@ -1199,3 +1217,247 @@ func test_133_ui_items_and_weapons() -> void:
 	m.debug = false
 	ui.queue_free()
 	yield(tree, "idle_frame")
+
+
+
+# ============================================================
+# 自定义道具 / 武器、禁用
+# ============================================================
+func test_140_custom_item() -> void:
+	var base = _plain_item()
+	var id = m.create_custom_item(base.my_id)
+	_check(id.begins_with(m.ITEM_PREFIX), "custom item id")
+	var it = m.find_target("item", id)
+	_check(it != null and it in isvc.items, "registered in ItemService")
+	m.apply_all()
+	_eq([it.value, it.tier, it.max_nb], [base.value, base.tier, base.max_nb], "fields from base")
+	_eq(it.effects.size(), base.effects.size(), "effects copied from base")
+	_eq(m.source_of(it), "mod", "custom item is a mod item")
+	_check(it.icon != null, "has icon")
+	m.item_profiles[id].tier = 2
+	m.item_profiles[id].price = 3
+	m._register_custom_item(id)
+	m.apply_all()
+	_eq([it.tier, it.value], [2, 3], "tier / price edits")
+	m.kind_enabled.item = false
+	m.apply_all()
+	_eq(it.tier, 2, "custom item ignores the item tab switch")
+	m.kind_enabled.item = true
+	var id2 = m.import_code(m.export_code(id, "item"), "", "item")
+	_check(id2 != "" and id2 != id and m.is_custom(id2), "custom item code imports as new custom item")
+	_check(m.delete_custom_item(id), "deleted")
+	_check(m.find_target("item", id) == null and not it in isvc.items, "unregistered")
+
+
+func test_141_disable() -> void:
+	var it = _plain_item()
+	var w = isvc.weapons[0]
+	m.set_disabled("item", it.my_id, true)
+	m.set_disabled("weapon", w.weapon_id, true)
+	m.set_disabled("character", CH, true)
+	m.apply_all()
+	var bans = m.ban_hashes(0)
+	_check(Keys.generate_hash(it.my_id) in bans, "disabled item banned")
+	var all = true
+	for x in m.family_members(w.weapon_id):
+		all = all and x.my_id_hash in bans
+	_check(all, "every tier of a disabled weapon banned")
+	_check(Keys.generate_hash(CH) in m.disabled_character_hashes(), "disabled character hidden from unlocked")
+	_eq(m.without([1, 2, 3], [2]), [1, 3], "without helper")
+	m.kind_enabled.item = false
+	m.kind_enabled.character = false
+	m.apply_all()
+	_check(not Keys.generate_hash(it.my_id) in m.ban_hashes(0), "item tab switch off lifts item disable")
+	_check(m.disabled_character_hashes().empty(), "character tab switch off lifts character disable")
+	m.set_disabled("weapon", w.weapon_id, false)
+	_check(not w.my_id_hash in m.ban_hashes(0), "re-enabled weapon")
+
+
+func _family_from(min_tier: int, type: int):
+	var seen = {}
+	for w in isvc.weapons:
+		if seen.has(w.weapon_id):
+			continue
+		seen[w.weapon_id] = true
+		var ms = m.family_members(w.weapon_id)
+		if ms[0].tier == min_tier and ms[0].type == type and ms[-1].tier == 3:
+			return ms
+	return null
+
+
+func test_142_custom_weapon() -> void:
+	var base = _family_from(0, 0)
+	var ranged = _family_from(0, 1)
+	var id = m.create_custom_weapon(base[0].weapon_id)
+	m.apply_all()
+	var w = m.find_target("weapon", id)
+	_check(w != null and w in isvc.weapons, "custom weapon registered")
+	var wid = w.weapon_id
+	_check(wid.begins_with(m.WEAPON_PREFIX), "custom weapon family id")
+	_eq(w.type, base[0].type, "type from base")
+	_check(not m.family_complete(wid) and m.is_disabled("weapon", wid), "incomplete weapon is disabled")
+	_check(w.my_id_hash in m.global_ban_hashes(), "incomplete weapon banned")
+	_eq(m.addable_tiers(wid), [1], "can add next tier")
+	for t in [1, 2, 3]:
+		_check(m.add_weapon_tier(wid, t) != "", "added tier %d" % t)
+	_eq(m.add_weapon_tier(wid, 3), "", "no duplicate tier")
+	m.apply_all()
+	_check(m.family_complete(wid) and not m.is_disabled("weapon", wid), "complete weapon enabled")
+	var ms = m.family_members(wid)
+	_eq(ms.size(), 4, "four tiers")
+	var linked = true
+	for i in 3:
+		linked = linked and ms[i].upgrades_into == ms[i + 1] and ms[i + 1].previous_upgrade == ms[i]
+	_check(linked and ms[3].upgrades_into == null, "upgrade chain")
+	_check(ms[3].value > ms[0].value, "higher tiers cost more")
+	m.weapon_profiles[ms[1].my_id].wstats = {"damage": 77}
+	m.apply_all()
+	_eq(ms[1].stats.damage, 77, "custom tier stats edit")
+	# 改为远程：基底换成远程武器家族
+	m.weapon_families[wid].base = ranged[0].weapon_id
+	m.apply_all()
+	_eq(ms[0].type, ranged[0].type, "switched to ranged")
+	_check("nb_projectiles" in ms[0].stats, "ranged stats")
+	m.weapon_families[wid].sets = [isvc.sets[0].my_id]
+	m.apply_all()
+	var sets_ok = true
+	for x in ms:
+		sets_ok = sets_ok and x.sets.size() == 1 and x.sets[0].my_id == isvc.sets[0].my_id
+	_check(sets_ok, "sets for all tiers")
+	_check(not m.delete_weapon_tier(ms[1].my_id), "middle tier cannot be deleted")
+	_check(m.delete_weapon_tier(ms[3].my_id), "top tier deleted")
+	m.apply_all()
+	_check(not m.family_complete(wid), "incomplete again")
+	_check(m.delete_custom_weapon(wid), "custom weapon deleted")
+	_check(m.family_members(wid).empty(), "all tiers removed")
+
+
+func test_143_lower_tier_for_vanilla() -> void:
+	var ms = _family_from(1, 0)
+	if ms == null:
+		ms = _family_from(1, 1)
+	var wid = ms[0].weapon_id
+	var lo = ms[0]
+	_eq(m.addable_tiers(wid), [0], "vanilla family: only a lower tier")
+	var id = m.add_weapon_tier(wid, 0)
+	m.apply_all()
+	var nw = m.find_target("weapon", id)
+	_check(nw != null and nw.tier == 0, "lower tier registered")
+	_check(nw.upgrades_into == lo and lo.previous_upgrade == nw, "links into vanilla tier")
+	_check(nw.value < lo.value, "cheaper")
+	_eq(m.source_of(nw), "mod", "added tier is a mod weapon")
+	_check(m.family_complete(wid), "still complete")
+	m.weapon_families[wid].name = "Test Weapon"
+	m.apply_all()
+	var named = true
+	for x in m.family_members(wid):
+		named = named and x.name == "Test Weapon"
+	_check(named, "family name for all tiers")
+	m.kind_enabled.weapon = false
+	m.apply_all()
+	_check(lo.name != "Test Weapon", "weapon tab switch off restores vanilla name")
+	m.kind_enabled.weapon = true
+	var code = m.export_bundle("weapon")
+	_check(m.delete_weapon_tier(id), "lower tier deleted")
+	_check(lo.previous_upgrade == null, "unlinked")
+	_check(m.import_bundle(code) > 0, "bundle imported")
+	m.apply_all()
+	_check(m.find_target("weapon", id) != null, "bundle restores added tier")
+
+
+func test_144_sources() -> void:
+	for c in isvc.characters:
+		if c.resource_path.begins_with("res://dlcs/dlc_1/"):
+			_eq(m.source_of(c), "dlc1", "dlc character source")
+			break
+	_eq(m.source_of(m.find_character(CH)), "vanilla" if m.find_character(CH).resource_path.begins_with("res://items/") else m.source_of(m.find_character(CH)), "vanilla character")
+	var id = m.create_custom(CH)
+	_eq(m.source_of(m.find_character(id)), "mod", "custom character is mod")
+
+
+func test_145_ui_custom_and_disable() -> void:
+	var ui = yield(_open_ui(CH), "completed")
+	# 角色：来源筛选与禁用
+	ui._on_filter("mod", "src")
+	_eq(ui._char_grid.get_child_count(), 0, "no mod characters yet")
+	ui._on_filter("all", "src")
+	ui._on_disable_toggled(true)
+	_check(CH in m.disabled.character, "character disabled from ui")
+	var greyed = false
+	for b in ui._char_grid.get_children():
+		if b.get_meta("id") == CH:
+			greyed = b.modulate.a < 1.0
+	_check(greyed, "disabled character greyed in list")
+	ui._on_disable_toggled(false)
+	# 道具：新建、改名、属性、删除
+	ui.set_kind("item")
+	var base = ui._id
+	ui._on_new_custom()
+	var iid = ui._id
+	_check(iid.begins_with(m.ITEM_PREFIX) and iid != base, "custom item created from ui")
+	for t in ui.OBJECT_TABS:
+		ui._on_tab_pressed(t[0])
+		yield(tree, "idle_frame")
+		_check(ui._page.get_child_count() > 0, "custom item tab " + t[0])
+	ui._on_name_changed("My Item")
+	_eq(m.find_target("item", iid).name, "My Item", "custom item renamed live")
+	ui._on_tab_pressed("attrs")
+	ui._on_attr_changed(2, "tier", -999)
+	_eq(m.find_target("item", iid).tier, 2, "custom item tier live")
+	ui._on_delete_custom()
+	ui._on_delete_custom()
+	_check(m.find_target("item", iid) == null, "custom item deleted from ui")
+	# 武器：每个家族一格
+	ui.set_kind("weapon")
+	var fams = {}
+	for b in ui._char_grid.get_children():
+		fams[b.get_meta("key")] = fams.get(b.get_meta("key"), 0) + 1
+	var one_each = true
+	for k in fams:
+		one_each = one_each and fams[k] == 1
+	_check(one_each and fams.size() > 10, "one entry per weapon family")
+	# 给最低 T2 的原版武器补 T1
+	var fam = _family_from(1, 0)
+	ui._select(fam[0].my_id)
+	_check(ui._tier_box.get_child_count() >= 4, "tier buttons shown")
+	ui._on_add_tier(0)
+	_eq(m.find_target("weapon", ui._id).tier, 0, "lower tier added from ui")
+	_eq(m.find_target("weapon", ui._id).weapon_id, fam[0].weapon_id, "same family")
+	ui._on_delete_tier()
+	_eq(m.family_members(fam[0].weapon_id).size(), fam.size(), "lower tier deleted from ui")
+	# 自定义武器：新建（未完成 -> 禁用）、补等级、改远程、类别
+	ui._on_new_custom()
+	var w = m.find_target("weapon", ui._id)
+	var wid = w.weapon_id
+	_check(m.is_custom_family(wid), "custom weapon created from ui")
+	_check(ui._disable_switch.pressed and ui._disable_switch.disabled, "incomplete weapon: disable switch locked on")
+	for t in ui.OBJECT_TABS:
+		ui._on_tab_pressed(t[0])
+		yield(tree, "idle_frame")
+		_check(ui._page.get_child_count() > 0, "custom weapon tab " + t[0])
+	while not m.family_complete(wid):
+		var add = m.addable_tiers(wid)
+		ui._on_add_tier(add[-1])
+	_check(not m.is_disabled("weapon", wid), "complete after adding tiers")
+	ui._refresh_header()
+	_check(not ui._disable_switch.disabled, "switch unlocked when complete")
+	ui._on_weapon_type(true)
+	_eq(m.find_target("weapon", ui._id).type, 1, "switched to ranged")
+	ui._on_set_pressed(isvc.sets[0].my_id)
+	_check(m.weapon_families[wid].sets is Array, "sets recorded on family")
+	ui._on_tab_pressed("attrs")
+	_check(ui._aspd_label != null and ui._aspd_label.text != "", "attack speed shown")
+	ui._on_delete_custom()
+	ui._on_delete_custom()
+	_check(not m.weapon_families.has(wid), "custom weapon deleted from ui")
+	ui.queue_free()
+	yield(tree, "idle_frame")
+
+
+func test_146_attack_interval() -> void:
+	for w in isvc.weapons:
+		var cd = m.Catalog.attack_interval(w.stats)
+		if cd <= 0.0 or cd > 10.0:
+			_check(false, "attack interval sane for " + w.my_id)
+			return
+	_check(true, "attack intervals sane")

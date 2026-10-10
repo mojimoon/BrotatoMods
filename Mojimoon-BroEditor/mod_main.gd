@@ -15,6 +15,10 @@ const CSV_PATH = MOD_DIR + "translations/broeditor.csv"
 const UI_SCENE = MOD_DIR + "ui/editor_ui.tscn"
 const FONT_26_PATH = "res://resources/fonts/actual/base/font_26.tres"
 const CUSTOM_PREFIX = "character_broeditor_"
+const ITEM_PREFIX = "item_broeditor_"
+const WEAPON_PREFIX = "weapon_broeditor_"
+# 给原版武器家族补的低级版本：<weapon_id>_<等级>_broeditor
+const TIER_SUFFIX = "_broeditor"
 const EFFECT_SCRIPT = "res://items/global/effect.gd"
 const SHARE_PREFIX = "BE1:"
 # 批量导出：一栏全部（角色 / 道具 / 武器）与三栏全部，前缀不同
@@ -36,7 +40,8 @@ const GROUPS = ["stats", "start", "graph"]
 const KINDS = ["character", "item", "weapon"]
 # 武器属性页可编辑的 WeaponStats 字段：[字段, 类型, 显示方式]；pct = 内部 0–1，界面按百分比整数编辑
 const WSTAT_FIELDS = [
-	["damage", "int", ""], ["cooldown", "int", "sec"], ["crit_chance", "float", "pct"], ["crit_damage", "float", ""],
+	["damage", "int", ""], ["cooldown", "int", ""], ["recoil", "int", ""], ["recoil_duration", "float", ""],
+	["additional_cooldown_every_x_shots", "int", ""], ["additional_cooldown_multiplier", "float", ""], ["crit_chance", "float", "pct"], ["crit_damage", "float", ""],
 	["accuracy", "float", "pct"], ["min_range", "int", ""], ["max_range", "int", ""], ["knockback", "int", ""],
 	["lifesteal", "float", "pct"], ["speed_percent_modifier", "int", ""], ["effect_scale", "float", "pct"],
 	["nb_projectiles", "int", ""], ["projectile_spread", "float", ""], ["piercing", "int", ""],
@@ -54,6 +59,10 @@ var profiles: Dictionary = {}
 var item_profiles: Dictionary = {}
 var weapon_profiles: Dictionary = {}
 var kind_enabled := {"character": true, "item": true, "weapon": true}
+# 武器家族（weapon_id）层面的修改：名称 / 词条对全部等级生效；自定义武器与补的低级版本也记在这里
+var weapon_families: Dictionary = {}
+# 禁用的对象（武器按家族 weapon_id）：角色不可选，道具 / 武器不出现
+var disabled := {"character": [], "item": [], "weapon": []}
 var next_id: int = 1
 # 调试模式：编辑器里在效果与属性旁显示键名
 var debug := false
@@ -64,6 +73,9 @@ var _backups: Dictionary = {}
 var _orig_effects: Dictionary = {}
 # 自定义角色 id -> CharacterData
 var _customs: Dictionary = {}
+var _custom_items: Dictionary = {}
+var _custom_weapons: Dictionary = {}
+var _global_ban = null
 # 角色 id -> 禁用的道具 / 武器 hash（商店过滤用）
 var _ban_cache: Dictionary = {}
 var _library = null
@@ -215,6 +227,33 @@ static func normalize_profile(p) -> Dictionary:
 
 
 # JSON 读回的数字是浮点：节点 id / 连线统一转为整数
+# 武器家族档案：custom = 自定义武器（base = 外观与近 / 远战来源的原版家族）；tiers = 本模组新增的等级
+static func new_family() -> Dictionary:
+	return {"custom": false, "base": "", "name": "", "icon": "", "sets": null, "tiers": []}
+
+
+static func normalize_family(f) -> Dictionary:
+	var out = new_family()
+	if not f is Dictionary:
+		return out
+	for k in out:
+		if f.has(k) and typeof(f[k]) == typeof(out[k]):
+			out[k] = f[k]
+	out.custom = bool(f.get("custom", false))
+	out.sets = null
+	if f.get("sets") is Array:
+		out.sets = []
+		for s in f.sets:
+			out.sets.push_back(str(s))
+	var tiers = []
+	for t in out.tiers:
+		if int(t) >= 0 and int(t) <= 3 and not int(t) in tiers:
+			tiers.push_back(int(t))
+	tiers.sort()
+	out.tiers = tiers
+	return out
+
+
 static func _int_ids(g: Dictionary) -> void:
 	for n in g.nodes:
 		n.id = int(n.get("id", 0))
@@ -262,13 +301,22 @@ func reset_profile(id: String, kind: String = "character") -> void:
 
 
 func is_custom(id: String) -> bool:
-	return profiles.has(id) and profiles[id].custom
+	for ps in [profiles, item_profiles, weapon_profiles]:
+		if ps.has(id) and ps[id].custom:
+			return true
+	return false
+
+
+func is_custom_family(weapon_id: String) -> bool:
+	return weapon_families.has(weapon_id) and weapon_families[weapon_id].custom
 
 
 func load_profiles() -> void:
 	profiles = {}
 	item_profiles = {}
 	weapon_profiles = {}
+	weapon_families = {}
+	disabled = {"character": [], "item": [], "weapon": []}
 	var file = File.new()
 	if not file.file_exists(SAVE_PATH) or file.open(SAVE_PATH, File.READ) != OK:
 		return
@@ -288,6 +336,22 @@ func load_profiles() -> void:
 		if ps is Dictionary:
 			for id in ps:
 				pair[1][str(id)] = normalize_profile(ps[id])
+	_load_extra(parsed.result)
+
+
+# 家族档案与禁用列表（存档与批量码共用）
+func _load_extra(data: Dictionary) -> void:
+	var fs = data.get("families", {})
+	if fs is Dictionary:
+		for wid in fs:
+			weapon_families[str(wid)] = normalize_family(fs[wid])
+	var dis = data.get("disabled", {})
+	if dis is Dictionary:
+		for k in KINDS:
+			if dis.get(k) is Array:
+				for id in dis[k]:
+					if not str(id) in disabled[k]:
+						disabled[k].push_back(str(id))
 
 
 func save_profiles() -> void:
@@ -301,6 +365,7 @@ func save_profiles() -> void:
 	file.store_string(JSON.print({
 		"version": 1, "next_id": next_id, "settings": {"debug": debug, "kinds": kind_enabled},
 		"profiles": profiles, "items": item_profiles, "weapons": weapon_profiles,
+		"families": weapon_families, "disabled": disabled,
 	}, "\t"))
 	file.close()
 
@@ -318,16 +383,28 @@ func export_code(id: String, kind: String = "character") -> String:
 func export_bundle(kind: String) -> String:
 	var data = {}
 	var prefix = ALL_PREFIX
+	var kinds = KINDS
 	if kind != "":
 		prefix = BUNDLE_PREFIX[kind]
-		data[BUNDLE_KEYS[kind]] = profiles_of(kind)
-	else:
-		for k in KINDS:
-			data[BUNDLE_KEYS[k]] = profiles_of(k)
+		kinds = [kind]
+	var dis = {}
+	for k in kinds:
+		data[BUNDLE_KEYS[k]] = profiles_of(k)
+		dis[k] = disabled[k]
+	if "weapon" in kinds:
+		data["families"] = weapon_families
+	data["disabled"] = dis
+	var has = _any_disabled(dis)
 	for k in data:
-		if not data[k].empty():
-			return prefix + Marshalls.utf8_to_base64(JSON.print(data))
-	return ""
+		has = has or (k != "disabled" and not data[k].empty())
+	return prefix + Marshalls.utf8_to_base64(JSON.print(data)) if has else ""
+
+
+static func _any_disabled(dis: Dictionary) -> bool:
+	for k in dis:
+		if not dis[k].empty():
+			return true
+	return false
 
 
 # 导入批量码：同 id 的档案被覆盖（自定义角色保留 id）；返回导入条数，-1 = 不是有效的批量码
@@ -348,6 +425,25 @@ func import_bundle(code: String) -> int:
 	if parsed.error != OK or not parsed.result is Dictionary:
 		return -1
 	var n = 0
+	# 先建好自定义武器 / 补的等级，后面的武器档案才找得到目标
+	if "weapon" in kinds:
+		var fs = parsed.result.get("families", {})
+		if fs is Dictionary:
+			for wid in fs:
+				var f = normalize_family(fs[wid])
+				if f.custom and not str(wid).begins_with(WEAPON_PREFIX):
+					continue
+				weapon_families[str(wid)] = f
+				if f.custom:
+					next_id = max(next_id, _id_number(str(wid)) + 1)
+				n += 1
+			_register_weapon_families()
+	if parsed.result.get("disabled") is Dictionary:
+		var keep = {}
+		for k in KINDS:
+			keep[k] = disabled[k] if not k in kinds else []
+		disabled = keep
+		_load_extra({"disabled": parsed.result.disabled})
 	for k in kinds:
 		var src = parsed.result.get(BUNDLE_KEYS[k], {})
 		if not src is Dictionary:
@@ -359,16 +455,27 @@ func import_bundle(code: String) -> int:
 			id = str(id)
 			if k == "character" and p.custom != id.begins_with(CUSTOM_PREFIX):
 				continue
+			if k == "item" and p.custom != id.begins_with(ITEM_PREFIX):
+				continue
+			if k == "item" and p.custom:
+				item_profiles[id] = p
+				_register_custom_item(id)
 			if k != "character" and find_target(k, id) == null:
 				continue
 			if k == "character" and not p.custom and find_character(id) == null:
 				continue
 			profiles_of(k)[id] = p
-			if p.custom:
-				next_id = max(next_id, int(id.substr(CUSTOM_PREFIX.length())) + 1)
+			if p.custom and k == "character":
 				_register_custom(id)
+			if p.custom and k != "weapon":
+				next_id = max(next_id, _id_number(id) + 1)
 			n += 1
 	return n
+
+
+# 自定义对象 id 末尾的编号
+static func _id_number(id: String) -> int:
+	return int(id.get_slice("_", id.count("_")))
 
 
 func import_code(code: String, target_id: String, kind: String = "character") -> String:
@@ -382,9 +489,16 @@ func import_code(code: String, target_id: String, kind: String = "character") ->
 	# 道具 / 武器的档案只能导入到同种类的对象上
 	if str(parsed.result.get("kind", "character")) != kind:
 		return ""
+	if kind == "item" and p.custom:
+		var nid = create_custom_item(p.base)
+		item_profiles[nid] = p
+		_register_custom_item(nid)
+		return nid
 	if kind != "character":
 		if target_id == "":
 			return ""
+		# 自定义武器的等级档案保持自定义
+		p.custom = is_custom(target_id)
 		profiles_of(kind)[target_id] = p
 		return target_id
 	if p.custom:
@@ -684,7 +798,7 @@ func _desc_effect(id: String, text: String):
 const BACKUP_FIELDS = {
 	"character": ["effects", "name", "starting_weapons", "wanted_tags"],
 	"item": ["effects", "name", "value", "tier", "max_nb", "tags"],
-	"weapon": ["effects", "name", "value", "stats"],
+	"weapon": ["effects", "name", "value", "stats", "sets"],
 }
 
 
@@ -739,12 +853,19 @@ func apply_all() -> void:
 		return
 	restore()
 	_ban_cache.clear()
+	_global_ban = null
 	_register_customs()
+	_register_custom_items()
+	_register_weapon_families()
 	_apply_items()
 	_apply_weapons()
+	_apply_families()
 	if _repool and isvc.has_method("init_unlocked_pool"):
 		isvc.init_unlocked_pool()
 	_repool = false
+	# 原版按 id 查找道具 / 武器的缓存（新增或删除对象后会过期）
+	isvc._item_id_lookup = {}
+	isvc._weapon_id_lookup = {}
 	for id in profiles:
 		var p = profiles[id]
 		var c = find_character(id)
@@ -769,12 +890,11 @@ func apply_all() -> void:
 
 # 道具：效果、名称、价格、稀有度、数量限制、词条
 func _apply_items() -> void:
-	if not kind_enabled.item:
-		return
 	for id in item_profiles:
 		var p = item_profiles[id]
 		var it = find_target("item", id)
-		if it == null or not p.enabled:
+		# 自定义道具总是生效（同自定义角色）
+		if it == null or not (p.custom or (p.enabled and kind_enabled.item)):
 			continue
 		var _orig = orig_effects(id)
 		_backup(it)
@@ -794,12 +914,10 @@ func _apply_items() -> void:
 
 # 武器：效果、名称、价格、武器属性（在原属性的副本上改写）
 func _apply_weapons() -> void:
-	if not kind_enabled.weapon:
-		return
 	for id in weapon_profiles:
 		var p = weapon_profiles[id]
 		var w = find_target("weapon", id)
-		if w == null or not p.enabled:
+		if w == null or not (p.custom or (p.enabled and kind_enabled.weapon)):
 			continue
 		var _orig = orig_effects(id)
 		_backup(w)
@@ -810,6 +928,107 @@ func _apply_weapons() -> void:
 			w.value = p.price
 		if not p.wstats.empty() or p.scaling is Array:
 			w.stats = weapon_stats_for(w, p)
+
+
+# 家族层面的名称、词条（全部等级）
+func _apply_families() -> void:
+	for wid in weapon_families:
+		var f = weapon_families[wid]
+		if not f.custom and not kind_enabled.weapon:
+			continue
+		var sets = null
+		if f.sets is Array:
+			sets = []
+			for s in _isvc().sets:
+				if s != null and s.my_id in f.sets:
+					sets.push_back(s)
+		for w in family_members(wid):
+			if f.name == "" and sets == null:
+				continue
+			_backup(w)
+			if f.name != "":
+				w.name = f.name
+			if sets != null:
+				w.sets = sets.duplicate()
+
+
+# 同一家族的全部等级（按等级排序）
+func family_members(weapon_id: String) -> Array:
+	var out = []
+	for w in _isvc().weapons:
+		if w != null and w.weapon_id == weapon_id:
+			out.push_back(w)
+	out.sort_custom(self, "_by_tier")
+	return out
+
+
+static func _by_tier(a, b) -> bool:
+	return a.tier < b.tier
+
+
+# 家族是否完整：等级连续且最高到 T4（未完成的武器自动禁用，但仍可编辑）
+func family_complete(weapon_id: String) -> bool:
+	var ms = family_members(weapon_id)
+	if ms.empty() or ms[-1].tier != 3:
+		return false
+	for i in ms.size():
+		if ms[i].tier != ms[0].tier + i:
+			return false
+	return true
+
+
+# 禁用（受本栏总开关控制；未完成的武器总是禁用）
+func is_disabled(kind: String, id: String) -> bool:
+	if kind == "weapon" and not family_complete(id):
+		return true
+	return kind_enabled[kind] and id in disabled[kind]
+
+
+func set_disabled(kind: String, id: String, on: bool) -> void:
+	disabled[kind].erase(id)
+	if on:
+		disabled[kind].push_back(id)
+	_global_ban = null
+	_ban_cache.clear()
+
+
+func disabled_character_hashes() -> Array:
+	var out = []
+	if kind_enabled.character:
+		for id in disabled.character:
+			out.push_back(Keys.generate_hash(id))
+	return out
+
+
+static func without(arr: Array, remove: Array) -> Array:
+	if remove.empty():
+		return arr
+	var out = []
+	for x in arr:
+		if not x in remove:
+			out.push_back(x)
+	return out
+
+
+# 被禁用的道具 / 武器哈希（所有角色）
+func global_ban_hashes() -> Array:
+	if _global_ban != null:
+		return _global_ban
+	var out = []
+	var isvc = _isvc()
+	for it in isvc.items:
+		if it != null and is_disabled("item", it.my_id):
+			out.push_back(Keys.generate_hash(it.my_id))
+	var seen = {}
+	for w in isvc.weapons:
+		if w == null:
+			continue
+		if not seen.has(w.weapon_id):
+			seen[w.weapon_id] = is_disabled("weapon", w.weapon_id)
+		if seen[w.weapon_id]:
+			out.push_back(w.my_id_hash)
+	_global_ban = out
+	return out
 
 
 # 按档案改写后的武器属性（不修改原资源）
@@ -843,11 +1062,11 @@ static func scaling_names(scaling: Array) -> Array:
 	return out
 
 
-# 对象来源：原版 / DLC / 模组（按资源路径）
+# 对象来源：原版 / dlc1、dlc2… / 模组（按资源路径；本模组新增的对象没有路径，属于模组）
 static func source_of(res) -> String:
 	var path = res.resource_path if res != null else ""
-	if path.begins_with("res://dlcs/"):
-		return "dlc"
+	if path.begins_with("res://dlcs/dlc_"):
+		return "dlc" + path.get_slice("/", 3).trim_prefix("dlc_")
 	if path.begins_with("res://items/") or path.begins_with("res://weapons/"):
 		return "vanilla"
 	return "mod"
@@ -982,6 +1201,264 @@ func _fill_custom(c, id: String, p: Dictionary) -> void:
 	c.wanted_tags = p.wanted_tags.duplicate() if p.wanted_tags is Array else []
 
 
+# ============================================================
+# 自定义道具（同 BroLab：基底提供外观，图标可选 / 可导入）
+# ============================================================
+func create_custom_item(base_id: String) -> String:
+	var id = ITEM_PREFIX + str(next_id)
+	while find_target("item", id) != null or item_profiles.has(id):
+		next_id += 1
+		id = ITEM_PREFIX + str(next_id)
+	next_id += 1
+	var p = new_profile()
+	p.custom = true
+	p.base = base_id
+	var base = find_target("item", base_id)
+	if base != null:
+		p.name = tr(orig_name(base)) + " +"
+		p.price = int(backup_value(base, "value"))
+		p.tier = int(backup_value(base, "tier"))
+		p.max_nb = int(backup_value(base, "max_nb"))
+		p.tags = backup_value(base, "tags").duplicate()
+		p.effects = []
+		for i in orig_effects(base_id).size():
+			p.effects.push_back({"from": base_id, "i": i})
+	else:
+		p.name = tr("BE_NEW_ITEM")
+		p.price = 10
+		p.tier = 0
+		p.effects = []
+	item_profiles[id] = p
+	_register_custom_item(id)
+	_repool = true
+	_unlock_new_characters()
+	return id
+
+
+func delete_custom_item(id: String) -> bool:
+	if not item_profiles.has(id) or not item_profiles[id].custom or in_saved_run_text(id):
+		return false
+	item_profiles.erase(id)
+	disabled.item.erase(id)
+	var it = _custom_items.get(id)
+	_custom_items.erase(id)
+	_isvc().items.erase(it)
+	_repool = true
+	return true
+
+
+func _register_custom_items() -> void:
+	for id in item_profiles:
+		if item_profiles[id].custom:
+			_register_custom_item(id)
+
+
+func _register_custom_item(id: String) -> void:
+	var isvc = _isvc()
+	var p = item_profiles[id]
+	var it = _custom_items.get(id)
+	if it == null:
+		it = load("res://items/global/item_data.gd").new()
+		it.my_id = id
+		it.unlocked_by_default = true
+		_custom_items[id] = it
+	# 基础字段直接取档案（自定义道具的档案总是完整的）
+	var base = find_target("item", p.base)
+	it.name = p.name if p.name != "" else tr("BE_NEW_ITEM")
+	it.icon = custom_icon(id, p, "item")
+	it.item_appearances = base.item_appearances if base != null else []
+	it.value = max(0, p.price)
+	if it.tier != max(0, p.tier):
+		_repool = true
+	it.tier = int(clamp(p.tier, 0, 3))
+	it.max_nb = p.max_nb if p.max_nb != -2 else -1
+	it.tags = p.tags.duplicate() if p.tags is Array else []
+	it.effects = []
+	it._generate_hashes()
+	if not it in isvc.items:
+		isvc.items.push_back(it)
+		_repool = true
+
+
+# ============================================================
+# 自定义武器 / 补低级版本
+# ============================================================
+static func tier_id(weapon_id: String, t: int, custom_family: bool) -> String:
+	return weapon_id + "_" + str(t + 1) + ("" if custom_family else TIER_SUFFIX)
+
+
+# 以 base_wid 家族为基底新建自定义武器（先只有基底最低的等级），返回该等级的 my_id
+func create_custom_weapon(base_wid: String) -> String:
+	var wid = WEAPON_PREFIX + str(next_id)
+	while weapon_families.has(wid) or not family_members(wid).empty():
+		next_id += 1
+		wid = WEAPON_PREFIX + str(next_id)
+	next_id += 1
+	var f = new_family()
+	f.custom = true
+	f.base = base_wid
+	var bm = _vanilla_members(base_wid)
+	f.name = tr(orig_name(bm[0])) + " +" if not bm.empty() else tr("BE_NEW_WEAPON")
+	f.tiers = [bm[0].tier if not bm.empty() else 0]
+	weapon_families[wid] = f
+	return add_weapon_tier(wid, f.tiers[0], true)
+
+
+# 可新增的等级：家族最低等级之下一级；自定义武器还可以加最高等级之上一级
+func addable_tiers(weapon_id: String) -> Array:
+	var ms = family_members(weapon_id)
+	if ms.empty():
+		return []
+	var out = []
+	if ms[0].tier > 0:
+		out.push_back(ms[0].tier - 1)
+	if is_custom_family(weapon_id) and ms[-1].tier < 3:
+		out.push_back(ms[-1].tier + 1)
+	return out
+
+
+func add_weapon_tier(weapon_id: String, t: int, force: bool = false) -> String:
+	if not force and not t in addable_tiers(weapon_id):
+		return ""
+	if not weapon_families.has(weapon_id):
+		weapon_families[weapon_id] = new_family()
+	var f = weapon_families[weapon_id]
+	if not t in f.tiers:
+		f.tiers.push_back(t)
+		f.tiers.sort()
+	var id = tier_id(weapon_id, t, f.custom)
+	var p = new_profile()
+	p.custom = true
+	weapon_profiles[id] = p
+	_register_weapon_families()
+	_unlock_new_characters()
+	return id
+
+
+# 删除自定义等级（只能删两端，保持连续）；自定义武器删到最后一级时整把删除
+func delete_weapon_tier(id: String) -> bool:
+	var w = find_target("weapon", id)
+	if w == null or not _custom_weapons.has(id) or in_saved_run_text(w.weapon_id):
+		return false
+	var ms = family_members(w.weapon_id)
+	if w != ms[0] and w != ms[-1]:
+		return false
+	var f = weapon_families[w.weapon_id]
+	f.tiers.erase(w.tier)
+	_unregister_weapon(id)
+	if f.custom and f.tiers.empty():
+		weapon_families.erase(w.weapon_id)
+		disabled.weapon.erase(w.weapon_id)
+	_link_family(w.weapon_id)
+	return true
+
+
+func delete_custom_weapon(weapon_id: String) -> bool:
+	if not is_custom_family(weapon_id) or in_saved_run_text(weapon_id):
+		return false
+	for w in family_members(weapon_id):
+		_unregister_weapon(w.my_id)
+	weapon_families.erase(weapon_id)
+	disabled.weapon.erase(weapon_id)
+	return true
+
+
+func _unregister_weapon(id: String) -> void:
+	var w = _custom_weapons.get(id)
+	_custom_weapons.erase(id)
+	weapon_profiles.erase(id)
+	_orig_effects.erase(id)
+	if w != null:
+		_isvc().weapons.erase(w)
+	_repool = true
+
+
+func _vanilla_members(weapon_id: String) -> Array:
+	var out = []
+	for w in family_members(weapon_id):
+		if not _custom_weapons.has(w.my_id):
+			out.push_back(w)
+	return out
+
+
+# 新等级的模板：自定义武器取基底家族同级（没有则最近一级），补的低级版本取原家族最低一级
+func _weapon_template(weapon_id: String, t: int):
+	var f = weapon_families[weapon_id]
+	var ms = _vanilla_members(f.base if f.custom else weapon_id)
+	var best = null
+	for w in ms:
+		if best == null or abs(w.tier - t) < abs(best.tier - t):
+			best = w
+	return best
+
+
+func _register_weapon_families() -> void:
+	for wid in weapon_families:
+		var f = weapon_families[wid]
+		for t in f.tiers:
+			_register_custom_weapon(wid, t)
+		_link_family(wid)
+
+
+func _register_custom_weapon(weapon_id: String, t: int) -> void:
+	var f = weapon_families[weapon_id]
+	var tpl = _weapon_template(weapon_id, t)
+	if tpl == null:
+		return
+	var id = tier_id(weapon_id, t, f.custom)
+	var w = _custom_weapons.get(id)
+	if w == null:
+		w = load("res://items/global/weapon_data.gd").new()
+		_custom_weapons[id] = w
+	w.my_id = id
+	w.weapon_id = weapon_id
+	w.tier = t
+	w.unlocked_by_default = true
+	w.type = tpl.type
+	w.scene = tpl.scene
+	w.stats = backup_value(tpl, "stats").duplicate()
+	w.sets = backup_value(tpl, "sets").duplicate()
+	w.effects = backup_value(tpl, "effects").duplicate()
+	w.value = int(round(backup_value(tpl, "value") * pow(2, t - tpl.tier)))
+	w.name = backup_value(tpl, "name")
+	w.icon = tpl.icon
+	if f.custom:
+		w.icon = custom_icon(weapon_id, f, "weapon")
+		w.name = f.name if f.name != "" else tr("BE_NEW_WEAPON")
+	w.add_to_chars_as_starting = []
+	w.upgrades_into = null
+	w._generate_hashes()
+	_orig_effects.erase(id)
+	if not weapon_profiles.has(id):
+		var p = new_profile()
+		p.custom = true
+		weapon_profiles[id] = p
+	if not w in _isvc().weapons:
+		_isvc().weapons.push_back(w)
+		_repool = true
+
+
+# 升级链：自定义等级指向下一级；原版成员只改 previous_upgrade（无需备份）
+func _link_family(weapon_id: String) -> void:
+	var ms = family_members(weapon_id)
+	for i in ms.size():
+		var w = ms[i]
+		if i == 0:
+			w.previous_upgrade = null
+		if _custom_weapons.has(w.my_id):
+			w.upgrades_into = ms[i + 1] if i + 1 < ms.size() else null
+		if i + 1 < ms.size():
+			ms[i + 1].previous_upgrade = w
+
+
+# 存档里进行中的一局是否用到了该 id（按文本查找）
+func in_saved_run_text(id: String) -> bool:
+	var pd = _autoload("ProgressData")
+	if pd == null or not pd.saved_run_state is Dictionary or not pd.saved_run_state.get("has_run_state", false):
+		return false
+	return var2str(pd.saved_run_state).find(id) >= 0
+
+
 # 新建的自定义角色：解锁并补上难度记录（游戏启动时由 ProgressData 读档自动完成）
 func _unlock_new_characters() -> void:
 	var pd = _autoload("ProgressData")
@@ -1047,7 +1524,7 @@ func ban_hashes(player_index: int) -> Array:
 		return []
 	if _ban_cache.has(c.my_id):
 		return _ban_cache[c.my_id]
-	var out = []
+	var out = global_ban_hashes().duplicate()
 	var p = profiles.get(c.my_id)
 	if p != null and ((p.enabled and kind_enabled.character) or p.custom):
 		for id in p.ban_items:
@@ -1231,16 +1708,20 @@ const DIGITS = ["111101101101111", "010110010010111", "111001111100111", "111001
 var _icon_cache: Dictionary = {}
 
 
-func custom_icon(id: String, p: Dictionary) -> Texture:
+# 自定义对象的图标：导入的图片 / 选的图标 / 基底的图标（后两者加编号）
+func custom_icon(id: String, p: Dictionary, kind: String = "character") -> Texture:
 	if p.icon.begins_with("file:"):
 		var t = _load_icon_file(p.icon.substr(5))
 		if t != null:
 			return t
 	var src = _find_any(p.icon) if p.icon != "" and not p.icon.begins_with("file:") else null
-	if src == null:
-		src = find_character(p.base)
+	if src == null and kind == "weapon":
+		var bm = _vanilla_members(p.base)
+		src = bm[0] if not bm.empty() else null
+	elif src == null:
+		src = find_target(kind, p.base)
 	var tex = src.icon if src != null else load("res://items/characters/well_rounded/well_rounded_icon.png")
-	return numbered_icon(tex, int(id.trim_prefix(CUSTOM_PREFIX)))
+	return numbered_icon(tex, _id_number(id))
 
 
 func _load_icon_file(name: String):

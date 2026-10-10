@@ -94,18 +94,30 @@ func _kinds(m, out: String):
 	var ui = load("res://mods-unpacked/Mojimoon-BroEditor/ui/editor_ui.tscn").instance()
 	root.add_child(ui)
 	yield(self, "idle_frame")
+	ui._on_filter("dlc1", "src")
+	yield(_shot(ui, out + "/char_dlc1.png"), "completed")
+	ui._on_filter("all", "src")
 	for kind in ["item", "weapon"]:
 		ui.set_kind(kind)
 		ui._on_filter(2, "tier")
 		ui._select(ui._first_listed())
 		if kind == "weapon":
 			ui._on_wstat_changed(99.0, ["damage", "int", ""])
-		for t in ["attrs", "effects"]:
+		ui._on_disable_toggled(true)
+		for t in ["overview", "attrs", "effects"]:
 			ui._on_tab_pressed(t)
-			for i in 6:
-				yield(self, "idle_frame")
-			var img = root.get_texture().get_data()
-			img.flip_y()
-			img.save_png(out + "/" + kind + "_" + t + ".png")
+			yield(_shot(ui, out + "/" + kind + "_" + t + ".png"), "completed")
+		ui._on_filter(-1, "tier")
+		ui._on_new_custom()
+		ui._on_tab_pressed("overview")
+		yield(_shot(ui, out + "/" + kind + "_custom.png"), "completed")
 	ui.queue_free()
 	yield(self, "idle_frame")
+
+
+func _shot(ui, path: String):
+	for i in 6:
+		yield(self, "idle_frame")
+	var img = root.get_texture().get_data()
+	img.flip_y()
+	img.save_png(path)

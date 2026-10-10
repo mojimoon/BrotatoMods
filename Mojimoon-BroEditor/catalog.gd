@@ -410,3 +410,57 @@ const STAT_ICON_PATHS = {
 	"hp_start_wave": ["res://items/all/sad_tomato/sad_tomato_icon.png"],
 	"hp_start_next_wave": ["res://items/all/weird_ghost/weird_ghost_icon.png"],
 }
+
+
+# ============================================================
+# 武器攻击间隔（移植自 AutoAnthony weapon_value.cooldown_seconds，即 codex 攻速计算器：
+# 攻速 0、6 把武器；含后坐 / 近战出招收招的补间帧、随机冷却抖动、换弹折算到每发）
+# ============================================================
+const _FPS = 60.0
+const _MIN_CD_FRAMES = 2
+const _MELEE_ATTACK_DURATION = 0.2
+const _WEAPON_COUNT = 6
+
+
+static func _tween(d: float) -> int:
+	if abs(d - 0.05) < 0.0001:
+		return 4
+	return int(floor(d * 60.0)) + 2
+
+
+static func _avg_attack(min_cd: float, max_cd: float) -> float:
+	if max_cd <= min_cd:
+		return max_cd
+	var c_min = ceil(min_cd)
+	var f_max = floor(max_cd)
+	var tri_a = f_max * (f_max + 1.0) / 2.0
+	var tri_b = c_min * (c_min + 1.0) / 2.0
+	return ((c_min - min_cd) * c_min + tri_a - tri_b + (max_cd - f_max) * ceil(max_cd)) / (max_cd - min_cd)
+
+
+# 平均每次攻击的间隔（秒）
+static func attack_interval(st) -> float:
+	var wcf = max(_MIN_CD_FRAMES, int(st.cooldown))
+	var recoil = float(st.recoil_duration)
+	var add_cd = 0.0
+	var alt_bonus = 0.0
+	if "attack_type" in st:
+		var eff_range = max(25.0, float(st.max_range))
+		var attack_dur = _MELEE_ATTACK_DURATION + max(0.0, eff_range / 70.0) * 0.15
+		add_cd = _tween(recoil) + _tween(_MELEE_ATTACK_DURATION) - 1
+		var half = _tween(attack_dur / 2.0)
+		var quarter = _tween(attack_dur / 4.0)
+		add_cd += half if int(st.attack_type) == 0 else 2 * quarter
+		if st.alternate_attack_type and half > 2 * quarter:
+			alt_bonus = 1.0
+	else:
+		add_cd = 2 * _tween(recoil) - 1
+	var max_rand = min(_WEAPON_COUNT * wcf / 5.0, _WEAPON_COUNT * 5.0)
+	var avg = add_cd + _avg_attack(max(1.0, wcf - max_rand), wcf + max_rand) - alt_bonus
+	var cd = avg / _FPS
+	var shots = int(st.additional_cooldown_every_x_shots)
+	var mult = float(st.additional_cooldown_multiplier)
+	if shots > 0 and mult > 0:
+		var actual = (add_cd + wcf * mult) / _FPS
+		cd += (actual - cd) / shots
+	return cd

@@ -56,11 +56,12 @@ const KIND_TABS = [
 ]
 # 道具 / 武器的页签
 const OBJECT_TABS = [
+	["overview", "BE_TAB_OVERVIEW", Color(1.0, 0.72, 0.30)],
 	["attrs", "BE_TAB_ATTRS", Color(0.55, 0.85, 0.55)],
 	["effects", "BE_TAB_EFFECTS", Color(0.40, 0.72, 1.0)],
 	["blueprint", "BE_TAB_BLUEPRINT", Color(1.0, 0.55, 0.35)],
 ]
-const SOURCES = [["all", "BE_FILTER_ALL"], ["vanilla", "BE_SRC_VANILLA"], ["dlc", "BE_SRC_DLC"], ["mod", "BE_SRC_MOD"]]
+const SOURCES = [["all", "BE_FILTER_ALL"], ["vanilla", "BE_SRC_VANILLA"], ["dlc1", "BE_SRC_DLC1"], ["mod", "BE_SRC_MOD"]]
 const SORTS = [["tier", "BE_SORT_TIER"], ["name", "BE_SORT_NAME"], ["price", "BE_SORT_PRICE"]]
 
 var initial_id := ""
@@ -74,7 +75,7 @@ var _tab := "overview"
 var _kind_ids: Dictionary = {}
 var _kind_tabs: Dictionary = {}
 var _filters := {
-	"character": {"q": ""},
+	"character": {"q": "", "src": "all"},
 	"item": {"q": "", "src": "all", "tier": -1, "tag": "", "sort": "tier"},
 	"weapon": {"q": "", "src": "all", "tier": -1, "tag": "", "sort": "tier"},
 }
@@ -95,6 +96,9 @@ var _head_name: Label
 var _head_info: Label
 var _enable_switch: CheckButton
 var _reset_btn: Button
+var _disable_switch: CheckButton
+var _tier_box: HBoxContainer
+var _aspd_label: Label
 var _delete_btn: Button
 var _tab_buttons: Dictionary = {}
 var _page: VBoxContainer
@@ -159,7 +163,7 @@ func _isvc():
 
 
 func _sig() -> String:
-	return JSON.print([_mod.profiles, _mod.item_profiles, _mod.weapon_profiles, _mod.kind_enabled])
+	return JSON.print([_mod.profiles, _mod.item_profiles, _mod.weapon_profiles, _mod.kind_enabled, _mod.weapon_families, _mod.disabled])
 
 
 func _profiles() -> Dictionary:
@@ -344,6 +348,7 @@ func _fill_left() -> void:
 	if _kind == "character":
 		box.add_child(_label(tr("BE_CHARACTERS"), FONT_NORMAL, C_ACCENT))
 		box.add_child(_search)
+		_filter_chips(box, "src", SOURCES)
 	else:
 		var head = HBoxContainer.new()
 		box.add_child(head)
@@ -382,12 +387,12 @@ func _fill_left() -> void:
 	_char_grid.add_constant_override("hseparation", 6)
 	_char_grid.add_constant_override("vseparation", 6)
 	scroll.add_child(_char_grid)
-	if _kind == "character":
-		box.add_child(_desc(tr("BE_CHARACTERS_DESC")))
+	box.add_child(_desc(tr("BE_CHARACTERS_DESC" if _kind == "character" else "BE_OBJECTS_DESC")))
+	if true:
 		var row = HBoxContainer.new()
 		row.add_constant_override("separation", 8)
 		box.add_child(row)
-		var new_btn = _button(tr("BE_NEW_CUSTOM"), FONT_SMALL)
+		var new_btn = _button(tr("BE_NEW_CUSTOM" if _kind == "character" else "BE_NEW_CUSTOM_" + _kind.to_upper()), FONT_SMALL)
 		new_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_apply_action_style(new_btn, C_CUSTOM)
 		new_btn.connect("pressed", self, "_on_new_custom")
@@ -449,13 +454,21 @@ func _tags_of(r) -> Array:
 	return out
 
 
+# 左栏对象：武器每个家族只列最低等级
 func _all_of_kind() -> Array:
 	var isvc = _isvc()
 	var arr = isvc.characters if _kind == "character" else (isvc.items if _kind == "item" else isvc.weapons)
 	var out = []
+	var heads = {}
 	for r in arr:
-		if r != null:
+		if r == null:
+			continue
+		if _kind != "weapon":
 			out.push_back(r)
+		elif not heads.has(r.weapon_id) or r.tier < heads[r.weapon_id].tier:
+			heads[r.weapon_id] = r
+	for wid in heads:
+		out.push_back(heads[wid])
 	return out
 
 
@@ -468,14 +481,18 @@ func _first_listed() -> String:
 
 func _matches(r, f: Dictionary) -> bool:
 	var q = f.q.strip_edges().to_lower()
-	if q != "" and tr(_mod.orig_name(r)).to_lower().find(q) < 0 and r.my_id.find(q) < 0:
+	if q != "" and tr(_mod.orig_name(r)).to_lower().find(q) < 0 and tr(r.name).to_lower().find(q) < 0 and r.my_id.find(q) < 0:
+		return false
+	if f.src != "all" and _source(r) != f.src:
 		return false
 	if _kind == "character":
 		return true
-	if f.src != "all" and BEMain.source_of(r) != f.src:
-		return false
-	if f.tier >= 0 and int(_mod.backup_value(r, "tier")) != f.tier:
-		return false
+	if f.tier >= 0:
+		var found = false
+		for m in (_mod.family_members(r.weapon_id) if _kind == "weapon" else [r]):
+			found = found or int(_mod.backup_value(m, "tier")) == f.tier
+		if not found:
+			return false
 	if f.tag != "":
 		var found = false
 		for t in _tags_of(r):
@@ -515,7 +532,14 @@ func _build_right(body: Control) -> void:
 	_head_name = _label("", FONT_NORMAL, C_TEXT)
 	col.add_child(_head_name)
 	_head_info = _label("", FONT_DESC, C_TEXT_DIM)
+	_head_info.clip_text = true
+	_head_name.clip_text = true
 	col.add_child(_head_info)
+	# 武器：同一家族的等级切换（右侧），可补等级
+	_tier_box = HBoxContainer.new()
+	_tier_box.add_constant_override("separation", 6)
+	_tier_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	head.add_child(_tier_box)
 	_enable_switch = _switch(tr("BE_PROFILE_ENABLED"), true)
 	_enable_switch.connect("toggled", self, "_on_enable_toggled")
 	head.add_child(_enable_switch)
@@ -524,6 +548,9 @@ func _build_right(body: Control) -> void:
 	_apply_action_style(_reset_btn, C_DANGER)
 	_reset_btn.connect("pressed", self, "_on_reset_pressed")
 	head.add_child(_reset_btn)
+	_disable_switch = _switch(tr("BE_OBJ_DISABLE"), false)
+	_disable_switch.connect("toggled", self, "_on_disable_toggled")
+	head.add_child(_disable_switch)
 	# 页签
 	_tabs_row = HBoxContainer.new()
 	_tabs_row.add_constant_override("separation", 8)
@@ -582,6 +609,7 @@ func _refresh_char_list() -> void:
 	for r in list:
 		var b = _icon_button(r.icon, CHAR_ICON)
 		b.set_meta("id", r.my_id)
+		b.set_meta("key", _key_of(r))
 		b.set_meta("tier", -1 if _kind == "character" else int(_mod.backup_value(r, "tier")))
 		b.connect("pressed", self, "_select", [r.my_id])
 		_char_grid.add_child(b)
@@ -592,21 +620,24 @@ func _refresh_char_marks() -> void:
 	if _char_grid == null:
 		return
 	var ps = _profiles()
+	var cur = _obj_key()
 	for b in _char_grid.get_children():
 		var id = b.get_meta("id")
+		var key = b.get_meta("key")
 		var tier = b.get_meta("tier")
 		var color = C_BORDER if tier < 0 else ItemService.get_color_from_tier(tier).darkened(0.3)
 		var w = 1
 		if _mod.is_custom(id):
 			color = C_CUSTOM
 			w = 2
-		elif ps.has(id) and ps[id].enabled:
+		elif ps.has(id) and ps[id].enabled or _kind == "weapon" and _is_modified(id):
 			color = C_ACCENT_3
 			w = 3
-		if id == _id:
+		if key == cur:
 			color = C_ACCENT
 			w = 3
 		_set_icon_style(b, color, w)
+		b.modulate = Color(1, 1, 1, 0.35) if _mod.is_disabled(_kind, key) else Color.white
 
 
 func _on_char_search(t: String) -> void:
@@ -635,23 +666,31 @@ func _refresh_header() -> void:
 	if c == null:
 		return
 	var v = _view()
+	var look = _look_view()
 	var custom = _mod.is_custom(_id)
-	_head_icon.texture = _custom_icon(v) if custom else c.icon
-	var nm = v.name if v.name != "" else tr(_mod.orig_name(c))
+	_head_icon.texture = c.icon
+	var nm = look.name if look.name != "" else tr(_orig_object_name())
 	_head_name.text = nm
-	_head_name.add_color_override("font_color", C_CUSTOM if custom else C_TEXT)
-	var info = _id
-	if _kind != "character" and BEMain.source_of(c) != "vanilla":
-		info += "  ·  " + tr("BE_SRC_" + BEMain.source_of(c).to_upper())
+	_head_name.add_color_override("font_color", C_CUSTOM if _look_custom() else C_TEXT)
+	var info = _obj_key()
+	var src = _source(c)
+	if src != "vanilla":
+		info += "  ·  " + tr("BE_SRC_" + src.to_upper())
 	if custom:
-		info += "  ·  " + tr("BE_CUSTOM_TAG")
-		var base = _mod.find_character(v.base)
+		if _kind == "character":
+			info += "  ·  " + tr("BE_CUSTOM_TAG")
+		var base = _base_res(look.base) if _look_custom() else null
 		if base != null:
 			info += "  ·  " + tr("BE_BASE").replace("{0}", tr(_mod.orig_name(base)))
-	elif _profiles().has(_id):
+	elif _is_modified(_id):
 		info += "  ·  " + tr("BE_MODIFIED_TAG" if v.enabled else "BE_DISABLED_TAG")
 	else:
 		info += "  ·  " + tr("BE_ORIGINAL_TAG")
+	var incomplete = _kind == "weapon" and not _mod.family_complete(c.weapon_id)
+	if incomplete:
+		info += "  ·  " + tr("BE_WEAPON_INCOMPLETE")
+	elif _mod.is_disabled(_kind, _obj_key()):
+		info += "  ·  " + tr("BE_OBJ_DISABLED_TAG")
 	if not _mod.kind_enabled[_kind]:
 		info += "  ·  " + tr("BE_KIND_OFF")
 	_head_info.text = info
@@ -659,13 +698,156 @@ func _refresh_header() -> void:
 	_enable_switch.set_block_signals(true)
 	_enable_switch.pressed = v.enabled
 	_enable_switch.set_block_signals(false)
-	_reset_btn.disabled = custom or not _profiles().has(_id)
+	_reset_btn.disabled = custom or not _is_modified(_id)
+	# 未完成的武器总是禁用（开关锁定为开）
+	_disable_switch.set_block_signals(true)
+	_disable_switch.pressed = incomplete or _obj_key() in _mod.disabled[_kind]
+	_disable_switch.disabled = incomplete
+	_disable_switch.set_block_signals(false)
+	_refresh_tier_box()
 	if _delete_btn != null:
-		_delete_btn.disabled = not custom
+		_delete_btn.disabled = not _look_custom()
 		_delete_btn.text = tr("BE_DELETE_CONFIRM" if _delete_armed else "BE_DELETE")
 	for t in _tab_buttons:
 		var tb = _tab_buttons[t]
 		_apply_chip_style(tb[0], t == _tab, tb[1])
+
+
+# 等级按钮：已有等级可切换；可补的等级显示 "+Tn"；本模组加的两端等级可删除
+func _refresh_tier_box() -> void:
+	for ch in _tier_box.get_children():
+		_tier_box.remove_child(ch)
+		ch.queue_free()
+	_tier_box.visible = _kind == "weapon"
+	if _kind != "weapon":
+		return
+	var w = _character()
+	var ms = _mod.family_members(w.weapon_id)
+	var addable = _mod.addable_tiers(w.weapon_id)
+	for t in 4:
+		var m = null
+		for x in ms:
+			if x.tier == t:
+				m = x
+		if m != null:
+			var b = _button("T" + str(t + 1), FONT_SMALL)
+			b.rect_min_size = Vector2(56, 0)
+			_apply_chip_style(b, m.my_id == _id, ItemService.get_color_from_tier(t))
+			b.connect("pressed", self, "_select", [m.my_id])
+			_tier_box.add_child(b)
+		elif t in addable:
+			var b = _button(tr("BE_TIER_ADD").replace("{0}", str(t + 1)), FONT_SMALL)
+			_apply_action_style(b, C_ACCENT_3)
+			b.connect("pressed", self, "_on_add_tier", [t])
+			_tier_box.add_child(b)
+	if _mod._custom_weapons.has(_id) and (w == ms[0] or w == ms[-1]):
+		var del = _button(tr("BE_TIER_DELETE"), FONT_SMALL)
+		_apply_action_style(del, C_DANGER)
+		del.connect("pressed", self, "_on_delete_tier")
+		_tier_box.add_child(del)
+
+
+func _on_add_tier(t: int) -> void:
+	var id = _mod.add_weapon_tier(_character().weapon_id, t)
+	if id == "":
+		return
+	_refresh_char_list()
+	_select(id)
+	_set_status(tr("BE_TIER_ADDED"))
+
+
+func _on_delete_tier() -> void:
+	var wid = _character().weapon_id
+	if not _mod.delete_weapon_tier(_id):
+		_set_status(tr("BE_CUSTOM_IN_USE_OBJ"))
+		return
+	var ms = _mod.family_members(wid)
+	_refresh_char_list()
+	_select(ms[0].my_id if not ms.empty() else _first_listed())
+	_set_status(tr("BE_TIER_DELETED"))
+
+
+func _on_disable_toggled(pressed: bool) -> void:
+	_mod.set_disabled(_kind, _obj_key(), pressed)
+	_changed()
+
+
+# 武器按家族（weapon_id）禁用 / 命名；其他按 my_id
+func _obj_key() -> String:
+	var r = _character()
+	return r.weapon_id if _kind == "weapon" and r != null else _id
+
+
+func _key_of(r) -> String:
+	return r.weapon_id if _kind == "weapon" else r.my_id
+
+
+func _fam_p() -> Dictionary:
+	var wid = _obj_key()
+	if not _mod.weapon_families.has(wid):
+		_mod.weapon_families[wid] = BEMain.new_family()
+	return _mod.weapon_families[wid]
+
+
+# 名称 / 图标 / 基底所在的档案：武器为家族档案，其他为对象档案
+func _look_view() -> Dictionary:
+	if _kind == "weapon":
+		return _mod.weapon_families.get(_obj_key(), BEMain.new_family())
+	return _view()
+
+
+func _look_p() -> Dictionary:
+	return _fam_p() if _kind == "weapon" else _p()
+
+
+func _look_custom() -> bool:
+	return _mod.is_custom_family(_obj_key()) if _kind == "weapon" else _mod.is_custom(_id)
+
+
+func _orig_object_name() -> String:
+	var r = _character()
+	if _kind == "weapon":
+		var vm = _mod._vanilla_members(r.weapon_id)
+		return _mod.orig_name(vm[0]) if not vm.empty() else "BE_NEW_WEAPON"
+	return _mod.orig_name(r)
+
+
+func _base_res(base: String):
+	if _kind == "weapon":
+		var vm = _mod._vanilla_members(base)
+		return vm[0] if not vm.empty() else null
+	return _mod.find_target(_kind, base)
+
+
+# 自定义对象改了名称 / 外观后重新登记（列表图标、名称立即更新）
+func _reregister() -> void:
+	if not _look_custom():
+		return
+	match _kind:
+		"character":
+			_mod._register_custom(_id)
+		"item":
+			_mod._register_custom_item(_id)
+		"weapon":
+			_mod._register_weapon_families()
+
+
+func _is_modified(id: String) -> bool:
+	if _profiles().has(id):
+		return true
+	if _kind == "weapon":
+		var r = _mod.find_target("weapon", id)
+		var f = _mod.weapon_families.get(r.weapon_id if r != null else "", null)
+		return f != null and not f.custom and (f.name != "" or f.sets is Array)
+	return false
+
+
+# 列表与筛选用的来源：武器按家族（含原版成员则取原版成员的来源）
+func _source(r) -> String:
+	if _kind == "weapon":
+		var vm = _mod._vanilla_members(r.weapon_id)
+		return BEMain.source_of(vm[0]) if not vm.empty() else "mod"
+	return BEMain.source_of(r)
 
 
 func _custom_icon(v: Dictionary) -> Texture:
@@ -696,7 +878,10 @@ func _build_page() -> void:
 	blueprint = null
 	match _tab:
 		"overview":
-			_build_overview()
+			if _kind == "character":
+				_build_overview()
+			else:
+				_build_object_overview()
 		"stats":
 			_build_stats()
 		"effects":
@@ -815,7 +1000,13 @@ func _refresh_preview() -> void:
 	if not _mod.is_custom(_id) and _profiles().has(_id) and not v.enabled:
 		_preview_text.add_child(_desc(tr("BE_PREVIEW_DISABLED")))
 	if _kind == "weapon":
-		_weapon_preview(v)
+		for w in _mod.family_members(_character().weapon_id):
+			var pv = _mod.weapon_profiles.get(w.my_id, BEMain.new_profile())
+			var cur = w.my_id == _id
+			_preview_text.add_child(_label("T" + str(w.tier + 1) + ("  ◀" if cur else ""), FONT_NORMAL if cur else FONT_SMALL, ItemService.get_color_from_tier(w.tier)))
+			_weapon_preview(w, pv)
+			_effect_lines(_mod.build_effects(w.my_id, pv))
+		return
 	_effect_lines(_mod.build_effects(_id, v))
 	if _kind != "character":
 		return
@@ -847,15 +1038,20 @@ func _effect_lines(effects: Array) -> void:
 
 
 # 武器属性文本（同原版武器面板：在武器副本上换成改写后的属性）
-func _weapon_preview(v: Dictionary) -> void:
-	var w = _character()
+func _weapon_preview(w, v: Dictionary) -> void:
 	var stats = _mod.weapon_stats_for(w, v)
 	if stats == null:
 		return
 	var copy = w.duplicate()
 	copy.stats = stats
-	copy.effects = _mod.build_effects(_id, v)
+	copy.effects = _mod.build_effects(w.my_id, v)
 	_preview_text.add_child(_rich(copy.get_weapon_stats_text(0)))
+	_preview_text.add_child(_label(_aspd_text(stats), FONT_DESC, C_TEXT_DIM))
+
+
+func _aspd_text(stats) -> String:
+	var cd = Catalog.attack_interval(stats)
+	return tr("BE_ATTACK_INTERVAL").replace("{0}", "%.2f" % cd).replace("{1}", "%.2f" % (1.0 / max(cd, 0.001)))
 
 
 func _all_tags() -> Array:
@@ -877,7 +1073,8 @@ func _tag_name(tag: String) -> String:
 
 
 func _on_name_changed(text: String) -> void:
-	_p().name = text.strip_edges()
+	_look_p().name = text.strip_edges()
+	_reregister()
 	_changed()
 
 
@@ -896,62 +1093,112 @@ func _on_tag_pressed(tag: String) -> void:
 		p[field].erase(tag)
 	else:
 		p[field].push_back(tag)
+	_reregister()
 	_changed()
 	_build_page()
 
 
-# ---------------- 道具 / 武器：属性 ----------------
-# 左：基础信息（名称、价格；道具另有稀有度、数量限制、词条、属性表；武器另有武器属性与属性加成）；右：预览
-func _build_attrs() -> void:
+# 武器类别：对全部等级生效（记在家族档案）
+func _on_set_pressed(set_id: String) -> void:
+	var f = _fam_p()
+	if not f.sets is Array:
+		f.sets = _set_ids(_mod.backup_value(_character(), "sets"))
+	if set_id in f.sets:
+		f.sets.erase(set_id)
+	else:
+		f.sets.push_back(set_id)
+	_reregister()
+	_changed()
+	_build_page()
+
+
+static func _set_ids(sets: Array) -> Array:
+	var out = []
+	for s in sets:
+		if s != null:
+			out.push_back(s.my_id)
+	return out
+
+
+# 自定义武器改近 / 远战：换成该类型的第一个原版家族作为基底（可再用"选择基底武器"换外观）
+func _on_weapon_type(ranged: bool) -> void:
+	var want = 1 if ranged else 0
+	var base = _base_res(_look_view().base)
+	if base != null and base.type == want:
+		return
+	for r in _family_heads():
+		if r.type == want:
+			_fam_p().base = r.weapon_id
+			break
+	_reregister()
+	_refresh_char_list()
+	_changed()
+	_build_page()
+
+
+# 原版武器家族的最低等级（选基底 / 图标用）
+func _family_heads() -> Array:
+	var heads = {}
+	for w in _isvc().weapons:
+		if w == null or _mod._custom_weapons.has(w.my_id):
+			continue
+		if not heads.has(w.weapon_id) or w.tier < heads[w.weapon_id].tier:
+			heads[w.weapon_id] = w
+	return heads.values()
+
+
+# ---------------- 道具 / 武器：概览 ----------------
+# 左：名称、外观（自定义）、标签 / 类别；右：预览（武器显示整个家族）
+func _build_object_overview() -> void:
 	var cols = HBoxContainer.new()
 	cols.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	cols.add_constant_override("separation", 12)
 	_page.add_child(cols)
-	var v = _view()
 	var r = _character()
-	var scroll = _scroll()
-	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	cols.add_child(scroll)
-	var left = VBoxContainer.new()
-	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	left.add_constant_override("separation", 10)
-	scroll.add_child(left)
+	var look = _look_view()
+	var left = _left_column(cols)
 
 	var box = _section(left, "BE_SEC_BASIC", C_ACCENT)
-	var grid = _stat_grid(box)
-	grid.columns = 2
-	var name_edit = _line_edit(tr(_mod.orig_name(r)))
-	name_edit.text = v.name
+	box.add_child(_label(tr("BE_NAME"), FONT_SMALL, C_TEXT))
+	var name_edit = _line_edit(tr(_orig_object_name()))
+	name_edit.text = look.name
 	name_edit.connect("text_changed", self, "_on_name_changed")
-	_attr_row(grid, tr("BE_NAME"), name_edit, v.name != "")
-	var orig_price = int(_mod.backup_value(r, "value"))
-	var price = _spin(0, 99999, 1)
-	price.value = v.price if v.price >= 0 else orig_price
-	price.connect("value_changed", self, "_on_attr_changed", ["price", orig_price])
-	_attr_row(grid, tr("BE_PRICE"), price, v.price >= 0)
+	box.add_child(name_edit)
+	box.add_child(_desc(tr("BE_WEAPON_NAME_DESC" if _kind == "weapon" else "BE_NAME_DESC")))
+
+	if _look_custom():
+		var cbox = _section(left, "BE_SEC_LOOK", C_CUSTOM)
+		var row = HBoxContainer.new()
+		row.add_constant_override("separation", 10)
+		cbox.add_child(row)
+		var base_btn = _button(tr("BE_PICK_BASE_" + _kind.to_upper()), FONT_SMALL)
+		_apply_action_style(base_btn, C_CUSTOM)
+		base_btn.connect("pressed", self, "_open_picker", ["base"])
+		row.add_child(base_btn)
+		var icon_btn = _button(tr("BE_PICK_ICON"), FONT_SMALL)
+		_apply_action_style(icon_btn, C_CUSTOM)
+		icon_btn.connect("pressed", self, "_open_picker", ["icon"])
+		row.add_child(icon_btn)
+		var import_btn = _button(tr("BE_IMPORT_ICON"), FONT_SMALL)
+		_apply_action_style(import_btn, C_CUSTOM)
+		import_btn.connect("pressed", self, "_on_import_icon")
+		row.add_child(import_btn)
+		if _kind == "weapon":
+			var sw = _switch(tr("BE_WEAPON_RANGED"), r.type == 1)
+			sw.connect("toggled", self, "_on_weapon_type")
+			row.add_child(sw)
+		cbox.add_child(_desc(tr("BE_LOOK_DESC_" + _kind.to_upper())))
+
+	var tbox = _section(left, "BE_SEC_ITEM_TAGS" if _kind == "item" else "BE_SEC_WEAPON_SETS", C_ACCENT_3)
+	if _kind == "weapon":
+		tbox.add_child(_desc(tr("BE_SETS_DESC")))
+	var tgrid = GridContainer.new()
+	tgrid.columns = 4
+	tgrid.add_constant_override("hseparation", 6)
+	tgrid.add_constant_override("vseparation", 6)
+	tbox.add_child(tgrid)
 	if _kind == "item":
-		var orig_nb = int(_mod.backup_value(r, "max_nb"))
-		var nb = _spin(-1, 999, 1)
-		nb.value = v.max_nb if v.max_nb != -2 else orig_nb
-		nb.connect("value_changed", self, "_on_attr_changed", ["max_nb", orig_nb])
-		_attr_row(grid, tr("BE_MAX_NB"), nb, v.max_nb != -2)
-		var tiers = HBoxContainer.new()
-		tiers.add_constant_override("separation", 6)
-		var cur_tier = v.tier if v.tier >= 0 else int(_mod.backup_value(r, "tier"))
-		for t in 4:
-			var tb = _button("T" + str(t + 1), FONT_SMALL)
-			tb.rect_min_size = Vector2(64, 0)
-			_apply_chip_style(tb, t == cur_tier, ItemService.get_color_from_tier(t))
-			tb.connect("pressed", self, "_on_attr_changed", [t, "tier", int(_mod.backup_value(r, "tier"))])
-			tiers.add_child(tb)
-		_attr_row(grid, tr("BE_TIER"), tiers, v.tier >= 0)
-		box.add_child(_desc(tr("BE_ITEM_BASIC_DESC")))
-		var tbox = _section(left, "BE_SEC_ITEM_TAGS", C_ACCENT_3)
-		var tgrid = GridContainer.new()
-		tgrid.columns = 4
-		tgrid.add_constant_override("hseparation", 6)
-		tgrid.add_constant_override("vseparation", 6)
-		tbox.add_child(tgrid)
+		var v = _view()
 		var tags = v.tags if v.tags is Array else _mod.backup_value(r, "tags")
 		for tag in _all_tags():
 			var b = _button(_tag_name(tag), FONT_DESC)
@@ -960,10 +1207,32 @@ func _build_attrs() -> void:
 			_apply_chip_style(b, tag in tags, C_ACCENT_3)
 			b.connect("pressed", self, "_on_tag_pressed", [tag])
 			tgrid.add_child(b)
-		_build_stat_tables(left, v)
 	else:
-		_build_weapon_stats(left, v, r)
+		var cur = look.sets if look.sets is Array else _set_ids(_mod.backup_value(r, "sets"))
+		for st in _isvc().sets:
+			if st == null:
+				continue
+			var b = _button(tr(st.name), FONT_DESC)
+			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			b.clip_text = true
+			_apply_chip_style(b, st.my_id in cur, C_ACCENT_3)
+			b.connect("pressed", self, "_on_set_pressed", [st.my_id])
+			tgrid.add_child(b)
+	_preview_card(cols)
 
+
+func _left_column(cols: Control) -> VBoxContainer:
+	var scroll = _scroll()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cols.add_child(scroll)
+	var left = VBoxContainer.new()
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left.add_constant_override("separation", 10)
+	scroll.add_child(left)
+	return left
+
+
+func _preview_card(cols: Control) -> void:
 	var pcard = _card(cols)
 	pcard.size_flags_horizontal = 0
 	pcard.rect_min_size = Vector2(460, 0)
@@ -979,6 +1248,52 @@ func _build_attrs() -> void:
 	_preview_text.add_constant_override("separation", 4)
 	pscroll.add_child(_preview_text)
 	_refresh_preview()
+
+
+# ---------------- 道具 / 武器：属性 ----------------
+# 道具：价格、数量限制、稀有度 + 属性表；武器：本等级的价格、武器属性、属性加成（右侧预览整个家族）
+func _build_attrs() -> void:
+	var cols = HBoxContainer.new()
+	cols.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	cols.add_constant_override("separation", 12)
+	_page.add_child(cols)
+	var v = _view()
+	var r = _character()
+	var left = _left_column(cols)
+	# 自定义道具没有"原值"：总是记下数值
+	var custom_item = _kind == "item" and _mod.is_custom(_id)
+
+	var box = _section(left, "BE_SEC_NUMBERS", C_ACCENT)
+	var grid = _stat_grid(box)
+	grid.columns = 2
+	var orig_price = -999 if custom_item else int(_mod.backup_value(r, "value"))
+	var price = _spin(0, 99999, 1)
+	price.value = v.price if v.price >= 0 else int(_mod.backup_value(r, "value"))
+	price.connect("value_changed", self, "_on_attr_changed", ["price", orig_price])
+	_attr_row(grid, tr("BE_PRICE"), price, v.price >= 0)
+	if _kind == "item":
+		var orig_nb = -999 if custom_item else int(_mod.backup_value(r, "max_nb"))
+		var nb = _spin(-1, 999, 1)
+		nb.value = v.max_nb if v.max_nb != -2 else int(_mod.backup_value(r, "max_nb"))
+		nb.connect("value_changed", self, "_on_attr_changed", ["max_nb", orig_nb])
+		_attr_row(grid, tr("BE_MAX_NB"), nb, v.max_nb != -2)
+		var tiers = HBoxContainer.new()
+		tiers.add_constant_override("separation", 6)
+		var orig_tier = int(_mod.backup_value(r, "tier"))
+		var cur_tier = v.tier if v.tier >= 0 else orig_tier
+		for t in 4:
+			var tb = _button("T" + str(t + 1), FONT_SMALL)
+			tb.rect_min_size = Vector2(64, 0)
+			_apply_chip_style(tb, t == cur_tier, ItemService.get_color_from_tier(t))
+			tb.connect("pressed", self, "_on_attr_changed", [t, "tier", -999 if custom_item else orig_tier])
+			tiers.add_child(tb)
+		_attr_row(grid, tr("BE_TIER"), tiers, v.tier >= 0)
+		box.add_child(_desc(tr("BE_ITEM_BASIC_DESC")))
+		_build_stat_tables(left, v)
+	else:
+		box.add_child(_desc(tr("BE_WEAPON_PRICE_DESC")))
+		_build_weapon_stats(left, v, r)
+		_preview_card(cols)
 
 
 # 一行：名称（改过时绿色）+ 控件
@@ -997,6 +1312,7 @@ func _attr_row(grid: Control, text: String, ctl: Control, modified: bool) -> Lab
 func _on_attr_changed(value, field: String, orig: int) -> void:
 	var unset = {"price": -1, "max_nb": -2, "tier": -1}[field]
 	_p()[field] = unset if int(value) == orig else int(value)
+	_reregister()
 	_changed()
 	if field == "tier":
 		_build_page()
@@ -1032,13 +1348,15 @@ func _build_weapon_stats(parent: Control, v: Dictionary, w) -> void:
 			_apply_chip_style(ctl, bool(cur), C_ACCENT_3)
 			ctl.connect("toggled", self, "_on_wstat_changed", [f])
 		else:
-			ctl = _spin(-99999, 99999, 0.01 if f[2] == "sec" or (f[1] == "float" and f[2] == "") else 1)
+			ctl = _spin(-99999, 99999, 0.01 if f[1] == "float" and f[2] == "" else 1)
 			ctl.value = _wstat_shown(cur, f[2])
 			ctl.connect("value_changed", self, "_on_wstat_changed", [f])
 		var name = tr("BE_WS_" + f[0].to_upper())
 		if _mod.debug:
 			name += "  " + f[0]
 		_attr_row(grid, name, ctl, v.wstats.has(f[0]))
+	_aspd_label = _label(_aspd_text(_mod.weapon_stats_for(w, v)), FONT_SMALL, C_ACCENT)
+	box.add_child(_aspd_label)
 
 	var sbox = _section(parent, "BE_SEC_SCALING", C_ACCENT_2)
 	sbox.add_child(_desc(tr("BE_SCALING_DESC")))
@@ -1106,6 +1424,8 @@ func _on_wstat_changed(value, f: Array) -> void:
 		_build_page()
 	else:
 		_changed()
+		if _aspd_label != null and is_instance_valid(_aspd_label):
+			_aspd_label.text = _aspd_text(_mod.weapon_stats_for(_character(), p))
 
 
 func _on_wstats_reset() -> void:
@@ -2047,8 +2367,8 @@ func _on_icon_file_selected(path: String) -> void:
 	if v == "":
 		_set_status(tr("BE_IMPORT_ICON_FAILED"))
 		return
-	_p().icon = v
-	_mod._register_custom(_id)
+	_look_p().icon = v
+	_reregister()
 	_changed()
 	_refresh_char_list()
 	_build_page()
@@ -2213,11 +2533,17 @@ func _open_picker(mode: String) -> void:
 		"start_items_w":
 			_picker_res = _isvc().weapons.duplicate()
 		"base":
-			_picker_res = _native_characters()
-			_picker_sel = [v.base]
+			match _kind:
+				"character":
+					_picker_res = _native_characters()
+				"item":
+					_picker_res = _native_items()
+				"weapon":
+					_picker_res = _family_heads()
+			_picker_sel = [_look_view().base]
 		"icon":
-			_picker_res = _native_characters() + _isvc().items
-			_picker_sel = [v.icon]
+			_picker_res = _native_characters() + _native_items() + _family_heads()
+			_picker_sel = [_look_view().icon]
 	_picker_res.sort_custom(self, "_sort_by_tier_name")
 
 	_picker = Control.new()
@@ -2240,7 +2566,7 @@ func _open_picker(mode: String) -> void:
 	var head = HBoxContainer.new()
 	head.add_constant_override("separation", 10)
 	box.add_child(head)
-	var title = _label(tr("BE_PICKER_" + mode.to_upper()), FONT_NORMAL, C_ACCENT_2)
+	var title = _label(tr("BE_PICKER_" + mode.to_upper() + ("_" + _kind.to_upper() if mode == "base" and _kind != "character" else "")), FONT_NORMAL, C_ACCENT_2)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(title)
 	_picker_count = _label("", FONT_SMALL, C_TEXT_DIM)
@@ -2271,6 +2597,14 @@ func _open_picker(mode: String) -> void:
 	foot.add_child(ok)
 	_fill_picker()
 	search.call_deferred("grab_focus")
+
+
+func _native_items() -> Array:
+	var out = []
+	for it in _isvc().items:
+		if not _mod.is_custom(it.my_id):
+			out.push_back(it)
+	return out
 
 
 func _native_characters() -> Array:
@@ -2336,16 +2670,24 @@ func _on_picker_confirm() -> void:
 				p.start_items.push_back({"id": id, "n": 1, "cursed": false})
 		"base":
 			if not _picker_sel.empty():
-				p.base = _picker_sel[0]
+				_look_p().base = _kind_base(_picker_sel[0])
 		"icon":
 			if not _picker_sel.empty():
-				p.icon = _picker_sel[0]
+				_look_p().icon = _picker_sel[0]
 	_close_picker()
-	if _mod.is_custom(_id):
-		_mod._register_custom(_id)
+	if _look_custom():
+		_reregister()
 		_refresh_char_list()
 	_changed()
 	_build_page()
+
+
+# 武器的基底记家族 id
+func _kind_base(id: String) -> String:
+	if _kind == "weapon":
+		var w = _mod.find_target("weapon", id)
+		return w.weapon_id if w != null else id
+	return id
 
 
 func _close_picker() -> void:
@@ -2369,6 +2711,10 @@ func _on_enable_toggled(pressed: bool) -> void:
 
 func _on_reset_pressed() -> void:
 	_mod.reset_profile(_id, _kind)
+	if _kind == "weapon" and not _look_custom() and _mod.weapon_families.has(_obj_key()):
+		var f = _mod.weapon_families[_obj_key()]
+		f.name = ""
+		f.sets = null
 	_expanded = -1
 	_changed()
 	_build_page()
@@ -2376,28 +2722,42 @@ func _on_reset_pressed() -> void:
 
 
 func _on_new_custom() -> void:
-	var base = _id if not _mod.is_custom(_id) else _view().base
-	var id = _mod.create_custom(base)
+	var base = _look_view().base if _look_custom() else (_obj_key())
+	var id = ""
+	match _kind:
+		"character":
+			id = _mod.create_custom(base)
+		"item":
+			id = _mod.create_custom_item(base)
+		"weapon":
+			id = _mod.create_custom_weapon(base)
 	_refresh_char_list()
 	_select(id)
-	_set_status(tr("BE_CUSTOM_CREATED"))
+	_set_status(tr("BE_CUSTOM_CREATED" if _kind == "character" else "BE_CUSTOM_CREATED_OBJ"))
 
 
 func _on_delete_custom() -> void:
-	if not _mod.is_custom(_id):
+	if not _look_custom():
 		return
 	if not _delete_armed:
 		_delete_armed = true
 		_refresh_header()
 		return
 	_delete_armed = false
-	if _mod.delete_custom(_id):
-		_set_status(tr("BE_CUSTOM_DELETED"))
-		var isvc = _isvc()
+	var ok = false
+	match _kind:
+		"character":
+			ok = _mod.delete_custom(_id)
+		"item":
+			ok = _mod.delete_custom_item(_id)
+		"weapon":
+			ok = _mod.delete_custom_weapon(_obj_key())
+	if ok:
+		_set_status(tr("BE_CUSTOM_DELETED" if _kind == "character" else "BE_CUSTOM_DELETED_OBJ"))
 		_refresh_char_list()
-		_select(isvc.characters[0].my_id if not isvc.characters.empty() else "")
+		_select(_first_listed())
 	else:
-		_set_status(tr("BE_CUSTOM_IN_USE"))
+		_set_status(tr("BE_CUSTOM_IN_USE" if _kind == "character" else "BE_CUSTOM_IN_USE_OBJ"))
 		_refresh_header()
 
 

@@ -10,3 +10,10 @@ func _ready() -> void:
 
 func _be_init_button() -> void:
 	BEMain.add_editor_button(self)
+
+
+# 禁用的初始武器 / 道具显示为未解锁（不可选）
+func _get_unlocked_elements(player_index: int) -> Array:
+	var out = ._get_unlocked_elements(player_index)
+	var m = BEMain.get_mod()
+	return m.without(out, m.global_ban_hashes()) if m != null else out
