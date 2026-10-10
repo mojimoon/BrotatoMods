@@ -11,6 +11,8 @@ extends Node
 const MOD_ID = "Mojimoon-BroEditor"
 const MOD_DIR = "res://mods-unpacked/Mojimoon-BroEditor/"
 const SAVE_PATH = "user://Mojimoon-BroEditor/profiles.json"
+# 新增的角色 / 道具 / 武器：每个一个单行 JSON（文件名 = id），可直接复制给别人
+const CUSTOM_DIR = "user://Mojimoon-BroEditor/custom/"
 const CSV_PATH = MOD_DIR + "translations/broeditor.csv"
 const UI_SCENE = MOD_DIR + "ui/editor_ui.tscn"
 const FONT_26_PATH = "res://resources/fonts/actual/base/font_26.tres"
@@ -325,6 +327,11 @@ func load_profiles() -> void:
 	weapon_profiles = {}
 	weapon_families = {}
 	disabled = {"character": [], "item": [], "weapon": []}
+	_load_main_file()
+	_load_custom_files()
+
+
+func _load_main_file() -> void:
 	var file = File.new()
 	if not file.file_exists(SAVE_PATH) or file.open(SAVE_PATH, File.READ) != OK:
 		return
@@ -363,20 +370,132 @@ func _load_extra(data: Dictionary) -> void:
 						disabled[k].push_back(str(id))
 
 
+# 一个自定义对象的数据：角色 / 道具 = 档案；武器 = 家族档案 + 各等级的档案
+func custom_file_data(kind: String, id: String) -> Dictionary:
+	if kind == "weapon":
+		var tiers = {}
+		for t in weapon_families[id].tiers:
+			var tid = tier_id(id, t, true)
+			if weapon_profiles.has(tid):
+				tiers[tid] = weapon_profiles[tid]
+		return {"kind": kind, "id": id, "family": weapon_families[id], "tiers": tiers}
+	return {"kind": kind, "id": id, "profile": profiles_of(kind)[id]}
+
+
+# 全部自定义对象：[[种类, id]]
+func custom_entries() -> Array:
+	var out = []
+	for id in profiles:
+		if profiles[id].custom:
+			out.push_back(["character", id])
+	for id in item_profiles:
+		if item_profiles[id].custom:
+			out.push_back(["item", id])
+	for wid in weapon_families:
+		if weapon_families[wid].custom:
+			out.push_back(["weapon", wid])
+	return out
+
+
+# profiles.json 只存原版对象的修改与设置；自定义对象各存一个文件（删掉的对象的文件一并删除）
 func save_profiles() -> void:
 	var dir = Directory.new()
-	if not dir.dir_exists(SAVE_PATH.get_base_dir()):
-		dir.make_dir_recursive(SAVE_PATH.get_base_dir())
+	if not dir.dir_exists(CUSTOM_DIR):
+		dir.make_dir_recursive(CUSTOM_DIR)
+	var main = {"profiles": {}, "items": {}, "weapons": {}, "families": {}}
+	var custom_tiers = {}
+	var files = {}
+	for e in custom_entries():
+		var data = custom_file_data(e[0], e[1])
+		files[e[1] + ".json"] = data
+		if e[0] == "weapon":
+			for tid in data.tiers:
+				custom_tiers[tid] = true
+	for pair in [["profiles", profiles], ["items", item_profiles]]:
+		for id in pair[1]:
+			if not pair[1][id].custom:
+				main[pair[0]][id] = pair[1][id]
+	for id in weapon_profiles:
+		if not custom_tiers.has(id):
+			main.weapons[id] = weapon_profiles[id]
+	for wid in weapon_families:
+		if not weapon_families[wid].custom:
+			main.families[wid] = weapon_families[wid]
+	main["version"] = 1
+	main["next_id"] = next_id
+	main["settings"] = {"debug": debug, "hide_numbers": hide_numbers, "kinds": kind_enabled}
+	main["disabled"] = disabled
 	var file = File.new()
 	if file.open(SAVE_PATH, File.WRITE) != OK:
 		ModLoaderLog.error("Failed to save profiles", MOD_ID)
 		return
-	file.store_string(JSON.print({
-		"version": 1, "next_id": next_id, "settings": {"debug": debug, "hide_numbers": hide_numbers, "kinds": kind_enabled},
-		"profiles": profiles, "items": item_profiles, "weapons": weapon_profiles,
-		"families": weapon_families, "disabled": disabled,
-	}, "\t"))
+	file.store_string(JSON.print(main, "\t"))
 	file.close()
+	for name in files:
+		if file.open(CUSTOM_DIR + name, File.WRITE) == OK:
+			file.store_string(JSON.print(files[name]))
+			file.close()
+	for name in _list_json(CUSTOM_DIR):
+		if not files.has(name):
+			dir.remove(CUSTOM_DIR + name)
+
+
+static func _list_json(path: String) -> Array:
+	var out = []
+	var dir = Directory.new()
+	if dir.open(path) != OK:
+		return out
+	dir.list_dir_begin(true, true)
+	var name = dir.get_next()
+	while name != "":
+		if not dir.current_is_dir() and name.get_extension().to_lower() == "json":
+			out.push_back(name)
+		name = dir.get_next()
+	dir.list_dir_end()
+	return out
+
+
+# 读取 custom/ 下的文件（包括别人分享的）
+func _load_custom_files() -> void:
+	for name in _list_json(CUSTOM_DIR):
+		var file = File.new()
+		if file.open(CUSTOM_DIR + name, File.READ) != OK:
+			continue
+		var parsed = JSON.parse(file.get_as_text())
+		file.close()
+		if not (parsed.error == OK and parsed.result is Dictionary and load_custom_data(parsed.result) != ""):
+			ModLoaderLog.error("custom file is invalid or clashes with an existing id; ignored: " + name, MOD_ID)
+
+
+# 载入一个自定义对象的数据；与原版对象重 id 的跳过。返回其 id（无效返回 ""）
+func load_custom_data(data: Dictionary) -> String:
+	var kind = str(data.get("kind", ""))
+	var id = str(data.get("id", ""))
+	if not kind in KINDS or clean_suffix(id) != id or not id.begins_with(ID_PREFIX[kind]):
+		return ""
+	if kind == "weapon":
+		var f = normalize_family(data.get("family", {}))
+		if not _vanilla_members(id).empty() or f.tiers.empty():
+			return ""
+		f.custom = true
+		weapon_families[id] = f
+		var tiers = data.get("tiers", {})
+		for t in f.tiers:
+			var tid = tier_id(id, t, true)
+			var p = normalize_profile(tiers.get(tid, {}) if tiers is Dictionary else {})
+			p.custom = true
+			weapon_profiles[tid] = p
+		next_id = max(next_id, f.num + 1)
+		return id
+	# 已登记的自定义对象（重新读取时）不算重 id
+	var ours = _customs.has(id) if kind == "character" else _custom_items.has(id)
+	if find_target(kind, id) != null and not ours:
+		return ""
+	var p = normalize_profile(data.get("profile", {}))
+	p.custom = true
+	profiles_of(kind)[id] = p
+	next_id = max(next_id, p.num + 1)
+	return id
 
 
 # 分享码：一个角色的档案（自定义角色导入后成为新的自定义角色）

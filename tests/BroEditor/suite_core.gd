@@ -798,3 +798,58 @@ func test_152_weapon_effect_categories() -> void:
 		if ResourceLoader.exists(path):
 			_eq(m.Catalog.category_of(load(path)), "combat", path.get_file() + " is combat")
 
+
+
+func _read(path: String) -> String:
+	var f = File.new()
+	if f.open(path, File.READ) != OK:
+		return ""
+	var t = f.get_as_text()
+	f.close()
+	return t
+
+
+func test_160_custom_files() -> void:
+	var cid = m.create_custom(CH, "filetest")
+	var iid = m.create_custom_item(_plain_item().my_id, "filetest")
+	var fam = _family_from(0, 0)
+	var wt = m.create_custom_weapon(fam[0].weapon_id, "filetest")
+	m.weapon_profiles[wt].wstats = {"damage": 55}
+	m.profiles[CH] = m.new_profile()
+	m.profiles[CH].stats = {"stat_luck": 2}
+	m.save_profiles()
+	for name in ["character_filetest", "item_filetest", "weapon_filetest"]:
+		var t = _read(m.CUSTOM_DIR + name + ".json")
+		_check(t != "" and t.find("\n") < 0, name + " saved as one-line json")
+	var main = JSON.parse(_read(m.SAVE_PATH)).result
+	_check(not main.profiles.has(cid) and main.profiles.has(CH), "profiles.json keeps only vanilla changes")
+	_check(not main.items.has(iid) and not main.weapons.has(wt) and not main.families.has("weapon_filetest"), "no custom objects in profiles.json")
+	# 重新读取
+	m.load_profiles()
+	m.apply_all()
+	_check(m.find_character(cid) != null and m.find_target("item", iid) != null, "custom character / item reloaded")
+	_eq(m.family_members("weapon_filetest").size(), fam.size(), "custom weapon tiers reloaded")
+	_eq(m.weapon_profiles[wt].wstats.get("damage"), 55, "weapon tier profile reloaded")
+	_eq(m.profiles[CH].stats, {"stat_luck": 2}, "vanilla change reloaded")
+	# 删除后文件也删除
+	_check(m.delete_custom_item(iid), "deleted")
+	m.save_profiles()
+	_check(not File.new().file_exists(m.CUSTOM_DIR + iid + ".json"), "file removed with the item")
+	# 别人分享的文件：复制进目录即可
+	var shared = m.custom_file_data("character", cid)
+	shared.id = "character_shared_one"
+	var f = File.new()
+	f.open(m.CUSTOM_DIR + "character_shared_one.json", File.WRITE)
+	f.store_string(JSON.print(shared))
+	f.close()
+	m.load_profiles()
+	m.apply_all()
+	_check(m.find_character("character_shared_one") != null, "shared file loaded as a custom character")
+	_eq(m.load_custom_data({"kind": "item", "id": _plain_item().my_id, "profile": {}}), "", "file clashing with a vanilla id ignored")
+	_eq(m.load_custom_data({"kind": "item", "id": "character_bad", "profile": {}}), "", "id must match its kind")
+	m.delete_custom("character_shared_one")
+	m.delete_custom(cid)
+	m.delete_custom_weapon("weapon_filetest")
+	m.profiles = {}
+	m.save_profiles()
+	_eq(m._list_json(m.CUSTOM_DIR), [], "all custom files removed")
