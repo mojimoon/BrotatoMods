@@ -38,7 +38,7 @@ About the buttons and options in the top-right corner:
 Files are saved in `%APPDATA%\Brotato\Mojimoon-BroEditor\` (Windows), `~/Library/Application Support/Brotato/Mojimoon-BroEditor/` (Mac) or `~/.local/share/Brotato/Mojimoon-BroEditor/` (Linux):
 
 - `profiles.json`: changes to vanilla characters, items and weapons, and the editor settings.
-- `custom\<id>.json`: one file per character, item or weapon you created. To share one, send the file; the receiver puts it in their own `custom\` folder and restarts the game.
+- `custom\character\`, `custom\item\`, `custom\weapon\`: one `<id>.json` file per character, item or weapon you created. To share, send the files (or a whole folder); the receiver puts them in the same folder and restarts the game.
 - `icons\`: imported icon images. Send them along with the file if your object uses one.
 
 <!-- BBCode
@@ -79,7 +79,7 @@ Files are saved in [code]%APPDATA%\Brotato\Mojimoon-BroEditor\[/code] (Windows),
 
 [list]
 [*][code]profiles.json[/code]: changes to vanilla characters, items and weapons, and the editor settings.
-[*][code]custom\<id>.json[/code]: one file per character, item or weapon you created. To share one, send the file; the receiver puts it in their own [code]custom\[/code] folder and restarts the game.
+[*][code]custom\character\[/code], [code]custom\item\[/code], [code]custom\weapon\[/code]: one [code]<id>.json[/code] file per character, item or weapon you created. To share, send the files (or a whole folder); the receiver puts them in the same folder and restarts the game.
 [*][code]icons\[/code]: imported icon images. Send them along with the file if your object uses one.
 [/list]
 
@@ -122,7 +122,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 文件保存在 `%APPDATA%\Brotato\Mojimoon-BroEditor\` (Windows)、`~/Library/Application Support/Brotato/Mojimoon-BroEditor/` (Mac) 或 `~/.local/share/Brotato/Mojimoon-BroEditor/` (Linux)：
 
 - `profiles.json`：对原版角色、道具、武器的修改，以及编辑器设置。
-- `custom\<id>.json`：每个新建的角色、道具、武器各一个文件。分享时发送这个文件，对方放进自己的 `custom\` 文件夹后重启游戏即可。
+- `custom\character\`、`custom\item\`、`custom\weapon\`：每个新建的角色、道具、武器各一个 `<id>.json` 文件。分享时发送文件（或整个文件夹），对方放进相同的文件夹后重启游戏即可。
 - `icons\`：导入的图标图片。如果对象用了导入的图标，一并发送。
 
 <!-- BBCode
@@ -163,7 +163,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 [list]
 [*][code]profiles.json[/code]：对原版角色、道具、武器的修改，以及编辑器设置。
-[*][code]custom\<id>.json[/code]：每个新建的角色、道具、武器各一个文件。分享时发送这个文件，对方放进自己的 [code]custom\[/code] 文件夹后重启游戏即可。
+[*][code]custom\character\[/code]、[code]custom\item\[/code]、[code]custom\weapon\[/code]：每个新建的角色、道具、武器各一个 [code]<id>.json[/code] 文件。分享时发送文件（或整个文件夹），对方放进相同的文件夹后重启游戏即可。
 [*][code]icons\[/code]：导入的图标图片。如果对象用了导入的图标，一并发送。
 [/list]
 

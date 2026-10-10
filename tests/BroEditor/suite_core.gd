@@ -818,7 +818,7 @@ func test_160_custom_files() -> void:
 	m.profiles[CH] = m.new_profile()
 	m.profiles[CH].stats = {"stat_luck": 2}
 	m.save_profiles()
-	for name in ["character_filetest", "item_filetest", "weapon_filetest"]:
+	for name in ["character/character_filetest", "item/item_filetest", "weapon/weapon_filetest"]:
 		var t = _read(m.CUSTOM_DIR + name + ".json")
 		_check(t != "" and t.find("\n") < 0, name + " saved as one-line json")
 	var main = JSON.parse(_read(m.SAVE_PATH)).result
@@ -834,8 +834,8 @@ func test_160_custom_files() -> void:
 	# 删除后文件也删除
 	_check(m.delete_custom_item(iid), "deleted")
 	m.save_profiles()
-	_check(not File.new().file_exists(m.CUSTOM_DIR + iid + ".json"), "file removed with the item")
-	# 别人分享的文件：复制进目录即可
+	_check(not File.new().file_exists(m.CUSTOM_DIR + "item/" + iid + ".json"), "file removed with the item")
+	# 别人分享的文件：复制进目录即可；0.8.0 放在根目录的旧文件也能读，保存后移入子文件夹
 	var shared = m.custom_file_data("character", cid)
 	shared.id = "character_shared_one"
 	var f = File.new()
@@ -845,6 +845,8 @@ func test_160_custom_files() -> void:
 	m.load_profiles()
 	m.apply_all()
 	_check(m.find_character("character_shared_one") != null, "shared file loaded as a custom character")
+	m.save_profiles()
+	_check(not f.file_exists(m.CUSTOM_DIR + "character_shared_one.json") and f.file_exists(m.CUSTOM_DIR + "character/character_shared_one.json"), "old root file moved into its kind folder")
 	_eq(m.load_custom_data({"kind": "item", "id": _plain_item().my_id, "profile": {}}), "", "file clashing with a vanilla id ignored")
 	_eq(m.load_custom_data({"kind": "item", "id": "character_bad", "profile": {}}), "", "id must match its kind")
 	m.delete_custom("character_shared_one")
@@ -852,4 +854,4 @@ func test_160_custom_files() -> void:
 	m.delete_custom_weapon("weapon_filetest")
 	m.profiles = {}
 	m.save_profiles()
-	_eq(m._list_json(m.CUSTOM_DIR), [], "all custom files removed")
+	_eq(m.custom_files(), [], "all custom files removed")

@@ -11,7 +11,7 @@ extends Node
 const MOD_ID = "Mojimoon-BroEditor"
 const MOD_DIR = "res://mods-unpacked/Mojimoon-BroEditor/"
 const SAVE_PATH = "user://Mojimoon-BroEditor/profiles.json"
-# 新增的角色 / 道具 / 武器：每个一个单行 JSON（文件名 = id），可直接复制给别人
+# 新增的角色 / 道具 / 武器：每个一个单行 JSON（custom/<种类>/<id>.json），可直接复制给别人
 const CUSTOM_DIR = "user://Mojimoon-BroEditor/custom/"
 const CSV_PATH = MOD_DIR + "translations/broeditor.csv"
 const UI_SCENE = MOD_DIR + "ui/editor_ui.tscn"
@@ -400,14 +400,15 @@ func custom_entries() -> Array:
 # profiles.json 只存原版对象的修改与设置；自定义对象各存一个文件（删掉的对象的文件一并删除）
 func save_profiles() -> void:
 	var dir = Directory.new()
-	if not dir.dir_exists(CUSTOM_DIR):
-		dir.make_dir_recursive(CUSTOM_DIR)
+	for kind in KINDS:
+		if not dir.dir_exists(CUSTOM_DIR + kind):
+			dir.make_dir_recursive(CUSTOM_DIR + kind)
 	var main = {"profiles": {}, "items": {}, "weapons": {}, "families": {}}
 	var custom_tiers = {}
 	var files = {}
 	for e in custom_entries():
 		var data = custom_file_data(e[0], e[1])
-		files[e[1] + ".json"] = data
+		files[e[0] + "/" + e[1] + ".json"] = data
 		if e[0] == "weapon":
 			for tid in data.tiers:
 				custom_tiers[tid] = true
@@ -435,7 +436,7 @@ func save_profiles() -> void:
 		if file.open(CUSTOM_DIR + name, File.WRITE) == OK:
 			file.store_string(JSON.print(files[name]))
 			file.close()
-	for name in _list_json(CUSTOM_DIR):
+	for name in custom_files():
 		if not files.has(name):
 			dir.remove(CUSTOM_DIR + name)
 
@@ -455,9 +456,18 @@ static func _list_json(path: String) -> Array:
 	return out
 
 
+# custom/ 下的全部文件（相对路径）；根目录的是 0.8.0 的旧位置，下次保存时移入子文件夹
+static func custom_files() -> Array:
+	var out = _list_json(CUSTOM_DIR)
+	for kind in KINDS:
+		for name in _list_json(CUSTOM_DIR + kind):
+			out.push_back(kind + "/" + name)
+	return out
+
+
 # 读取 custom/ 下的文件（包括别人分享的）
 func _load_custom_files() -> void:
-	for name in _list_json(CUSTOM_DIR):
+	for name in custom_files():
 		var file = File.new()
 		if file.open(CUSTOM_DIR + name, File.READ) != OK:
 			continue
