@@ -14,6 +14,7 @@ const BlueprintPage = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/bluepri
 const SearchSelect = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/search_select.gd")
 const DragRow = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/drag_row.gd")
 const Modal = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/modal.gd")
+const EffectDetail = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/effect_detail.gd")
 const FONT_TITLE = preload("res://resources/fonts/actual/base/font_32_outline.tres")
 const FONT_NORMAL = preload("res://resources/fonts/actual/base/font_26.tres")
 const FONT_SMALL = preload("res://resources/fonts/actual/base/font_22.tres")
@@ -1259,11 +1260,18 @@ func _id_row(parent: Control) -> void:
 	le.text = _obj_key().trim_prefix(prefix)
 	le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	le.connect("text_entered", self, "_on_id_entered")
+	# 失去焦点也保存（与原 id 相同时不处理）
+	le.connect("focus_exited", self, "_on_id_focus_exited", [le])
 	row.add_child(le)
 	var ok = _button(tr("BE_ID_APPLY"), FONT_SMALL)
 	_apply_action_style(ok, C_CUSTOM)
 	ok.connect("pressed", self, "_on_id_apply", [le])
 	row.add_child(ok)
+
+
+func _on_id_focus_exited(le: LineEdit) -> void:
+	if is_instance_valid(le) and BEMain.clean_suffix(le.text) != _obj_key().trim_prefix(BEMain.ID_PREFIX[_kind]):
+		_on_id_entered(le.text)
 
 
 func _on_id_apply(le: LineEdit) -> void:
@@ -2153,6 +2161,12 @@ func _build_effect_fields(col: Control, i: int, spec: Dictionary) -> void:
 		var opt = _search_select(items, e.custom_key)
 		opt.connect("selected", self, "_on_effect_trigger", [i])
 		grid.add_child(opt)
+	if EffectDetail.has_details(e):
+		var det = _button(tr("BE_EFFECT_DETAILS"), FONT_DESC)
+		_apply_action_style(det, C_CUSTOM)
+		det.connect("pressed", self, "_on_effect_details", [i])
+		grid.add_child(det)
+		grid.add_child(Control.new())
 	for f in Catalog.editable_fields(e):
 		var name_key = "BE_FIELD_" + f.name.to_upper()
 		var lbl_text = tr(name_key)
@@ -2189,6 +2203,21 @@ func _build_effect_fields(col: Control, i: int, spec: Dictionary) -> void:
 					le.rect_min_size = Vector2(200, 0)
 					le.connect("text_changed", self, "_on_field_changed", [i, f.name])
 					grid.add_child(le)
+
+
+# 详细信息弹窗：直接改写该行的 spec
+func _on_effect_details(i: int) -> void:
+	var specs = _edit_specs()
+	if i < specs.size() and specs[i] is Dictionary:
+		EffectDetail.open(self, specs[i], false, self, "_on_effect_detail_changed")
+
+
+func _on_effect_detail_changed() -> void:
+	var specs = _specs()
+	for k in _effect_rows:
+		if k < specs.size() and is_instance_valid(_effect_rows[k]):
+			_effect_rows[k].bbcode_text = _effect_text(specs[k])
+	_changed()
 
 
 func _on_bool_field(pressed: bool, i: int, field: String, tb: Button) -> void:
@@ -2469,6 +2498,8 @@ func _open_char_weapons() -> void:
 		b.align = Button.ALIGN_LEFT
 		b.clip_text = true
 		b.rect_min_size = Vector2(300, 56)
+		# 武器多到换行时按钮不随行高变大
+		b.size_flags_vertical = 0
 		_apply_action_style(b, C_CUSTOM_2)
 		b.connect("pressed", self, "_on_char_weapons_picked", [c.my_id, m])
 		grid.add_child(b)

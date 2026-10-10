@@ -918,3 +918,115 @@ func test_170_weapon_effects_copied_and_library_dedup() -> void:
 	_check(m.library(true).size() < full, "dedup on is smaller (%d < %d)" % [m.library(true).size(), full])
 	m.set_library_dedup(false)
 	m.delete_custom_weapon(cwid)
+
+
+# 效果库里第一个带指定子资源字段的效果
+func _lib_with_sub(field: String, script_part: String = ""):
+	for entry in m.library(true):
+		var e = entry.effect
+		if field in m.Catalog.sub_fields(e) and (script_part == "" or e.get_script().resource_path.find(script_part) >= 0):
+			return entry
+	return null
+
+
+# 子资源（燃烧 / 投射物 / 爆炸的武器属性）的详细信息：写入 spec.sub，复制后改写，不影响模板
+func test_180_effect_sub_resources() -> void:
+	var burn = _lib_with_sub("burning_data", "burn_chance")
+	_check(burn != null, "burn chance effect in the library")
+	if burn != null:
+		var e = m.make_effect({"from": burn.from, "i": burn.i, "sub": {"burning_data": {"damage": 99, "duration": 7, "scaling_stats": [["stat_max_hp", 0.5]]}}})
+		_eq([e.burning_data.damage, e.burning_data.duration], [99, 7], "burning damage / duration")
+		_eq(m.scaling_names(e.burning_data.scaling_stats), [["stat_max_hp", 0.5]], "burning scaling: +50% max HP")
+		_check(burn.effect.burning_data.damage != 99 and e.burning_data != burn.effect.burning_data, "template untouched")
+		_check(m.effect_text(e, false).find("7x") >= 0, "text shows the new duration: " + m.effect_text(e, false))
+	var proj = _lib_with_sub("weapon_stats", "projectile")
+	_check(proj != null, "projectile effect in the library")
+	if proj != null:
+		var e = m.make_effect({"from": proj.from, "i": proj.i, "sub": {"weapon_stats": {"damage": 42, "nb_projectiles": 3}}})
+		_eq([e.weapon_stats.damage, e.weapon_stats.nb_projectiles], [42, 3], "projectile damage / count")
+		_check(proj.effect.weapon_stats.damage != 42, "template untouched")
+	var boom = _lib_with_sub("stats", "exploding")
+	_check(boom != null, "explosion effect in the library")
+	if boom != null:
+		var e = m.make_effect({"from": boom.from, "i": boom.i, "sub": {"stats": {"scaling_stats": [["stat_max_hp", 0.5], ["stat_elemental_damage", 1.0]]}}})
+		_eq(m.scaling_names(e.stats.scaling_stats), [["stat_max_hp", 0.5], ["stat_elemental_damage", 1.0]], "explosion scaling")
+	# 存档往返（JSON）
+	var spec = JSON.parse(JSON.print({"from": burn.from, "i": burn.i, "sub": {"burning_data": {"damage": 12}}})).result
+	_eq(m.make_effect(spec).burning_data.damage, 12, "JSON round trip")
+	_eq(m.Catalog.category_of(_beast_effect()), "pet", "beast master effect is a pet effect")
+
+
+func _beast_effect():
+	for e in m.orig_effects("character_beast_master"):
+		if e.key == "beast_master_effect":
+			return e
+	return null
+
+
+# 诅咒（DLC）后的效果：属性、子资源、蓝图都照常生效
+func test_181_cursed_effects() -> void:
+	var dlc = tree.root.get_node("ProgressData").get_dlc_data("abyssal_terrors")
+	_check(dlc != null, "DLC data available")
+	if dlc == null:
+		return
+	var burn = _lib_with_sub("burning_data", "burn_chance")
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	GE.add_link(g, GE.add_node(g, "wave_start", Vector2.ZERO), GE.add_node(g, "perm_stat", Vector2.ZERO, {"stat": "stat_engineering", "value": 3}))
+	var iid = m.create_custom_item(_plain_item().my_id, "cursetest")
+	var p = m.item_profiles[iid]
+	p.stats = {"stat_armor": 4}
+	p.effects = [{"from": burn.from, "i": burn.i, "sub": {"burning_data": {"damage": 20}}}]
+	p.graph = g
+	m.apply_all()
+	var it = m.find_target("item", iid)
+	var cursed = dlc.curse_item(it, 0, true, 0.5)
+	_check(cursed.is_cursed and cursed != it, "item cursed")
+	var ge = null
+	var armor = null
+	var b = null
+	for e in cursed.effects:
+		if e.get_script() == GE:
+			ge = e
+		elif e.key == "stat_armor":
+			armor = e
+		elif "burning_data" in e:
+			b = e
+	_check(ge != null and GE.paths(ge.graph).size() == 1, "blueprint survives the curse")
+	_check(armor != null and armor.value >= 4, "stat effect kept (boosted: %s)" % (armor.value if armor != null else -1))
+	_check(b != null and b.burning_data.damage >= 20, "edited burning kept (boosted: %s)" % (b.burning_data.damage if b != null else -1))
+	# 加入一局：属性生效，蓝图在波次开始时触发
+	_setup_player(CH)
+	rd.players_data[0].items = []
+	rd.add_character(m.find_character(CH), 0)
+	var a0 = rd.get_player_effect(Keys.generate_hash("stat_armor"), 0)
+	rd.add_item(cursed, 0)
+	_eq(rd.get_player_effect(Keys.generate_hash("stat_armor"), 0), a0 + armor.value, "cursed stat applied")
+	var eng0 = rd.get_player_effect(Keys.generate_hash("stat_engineering"), 0)
+	m.graph_dirty = true
+	m.runtime.start_wave(null)
+	m.runtime.fire("wave_start", 0)
+	_eq(rd.get_player_effect(Keys.generate_hash("stat_engineering"), 0), eng0 + 3, "blueprint on the cursed item fires")
+	m.runtime.end_wave()
+	# 自定义武器诅咒：伤害提高，效果保留（原版另加一条诅咒属性）
+	var base_w = null
+	for v in isvc.weapons:
+		if v.tier == 0 and not v.effects.empty() and not m.is_custom(v.my_id):
+			base_w = v
+			break
+	var wt = m.create_custom_weapon(base_w.weapon_id, "cursetest")
+	m.apply_all()
+	var w = m.find_target("weapon", wt)
+	var cw = dlc.curse_item(w, 0, true, 0.5)
+	_check(cw.is_cursed and cw.stats.damage >= w.stats.damage, "custom weapon cursed: damage %d -> %d" % [w.stats.damage, cw.stats.damage])
+	var keys = []
+	for e in w.effects:
+		keys.push_back(e.key)
+	var ckeys = []
+	for e in cw.effects:
+		if e.key != "stat_curse":
+			ckeys.push_back(e.key)
+	_check(not keys.empty(), "weapon has effects: " + str(keys))
+	_eq(ckeys, keys, "custom weapon effects kept through the curse")
+	m.delete_custom_item(iid)
+	m.delete_custom_weapon(m.find_target("weapon", wt).weapon_id)

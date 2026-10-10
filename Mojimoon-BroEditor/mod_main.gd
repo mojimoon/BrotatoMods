@@ -791,23 +791,46 @@ func make_effect(spec: Dictionary):
 	else:
 		e = load(EFFECT_SCRIPT).new()
 		e.effect_sign = 3	# FROM_VALUE
-	var sets = spec.get("set", {})
-	if sets is Dictionary:
-		for k in sets:
-			if not k in e:
+	_set_typed(e, spec.get("set", {}))
+	# 子资源（燃烧数据、武器属性…）：复制后改写，不影响模板
+	var subs = spec.get("sub", {})
+	if subs is Dictionary:
+		for f in subs:
+			var r = e.get(f) if f in e else null
+			if not r is Resource or not subs[f] is Dictionary:
 				continue
-			var cur = e.get(k)
-			match typeof(cur):
-				TYPE_INT:
-					e.set(k, int(sets[k]))
-				TYPE_REAL:
-					e.set(k, float(sets[k]))
-				TYPE_BOOL:
-					e.set(k, bool(sets[k]))
-				TYPE_STRING:
-					e.set(k, str(sets[k]))
+			r = r.duplicate()
+			var vals = subs[f].duplicate()
+			if vals.get("scaling_stats") is Array and "scaling_stats" in r:
+				var sc = []
+				for row in vals.scaling_stats:
+					if row is Array and row.size() >= 2:
+						sc.push_back([str(row[0]), float(row[1])])
+				r.scaling_stats = Utils.convert_to_hash_array(sc)
+			vals.erase("scaling_stats")
+			_set_typed(r, vals)
+			e.set(f, r)
 	e._generate_hashes()
 	return e
+
+
+# 按目标字段的类型写入（JSON 读回的数字是浮点）
+static func _set_typed(obj, sets) -> void:
+	if not sets is Dictionary:
+		return
+	for k in sets:
+		if not k in obj:
+			continue
+		var cur = obj.get(k)
+		match typeof(cur):
+			TYPE_INT:
+				obj.set(k, int(sets[k]))
+			TYPE_REAL:
+				obj.set(k, float(sets[k]))
+			TYPE_BOOL:
+				obj.set(k, bool(sets[k]))
+			TYPE_STRING:
+				obj.set(k, str(sets[k]))
 
 
 # 普通属性效果的原版描述 key（stat_ 以外的 key 没有同名文本，借用原版同 key 效果的 text_key）

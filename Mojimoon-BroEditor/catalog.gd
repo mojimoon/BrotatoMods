@@ -152,7 +152,7 @@ static func category_of(e) -> String:
 	for part in [ck, tk, script_path.get_file().get_basename()] + ([] if ck != "" else [key]):
 		for w in _split_words(part):
 			words[w] = true
-	if tk.begins_with("effect_pet"):
+	if tk.begins_with("effect_pet") or key in PET_KEYS:
 		return "pet"
 	# 武器自带的效果（脚本在 effects/weapons/、text_key 带 _weapon）：名字里的 "weapon" 不代表武器类，
 	# 先不看它分类（琉特琴的增伤、粒子加速器的减速、十字弓的暴击贯通都属于战斗）
@@ -213,6 +213,37 @@ static func build_library(sources: Array, dedup: bool = true) -> Array:
 
 # 可在编辑器里修改的效果字段：脚本导出的 int / float / bool / String（数组和子资源保持模板原样）
 const HIDDEN_FIELDS = ["text_key", "custom_key", "storage_method", "effect_sign", "custom_args", "script", "resource_name", "resource_path", "resource_local_to_scene"]
+
+
+# 归入宠物类的效果 key（不以 effect_pet 开头的）
+const PET_KEYS = ["beast_master_effect"]
+# 子资源里不提供编辑的字段（音效、治疗武器标记）
+const SUB_HIDDEN = ["sound_db_mod", "is_healing"]
+
+
+# 效果里可在详细信息里编辑的子资源字段：带脚本的 Resource（燃烧数据、武器属性等；效果、场景、音效除外）
+static func sub_fields(e) -> Array:
+	var out = []
+	for p in e.get_property_list():
+		if not p.usage & PROPERTY_USAGE_SCRIPT_VARIABLE or not p.usage & PROPERTY_USAGE_STORAGE or p.type != TYPE_OBJECT:
+			continue
+		var r = e.get(p.name)
+		if r is Resource and r.get_script() != null and not "key_hash" in r and (not sub_child_fields(r).empty() or "scaling_stats" in r):
+			out.push_back(p.name)
+	return out
+
+
+# 子资源的标量字段
+static func sub_child_fields(r) -> Array:
+	var out = []
+	for p in r.get_property_list():
+		if not p.usage & PROPERTY_USAGE_SCRIPT_VARIABLE or not p.usage & PROPERTY_USAGE_STORAGE:
+			continue
+		if p.name in SUB_HIDDEN or p.name.begins_with("_") or p.name.ends_with("_hash"):
+			continue
+		if p.type in [TYPE_INT, TYPE_REAL, TYPE_BOOL]:
+			out.push_back({"name": p.name, "type": p.type})
+	return out
 
 
 static func editable_fields(e) -> Array:

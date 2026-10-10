@@ -762,3 +762,81 @@ func test_160_sort_and_char_weapons_popup() -> void:
 	_check(ui._modals.empty(), "back closes the popup")
 	ui.queue_free()
 	yield(tree, "idle_frame")
+
+
+# 详细信息弹窗（效果页 / 蓝图的获得效果节点）；ID 失去焦点即保存；从角色导入的头像不随行高变大
+func test_161_effect_details_and_focus_save() -> void:
+	var burn = null
+	for entry in m.library():
+		if "burning_data" in m.Catalog.sub_fields(entry.effect):
+			burn = entry
+			break
+	var p = m.new_profile()
+	p.effects = [{"from": burn.from, "i": burn.i}]
+	m.profiles[CH] = p
+	var ui = yield(_open_ui(CH), "completed")
+	ui._on_tab_pressed("effects")
+	ui._on_effect_edit(0)
+	yield(tree, "idle_frame")
+	ui._on_effect_details(0)
+	_eq(ui._modals.size(), 1, "details popup opened")
+	var d = ui._modals[-1].get_meta("detail")
+	d._on_value(55, "sub", "burning_data", "damage", TYPE_INT)
+	d._on_scaling_add("burning_data")
+	_eq(m.profiles[CH].effects[0].sub.burning_data.damage, 55, "detail written to the spec")
+	_eq(m.make_effect(m.profiles[CH].effects[0]).burning_data.damage, 55, "effect uses it")
+	_check(m.profiles[CH].effects[0].sub.burning_data.scaling_stats.size() >= 2, "scaling row added")
+	ui._modals[-1].close()
+	# 蓝图：获得效果节点
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	var t = GE.add_node(g, "wave_start", Vector2.ZERO)
+	var gn = GE.add_node(g, "grant", Vector2.ZERO, {"ref": {"from": burn.from, "i": burn.i}})
+	GE.add_link(g, t, gn)
+	m.profiles[CH].graph = g
+	ui._on_tab_pressed("blueprint")
+	yield(tree, "idle_frame")
+	ui.blueprint._on_ref_details(gn)
+	_eq(ui._modals.size(), 1, "blueprint details popup opened")
+	var bd = ui._modals[-1].get_meta("detail")
+	bd._on_value(66, "sub", "burning_data", "damage", TYPE_INT)
+	bd._on_value(25.0, "set", "", "chance", TYPE_REAL) if "chance" in burn.effect else null
+	var ref = GE.nodes_by_id(m.profiles[CH].graph)[gn].params.ref
+	_eq(m.make_effect(ref).burning_data.damage, 66, "blueprint grant uses the detail")
+	ui._modals[-1].close()
+	# ID：失去焦点即保存
+	var cid = m.create_custom(CH, "focustest")
+	ui._refresh_char_list()
+	ui._select(cid)
+	ui._on_tab_pressed("overview")
+	yield(tree, "idle_frame")
+	var le = null
+	for n in _all_nodes(ui._page):
+		if n is LineEdit and n.text == "focustest":
+			le = n
+	_check(le != null, "id field found")
+	if le != null:
+		le.text = "focus_saved"
+		le.emit_signal("focus_exited")
+		_check(m.profiles.has("character_focus_saved") and not m.profiles.has(cid), "id saved on focus loss")
+	# 从角色导入：头像按钮不拉伸
+	ui._on_tab_pressed("gear")
+	ui._open_char_weapons()
+	yield(_frames(3), "completed")
+	var ok = true
+	for n in _all_nodes(ui._modals[-1]):
+		if n is Button and n.icon != null:
+			ok = ok and n.size_flags_vertical == 0
+	_check(ok, "character buttons do not stretch with tall rows")
+	ui._modals[-1].close()
+	ui.queue_free()
+	yield(tree, "idle_frame")
+	m.delete_custom("character_focus_saved")
+
+
+func _all_nodes(n: Node) -> Array:
+	var out = []
+	for c in n.get_children():
+		out.push_back(c)
+		out += _all_nodes(c)
+	return out

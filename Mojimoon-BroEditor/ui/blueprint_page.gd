@@ -192,7 +192,18 @@ func _param_control(n: Dictionary, p: Array) -> Control:
 	b.rect_min_size = Vector2(200, 0)
 	ui._apply_action_style(b, TYPE_COLORS.effect)
 	b.connect("pressed", self, "_open_effect_picker", [int(n.id)])
-	return b
+	# 有子资源（燃烧、投射物、爆炸…）或数值的效果：详细信息弹窗
+	var e = ui._mod.make_effect(cur) if cur is Dictionary else null
+	if not ui.EffectDetail.has_details(e, true):
+		return b
+	var box = HBoxContainer.new()
+	box.add_constant_override("separation", 4)
+	box.add_child(b)
+	var det = ui._button(ui.tr("BE_EFFECT_DETAILS"), ui.FONT_DESC)
+	ui._apply_action_style(det, ui.C_CUSTOM)
+	det.connect("pressed", self, "_on_ref_details", [int(n.id)])
+	box.add_child(det)
+	return box
 
 
 func _find(g: Dictionary, id: int):
@@ -353,6 +364,18 @@ func _fill_picker() -> void:
 func _on_picker_search(text: String) -> void:
 	_picker_filter = text.strip_edges().to_lower()
 	_fill_picker()
+
+
+func _on_ref_details(id: int) -> void:
+	var n = _find(_edit_graph(), id)
+	var ref = n.get("params", {}).get("ref") if n != null else null
+	if ref is Dictionary:
+		ui.EffectDetail.open(ui, ref, true, self, "_on_ref_detail_changed")
+
+
+func _on_ref_detail_changed() -> void:
+	rebuild()
+	_changed()
 
 
 func _on_picked(ref: Dictionary) -> void:
