@@ -2,7 +2,7 @@
 
 [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3808638762) | [Open in Steam Client](https://link.steam.watch/url/CommunityFilePage/3808638762)
 
-[English](#english) | [中文](#中文)
+[English](#english) | [中文](#中文) | [Screenshots](#screenshots) | [截图](#截图)
 
 > modid: Mojimoon-OneItemToRuleThemAllv2
 
@@ -159,17 +159,14 @@ Note: this is an entirely different mod. [pullquote]Do not enable v1 and v2 at t
 GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/url]
 
 -->
-<details>
 
-<summary>Screenshots</summary>
+### Screenshots
 
 ![](../img/OneItemToRuleThemAllv2/oitrta-v2-en-1.jpg)
 
 ![](../img/OneItemToRuleThemAllv2/oitrta-v2-en-2.jpg)
 
 ![](../img/OneItemToRuleThemAllv2/oitrta-v2-en-3.jpg)
-
-</details>
 
 ---
 
@@ -325,9 +322,7 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 
 -->
 
-<details>
-
-<summary>截图</summary>
+### 截图
 
 ![](../img/OneItemToRuleThemAllv2/oitrta-v2-zh-1.jpg)
 
@@ -335,7 +330,6 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 
 ![](../img/OneItemToRuleThemAllv2/oitrta-v2-zh-3.jpg)
 
-</details>
 
 <!--
 

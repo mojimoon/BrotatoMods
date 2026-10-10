@@ -2,7 +2,7 @@
 
 [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3671945570) | [Open in Steam Client](https://link.steam.watch/url/CommunityFilePage/3671945570)
 
-[English](#english) | [中文](#中文)
+[English](#english) | [中文](#中文) | [Screenshots](#screenshots)
 
 > modid: Mojimoon-DoubleSidedUpgrades
 
@@ -133,9 +133,7 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 
 --->
 
-<details>
-
-<summary>Screenshots / 截图</summary>
+### Screenshots
 
 ![](../img/DoubleSidedUpgrades/dsu-en-1.png)
 
@@ -144,5 +142,3 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 ![](../img/DoubleSidedUpgrades/dsu-en-3.png)
 
 ![](../img/DoubleSidedUpgrades/dsu-en-4.png)
-
-</details>

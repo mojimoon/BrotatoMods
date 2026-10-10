@@ -2,7 +2,7 @@
 
 [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3671094202) | [Open in Steam Client](https://link.steam.watch/url/CommunityFilePage/3671094202)
 
-[English](#english) | [中文](#中文)
+[English](#english) | [中文](#中文) | [Screenshots](#screenshots) | [截图](#截图)
 
 > modid: Mojimoon-AutoAnthony  
 > Design Docs / 设计文档：[DESIGN.md](DESIGN.md)
@@ -129,17 +129,13 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 -->
 
-<details>
-
-<summary>Screenshot</summary>
+### Screenshots
 
 ![](../img/AutoAnthony/aa-en-2.jpg)
 
 ![](../img/AutoAnthony/aa-en-3.jpg)
 
 ![](../img/AutoAnthony/aa-en-4.jpg)
-
-</details>
 
 ---
 
@@ -261,9 +257,7 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 
 -->
 
-<details>
-
-<summary>截图</summary>
+### 截图
 
 ![](../img/AutoAnthony/aa-zh-1.png)
 
@@ -272,8 +266,6 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 ![](../img/AutoAnthony/aa-zh-3.jpg)
 
 ![](../img/AutoAnthony/aa-zh-4.jpg)
-
-</details>
 
 <!--
 
