@@ -34,7 +34,8 @@ func run(p_tree: SceneTree):
 	print("user dir: ", OS.get_user_data_dir())
 	var tests: Array = []
 	for method in get_method_list():
-		if method.name.begins_with("test_"):
+		var only = OS.get_environment("BE_ONLY")
+		if method.name.begins_with("test_") and (only == "" or method.name.find(only) >= 0):
 			tests.push_back(method.name)
 	tests.sort()
 	for t in tests:
@@ -244,7 +245,7 @@ func test_12_effects_edit_and_starting_weapons() -> void:
 func test_20_custom_character_lifecycle() -> void:
 	var n = isvc.characters.size()
 	var id = m.create_custom(CH)
-	_check(id.begins_with(m.CUSTOM_PREFIX), "custom id prefix")
+	_check(id.begins_with(m.CHAR_PREFIX), "custom id prefix")
 	_eq(isvc.characters.size(), n + 1, "registered")
 	var c = m.find_character(id)
 	_eq(c.effects.size(), m.orig_effects(CH).size(), "copies base effects")
@@ -1295,11 +1296,14 @@ func test_142_custom_weapon() -> void:
 	var wid = w.weapon_id
 	_check(wid.begins_with(m.WEAPON_PREFIX), "custom weapon family id")
 	_eq(w.type, base[0].type, "type from base")
+	_eq(m.family_members(wid).size(), base.size(), "whole base family copied")
+	_check(m.family_complete(wid), "copied family is complete")
+	_check(m.delete_weapon_tier(m.family_members(wid)[-1].my_id), "top tier deleted")
+	m.apply_all()
 	_check(not m.family_complete(wid) and m.is_disabled("weapon", wid), "incomplete weapon is disabled")
 	_check(w.my_id_hash in m.global_ban_hashes(), "incomplete weapon banned")
-	_eq(m.addable_tiers(wid), [1], "can add next tier")
-	for t in [1, 2, 3]:
-		_check(m.add_weapon_tier(wid, t) != "", "added tier %d" % t)
+	_eq(m.addable_tiers(wid), [3], "can add next tier")
+	_check(m.add_weapon_tier(wid, 3) != "", "added tier back")
 	_eq(m.add_weapon_tier(wid, 3), "", "no duplicate tier")
 	m.apply_all()
 	_check(m.family_complete(wid) and not m.is_disabled("weapon", wid), "complete weapon enabled")
@@ -1430,6 +1434,10 @@ func test_145_ui_custom_and_disable() -> void:
 	var w = m.find_target("weapon", ui._id)
 	var wid = w.weapon_id
 	_check(m.is_custom_family(wid), "custom weapon created from ui")
+	_check(m.family_complete(wid), "custom weapon copies the whole family")
+	var top = m.family_members(wid)[-1]
+	ui._select(top.my_id)
+	ui._on_delete_tier()
 	_check(ui._disable_switch.pressed and ui._disable_switch.disabled, "incomplete weapon: disable switch locked on")
 	for t in ui.OBJECT_TABS:
 		ui._on_tab_pressed(t[0])
@@ -1441,8 +1449,6 @@ func test_145_ui_custom_and_disable() -> void:
 	_check(not m.is_disabled("weapon", wid), "complete after adding tiers")
 	ui._refresh_header()
 	_check(not ui._disable_switch.disabled, "switch unlocked when complete")
-	ui._on_weapon_type(true)
-	_eq(m.find_target("weapon", ui._id).type, 1, "switched to ranged")
 	ui._on_set_pressed(isvc.sets[0].my_id)
 	_check(m.weapon_families[wid].sets is Array, "sets recorded on family")
 	ui._on_tab_pressed("attrs")
@@ -1461,3 +1467,106 @@ func test_146_attack_interval() -> void:
 			_check(false, "attack interval sane for " + w.my_id)
 			return
 	_check(true, "attack intervals sane")
+
+
+
+# 一局进行中删除自定义道具 / 武器后读档继续：不应报错（找不到的对象被原版读档逻辑跳过）
+func test_150_resume_after_delete() -> void:
+	var pd = tree.root.get_node("ProgressData")
+	var cid = m.create_custom(CH)
+	var iid = m.create_custom_item(_plain_item().my_id)
+	var base = _family_from(0, 0)
+	var wtier = m.create_custom_weapon(base[0].weapon_id)
+	var wid = m.find_target("weapon", wtier).weapon_id
+	while not m.family_complete(wid):
+		var add = m.addable_tiers(wid)
+		m.add_weapon_tier(wid, add[-1])
+	m.apply_all()
+	_setup_player(cid)
+	rd.players_data[0].items = []
+	rd.add_character(m.find_character(cid), 0)
+	rd.add_weapon(m.find_target("weapon", wtier), 0)
+	rd.add_item(m.find_target("item", iid), 0)
+	rd.current_wave = 3
+	pd.save_run_state()
+	_check(pd.saved_run_state.has_run_state, "run state saved")
+	_check(m.delete_custom_item(iid), "item deleted mid-run")
+	_check(m.delete_custom_weapon(wid), "weapon deleted mid-run")
+	m.apply_all()
+	pd.load_game_file()
+	rd.resume_from_state(pd.saved_run_state)
+	_check(rd.players_data[0].current_character != null, "character kept")
+	_eq(rd.players_data[0].weapons.size(), 0, "deleted weapon dropped from the run")
+	var _e = tree.change_scene("res://main.tscn")
+	yield(_frames(60), "completed")
+	_check(tree.current_scene != null, "battle scene running after resume")
+	var _s = tree.change_scene(MenuData.shop_scene if "shop_scene" in MenuData else "res://ui/menus/shop/shop.tscn")
+	yield(_frames(30), "completed")
+	_check(tree.current_scene != null, "shop scene running after resume")
+	var _b = tree.change_scene(MenuData.character_selection_scene)
+	yield(_frames(4), "completed")
+	pd.reset_and_save_new_run_state()
+
+
+
+func test_151_ids_and_rename() -> void:
+	_eq(m.clean_suffix(" my item-2! "), "my_item2", "suffix cleaned")
+	var base = _plain_item()
+	var iid = m.create_custom_item(base.my_id)
+	var body = base.my_id.trim_prefix("item_")
+	_check(iid.begins_with("item_" + body + "_"), "default id = item_<base>_<random>")
+	_eq(m.create_custom_item(base.my_id, base.my_id.trim_prefix("item_")), "", "taken suffix rejected")
+	var named = m.create_custom_item(base.my_id, "solution")
+	_eq(named, "item_solution", "custom suffix")
+	m.profiles[CH] = m.new_profile()
+	m.profiles[CH].ban_items = [named]
+	_eq(m.rename_custom("item", named, "new solution"), "item_new_solution", "item renamed")
+	_check(m.find_target("item", "item_new_solution") != null and m.find_target("item", named) == null, "item resource renamed")
+	_eq(m.profiles[CH].ban_items, ["item_new_solution"], "references follow")
+	_eq(m.rename_custom("item", "item_new_solution", base.my_id.trim_prefix("item_")), "", "rename to vanilla id rejected")
+	var cid = m.create_custom(CH, "hero")
+	_eq(cid, "character_hero", "character id")
+	_eq(m.rename_custom("character", cid, "hero2"), "character_hero2", "character renamed")
+	_check(m.find_character("character_hero2") != null, "character resource renamed")
+	var fam = _family_from(0, 0)
+	var wt = m.create_custom_weapon(fam[0].weapon_id, "blade")
+	_eq(wt, "weapon_blade_1", "weapon tier id")
+	_eq(m.rename_custom("weapon", "weapon_blade", "sword x"), "weapon_sword_x", "weapon renamed")
+	var ms = m.family_members("weapon_sword_x")
+	_eq(ms.size(), fam.size(), "all tiers moved")
+	_eq(ms[0].my_id, "weapon_sword_x_1", "tier ids follow")
+	_check(m.weapon_profiles.has("weapon_sword_x_1") and not m.weapon_profiles.has("weapon_blade_1"), "tier profiles moved")
+	m.apply_all()
+	_check(m.family_complete("weapon_sword_x"), "renamed weapon still complete")
+	# 隐藏编号
+	var p = m.item_profiles["item_new_solution"]
+	var numbered = m.custom_icon("item_new_solution", p, "item")
+	m.hide_numbers = true
+	var plain = m.custom_icon("item_new_solution", p, "item")
+	m.hide_numbers = false
+	_check(plain == base.icon and numbered != base.icon, "hide numbers uses the vanilla icon")
+
+
+func test_152_weapon_effect_categories() -> void:
+	for path in ["res://dlcs/dlc_1/weapons/melee/lute/1/lute_effect_0.tres",
+			"res://weapons/ranged/particle_accelerator/3/particle_accelerator_3_effect_2.tres",
+			"res://weapons/ranged/crossbow/1/crossbow_effect.tres"]:
+		if ResourceLoader.exists(path):
+			_eq(m.Catalog.category_of(load(path)), "combat", path.get_file() + " is combat")
+
+
+func test_153_weapon_attack_type() -> void:
+	var ui = yield(_open_ui(CH), "completed")
+	ui.set_kind("weapon")
+	var fam = _family_from(0, 0)
+	ui._select(fam[0].my_id)
+	ui._on_tab_pressed("attrs")
+	var sweep = 1 - int(fam[0].stats.attack_type)
+	ui._on_wstat_changed(sweep, ["attack_type", "int", ""])
+	_eq(ui._p().wstats.get("attack_type"), sweep, "attack type toggled")
+	ui._on_wstat_changed(30.0, ["speed_percent_modifier", "int", "neg"])
+	_eq(ui._p().wstats.get("speed_percent_modifier"), -30, "slow shown as positive, stored negative")
+	m.apply_all()
+	_eq(fam[0].stats.attack_type, sweep, "applied")
+	ui.queue_free()
+	yield(tree, "idle_frame")

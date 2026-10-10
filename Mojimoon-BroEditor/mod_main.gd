@@ -14,9 +14,11 @@ const SAVE_PATH = "user://Mojimoon-BroEditor/profiles.json"
 const CSV_PATH = MOD_DIR + "translations/broeditor.csv"
 const UI_SCENE = MOD_DIR + "ui/editor_ui.tscn"
 const FONT_26_PATH = "res://resources/fonts/actual/base/font_26.tres"
-const CUSTOM_PREFIX = "character_broeditor_"
-const ITEM_PREFIX = "item_broeditor_"
-const WEAPON_PREFIX = "weapon_broeditor_"
+# 新建对象的 id = 前缀 + 玩家输入的后缀（默认 <基底>_<随机数>）
+const CHAR_PREFIX = "character_"
+const ITEM_PREFIX = "item_"
+const WEAPON_PREFIX = "weapon_"
+const ID_PREFIX = {"character": CHAR_PREFIX, "item": ITEM_PREFIX, "weapon": WEAPON_PREFIX}
 # 给原版武器家族补的低级版本：<weapon_id>_<等级>_broeditor
 const TIER_SUFFIX = "_broeditor"
 const EFFECT_SCRIPT = "res://items/global/effect.gd"
@@ -46,7 +48,7 @@ const WSTAT_FIELDS = [
 	["lifesteal", "float", "pct"], ["speed_percent_modifier", "int", ""], ["effect_scale", "float", "pct"],
 	["nb_projectiles", "int", ""], ["projectile_spread", "float", ""], ["piercing", "int", ""],
 	["piercing_dmg_reduction", "float", "pct"], ["bounce", "int", ""], ["bounce_dmg_reduction", "float", "pct"],
-	["projectile_speed", "int", ""], ["is_healing", "bool", ""],
+	["projectile_speed", "int", ""], ["attack_type", "int", ""],
 ]
 # 开局状态的默认值
 const START_DEFAULT = {
@@ -66,6 +68,8 @@ var disabled := {"character": [], "item": [], "weapon": []}
 var next_id: int = 1
 # 调试模式：编辑器里在效果与属性旁显示键名
 var debug := false
+# 隐藏自定义对象图标右下角的编号（使用原版图标时才有编号）
+var hide_numbers := false
 
 # 原版角色 id -> 原始字段（还原用）
 var _backups: Dictionary = {}
@@ -161,6 +165,8 @@ static func new_profile() -> Dictionary:
 		"tags": null,
 		"wstats": {},
 		"scaling": null,
+		# 自定义对象的图标编号
+		"num": 0,
 	}
 
 
@@ -196,6 +202,7 @@ static func normalize_profile(p) -> Dictionary:
 		out.graph = null
 	if out.graph != null:
 		_int_ids(out.graph)
+	out.num = int(out.num)
 	out.price = int(out.price)
 	out.tier = int(out.tier)
 	out.max_nb = int(out.max_nb)
@@ -229,7 +236,7 @@ static func normalize_profile(p) -> Dictionary:
 # JSON 读回的数字是浮点：节点 id / 连线统一转为整数
 # 武器家族档案：custom = 自定义武器（base = 外观与近 / 远战来源的原版家族）；tiers = 本模组新增的等级
 static func new_family() -> Dictionary:
-	return {"custom": false, "base": "", "name": "", "icon": "", "sets": null, "tiers": []}
+	return {"custom": false, "base": "", "name": "", "icon": "", "sets": null, "tiers": [], "num": 0}
 
 
 static func normalize_family(f) -> Dictionary:
@@ -240,6 +247,7 @@ static func normalize_family(f) -> Dictionary:
 		if f.has(k) and typeof(f[k]) == typeof(out[k]):
 			out[k] = f[k]
 	out.custom = bool(f.get("custom", false))
+	out.num = int(f.get("num", 0))
 	out.sets = null
 	if f.get("sets") is Array:
 		out.sets = []
@@ -328,6 +336,7 @@ func load_profiles() -> void:
 	next_id = max(1, int(parsed.result.get("next_id", 1)))
 	var settings = parsed.result.get("settings", {})
 	debug = bool(settings.get("debug", false)) if settings is Dictionary else false
+	hide_numbers = bool(settings.get("hide_numbers", false)) if settings is Dictionary else false
 	var kinds = settings.get("kinds", {}) if settings is Dictionary else {}
 	for k in KINDS:
 		kind_enabled[k] = bool(kinds.get(k, true)) if kinds is Dictionary else true
@@ -363,7 +372,7 @@ func save_profiles() -> void:
 		ModLoaderLog.error("Failed to save profiles", MOD_ID)
 		return
 	file.store_string(JSON.print({
-		"version": 1, "next_id": next_id, "settings": {"debug": debug, "kinds": kind_enabled},
+		"version": 1, "next_id": next_id, "settings": {"debug": debug, "hide_numbers": hide_numbers, "kinds": kind_enabled},
 		"profiles": profiles, "items": item_profiles, "weapons": weapon_profiles,
 		"families": weapon_families, "disabled": disabled,
 	}, "\t"))
@@ -431,11 +440,11 @@ func import_bundle(code: String) -> int:
 		if fs is Dictionary:
 			for wid in fs:
 				var f = normalize_family(fs[wid])
-				if f.custom and not str(wid).begins_with(WEAPON_PREFIX):
+				# 自定义武器不能占用原版武器的 id
+				if f.custom and not _vanilla_members(str(wid)).empty():
 					continue
 				weapon_families[str(wid)] = f
-				if f.custom:
-					next_id = max(next_id, _id_number(str(wid)) + 1)
+				next_id = max(next_id, f.num + 1)
 				n += 1
 			_register_weapon_families()
 	if parsed.result.get("disabled") is Dictionary:
@@ -453,9 +462,11 @@ func import_bundle(code: String) -> int:
 				continue
 			var p = normalize_profile(src[id])
 			id = str(id)
-			if k == "character" and p.custom != id.begins_with(CUSTOM_PREFIX):
+			# 自定义对象不能占用原版对象的 id；原版对象的档案要有对应的对象
+			var existing = find_target(k, id)
+			if p.custom and existing != null and not is_custom(id):
 				continue
-			if k == "item" and p.custom != id.begins_with(ITEM_PREFIX):
+			if not p.custom and k != "weapon" and existing == null:
 				continue
 			if k == "item" and p.custom:
 				item_profiles[id] = p
@@ -467,8 +478,8 @@ func import_bundle(code: String) -> int:
 			profiles_of(k)[id] = p
 			if p.custom and k == "character":
 				_register_custom(id)
-			if p.custom and k != "weapon":
-				next_id = max(next_id, _id_number(id) + 1)
+			if p.custom:
+				next_id = max(next_id, p.num + 1)
 			n += 1
 	return n
 
@@ -1085,14 +1096,13 @@ func custom_ids() -> Array:
 
 
 # 以 base_id 为基底新建自定义角色（复制基底的效果、初始武器、偏好词条），返回新 id
-func create_custom(base_id: String) -> String:
-	var id = CUSTOM_PREFIX + str(next_id)
-	while find_character(id) != null or profiles.has(id):
-		next_id += 1
-		id = CUSTOM_PREFIX + str(next_id)
-	next_id += 1
+func create_custom(base_id: String, suffix: String = "") -> String:
+	var id = new_custom_id("character", base_id, suffix)
+	if id == "":
+		return ""
 	var p = new_profile()
 	p.custom = true
+	p.num = _take_num()
 	p.base = base_id
 	var base = find_character(base_id)
 	if base != null:
@@ -1124,9 +1134,9 @@ func create_custom(base_id: String) -> String:
 	return id
 
 
-# 删除自定义角色；存档中进行中的一局正在使用该角色时拒绝（读档会找不到角色）
+# 删除自定义角色（进行中的一局：角色数据随存档保存，读档时找不到的对象由原版跳过）
 func delete_custom(id: String) -> bool:
-	if not is_custom(id) or is_in_saved_run(id):
+	if not is_custom(id):
 		return false
 	profiles.erase(id)
 	var c = _customs.get(id)
@@ -1135,24 +1145,6 @@ func delete_custom(id: String) -> bool:
 	if c != null and isvc != null:
 		isvc.characters.erase(c)
 	return true
-
-
-func is_in_saved_run(id: String) -> bool:
-	var pd = _autoload("ProgressData")
-	if pd == null or not pd.saved_run_state is Dictionary or not pd.saved_run_state.get("has_run_state", false):
-		return false
-	var players = pd.saved_run_state.get("players_data", [])
-	if not players is Array:
-		return false
-	for pl in players:
-		var ch = pl.get("current_character") if pl is Dictionary else (pl.current_character if pl is Object and "current_character" in pl else null)
-		if ch is Object and "my_id" in ch and ch.my_id == id:
-			return true
-		if ch is Dictionary and str(ch.get("my_id", "")) == id:
-			return true
-		if ch is String and ch == id:
-			return true
-	return false
 
 
 func _register_customs() -> void:
@@ -1204,14 +1196,13 @@ func _fill_custom(c, id: String, p: Dictionary) -> void:
 # ============================================================
 # 自定义道具（同 BroLab：基底提供外观，图标可选 / 可导入）
 # ============================================================
-func create_custom_item(base_id: String) -> String:
-	var id = ITEM_PREFIX + str(next_id)
-	while find_target("item", id) != null or item_profiles.has(id):
-		next_id += 1
-		id = ITEM_PREFIX + str(next_id)
-	next_id += 1
+func create_custom_item(base_id: String, suffix: String = "") -> String:
+	var id = new_custom_id("item", base_id, suffix)
+	if id == "":
+		return ""
 	var p = new_profile()
 	p.custom = true
+	p.num = _take_num()
 	p.base = base_id
 	var base = find_target("item", base_id)
 	if base != null:
@@ -1236,7 +1227,7 @@ func create_custom_item(base_id: String) -> String:
 
 
 func delete_custom_item(id: String) -> bool:
-	if not item_profiles.has(id) or not item_profiles[id].custom or in_saved_run_text(id):
+	if not item_profiles.has(id) or not item_profiles[id].custom:
 		return false
 	item_profiles.erase(id)
 	disabled.item.erase(id)
@@ -1288,20 +1279,140 @@ static func tier_id(weapon_id: String, t: int, custom_family: bool) -> String:
 
 
 # 以 base_wid 家族为基底新建自定义武器（先只有基底最低的等级），返回该等级的 my_id
-func create_custom_weapon(base_wid: String) -> String:
-	var wid = WEAPON_PREFIX + str(next_id)
-	while weapon_families.has(wid) or not family_members(wid).empty():
-		next_id += 1
-		wid = WEAPON_PREFIX + str(next_id)
-	next_id += 1
+# 以 base_wid 家族为基底新建自定义武器：复制基底的全部等级，返回最低等级的 my_id
+func create_custom_weapon(base_wid: String, suffix: String = "") -> String:
+	var wid = new_custom_id("weapon", base_wid, suffix)
+	var bm = _vanilla_members(base_wid)
+	if wid == "" or bm.empty():
+		return ""
 	var f = new_family()
 	f.custom = true
+	f.num = _take_num()
 	f.base = base_wid
-	var bm = _vanilla_members(base_wid)
-	f.name = tr(orig_name(bm[0])) + " +" if not bm.empty() else tr("BE_NEW_WEAPON")
-	f.tiers = [bm[0].tier if not bm.empty() else 0]
+	f.name = tr(orig_name(bm[0])) + " +"
+	for w in bm:
+		f.tiers.push_back(w.tier)
 	weapon_families[wid] = f
-	return add_weapon_tier(wid, f.tiers[0], true)
+	for t in f.tiers:
+		var p = new_profile()
+		p.custom = true
+		weapon_profiles[tier_id(wid, t, true)] = p
+	_register_weapon_families()
+	_unlock_new_characters()
+	return tier_id(wid, f.tiers[0], true)
+
+
+# ============================================================
+# 自定义对象的 id
+# ============================================================
+# 后缀只保留字母、数字、_（空格转为 _）
+static func clean_suffix(text: String) -> String:
+	var out = ""
+	for ch in text.strip_edges().replace(" ", "_"):
+		var c = ord(ch)
+		if ch == "_" or (c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122):
+			out += ch
+	return out
+
+
+func id_taken(kind: String, id: String) -> bool:
+	if kind == "weapon":
+		return weapon_families.has(id) or not family_members(id).empty()
+	return find_target(kind, id) != null or profiles_of(kind).has(id)
+
+
+# 新对象的 id：给了后缀就用它（重复返回 ""），否则用 <基底>_<随机数>（导入时不易重复）
+func new_custom_id(kind: String, base_id: String, suffix: String) -> String:
+	var prefix = ID_PREFIX[kind]
+	suffix = clean_suffix(suffix)
+	if suffix != "":
+		return "" if id_taken(kind, prefix + suffix) else prefix + suffix
+	var body = base_id.trim_prefix(prefix)
+	if body == "":
+		body = "custom"
+	var id = ""
+	while id == "" or id_taken(kind, id):
+		id = prefix + body + "_" + str(1000 + randi() % 9000)
+	return id
+
+
+func _take_num() -> int:
+	next_id += 1
+	return next_id - 1
+
+
+# 修改自定义对象的 id 后缀；返回新 id（角色 / 道具为 my_id，武器为 weapon_id），失败返回 ""
+func rename_custom(kind: String, old_id: String, suffix: String) -> String:
+	suffix = clean_suffix(suffix)
+	if suffix == "":
+		return ""
+	var new_id = ID_PREFIX[kind] + suffix
+	if new_id == old_id:
+		return old_id
+	if id_taken(kind, new_id):
+		return ""
+	match kind:
+		"character":
+			if not (profiles.has(old_id) and profiles[old_id].custom):
+				return ""
+			_move_key(profiles, old_id, new_id)
+			_rename_res(_customs, old_id, new_id)
+		"item":
+			if not (item_profiles.has(old_id) and item_profiles[old_id].custom):
+				return ""
+			_move_key(item_profiles, old_id, new_id)
+			_rename_res(_custom_items, old_id, new_id)
+		"weapon":
+			if not is_custom_family(old_id):
+				return ""
+			_move_key(weapon_families, old_id, new_id)
+			for t in weapon_families[new_id].tiers:
+				var oid = tier_id(old_id, t, true)
+				var nid = tier_id(new_id, t, true)
+				_move_key(weapon_profiles, oid, nid)
+				var w = _rename_res(_custom_weapons, oid, nid)
+				if w != null:
+					w.weapon_id = new_id
+					w._generate_hashes()
+				_replace_refs(oid, nid)
+	_replace_refs(old_id, new_id)
+	var i = disabled[kind].find(old_id)
+	if i >= 0:
+		disabled[kind][i] = new_id
+	_global_ban = null
+	_ban_cache.clear()
+	_unlock_new_characters()
+	return new_id
+
+
+static func _move_key(d: Dictionary, old, new) -> void:
+	if d.has(old):
+		d[new] = d[old]
+		d.erase(old)
+
+
+func _rename_res(d: Dictionary, old: String, new: String):
+	var r = d.get(old)
+	_move_key(d, old, new)
+	_orig_effects.erase(old)
+	if r != null:
+		r.my_id = new
+		r._generate_hashes()
+	return r
+
+
+# 角色档案里对改名对象的引用（初始武器 / 道具、禁用列表）
+func _replace_refs(old: String, new: String) -> void:
+	for id in profiles:
+		var p = profiles[id]
+		for k in ["weapons", "ban_items", "ban_weapons"]:
+			if p[k] is Array:
+				for i in p[k].size():
+					if str(p[k][i]) == old:
+						p[k][i] = new
+		for st in p.start_items:
+			if st is Dictionary and str(st.get("id", "")) == old:
+				st.id = new
 
 
 # 可新增的等级：家族最低等级之下一级；自定义武器还可以加最高等级之上一级
@@ -1317,8 +1428,8 @@ func addable_tiers(weapon_id: String) -> Array:
 	return out
 
 
-func add_weapon_tier(weapon_id: String, t: int, force: bool = false) -> String:
-	if not force and not t in addable_tiers(weapon_id):
+func add_weapon_tier(weapon_id: String, t: int) -> String:
+	if not t in addable_tiers(weapon_id):
 		return ""
 	if not weapon_families.has(weapon_id):
 		weapon_families[weapon_id] = new_family()
@@ -1338,7 +1449,7 @@ func add_weapon_tier(weapon_id: String, t: int, force: bool = false) -> String:
 # 删除自定义等级（只能删两端，保持连续）；自定义武器删到最后一级时整把删除
 func delete_weapon_tier(id: String) -> bool:
 	var w = find_target("weapon", id)
-	if w == null or not _custom_weapons.has(id) or in_saved_run_text(w.weapon_id):
+	if w == null or not _custom_weapons.has(id):
 		return false
 	var ms = family_members(w.weapon_id)
 	if w != ms[0] and w != ms[-1]:
@@ -1354,7 +1465,7 @@ func delete_weapon_tier(id: String) -> bool:
 
 
 func delete_custom_weapon(weapon_id: String) -> bool:
-	if not is_custom_family(weapon_id) or in_saved_run_text(weapon_id):
+	if not is_custom_family(weapon_id):
 		return false
 	for w in family_members(weapon_id):
 		_unregister_weapon(w.my_id)
@@ -1451,14 +1562,6 @@ func _link_family(weapon_id: String) -> void:
 			ms[i + 1].previous_upgrade = w
 
 
-# 存档里进行中的一局是否用到了该 id（按文本查找）
-func in_saved_run_text(id: String) -> bool:
-	var pd = _autoload("ProgressData")
-	if pd == null or not pd.saved_run_state is Dictionary or not pd.saved_run_state.get("has_run_state", false):
-		return false
-	return var2str(pd.saved_run_state).find(id) >= 0
-
-
 # 新建的自定义角色：解锁并补上难度记录（游戏启动时由 ProgressData 读档自动完成）
 func _unlock_new_characters() -> void:
 	var pd = _autoload("ProgressData")
@@ -1477,7 +1580,7 @@ func library(with_weapons: bool = false) -> Array:
 		if _weapon_library == null:
 			var sources = _library_sources()
 			for w in _isvc().weapons:
-				if w != null and not w.effects.empty():
+				if w != null and not w.effects.empty() and not _custom_weapons.has(w.my_id):
 					sources.push_back([w.my_id, orig_name(w), orig_effects(w.my_id)])
 			_weapon_library = Catalog.build_library(sources)
 		return _weapon_library
@@ -1490,10 +1593,10 @@ func _library_sources() -> Array:
 	var isvc = _isvc()
 	var sources = []
 	for c in isvc.characters:
-		if c != null and not c.my_id.begins_with(CUSTOM_PREFIX):
+		if c != null and not is_custom(c.my_id):
 			sources.push_back([c.my_id, orig_name(c), orig_effects(c.my_id)])
 	for it in isvc.items:
-		if it != null:
+		if it != null and not is_custom(it.my_id):
 			sources.push_back([it.my_id, orig_name(it), orig_effects(it.my_id)])
 	return sources
 
@@ -1721,7 +1824,7 @@ func custom_icon(id: String, p: Dictionary, kind: String = "character") -> Textu
 	elif src == null:
 		src = find_target(kind, p.base)
 	var tex = src.icon if src != null else load("res://items/characters/well_rounded/well_rounded_icon.png")
-	return numbered_icon(tex, _id_number(id))
+	return numbered_icon(tex, p.num if p.num > 0 else _id_number(id))
 
 
 func _load_icon_file(name: String):
@@ -1758,7 +1861,7 @@ func import_icon(path: String, id: String) -> String:
 
 
 func numbered_icon(tex: Texture, n: int) -> Texture:
-	if tex == null or n <= 0:
+	if tex == null or n <= 0 or hide_numbers:
 		return tex
 	var key = str(tex.get_rid().get_id()) + "#" + str(n)
 	if _icon_cache.has(key):

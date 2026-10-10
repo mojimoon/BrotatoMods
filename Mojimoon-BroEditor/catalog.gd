@@ -154,6 +154,19 @@ static func category_of(e) -> String:
 			words[w] = true
 	if tk.begins_with("effect_pet"):
 		return "pet"
+	# 武器自带的效果（脚本在 effects/weapons/、text_key 带 _weapon）：名字里的 "weapon" 不代表武器类，
+	# 先不看它分类（琉特琴的增伤、粒子加速器的减速、十字弓的暴击贯通都属于战斗）
+	if script_path.find("/effects/weapons/") >= 0 or tk.ends_with("_weapon"):
+		var plain = words.duplicate()
+		plain.erase("weapon")
+		plain.erase("weapons")
+		var cat = _category_from(plain)
+		if cat != "other":
+			return cat
+	return _category_from(words)
+
+
+static func _category_from(words: Dictionary) -> String:
 	for c in CATEGORY_WORDS:
 		for w in c[1]:
 			if words.has(w):

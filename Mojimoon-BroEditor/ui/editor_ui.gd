@@ -99,6 +99,22 @@ var _reset_btn: Button
 var _disable_switch: CheckButton
 var _tier_box: HBoxContainer
 var _aspd_label: Label
+
+# 武器属性页的排布：每行两项；"#type" = 近战 / 远战（只读），"#attack" = 横扫 / 突刺（仅近战）
+const WSTAT_LAYOUT = [
+	["damage", "cooldown"], ["recoil", "recoil_duration"],
+	["additional_cooldown_every_x_shots", "additional_cooldown_multiplier"],
+	["crit_chance", "crit_damage"], ["max_range", "min_range"], ["accuracy", "knockback"],
+	["speed_percent_modifier", "effect_scale"], ["lifesteal", "#type"],
+	["#attack"],
+	["nb_projectiles", "projectile_spread"], ["piercing", "piercing_dmg_reduction"],
+	["bounce", "bounce_dmg_reduction"], ["projectile_speed"],
+]
+# 界面显示方式：pct = 内部 0–1 显示为百分比；neg = 取负（命中减速：原版用负数表示减速）
+const WSTAT_SHOW = {
+	"crit_chance": "pct", "accuracy": "pct", "lifesteal": "pct", "effect_scale": "pct",
+	"piercing_dmg_reduction": "pct", "bounce_dmg_reduction": "pct", "speed_percent_modifier": "neg",
+}
 var _delete_btn: Button
 var _tab_buttons: Dictionary = {}
 var _page: VBoxContainer
@@ -231,6 +247,9 @@ func _build_header(root: Control) -> void:
 	_status.align = Label.ALIGN_RIGHT
 	_status.clip_text = true
 	header.add_child(_status)
+	var nums = _switch(tr("BE_HIDE_NUMBERS"), _mod.hide_numbers)
+	nums.connect("toggled", self, "_on_hide_numbers_toggled")
+	header.add_child(nums)
 	var dbg = _switch(tr("BE_DEBUG"), _mod.debug)
 	dbg.connect("toggled", self, "_on_debug_toggled")
 	header.add_child(dbg)
@@ -387,7 +406,7 @@ func _fill_left() -> void:
 	_char_grid.add_constant_override("hseparation", 6)
 	_char_grid.add_constant_override("vseparation", 6)
 	scroll.add_child(_char_grid)
-	box.add_child(_desc(tr("BE_CHARACTERS_DESC" if _kind == "character" else "BE_OBJECTS_DESC")))
+	box.add_child(_desc(tr("BE_CHARACTERS_DESC")))
 	if true:
 		var row = HBoxContainer.new()
 		row.add_constant_override("separation", 8)
@@ -759,7 +778,6 @@ func _on_add_tier(t: int) -> void:
 func _on_delete_tier() -> void:
 	var wid = _character().weapon_id
 	if not _mod.delete_weapon_tier(_id):
-		_set_status(tr("BE_CUSTOM_IN_USE_OBJ"))
 		return
 	var ms = _mod.family_members(wid)
 	_refresh_char_list()
@@ -953,6 +971,7 @@ func _build_overview() -> void:
 		import_btn.connect("pressed", self, "_on_import_icon")
 		row.add_child(import_btn)
 		cbox.add_child(_desc(tr("BE_LOOK_DESC")))
+		_id_row(cbox)
 
 	var tbox = _section(left, "BE_SEC_TAGS", C_ACCENT_3)
 	tbox.add_child(_desc(tr("BE_TAGS_DESC")))
@@ -1002,11 +1021,24 @@ func _refresh_preview() -> void:
 	if _kind == "weapon":
 		for w in _mod.family_members(_character().weapon_id):
 			var pv = _mod.weapon_profiles.get(w.my_id, BEMain.new_profile())
+			var color = ItemService.get_color_from_tier(w.tier)
 			var cur = w.my_id == _id
-			_preview_text.add_child(_label("T" + str(w.tier + 1) + ("  ◀" if cur else ""), FONT_NORMAL if cur else FONT_SMALL, ItemService.get_color_from_tier(w.tier)))
-			_weapon_preview(w, pv)
-			_effect_lines(_mod.build_effects(w.my_id, pv))
+			var card = PanelContainer.new()
+			card.mouse_filter = Control.MOUSE_FILTER_STOP
+			card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+			card.add_stylebox_override("panel", _style(color.darkened(0.72) if cur else C_BG_ITEM, color if cur else C_BORDER, 6, 2 if cur else 1, 10, 6))
+			card.connect("gui_input", self, "_on_preview_tier_input", [w.my_id])
+			_preview_text.add_child(card)
+			var box = VBoxContainer.new()
+			box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			box.add_constant_override("separation", 2)
+			card.add_child(box)
+			box.add_child(_label("T" + str(w.tier + 1) + "  ·  " + _price_text(w, pv), FONT_SMALL, color))
+			_weapon_preview(box, w, pv)
+			_effect_lines(_mod.build_effects(w.my_id, pv), box)
 		return
+	if _kind == "item":
+		_preview_text.add_child(_label(_price_text(_character(), v), FONT_SMALL, C_TEXT_DIM))
 	_effect_lines(_mod.build_effects(_id, v))
 	if _kind != "character":
 		return
@@ -1021,15 +1053,27 @@ func _refresh_preview() -> void:
 		_preview_text.add_child(_label(tr("BE_PREVIEW_BANS").replace("{0}", str(v.ban_items.size())).replace("{1}", str(v.ban_weapons.size())), FONT_DESC, C_TEXT_DIM))
 
 
+func _price_text(r, v: Dictionary) -> String:
+	return tr("BE_PRICE") + ": " + str(v.price if v.price >= 0 else int(_mod.backup_value(r, "value")))
+
+
+func _on_preview_tier_input(event: InputEvent, id: String) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == BUTTON_LEFT and id != _id:
+		call_deferred("_select", id)
+
+
 # 原版效果行（左边图标，右边文本）
-func _effect_lines(effects: Array) -> void:
+func _effect_lines(effects: Array, parent: Control = null) -> void:
+	if parent == null:
+		parent = _preview_text
 	for e in effects:
 		var path = e.get_script().resource_path if e.get_script() != null else ""
 		var native = false
 		for dir in SAFE_TEXT_DIRS:
 			native = native or path.begins_with(dir)
 		var line = EFFECT_LINE.instance()
-		_preview_text.add_child(line)
+		line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		parent.add_child(line)
 		if native:
 			line._display_effect(0, e, true, true)
 		else:
@@ -1038,20 +1082,21 @@ func _effect_lines(effects: Array) -> void:
 
 
 # 武器属性文本（同原版武器面板：在武器副本上换成改写后的属性）
-func _weapon_preview(w, v: Dictionary) -> void:
+func _weapon_preview(parent: Control, w, v: Dictionary) -> void:
 	var stats = _mod.weapon_stats_for(w, v)
 	if stats == null:
 		return
 	var copy = w.duplicate()
 	copy.stats = stats
 	copy.effects = _mod.build_effects(w.my_id, v)
-	_preview_text.add_child(_rich(copy.get_weapon_stats_text(0)))
-	_preview_text.add_child(_label(_aspd_text(stats), FONT_DESC, C_TEXT_DIM))
+	var rt = _rich(copy.get_weapon_stats_text(0))
+	rt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(rt)
+	parent.add_child(_label(_aspd_text(stats), FONT_DESC, C_TEXT_DIM))
 
 
 func _aspd_text(stats) -> String:
-	var cd = Catalog.attack_interval(stats)
-	return tr("BE_ATTACK_INTERVAL").replace("{0}", "%.2f" % cd).replace("{1}", "%.2f" % (1.0 / max(cd, 0.001)))
+	return tr("BE_ATTACK_INTERVAL").replace("{0}", "%.2f" % Catalog.attack_interval(stats))
 
 
 func _all_tags() -> Array:
@@ -1120,22 +1165,6 @@ static func _set_ids(sets: Array) -> Array:
 	return out
 
 
-# 自定义武器改近 / 远战：换成该类型的第一个原版家族作为基底（可再用"选择基底武器"换外观）
-func _on_weapon_type(ranged: bool) -> void:
-	var want = 1 if ranged else 0
-	var base = _base_res(_look_view().base)
-	if base != null and base.type == want:
-		return
-	for r in _family_heads():
-		if r.type == want:
-			_fam_p().base = r.weapon_id
-			break
-	_reregister()
-	_refresh_char_list()
-	_changed()
-	_build_page()
-
-
 # 原版武器家族的最低等级（选基底 / 图标用）
 func _family_heads() -> Array:
 	var heads = {}
@@ -1183,11 +1212,8 @@ func _build_object_overview() -> void:
 		_apply_action_style(import_btn, C_CUSTOM)
 		import_btn.connect("pressed", self, "_on_import_icon")
 		row.add_child(import_btn)
-		if _kind == "weapon":
-			var sw = _switch(tr("BE_WEAPON_RANGED"), r.type == 1)
-			sw.connect("toggled", self, "_on_weapon_type")
-			row.add_child(sw)
 		cbox.add_child(_desc(tr("BE_LOOK_DESC_" + _kind.to_upper())))
+		_id_row(cbox)
 
 	var tbox = _section(left, "BE_SEC_ITEM_TAGS" if _kind == "item" else "BE_SEC_WEAPON_SETS", C_ACCENT_3)
 	if _kind == "weapon":
@@ -1219,6 +1245,41 @@ func _build_object_overview() -> void:
 			b.connect("pressed", self, "_on_set_pressed", [st.my_id])
 			tgrid.add_child(b)
 	_preview_card(cols)
+
+
+# 自定义对象的 id：前缀 + 可编辑的后缀
+func _id_row(parent: Control) -> void:
+	var prefix = BEMain.ID_PREFIX[_kind]
+	var row = HBoxContainer.new()
+	row.add_constant_override("separation", 8)
+	parent.add_child(row)
+	row.add_child(_label("ID", FONT_SMALL, C_TEXT))
+	row.add_child(_label(prefix, FONT_SMALL, C_TEXT_DIM))
+	var le = _line_edit("")
+	le.text = _obj_key().trim_prefix(prefix)
+	le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	le.connect("text_entered", self, "_on_id_entered")
+	row.add_child(le)
+	var ok = _button(tr("BE_ID_APPLY"), FONT_SMALL)
+	_apply_action_style(ok, C_CUSTOM)
+	ok.connect("pressed", self, "_on_id_apply", [le])
+	row.add_child(ok)
+
+
+func _on_id_apply(le: LineEdit) -> void:
+	_on_id_entered(le.text)
+
+
+func _on_id_entered(text: String) -> void:
+	var tier = _character().tier if _kind == "weapon" else 0
+	var nid = _mod.rename_custom(_kind, _obj_key(), text)
+	if nid == "":
+		_set_status(tr("BE_ID_TAKEN"))
+		return
+	_id = BEMain.tier_id(nid, tier, true) if _kind == "weapon" else nid
+	_refresh_char_list()
+	_select(_id)
+	_set_status(tr("BE_ID_DONE"))
 
 
 func _left_column(cols: Control) -> VBoxContainer:
@@ -1334,32 +1395,24 @@ func _build_weapon_stats(parent: Control, v: Dictionary, w) -> void:
 	head.add_child(reset)
 	var grid = _stat_grid(box)
 	grid.columns = 4
+	var types = {}
 	for f in BEMain.WSTAT_FIELDS:
-		if not f[0] in base:
+		types[f[0]] = f[1]
+	for row in WSTAT_LAYOUT:
+		var cells = []
+		for k in row:
+			if k == "#type" or (k == "#attack" and "attack_type" in base) or (types.has(k) and k in base):
+				cells.push_back(k)
+		if cells.empty():
 			continue
-		var orig = base.get(f[0])
-		var cur = v.wstats.get(f[0], orig)
-		var ctl
-		if f[1] == "bool":
-			ctl = _button(tr("BE_YES" if cur else "BE_NO"), FONT_DESC)
-			ctl.toggle_mode = true
-			ctl.pressed = bool(cur)
-			ctl.rect_min_size = Vector2(150, 0)
-			_apply_chip_style(ctl, bool(cur), C_ACCENT_3)
-			ctl.connect("toggled", self, "_on_wstat_changed", [f])
-		else:
-			ctl = _spin(-99999, 99999, 0.01 if f[1] == "float" and f[2] == "" else 1)
-			ctl.value = _wstat_shown(cur, f[2])
-			ctl.connect("value_changed", self, "_on_wstat_changed", [f])
-		var name = tr("BE_WS_" + f[0].to_upper())
-		if _mod.debug:
-			name += "  " + f[0]
-		_attr_row(grid, name, ctl, v.wstats.has(f[0]))
-	_aspd_label = _label(_aspd_text(_mod.weapon_stats_for(w, v)), FONT_SMALL, C_ACCENT)
+		while cells.size() < 2:
+			cells.push_back("")
+		for k in cells:
+			_wstat_cell(grid, k, types.get(k, ""), base, v, w)
+	_aspd_label = _label(_aspd_text(_mod.weapon_stats_for(w, v)), FONT_DESC, C_TEXT_DIM)
 	box.add_child(_aspd_label)
 
 	var sbox = _section(parent, "BE_SEC_SCALING", C_ACCENT_2)
-	sbox.add_child(_desc(tr("BE_SCALING_DESC")))
 	var scaling = v.scaling if v.scaling is Array else BEMain.scaling_names(base.scaling_stats)
 	for i in scaling.size():
 		var row = HBoxContainer.new()
@@ -1393,13 +1446,44 @@ func _build_weapon_stats(parent: Control, v: Dictionary, w) -> void:
 	sbox.add_child(add)
 
 
-# 界面显示值：pct = 百分比整数，sec = 秒
+# 一格武器属性（名称 + 控件）
+func _wstat_cell(grid: Control, k: String, type: String, base, v: Dictionary, w) -> void:
+	if k == "":
+		grid.add_child(Control.new())
+		grid.add_child(Control.new())
+		return
+	if k == "#type":
+		var lbl = _label(tr("BE_WS_TYPE"), FONT_DESC, C_TEXT)
+		grid.add_child(lbl)
+		grid.add_child(_label(tr("RANGED" if w.type == 1 else "MELEE"), FONT_SMALL, C_TEXT_DIM))
+		return
+	if k == "#attack":
+		var sweep = int(v.wstats.get("attack_type", base.attack_type)) == 1
+		var tb = _button(tr("BE_WS_SWEEP" if sweep else "BE_WS_THRUST"), FONT_DESC)
+		tb.rect_min_size = Vector2(150, 0)
+		tb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		_apply_chip_style(tb, sweep, C_ACCENT_2)
+		tb.connect("pressed", self, "_on_wstat_changed", [0 if sweep else 1, ["attack_type", "int", ""]])
+		_attr_row(grid, tr("BE_WS_ATTACK_TYPE"), tb, v.wstats.has("attack_type"))
+		return
+	var mode = WSTAT_SHOW.get(k, "")
+	var cur = v.wstats.get(k, base.get(k))
+	var ctl = _spin(-99999, 99999, 0.01 if type == "float" and mode == "" else 1)
+	ctl.value = _wstat_shown(cur, mode)
+	ctl.connect("value_changed", self, "_on_wstat_changed", [[k, type, mode]])
+	var name = tr("BE_WS_" + k.to_upper())
+	if _mod.debug:
+		name += "  " + k
+	_attr_row(grid, name, ctl, v.wstats.has(k))
+
+
+# 界面显示值：pct = 百分比整数，neg = 取负
 static func _wstat_shown(value, mode: String) -> float:
 	match mode:
 		"pct":
 			return round(float(value) * 100)
-		"sec":
-			return stepify(float(value) / 60.0, 0.01)
+		"neg":
+			return -float(value)
 	return float(value)
 
 
@@ -1407,20 +1491,23 @@ func _on_wstat_changed(value, f: Array) -> void:
 	var p = _p()
 	var base = _mod.backup_value(_character(), "stats")
 	var stored
-	match f[1]:
-		"bool":
-			stored = bool(value)
-		"int":
-			stored = int(round(value * 60)) if f[2] == "sec" else int(value)
+	match f[2]:
+		"pct":
+			stored = float(value) / 100.0
+		"neg":
+			stored = -float(value)
 		_:
-			stored = float(value) / 100.0 if f[2] == "pct" else float(value)
-	if f[2] == "pct" and _wstat_shown(base.get(f[0]), "pct") == float(value):
+			stored = float(value)
+	if f[1] == "int":
+		stored = int(round(stored))
+	if _wstat_shown(base.get(f[0]), f[2]) == _wstat_shown(stored, f[2]):
 		stored = base.get(f[0])
 	if stored == base.get(f[0]):
 		p.wstats.erase(f[0])
 	else:
 		p.wstats[f[0]] = stored
-	if f[1] == "bool":
+	if f[0] == "attack_type":
+		_changed()
 		_build_page()
 	else:
 		_changed()
@@ -1785,7 +1872,7 @@ func _build_effects() -> void:
 	_apply_action_style(clear, C_DANGER)
 	clear.connect("pressed", self, "_on_effects_clear")
 	head.add_child(clear)
-	lbox.add_child(_desc(tr("BE_EFFECTS_DESC" if _kind == "character" else "BE_EFFECTS_DESC_OBJ")))
+	lbox.add_child(_desc(tr("BE_EFFECTS_DESC")))
 	var scroll = _scroll()
 	lbox.add_child(scroll)
 	_effect_list = VBoxContainer.new()
@@ -2235,7 +2322,6 @@ func _build_gear() -> void:
 	var c = _character()
 
 	var wbox = _section(box, "BE_SEC_START_WEAPONS", C_CUSTOM)
-	wbox.add_child(_desc(tr("BE_START_WEAPONS_DESC")))
 	var wrow = HBoxContainer.new()
 	wrow.add_constant_override("separation", 8)
 	wbox.add_child(wrow)
@@ -2699,6 +2785,16 @@ func _close_picker() -> void:
 # ============================================================
 # 顶部事件
 # ============================================================
+# 重新登记自定义对象（图标重新生成）
+func _on_hide_numbers_toggled(pressed: bool) -> void:
+	_mod.hide_numbers = pressed
+	_mod._icon_cache.clear()
+	_mod.apply_all()
+	_refresh_char_list()
+	_refresh_header()
+	_build_page()
+
+
 func _on_debug_toggled(pressed: bool) -> void:
 	_mod.debug = pressed
 	_build_page()
@@ -2757,7 +2853,6 @@ func _on_delete_custom() -> void:
 		_refresh_char_list()
 		_select(_first_listed())
 	else:
-		_set_status(tr("BE_CUSTOM_IN_USE" if _kind == "character" else "BE_CUSTOM_IN_USE_OBJ"))
 		_refresh_header()
 
 
