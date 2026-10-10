@@ -277,7 +277,7 @@ func test_133_ui_items_and_weapons() -> void:
 		ui._on_filter("price", "sort")
 		_check(ui._char_grid.get_child_count() > 0, kind + " sorted by price")
 	# 武器属性页编辑
-	ui._on_tab_pressed("attrs")
+	ui._on_tab_pressed("stats")
 	var w = m.find_target("weapon", ui._id)
 	ui._on_wstat_changed(42.0, ["damage", "int", ""])
 	_eq(ui._p().wstats.get("damage"), 42 if w.stats.damage != 42 else null, "weapon damage edit")
@@ -289,7 +289,7 @@ func test_133_ui_items_and_weapons() -> void:
 	_eq(ui._p().price, 9 if w.value != 9 else -1, "price edit")
 	# 道具：稀有度
 	ui.set_kind("item")
-	ui._on_tab_pressed("attrs")
+	ui._on_tab_pressed("stats")
 	var it = m.find_target("item", ui._id)
 	ui._on_attr_changed((it.tier + 1) % 4, "tier", it.tier)
 	_eq(ui._p().tier, (it.tier + 1) % 4, "tier edit")
@@ -333,7 +333,7 @@ func test_145_ui_custom_and_disable() -> void:
 		_check(ui._page.get_child_count() > 0, "custom item tab " + t[0])
 	ui._on_name_changed("My Item")
 	_eq(m.find_target("item", iid).name, "My Item", "custom item renamed live")
-	ui._on_tab_pressed("attrs")
+	ui._on_tab_pressed("stats")
 	ui._on_attr_changed(2, "tier", -999)
 	_eq(m.find_target("item", iid).tier, 2, "custom item tier live")
 	ui._on_delete_custom()
@@ -379,7 +379,7 @@ func test_145_ui_custom_and_disable() -> void:
 	_check(not ui._disable_switch.disabled, "switch unlocked when complete")
 	ui._on_set_pressed(isvc.sets[0].my_id)
 	_check(m.weapon_families[wid].sets is Array, "sets recorded on family")
-	ui._on_tab_pressed("attrs")
+	ui._on_tab_pressed("stats")
 	_check(ui._aspd_label != null and ui._aspd_label.text != "", "attack speed shown")
 	ui._on_delete_custom()
 	ui._on_delete_custom()
@@ -393,7 +393,7 @@ func test_153_weapon_attack_type() -> void:
 	ui.set_kind("weapon")
 	var fam = _family_from(0, 0)
 	ui._select(fam[0].my_id)
-	ui._on_tab_pressed("attrs")
+	ui._on_tab_pressed("stats")
 	var sweep = 1 - int(fam[0].stats.attack_type)
 	ui._on_wstat_changed(sweep, ["attack_type", "int", ""])
 	_eq(ui._p().wstats.get("attack_type"), sweep, "attack type toggled")
@@ -478,8 +478,39 @@ func test_156_name_colors_and_shared_layout() -> void:
 	_check(widths[0] == widths[1] and widths[1] == widths[2], "same preview column width on every tab: " + str(widths))
 	_eq(widths[0], float(ui.PREVIEW_WIDTH), "preview column keeps its fixed width")
 	ui.set_kind("weapon")
-	ui._on_tab_pressed("attrs")
+	ui._on_tab_pressed("stats")
 	ui._on_wstat_changed(999.0, ["damage", "int", ""])
 	_eq(ui._name_labels["damage"].get_color("font_color"), ui.C_ACCENT_3, "weapon stat raised is green")
+	ui.queue_free()
+	yield(tree, "idle_frame")
+
+
+# 每栏按自己的页签列表打开属性页 / 效果页：三栏各用各的属性页，效果库只有武器栏多出武器效果
+func test_157_stats_and_effects_per_kind() -> void:
+	var ui = yield(_open_ui(CH), "completed")
+	var lib_sizes = {}
+	for kind in m.KINDS:
+		ui.set_kind(kind)
+		yield(tree, "idle_frame")
+		var ids = []
+		for t in ui._tab_defs():
+			ids.push_back(t[0])
+		_check("stats" in ids and "effects" in ids, kind + " has stats and effects tabs")
+		ui._on_tab_pressed("stats")
+		yield(tree, "idle_frame")
+		var names = ui._name_labels
+		match kind:
+			"character":
+				_check(names.has("materials") and names.has("stat_max_hp") and not names.has("value"), "character stats: start state + stat tables")
+			"item":
+				_check(names.has("value") and names.has("max_nb") and names.has("stat_max_hp") and not names.has("materials"), "item stats: numbers + stat tables, no start state")
+			"weapon":
+				_check(names.has("value") and names.has("damage") and not names.has("stat_max_hp") and not names.has("materials"), "weapon stats: numbers + weapon stats only")
+		ui._on_tab_pressed("effects")
+		ui._on_lib_search("")
+		yield(tree, "idle_frame")
+		lib_sizes[kind] = ui._lib_list.get_child_count()
+	_eq(m.library(false).size() < m.library(true).size(), true, "weapon library has weapon effects")
+	_check(lib_sizes.character == lib_sizes.item, "characters and items share one library (%d / %d)" % [lib_sizes.character, lib_sizes.item])
 	ui.queue_free()
 	yield(tree, "idle_frame")

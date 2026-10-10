@@ -904,8 +904,12 @@ func _build_page() -> void:
 	match _tab:
 		"overview":
 			_build_overview()
+		# 属性页：角色 = 开局状态 + 属性表；道具 = 数值 + 属性表；武器 = 数值 + 武器属性
 		"stats":
-			_build_stats()
+			if _kind == "character":
+				_build_stats()
+			else:
+				_build_attrs()
 		"effects":
 			_build_effects()
 		"blueprint":
@@ -915,8 +919,6 @@ func _build_page() -> void:
 			_build_gear()
 		"bans":
 			_build_bans()
-		"attrs":
-			_build_attrs()
 
 
 # ---------------- 概览 ----------------

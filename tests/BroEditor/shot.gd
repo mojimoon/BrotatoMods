@@ -104,7 +104,7 @@ func _kinds(m, out: String):
 		if kind == "weapon":
 			ui._on_wstat_changed(99.0, ["damage", "int", ""])
 		ui._on_disable_toggled(true)
-		for t in ["overview", "attrs", "effects"]:
+		for t in ["overview", "stats", "effects"]:
 			ui._on_tab_pressed(t)
 			yield(_shot(ui, out + "/" + kind + "_" + t + ".png"), "completed")
 		ui._on_filter(-1, "tier")
