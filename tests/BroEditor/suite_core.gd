@@ -1066,34 +1066,39 @@ func _burn_ref(dmg: int) -> Dictionary:
 	return {}
 
 
-# 各种节点与组合在诅咒后的数值：常规放大、负面的正数缩小、正面的负数放大、中立不变、原版特判
+# 各种节点与组合在诅咒后的数值。路径符号 = 效果的好坏；默认诅咒效果的数值，路径上有"每 X 次"时改诅咒 X（方向 = 效果符号 × -1）
 func test_190_cursed_blueprint_values() -> void:
 	var GE = load(GraphEffectScript)
 	var g = GE.new_graph()
 	var ids = {}
 	var rows = {
-		"armor": [["perm_stat", {"stat": "stat_armor", "value": 3}]],
-		"armor_neg": [["perm_stat", {"stat": "stat_armor", "value": -4}]],
-		"price_good": [["perm_stat", {"stat": "items_price", "value": -5}]],
-		"price_bad": [["perm_stat", {"stat": "items_price", "value": 5}]],
-		"enemies": [["temp_stat", {"stat": "number_of_enemies", "value": 10}]],
-		"dodge_cap": [["temp_stat", {"stat": "dodge_cap", "value": 60}]],
-		"timed": [["timed_stat", {"stat": "stat_attack_speed", "value": 20, "secs": 3}]],
-		"gold": [["every", {"n": 6}], ["add_gold", {"value": 2}]],
-		"every1": [["every", {"n": 1}], ["heal_hp", {"value": 3}]],
-		"chance": [["chance", {"pct": 40}], ["xp", {"value": 5}]],
-		"chance_cap": [["chance", {"pct": 80}], ["damage", {"stat": "stat_ranged_damage", "pct": 100}]],
-		"waves": [["wave_min", {"n": 10}], ["wave_max", {"n": 10}], ["explode", {"stat": "stat_elemental_damage", "pct": 100}]],
-		"cap": [["cap", {"n": 4}], ["cooldown", {"secs": 3}], ["hp_dmg", {"pct": 5}]],
-		"hp": [["hp_below", {"pct": 50}], ["hp_above", {"pct": 50}], ["ignite", {"value": 5}]],
-		"stats": [["stat_min", {"stat": "stat_armor", "n": 10}], ["stat_max", {"stat": "stat_luck", "n": 10}], ["slow", {"pct": 10}]],
-		"misc": [["rand_stats", {"value": 1}]],
-		"fruit": [["fruit", {"value": 1}]],
+		"armor": ["wave_start", ["perm_stat", {"stat": "stat_armor", "value": 3}]],
+		"armor_neg": ["wave_start", ["perm_stat", {"stat": "stat_armor", "value": -4}]],
+		"price_good": ["wave_start", ["perm_stat", {"stat": "items_price", "value": -5}]],
+		"price_bad": ["wave_start", ["perm_stat", {"stat": "items_price", "value": 5}]],
+		"enemies": ["wave_start", ["temp_stat", {"stat": "number_of_enemies", "value": 10}]],
+		"dodge_cap": ["wave_start", ["temp_stat", {"stat": "dodge_cap", "value": 60}]],
+		"timed": ["wave_start", ["timed_stat", {"stat": "stat_attack_speed", "value": 20, "secs": 3}]],
+		"timed_bad": ["hit", ["timed_stat", {"stat": "stat_armor", "value": -6, "secs": 4}]],
+		"every_gold": ["kill", ["every", {"n": 6}], ["add_gold", {"value": 2}]],
+		"every_bad": ["kill", ["every", {"n": 6}], ["perm_stat", {"stat": "stat_armor", "value": -2}]],
+		"every_neutral": ["kill", ["every", {"n": 6}], ["temp_stat", {"stat": "number_of_enemies", "value": 10}]],
+		"every_price": ["kill", ["every", {"n": 6}], ["perm_stat", {"stat": "items_price", "value": -5}]],
+		"every1": ["crit", ["every", {"n": 1}], ["heal_hp", {"value": 3}]],
+		"wave_every": ["kill", ["wave_min", {"n": 5}], ["every", {"n": 6}], ["add_gold", {"value": 2}]],
+		"chance": ["level_up", ["chance", {"pct": 40}], ["xp", {"value": 5}]],
+		"chance80": ["wave_start", ["chance", {"pct": 80}], ["damage", {"stat": "stat_ranged_damage", "pct": 100}]],
+		"waves": ["wave_start", ["wave_min", {"n": 10}], ["wave_max", {"n": 10}], ["explode", {"stat": "stat_elemental_damage", "pct": 100}]],
+		"cap": ["hit", ["cap", {"n": 4}], ["cooldown", {"secs": 3}], ["hp_dmg", {"pct": 5}]],
+		"hp": ["hit", ["hp_below", {"pct": 50}], ["hp_above", {"pct": 50}], ["ignite", {"value": 5}]],
+		"stats": ["kill", ["stat_min", {"stat": "stat_armor", "n": 10}], ["stat_max", {"stat": "stat_luck", "n": 10}], ["slow", {"pct": 10}]],
+		"misc": ["wave_start", ["rand_stats", {"value": 1}]],
+		"fruit": ["wave_start", ["fruit", {"value": 1}]],
 	}
-	var triggers = {"gold": "kill", "every1": "crit", "chance": "level_up", "cap": "hit", "hp": "hit", "stats": "kill"}
 	for r in rows:
-		var prev = GE.add_node(g, triggers.get(r, "wave_start"), Vector2.ZERO)
-		for step in rows[r]:
+		var prev = GE.add_node(g, rows[r][0], Vector2.ZERO)
+		for k in range(1, rows[r].size()):
+			var step = rows[r][k]
 			var id = GE.add_node(g, step[0], Vector2.ZERO, step[1].duplicate())
 			ids[r + ":" + step[0]] = id
 			GE.add_link(g, prev, id)
@@ -1111,37 +1116,44 @@ func test_190_cursed_blueprint_values() -> void:
 	_check(abs(ge.curse_modifier() - CURSE_M) < 0.002, "curse modifier recovered: %s" % ge.curse_modifier())
 	var by = GE.nodes_by_id(ge.live_graph())
 	var cases = [
-		["armor:perm_stat", "value", _good(3), "positive stat grows"],
-		["armor_neg:perm_stat", "value", _bad(-4), "negative stat shrinks"],
+		["armor:perm_stat", "value", _good(3), "+3 armor grows"],
+		["armor_neg:perm_stat", "value", _bad(-4), "-4 armor shrinks"],
 		["price_good:perm_stat", "value", _good(-5), "-X% price: X grows"],
 		["price_bad:perm_stat", "value", _bad(5), "+X% price: X shrinks"],
 		["enemies:temp_stat", "value", 10, "+X% enemies: neutral, unchanged"],
-		["timed:timed_stat", "value", _good(20), "timed stat grows"],
-		["timed:timed_stat", "secs", _good(3), "timed duration grows"],
-		["gold:every", "n", _bad(6), "every X kills: X shrinks"],
-		["gold:add_gold", "value", _good(2), "materials grow"],
+		["timed:timed_stat", "value", _good(20), "timed +attack speed grows"],
+		["timed:timed_stat", "secs", _good(3), "its duration grows"],
+		["timed_bad:timed_stat", "value", _bad(-6), "timed -armor shrinks"],
+		["timed_bad:timed_stat", "secs", _bad(4), "its duration shrinks"],
+		["every_gold:every", "n", _bad(6), "every X kills -> +gold: X shrinks"],
+		["every_gold:add_gold", "value", 2, "  and the gold is unchanged"],
+		["every_bad:every", "n", _good(6), "every X kills -> -armor: X grows (-1 x -1)"],
+		["every_bad:perm_stat", "value", -2, "  and the armor is unchanged"],
+		["every_neutral:every", "n", 6, "every X kills -> +enemies (neutral): unchanged"],
+		["every_price:every", "n", _bad(6), "every X kills -> -price: X shrinks"],
+		["every_price:perm_stat", "value", -5, "  and the price is unchanged"],
 		["every1:every", "n", 1, "every 1 stays 1"],
-		["every1:heal_hp", "value", _good(3), "heal grows"],
-		["chance:chance", "pct", _good(40), "chance grows"],
-		["chance:xp", "value", _good(5), "xp grows"],
-		["chance_cap:chance", "pct", 100, "chance capped at 100"],
-		["chance_cap:damage", "pct", _good(100), "damage % grows"],
-		["waves:wave_min", "n", _bad(10), "from wave X: X shrinks"],
-		["waves:wave_max", "n", _good(10), "until wave X: X grows"],
-		["waves:explode", "pct", _good(100), "explosion % grows"],
-		["cap:cap", "n", _good(4), "per-wave cap grows"],
-		["cap:cooldown", "secs", _bad(3), "cooldown shrinks"],
-		["cap:hp_dmg", "pct", _good(5), "hp damage grows"],
-		["hp:hp_below", "pct", _good(50), "below X% HP: X grows"],
-		["hp:hp_above", "pct", _bad(50), "above X% HP: X shrinks"],
-		["hp:ignite", "value", _good(5), "ignite grows"],
-		["stats:stat_min", "n", _bad(10), "stat >= X: X shrinks"],
-		["stats:stat_max", "n", _good(10), "stat <= X: X grows"],
-		["stats:slow", "pct", _good(10), "slow grows"],
+		["every1:heal_hp", "value", 3, "  heal unchanged"],
+		["wave_every:every", "n", _bad(6), "other conditions do not flip every X"],
+		["wave_every:wave_min", "n", 5, "  from-wave unchanged"],
+		["chance:chance", "pct", 40, "chance unchanged"],
+		["chance:xp", "value", _good(5), "  xp grows"],
+		["chance80:chance", "pct", 80, "chance 80 unchanged"],
+		["chance80:damage", "pct", _good(100), "  damage % grows"],
+		["waves:wave_min", "n", 10, "wave conditions unchanged"],
+		["waves:wave_max", "n", 10, "wave conditions unchanged"],
+		["waves:explode", "pct", _good(100), "  explosion % grows"],
+		["cap:cap", "n", 4, "cap unchanged"],
+		["cap:cooldown", "secs", 3, "cooldown unchanged"],
+		["cap:hp_dmg", "pct", _good(5), "  hp damage grows"],
+		["hp:hp_below", "pct", 50, "hp conditions unchanged"],
+		["hp:ignite", "value", _good(5), "  ignite grows"],
+		["stats:stat_min", "n", 10, "stat conditions unchanged"],
+		["stats:slow", "pct", _good(10), "  slow grows"],
 		["misc:rand_stats", "value", _good(1), "random stats grow"],
 		["fruit:fruit", "value", _good(1), "fruit grows"],
-		["interval", "secs", _bad(5), "every X seconds: X shrinks"],
-		["grant", "n", _good(1), "grant count grows"],
+		["interval", "secs", 5, "interval unchanged"],
+		["grant", "n", 1, "grant count unchanged"],
 	]
 	for c in cases:
 		_eq(int(by[ids[c[0]]].params[c[1]]), c[2], c[3])
@@ -1181,7 +1193,7 @@ func test_191_cursed_blueprint_runtime() -> void:
 	var g0 = rd.players_data[0].gold
 	for i in _bad(6):
 		m.runtime.fire("kill", 0)
-	_eq(rd.players_data[0].gold - g0, _good(2), "every %d kills (cursed from 6): +%d materials" % [_bad(6), _good(2)])
+	_eq(rd.players_data[0].gold - g0, 2, "every %d kills (cursed from 6): +2 materials" % _bad(6))
 	m.runtime.end_wave()
 	var ge = res[1]
 	var copy = GE.new()

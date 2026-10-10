@@ -1916,43 +1916,85 @@ func _good_dir(key: String) -> int:
 	return _good_dirs.get(key, 1)
 
 
+# 效果节点对玩家的好坏（路径符号）：+1 / -1 / 0
+func _effect_goodness(n: Dictionary) -> int:
+	var kind = str(n.get("kind", ""))
+	var params = n.get("params", {})
+	if kind == "grant":
+		var ge = make_effect(params.ref) if params.get("ref") is Dictionary else null
+		if ge == null:
+			return 0
+		var s = ge.get_sign(ge.effect_sign, ge.value)
+		return 1 if s in [0, 5] else (-1 if s == 1 else 0)
+	var v = int(params.get("value", params.get("pct", _node_default(kind, "value"))))
+	if v == 0:
+		return 0
+	var sv = 1 if v > 0 else -1
+	if kind in ["temp_stat", "perm_stat", "timed_stat"]:
+		return _good_dir(str(params.get("stat", ""))) * sv
+	return sv
+
+
+# 每条路径：路径符号 E = 效果的好坏；有 CURSE_TARGETS 里的条件时诅咒该条件（方向 = E × 条件符号），
+# 否则诅咒效果的数值（方向 = E）。E = 0（中立）的路径不变。方向交给原版：+1 按正面放大、-1 按负面缩小
 func curse_graph(g: Dictionary, modifier: float) -> Dictionary:
 	var out = g.duplicate(true)
 	var pd = _autoload("ProgressData")
 	var dlc = pd.get_dlc_data("abyssal_terrors") if pd != null else null
 	if dlc == null or modifier <= 0.0:
 		return out
+	var by_id = GraphEffect.nodes_by_id(out)
+	var dirs = {}	# "节点 id:参数" -> 方向（同一节点在多条路径上取第一条的）
+	for path in GraphEffect.paths(out):
+		var eff = by_id[path[-1]]
+		var e_sign = _effect_goodness(eff)
+		if e_sign == 0:
+			continue
+		var target = null
+		for id in path.slice(0, path.size() - 2):
+			if Catalog.CURSE_TARGETS.has(by_id[id].kind):
+				target = by_id[id]
+				break
+		if target != null:
+			var tp = Catalog.CURSE_TARGETS[target.kind]
+			var k = str(target.id) + ":" + tp
+			if not dirs.has(k):
+				dirs[k] = e_sign * Catalog.curse_sign(target.kind, tp)
+			continue
+		if eff.kind == "grant":
+			var k = str(eff.id) + ":ref"
+			if not dirs.has(k):
+				dirs[k] = e_sign
+			continue
+		for pname in Catalog.CURSE_EFFECT_PARAMS.get(eff.kind, []):
+			var k = str(eff.id) + ":" + pname
+			if not dirs.has(k):
+				dirs[k] = e_sign * Catalog.curse_sign(eff.kind, pname)
 	var proxies = []
-	for n in out.nodes:
-		var kind = str(n.get("kind", ""))
-		var params = n.get("params", {})
-		var defs = Catalog.CURSE_PARAMS.get(kind, {})
-		for pname in defs:
-			var v = int(params.get(pname, _node_default(kind, pname)))
-			if v == 0:
-				continue
-			var e = load(EFFECT_SCRIPT).new()
-			e.value = v
-			match defs[pname]:
-				"stat":
-					e.key = str(params.get("stat", ""))
-					var d = _good_dir(e.key)
-					e.effect_sign = 2 if d == 0 else (0 if sign(v) == d else 1)
-				"good":
-					e.key = "broeditor_param"
-					e.effect_sign = 0 if v > 0 else 1
-				_:
-					e.key = "broeditor_param"
-					e.effect_sign = 1 if v > 0 else 0
-			e.resource_name = CURSE_TAG + str(n.id) + ":" + pname
-			e._generate_hashes()
-			proxies.push_back(e)
-		# 获得效果：引用的效果本身按原版规则诅咒（燃烧、投射物等按类型处理）
-		if kind == "grant" and params.get("ref") is Dictionary:
-			var ge = make_effect(params.ref)
+	for k in dirs:
+		var parts = k.split(":")
+		var n = by_id.get(int(parts[0]), by_id.get(parts[0]))
+		if n == null:
+			continue
+		var pname = parts[1]
+		if pname == "ref":
+			var ge = make_effect(n.params.ref)
 			if ge != null:
-				ge.resource_name = CURSE_TAG + str(n.id) + ":ref"
+				ge.resource_name = CURSE_TAG + k
 				proxies.push_back(ge)
+			continue
+		var v = int(n.params.get(pname, _node_default(n.kind, pname)))
+		if v == 0:
+			continue
+		var e = load(EFFECT_SCRIPT).new()
+		e.value = v
+		# 属性类效果的数值用属性 key（原版按 key 的特判同样生效，如闪避上限）；其余用占位 key
+		e.key = str(n.params.get("stat", "")) if n.kind in ["temp_stat", "perm_stat", "timed_stat"] and pname == "value" else "broeditor_param"
+		# 方向 +1：|值| 放大（原版正面）；-1：|值| 缩小（原版负面）——与数值本身的正负无关
+		e.effect_sign = 0 if dirs[k] > 0 else 1
+		e.resource_name = CURSE_TAG + k
+		e._generate_hashes()
+		proxies.push_back(e)
 	if proxies.empty():
 		return out
 	var item = load("res://items/global/item_data.gd").new()
@@ -1963,23 +2005,21 @@ func curse_graph(g: Dictionary, modifier: float) -> Dictionary:
 	dlc.cursed_item_base_percent_modifier = -100000
 	var cursed = dlc.curse_item(item, 0, true, modifier)
 	dlc.cursed_item_base_percent_modifier = base
-	var by_id = {}
-	for n in out.nodes:
-		by_id[str(n.id)] = n
 	for ce in cursed.effects:
 		var tag = str(ce.resource_name)
 		if not tag.begins_with(CURSE_TAG):
 			continue
 		var parts = tag.substr(CURSE_TAG.length()).split(":")
-		var n = by_id.get(parts[0])
+		var n = by_id.get(int(parts[0]), by_id.get(parts[0]))
 		if n == null:
 			continue
 		if parts[1] == "ref":
 			n.params.ref = _effect_to_spec(n.params.ref, ce)
 			continue
 		var v = int(ce.value)
-		if Catalog.CURSE_MAX.has(n.kind):
-			v = int(min(v, Catalog.CURSE_MAX[n.kind]))
+		var mx = Catalog.CURSE_MAX.get(n.kind, {}).get(parts[1])
+		if mx != null:
+			v = int(min(v, mx))
 		n.params[parts[1]] = v
 	return out
 

@@ -215,37 +215,35 @@ static func build_library(sources: Array, dedup: bool = true) -> Array:
 const HIDDEN_FIELDS = ["text_key", "custom_key", "storage_method", "effect_sign", "custom_args", "script", "resource_name", "resource_path", "resource_local_to_scene"]
 
 
-# 诅咒蓝图时各节点参数的方向：good = 越大越好（诅咒放大），bad = 越小越好（诅咒缩小），
-# stat = 按该属性在原版效果里的好坏方向（同原版：负面的正数缩小、正面的负数放大、中立的不变）；未列出的不变
-const CURSE_PARAMS = {
-	"interval": {"secs": "bad"},
-	"chance": {"pct": "good"},
-	"every": {"n": "bad"},
-	"cap": {"n": "good"},
-	"cooldown": {"secs": "bad"},
-	"hp_below": {"pct": "good"},
-	"hp_above": {"pct": "bad"},
-	"wave_min": {"n": "bad"},
-	"wave_max": {"n": "good"},
-	"stat_min": {"n": "bad"},
-	"stat_max": {"n": "good"},
-	"temp_stat": {"value": "stat"},
-	"perm_stat": {"value": "stat"},
-	"timed_stat": {"value": "stat", "secs": "good"},
-	"heal_hp": {"value": "good"},
-	"add_gold": {"value": "good"},
-	"xp": {"value": "good"},
-	"damage": {"pct": "good"},
-	"explode": {"pct": "good"},
-	"hp_dmg": {"pct": "good"},
-	"ignite": {"value": "good"},
-	"slow": {"pct": "good"},
-	"rand_stats": {"value": "good"},
-	"fruit": {"value": "good"},
-	"grant": {"n": "good"},
+# ---------------- 蓝图诅咒 ----------------
+# 符号：参数增大对玩家是 +1 有利 / -1 不利 / 0 无关。默认 +1，这里只列 -1 与 0。
+#   扳机：只有 interval 有参数（间隔秒数越大越少触发）
+#   条件：every / cooldown / hp_above / wave_min / stat_min 的数值越大越难满足；chance / cap / hp_below / wave_max / stat_max 为默认 +1；
+#         if_moving / if_still 无参数
+#   效果：属性类（temp_stat / perm_stat / timed_stat 的 value）的符号 = 该属性在原版效果里的好坏方向 × 数值正负
+#         （由 mod_main._good_dir 从原版效果读取，如价格为 -1、敌人数量为 0）；其余效果的数值都是默认 +1
+const CURSE_SIGNS = {
+	"interval": {"secs": -1},
+	"every": {"n": -1},
+	"cooldown": {"secs": -1},
+	"hp_above": {"pct": -1},
+	"wave_min": {"n": -1},
+	"stat_min": {"n": -1},
+}
+# 诅咒默认改效果的数值；路径上有以下条件时改条件的数值、效果不变（同原版"每击杀 X 个敌人"诅咒的是 X）
+const CURSE_TARGETS = {"every": "n"}
+# 效果节点里被诅咒的数值参数（grant 引用的效果按原版对该类效果的规则诅咒，次数不变）
+const CURSE_EFFECT_PARAMS = {
+	"temp_stat": ["value"], "perm_stat": ["value"], "timed_stat": ["value", "secs"],
+	"heal_hp": ["value"], "add_gold": ["value"], "xp": ["value"], "damage": ["pct"], "explode": ["pct"],
+	"hp_dmg": ["pct"], "ignite": ["value"], "slow": ["pct"], "rand_stats": ["value"], "fruit": ["value"],
 }
 # 百分比参数的上限
-const CURSE_MAX = {"chance": 100, "hp_below": 100}
+const CURSE_MAX = {"chance": {"pct": 100}, "hp_below": {"pct": 100}}
+
+
+static func curse_sign(kind: String, param: String) -> int:
+	return CURSE_SIGNS.get(kind, {}).get(param, 1)
 
 
 # 归入宠物类的效果 key（不以 effect_pet 开头的）
