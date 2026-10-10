@@ -18,15 +18,25 @@ const STAT_GROUPS = [
 		"xp_gain", "pickup_range", "knockback", "consumable_heal", "explosion_damage", "explosion_size",
 		"piercing", "piercing_damage", "bounce", "bounce_damage", "projectiles", "damage_against_bosses",
 		"burning_spread", "burning_cooldown_reduction", "structure_attack_speed", "structure_percent_damage",
-		"structure_range", "accuracy", "harvesting_growth", "weapon_slot",
+		"structure_range", "accuracy", "harvesting_growth", "weapon_slot", "stat_curse", "chance_double_gold",
+		"item_box_gold", "heal_when_pickup_gold", "burning_cooldown_increase", "hit_protection", "lose_hp_per_second",
+	]],
+	["BE_GRP_GAIN", [
+		"gain_stat_max_hp", "gain_stat_hp_regeneration", "gain_stat_lifesteal", "gain_stat_percent_damage",
+		"gain_stat_melee_damage", "gain_stat_ranged_damage", "gain_stat_elemental_damage", "gain_stat_attack_speed",
+		"gain_stat_crit_chance", "gain_stat_engineering", "gain_stat_range", "gain_stat_armor", "gain_stat_dodge",
+		"gain_stat_speed", "gain_stat_luck", "gain_stat_harvesting", "gain_stat_curse", "gain_explosion_damage",
+		"gain_piercing_damage", "gain_bounce_damage", "gain_damage_against_bosses",
 	]],
 	["BE_GRP_WORLD", [
 		"items_price", "weapons_price", "reroll_price", "free_rerolls", "gold_drops", "enemy_gold_drops",
 		"neutral_gold_drops", "crate_chance", "loot_alien_chance", "recycling_gains", "map_size",
 		"number_of_enemies", "enemy_health", "enemy_damage", "enemy_speed", "boss_strength", "trees",
-		"trees_start_wave", "hp_start_wave", "hp_start_next_wave", "dodge_cap", "speed_cap", "hp_cap",
-		"crit_chance_cap",
+		"trees_start_wave", "hp_start_wave", "hp_start_next_wave", "next_level_xp_needed", "gain_pct_gold_start_wave",
+		"increase_material_value", "minimum_weapons_in_shop", "item_steals", "enemy_fruit_drops", "extra_loot_aliens",
+		"loot_alien_speed", "stronger_elites_on_kill", "stronger_loot_aliens_on_kill",
 	]],
+	["BE_GRP_CAPS", ["hp_cap", "speed_cap", "dodge_cap", "crit_chance_cap"]],
 	["BE_GRP_RULES", [
 		"no_melee_weapons", "no_ranged_weapons", "no_duplicate_weapons", "min_weapon_tier", "max_weapon_tier",
 		"max_melee_weapons", "max_ranged_weapons", "can_attack_while_moving", "one_shot_trees", "double_boss",
@@ -184,3 +194,105 @@ class FieldSorter:
 		if ia != ib:
 			return ia < ib
 		return a.name < b.name
+
+
+# ============================================================
+# 蓝图节点（扳机 → 条件 → 效果，用路径连接；参考 AutoAnthony 的扳机 / 载荷拆分，不做合法性检查）
+#   [id, 类型, 参数[[名称, 类型, 默认值]...]]；参数类型：int / stat / mode:<a>|<b> / effect（效果库引用）
+#   名称 key = BE_N_<ID>，路径文本 key = BE_NT_<ID>（{参数名} 替换为参数值）
+#   状态扳机（still / moving / low_hp / full_hp）：进入状态时执行，离开时撤销"本波属性"与"本波获得"
+# ============================================================
+const NODES = [
+	["wave_start", "trigger", []],
+	["wave_end", "trigger", []],
+	["half_wave", "trigger", []],
+	["interval", "trigger", [["secs", "int", 5]]],
+	["level_up", "trigger", []],
+	["kill", "trigger", []],
+	["crit", "trigger", []],
+	["crit_kill", "trigger", []],
+	["burning_kill", "trigger", []],
+	["cursed_kill", "trigger", []],
+	["tree_kill", "trigger", []],
+	["hit", "trigger", []],
+	["dodge", "trigger", []],
+	["heal", "trigger", []],
+	["gold", "trigger", []],
+	["consumable", "trigger", []],
+	["crate", "trigger", []],
+	["steps", "trigger", []],
+	["reroll", "trigger", []],
+	["buy", "trigger", []],
+	["still", "trigger", []],
+	["moving", "trigger", []],
+	["low_hp", "trigger", []],
+	["full_hp", "trigger", []],
+	["chance", "cond", [["pct", "int", 25]]],
+	["every", "cond", [["n", "int", 5]]],
+	["cap", "cond", [["n", "int", 3]]],
+	["cooldown", "cond", [["secs", "int", 3]]],
+	["hp_below", "cond", [["pct", "int", 50]]],
+	["hp_above", "cond", [["pct", "int", 50]]],
+	["wave_min", "cond", [["n", "int", 5]]],
+	["wave_max", "cond", [["n", "int", 10]]],
+	["stat_min", "cond", [["stat", "stat", "stat_armor"], ["n", "int", 10]]],
+	["stat_max", "cond", [["stat", "stat", "stat_armor"], ["n", "int", 10]]],
+	["if_moving", "cond", []],
+	["if_still", "cond", []],
+	["temp_stat", "effect", [["stat", "stat", "stat_percent_damage"], ["value", "int", 5]]],
+	["perm_stat", "effect", [["stat", "stat", "stat_max_hp"], ["value", "int", 1]]],
+	["timed_stat", "effect", [["stat", "stat", "stat_attack_speed"], ["value", "int", 20], ["secs", "int", 3]]],
+	["heal_hp", "effect", [["value", "int", 3]]],
+	["add_gold", "effect", [["value", "int", 1]]],
+	["xp", "effect", [["value", "int", 5]]],
+	["damage", "effect", [["stat", "stat", "stat_ranged_damage"], ["pct", "int", 100]]],
+	["explode", "effect", [["stat", "stat", "stat_elemental_damage"], ["pct", "int", 100]]],
+	["hp_dmg", "effect", [["pct", "int", 5]]],
+	["ignite", "effect", [["value", "int", 5]]],
+	["slow", "effect", [["pct", "int", 10]]],
+	["rand_stats", "effect", [["value", "int", 1]]],
+	["fruit", "effect", [["value", "int", 1]]],
+	["grant", "effect", [["ref", "effect", null], ["n", "int", 1], ["mode", "mode:temp|perm", "temp"]]],
+]
+const STATE_TRIGGERS = ["still", "moving", "low_hp", "full_hp"]
+const SHOP_TRIGGERS = ["reroll", "buy"]
+
+# 原版触发型效果（Effect{key = 属性, value, custom_key = 扳机}）-> 蓝图 [扳机, [条件...], 效果]（"拆解"按钮用）
+const NATIVE_SPLIT = {
+	"stats_on_level_up": ["level_up", [], "perm_stat"],
+	"temp_stats_on_hit": ["hit", [], "temp_stat"],
+	"temp_stats_on_dodge": ["dodge", [], "temp_stat"],
+	"stats_end_of_wave": ["wave_end", [], "perm_stat"],
+	"stats_next_wave": ["wave_start", [], "temp_stat"],
+	"temp_stats_while_not_moving": ["still", [], "temp_stat"],
+	"temp_stats_while_moving": ["moving", [], "temp_stat"],
+	"stats_below_half_health": ["low_hp", [], "temp_stat"],
+	"gain_stats_on_reroll": ["reroll", [], "perm_stat"],
+	"stats_on_fruit": ["consumable", [], "perm_stat"],
+	"consumable_stats_while_max": ["consumable", [["hp_above", {"pct": 100}]], "perm_stat"],
+	"temp_consumable_stats_while_max": ["consumable", [["hp_above", {"pct": 100}]], "temp_stat"],
+	"decaying_stats_on_hit": ["hit", [], "timed_stat"],
+	"decaying_stats_on_consumable": ["consumable", [], "timed_stat"],
+}
+
+
+static func node_def(kind: String):
+	for d in NODES:
+		if d[0] == kind:
+			return d
+	return null
+
+
+static func node_type(kind: String) -> String:
+	var d = node_def(kind)
+	return d[1] if d != null else ""
+
+
+# 新节点的默认参数
+static func default_params(kind: String) -> Dictionary:
+	var out = {}
+	var d = node_def(kind)
+	if d != null:
+		for p in d[2]:
+			out[p[0]] = p[2]
+	return out

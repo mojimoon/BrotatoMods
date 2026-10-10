@@ -9,6 +9,8 @@ extends Control
 
 const BEMain = preload("res://mods-unpacked/Mojimoon-BroEditor/mod_main.gd")
 const Catalog = preload("res://mods-unpacked/Mojimoon-BroEditor/catalog.gd")
+const GraphEffect = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/graph_effect.gd")
+const BlueprintPage = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/blueprint_page.gd")
 const FONT_TITLE = preload("res://resources/fonts/actual/base/font_32_outline.tres")
 const FONT_NORMAL = preload("res://resources/fonts/actual/base/font_26.tres")
 const FONT_SMALL = preload("res://resources/fonts/actual/base/font_22.tres")
@@ -39,6 +41,7 @@ const TABS = [
 	["overview", "BE_TAB_OVERVIEW", Color(1.0, 0.72, 0.30)],
 	["stats", "BE_TAB_STATS", Color(0.55, 0.85, 0.55)],
 	["effects", "BE_TAB_EFFECTS", Color(0.40, 0.72, 1.0)],
+	["blueprint", "BE_TAB_BLUEPRINT", Color(1.0, 0.55, 0.35)],
 	["gear", "BE_TAB_GEAR", Color(0.78, 0.55, 1.0)],
 	["bans", "BE_TAB_BANS", Color(0.92, 0.38, 0.44)],
 ]
@@ -74,9 +77,7 @@ var _lib_cat := "all"
 var _lib_search := ""
 var _lib_list: VBoxContainer
 var _lib_count: Label
-var _bp_trigger: OptionButton
-var _bp_stat: OptionButton
-var _bp_value: SpinBox
+var blueprint = null
 # 禁用页
 var _ban_filter := ""
 var _ban_grids: Dictionary = {}
@@ -114,6 +115,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
 		if _picker != null:
 			_close_picker()
+		elif blueprint != null and blueprint.close_picker():
+			pass
 		else:
 			_on_close_pressed()
 		get_tree().set_input_as_handled()
@@ -183,12 +186,10 @@ func _build_header(root: Control) -> void:
 	header.add_child(_status)
 	var import_btn = _button(tr("BE_IMPORT"), FONT_SMALL)
 	_apply_action_style(import_btn, C_ACCENT_2)
-	import_btn.hint_tooltip = tr("BE_IMPORT_DESC")
 	import_btn.connect("pressed", self, "_on_import_pressed")
 	header.add_child(import_btn)
 	var export_btn = _button(tr("BE_EXPORT"), FONT_SMALL)
 	_apply_action_style(export_btn, C_ACCENT_2)
-	export_btn.hint_tooltip = tr("BE_EXPORT_DESC")
 	export_btn.connect("pressed", self, "_on_export_pressed")
 	header.add_child(export_btn)
 	var close_btn = _button("X", FONT_NORMAL)
@@ -222,7 +223,6 @@ func _build_left(body: Control) -> void:
 	box.add_child(row)
 	var new_btn = _button(tr("BE_NEW_CUSTOM"), FONT_SMALL)
 	new_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	new_btn.hint_tooltip = tr("BE_NEW_CUSTOM_DESC")
 	_apply_action_style(new_btn, C_CUSTOM)
 	new_btn.connect("pressed", self, "_on_new_custom")
 	row.add_child(new_btn)
@@ -256,12 +256,10 @@ func _build_right(body: Control) -> void:
 	_head_info = _label("", FONT_DESC, C_TEXT_DIM)
 	col.add_child(_head_info)
 	_enable_switch = _switch(tr("BE_PROFILE_ENABLED"), true)
-	_enable_switch.hint_tooltip = tr("BE_PROFILE_ENABLED_DESC")
 	_enable_switch.connect("toggled", self, "_on_enable_toggled")
 	head.add_child(_enable_switch)
 	_reset_btn = _button(tr("BE_RESET"), FONT_SMALL)
 	_reset_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_reset_btn.hint_tooltip = tr("BE_RESET_DESC")
 	_apply_action_style(_reset_btn, C_DANGER)
 	_reset_btn.connect("pressed", self, "_on_reset_pressed")
 	head.add_child(_reset_btn)
@@ -306,7 +304,6 @@ func _refresh_char_list() -> void:
 			natives.push_back(c)
 	for c in customs + natives:
 		var b = _icon_button(c.icon, CHAR_ICON)
-		b.hint_tooltip = tr(c.name)
 		b.set_meta("id", c.my_id)
 		b.connect("pressed", self, "_select", [c.my_id])
 		_char_grid.add_child(b)
@@ -405,6 +402,9 @@ func _build_page() -> void:
 	_effect_list = null
 	_lib_list = null
 	_ban_grids = {}
+	if blueprint != null:
+		blueprint.close_picker()
+	blueprint = null
 	match _tab:
 		"overview":
 			_build_overview()
@@ -412,6 +412,9 @@ func _build_page() -> void:
 			_build_stats()
 		"effects":
 			_build_effects()
+		"blueprint":
+			blueprint = BlueprintPage.new()
+			blueprint.build(self, _page)
 		"gear":
 			_build_gear()
 		"bans":
@@ -483,7 +486,6 @@ func _build_overview() -> void:
 		var b = _button(_tag_name(tag), FONT_DESC)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.clip_text = true
-		b.hint_tooltip = tag
 		_apply_chip_style(b, tag in tags, C_ACCENT_3)
 		b.connect("pressed", self, "_on_tag_pressed", [tag])
 		grid.add_child(b)
@@ -592,11 +594,7 @@ func _is_valid_stat(key: String) -> bool:
 
 
 func stat_name(key: String) -> String:
-	if key.begins_with("stat_"):
-		return tr(key.to_upper())
-	var k = "BE_K_" + key.to_upper()
-	var t = tr(k)
-	return t if t != k else key
+	return _mod.stat_name(key)
 
 
 func _build_stats() -> void:
@@ -617,6 +615,7 @@ func _build_stats() -> void:
 	grid.add_constant_override("vseparation", 12)
 	scroll.add_child(grid)
 	var v = _view()
+	_build_start_state(grid, v)
 	for g in Catalog.STAT_GROUPS:
 		var box = _section(grid, g[0], C_ACCENT_3)
 		box.get_parent().size_flags_vertical = 0
@@ -635,7 +634,6 @@ func _build_stats() -> void:
 			var lbl = _label(stat_name(key), FONT_DESC, C_TEXT)
 			lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			lbl.clip_text = true
-			lbl.hint_tooltip = key
 			lbl.mouse_filter = Control.MOUSE_FILTER_PASS
 			row.add_child(lbl)
 			var sb = _spin(-9999, 9999, 1)
@@ -644,6 +642,62 @@ func _build_stats() -> void:
 			sb.connect("value_changed", self, "_on_stat_changed", [key, lbl])
 			row.add_child(sb)
 			_mark_stat_label(lbl, int(sb.value))
+
+
+# 开局状态（同 cave-modtools）：[字段, 名称 key, 最小, 最大]
+const START_FIELDS = [
+	["materials", "BE_START_MATERIALS", 0, 99999],
+	["levels", "BE_START_LEVELS", 0, 300],
+	["crates", "BE_START_CRATES", 0, 300],
+	["legendary_crates", "BE_START_LEGENDARY_CRATES", 0, 300],
+	["ban_tokens", "BE_START_BAN_TOKENS", 0, 300],
+	["start_wave", "BE_START_WAVE", 1, 1000],
+	["wave_delta", "BE_START_WAVE_DELTA", -120, 120],
+	["wave_lock", "BE_START_WAVE_LOCK", 0, 600],
+]
+
+
+func _build_start_state(parent: Control, v: Dictionary) -> void:
+	var box = _section(parent, "BE_GRP_START", C_ACCENT)
+	box.get_parent().size_flags_vertical = 0
+	var sub = GridContainer.new()
+	sub.columns = 2
+	sub.add_constant_override("hseparation", 16)
+	sub.add_constant_override("vseparation", 4)
+	box.add_child(sub)
+	for f in START_FIELDS:
+		var row = HBoxContainer.new()
+		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_constant_override("separation", 6)
+		sub.add_child(row)
+		var lbl = _label(tr(f[1]), FONT_DESC, C_TEXT)
+		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		lbl.clip_text = true
+		row.add_child(lbl)
+		var sb = _spin(f[2], f[3], 1)
+		sb.allow_greater = false
+		sb.allow_lesser = false
+		sb.rect_min_size = Vector2(120, 0)
+		sb.value = int(BEMain.start_value(v, f[0]))
+		sb.connect("value_changed", self, "_on_start_changed", [f[0]])
+		row.add_child(sb)
+	var settle = CheckBox.new()
+	settle.text = tr("BE_START_LEVEL_SETTLE")
+	settle.add_font_override("font", FONT_DESC)
+	settle.pressed = bool(BEMain.start_value(v, "level_settle"))
+	settle.connect("toggled", self, "_on_start_changed", ["level_settle"])
+	box.add_child(settle)
+	box.add_child(_desc(tr("BE_START_DESC")))
+
+
+func _on_start_changed(value, key: String) -> void:
+	var p = _p()
+	var v = bool(value) if typeof(BEMain.START_DEFAULT[key]) == TYPE_BOOL else int(value)
+	if v == BEMain.START_DEFAULT[key]:
+		p.start.erase(key)
+	else:
+		p.start[key] = v
+	_changed()
 
 
 func _mark_stat_label(lbl: Label, value: int) -> void:
@@ -700,7 +754,6 @@ func _build_effects() -> void:
 	if not _mod.is_custom(_id):
 		var orig = _button(tr("BE_EFFECTS_ORIGINAL"), FONT_SMALL)
 		_apply_action_style(orig, C_ACCENT)
-		orig.hint_tooltip = tr("BE_EFFECTS_ORIGINAL_DESC")
 		orig.connect("pressed", self, "_on_effects_original")
 		head.add_child(orig)
 	var clear = _button(tr("BE_EFFECTS_CLEAR"), FONT_SMALL)
@@ -724,30 +777,6 @@ func _build_effects() -> void:
 	var rbox = VBoxContainer.new()
 	rbox.add_constant_override("separation", 8)
 	rcard.add_child(rbox)
-	rbox.add_child(_label(tr("BE_SEC_BLUEPRINT"), FONT_NORMAL, C_ACCENT))
-	rbox.add_child(_desc(tr("BE_BLUEPRINT_DESC")))
-	var bp = HBoxContainer.new()
-	bp.add_constant_override("separation", 6)
-	rbox.add_child(bp)
-	_bp_trigger = _option()
-	_bp_trigger.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	for t in Catalog.TRIGGERS:
-		if t[0] == "" or _mod.trigger_template(t[0]) != null:
-			_bp_trigger.add_item(tr(t[1]))
-			_bp_trigger.set_item_metadata(_bp_trigger.get_item_count() - 1, t[0])
-	bp.add_child(_bp_trigger)
-	_bp_stat = _stat_option("stat_max_hp")
-	_bp_stat.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bp.add_child(_bp_stat)
-	_bp_value = _spin(-9999, 9999, 1)
-	_bp_value.value = 1
-	_bp_value.rect_min_size = Vector2(110, 0)
-	bp.add_child(_bp_value)
-	var add = _button(tr("BE_ADD"), FONT_SMALL)
-	_apply_action_style(add, C_ACCENT_3)
-	add.connect("pressed", self, "_on_blueprint_add")
-	bp.add_child(add)
-
 	rbox.add_child(_label(tr("BE_SEC_LIBRARY"), FONT_NORMAL, C_ACCENT))
 	rbox.add_child(_desc(tr("BE_LIBRARY_DESC")))
 	var cats = GridContainer.new()
@@ -834,6 +863,12 @@ func _effect_row(i: int, spec) -> Control:
 		_apply_action_style(b, C_ACCENT_2)
 		b.connect("pressed", self, a[1], [i, a[2]])
 		row.add_child(b)
+	var e = _mod.make_effect(spec) if spec is Dictionary else null
+	if e != null and Catalog.NATIVE_SPLIT.has(e.custom_key) and Catalog.is_plain_effect(e):
+		var split = _button(tr("BE_SPLIT"), FONT_DESC)
+		_apply_action_style(split, Color(1.0, 0.55, 0.35))
+		split.connect("pressed", self, "_on_effect_split", [i])
+		row.add_child(split)
 	var edit = _button(tr("BE_EDIT"), FONT_DESC)
 	_apply_chip_style(edit, i == _expanded, C_ACCENT_2)
 	edit.connect("pressed", self, "_on_effect_edit", [i])
@@ -877,7 +912,6 @@ func _build_effect_fields(col: Control, i: int, spec: Dictionary) -> void:
 		if lbl_text == name_key:
 			lbl_text = f.name
 		var lbl = _label(lbl_text, FONT_DESC, C_TEXT_DIM)
-		lbl.hint_tooltip = f.name
 		lbl.mouse_filter = Control.MOUSE_FILTER_PASS
 		grid.add_child(lbl)
 		var cur = e.get(f.name)
@@ -934,6 +968,24 @@ func _on_effect_delete(i: int) -> void:
 	_changed()
 
 
+# 拆解：原版触发型效果 -> 蓝图里的一条路径（扳机 → 效果），并从效果列表移除
+func _on_effect_split(i: int) -> void:
+	var specs = _edit_specs()
+	var e = _mod.make_effect(specs[i])
+	var p = _p()
+	if not p.graph is Dictionary:
+		p.graph = GraphEffect.new_graph()
+	var y = 0
+	for n in p.graph.nodes:
+		y = max(y, float(n.pos[1]) + 180)
+	if GraphEffect.split_native(p.graph, e, Vector2(40, y)):
+		specs.remove(i)
+		_expanded = -1
+		_fill_effect_list()
+		_changed()
+		_set_status(tr("BE_SPLIT_DONE"))
+
+
 func _on_effects_original() -> void:
 	_p().effects = null
 	_expanded = -1
@@ -984,12 +1036,6 @@ func _trigger_spec(custom_key: String, key: String, value: int) -> Dictionary:
 		return {"set": {"key": key, "value": value, "text_key": _mod.stat_text_key(key)}}
 	var t = _mod.trigger_template(custom_key)
 	return {"from": t.from, "i": t.i, "set": {"key": key, "value": value}}
-
-
-func _on_blueprint_add() -> void:
-	var ck = _bp_trigger.get_item_metadata(_bp_trigger.selected)
-	var key = _bp_stat.get_item_metadata(_bp_stat.selected)
-	_add_spec(_trigger_spec(ck, key, int(_bp_value.value)))
 
 
 func _add_spec(spec: Dictionary) -> void:
@@ -1579,16 +1625,9 @@ func _icon_button(tex: Texture, size: int) -> Button:
 	return b
 
 
-# 道具 / 武器 / 角色图标按钮；悬浮提示 = 名称 + 效果（去掉 BBCode）
+# 道具 / 武器 / 角色图标按钮
 func _res_button(r) -> Button:
-	var b = _icon_button(r.icon, GRID_ICON)
-	var tip = tr(r.name)
-	if r is ItemData and not r is CharacterData:
-		tip += "\n" + _strip(r.get_effects_text(0))
-	elif r is WeaponData:
-		tip += "  (T" + str(r.tier + 1) + ")"
-	b.hint_tooltip = tip
-	return b
+	return _icon_button(r.icon, GRID_ICON)
 
 
 func _set_icon_style(b: Button, color: Color, w: int) -> void:

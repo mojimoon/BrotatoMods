@@ -15,13 +15,25 @@ func _initialize() -> void:
 	p.stats = {"stat_armor": 5, "items_price": -10}
 	p.ban_items = [isvc.items[0].my_id, isvc.items[3].my_id]
 	p.desc = "测试介绍：一个会编辑的土豆"
+	p.start = {"materials": 30, "levels": 2}
+	var GE = load("res://mods-unpacked/Mojimoon-BroEditor/graph/graph_effect.gd")
+	var g = GE.new_graph()
+	var tk = GE.add_node(g, "kill", Vector2(20, 40))
+	var c1 = GE.add_node(g, "chance", Vector2(320, 40), {"pct": 20})
+	var e1 = GE.add_node(g, "explode", Vector2(620, 40))
+	var t2 = GE.add_node(g, "still", Vector2(20, 300))
+	var e2 = GE.add_node(g, "temp_stat", Vector2(620, 300))
+	GE.add_link(g, tk, c1)
+	GE.add_link(g, c1, e1)
+	GE.add_link(g, t2, e2)
+	p.graph = g
 	m.profiles[ch] = p
 	m.apply_all()
 	for target in [ch, custom]:
 		var ui = load("res://mods-unpacked/Mojimoon-BroEditor/ui/editor_ui.tscn").instance()
 		ui.initial_id = target
 		root.add_child(ui)
-		for t in ["overview", "stats", "effects", "gear", "bans"]:
+		for t in ["overview", "stats", "effects", "blueprint", "gear", "bans"]:
 			ui._on_tab_pressed(t)
 			if t == "effects":
 				ui._on_effect_edit(1)

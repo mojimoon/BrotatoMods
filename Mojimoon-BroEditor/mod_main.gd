@@ -20,6 +20,15 @@ const SHARE_PREFIX = "BE1:"
 const MAX_DESC = 300
 
 const Catalog = preload("res://mods-unpacked/Mojimoon-BroEditor/catalog.gd")
+const GraphEffect = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/graph_effect.gd")
+const Runtime = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/runtime.gd")
+# 上限类属性：角色效果直接设定上限值（原版 REPLACE 存储），而不是加减
+const CAP_KEYS = ["hp_cap", "speed_cap", "dodge_cap", "crit_chance_cap"]
+# 开局状态的默认值
+const START_DEFAULT = {
+	"materials": 0, "levels": 0, "level_settle": false, "crates": 0, "legendary_crates": 0,
+	"ban_tokens": 0, "start_wave": 1, "wave_delta": 0, "wave_lock": 0,
+}
 
 # id -> 档案
 var profiles: Dictionary = {}
@@ -35,11 +44,22 @@ var _customs: Dictionary = {}
 var _ban_cache: Dictionary = {}
 var _library = null
 var _desc_translation: Translation = null
+# 蓝图运行时（常驻）与"需要重建触发索引"标记
+var runtime = null
+var graph_dirty := true
+# 结算升级 / 开局箱子：开局时记下，第一波开始时执行
+var _pending_start: Dictionary = {}
+var _wave_duration_set := false
+var _start_wave_set := false
 
 
 func _init() -> void:
 	var dir: String = ModLoaderMod.get_unpacked_dir() + MOD_ID + "/extensions/"
 	ModLoaderMod.install_script_extension(dir + "singletons/item_service.gd")
+	ModLoaderMod.install_script_extension(dir + "singletons/run_data.gd")
+	ModLoaderMod.install_script_extension(dir + "main.gd")
+	ModLoaderMod.install_script_extension(dir + "ui/menus/shop/shop.gd")
+	ModLoaderMod.install_script_extension(dir + "ui/menus/shop/coop_shop.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/run/character_selection.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/run/weapon_selection.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/run/difficulty_selection/difficulty_selection.gd")
@@ -48,6 +68,13 @@ func _init() -> void:
 func _ready() -> void:
 	_register_translations()
 	load_profiles()
+	runtime = Runtime.new()
+	runtime.mod = self
+	add_child(runtime)
+	# 存档反序列化按 get_id() 在 ItemService.effects 中查找效果脚本：要在 ProgressData 读档之前注册
+	var isvc = _isvc()
+	if isvc != null and not GraphEffect in isvc.effects:
+		isvc.effects.push_back(GraphEffect)
 	# 自定义角色必须在 ProgressData 读档之前注册（存档里的本局可能就是自定义角色）
 	_register_customs()
 	# DLC 角色在 ProgressData 就绪后才加入：本帧结束后再应用档案
@@ -86,6 +113,8 @@ static func new_profile() -> Dictionary:
 		"ban_items": [],
 		"ban_weapons": [],
 		"wanted_tags": null,
+		"graph": null,
+		"start": {},
 	}
 
 
@@ -117,7 +146,37 @@ static func normalize_profile(p) -> Dictionary:
 	for k in ["start_items", "ban_items", "ban_weapons"]:
 		if not out[k] is Array:
 			out[k] = []
+	if out.graph != null and not (out.graph is Dictionary and out.graph.get("nodes") is Array and out.graph.get("links") is Array):
+		out.graph = null
+	if out.graph != null:
+		_int_ids(out.graph)
+	var start = {}
+	if out.start is Dictionary:
+		for k in START_DEFAULT:
+			if out.start.has(k) and typeof(out.start[k]) in [TYPE_INT, TYPE_REAL, TYPE_BOOL]:
+				var v = bool(out.start[k]) if typeof(START_DEFAULT[k]) == TYPE_BOOL else int(out.start[k])
+				if v != START_DEFAULT[k]:
+					start[k] = v
+	out.start = start
 	return out
+
+
+# JSON 读回的数字是浮点：节点 id / 连线统一转为整数
+static func _int_ids(g: Dictionary) -> void:
+	for n in g.nodes:
+		n.id = int(n.get("id", 0))
+		if not n.get("params") is Dictionary:
+			n.params = {}
+	var links = []
+	for l in g.links:
+		if l is Array and l.size() >= 2:
+			links.push_back([int(l[0]), int(l[1])])
+	g.links = links
+	g.next = int(g.get("next", 1))
+
+
+static func start_value(p: Dictionary, k: String):
+	return p.get("start", {}).get(k, START_DEFAULT[k])
 
 
 static func clean_desc(text: String) -> String:
@@ -293,8 +352,41 @@ func stat_text_key(key: String) -> String:
 	return _stat_text_keys.get(key, "")
 
 
+# 属性显示名：原版 STAT_X；属性获取修改（gain_stat_x / gain_x）= "<属性> 获取 %"；其余用本 mod 的 BE_K_X
+func stat_name(key: String) -> String:
+	if key.begins_with("gain_") and key != "gain_pct_gold_start_wave":
+		var base = key.substr(5)
+		return tr("BE_GAIN_FMT").replace("{0}", stat_name(base).trim_suffix(" %").trim_prefix("% "))
+	if key.begins_with("stat_"):
+		return tr(key.to_upper())
+	var k = "BE_K_" + key.to_upper()
+	var t = tr(k)
+	return t if t != k else key
+
+
+# 原版没有描述文本的属性 key：注册 "+X 名称" 文本（原版 Text 按 key 决定是否加 +/- 号）
+func _plain_text_key(key: String) -> String:
+	var tk = stat_text_key(key)
+	if tk != "" or tr(key.to_upper()) != key.to_upper():
+		return tk
+	tk = "BE_FX_" + key.to_upper()
+	if tr(tk) == tk:
+		if _desc_translation == null:
+			_desc_translation = Translation.new()
+			_desc_translation.locale = TranslationServer.get_locale()
+			TranslationServer.add_translation(_desc_translation)
+		_desc_translation.add_message(tk, stat_name(key))
+		var text = _autoload("Text")
+		if text != null:
+			text.keys_needing_operator[tk.to_lower()] = [0]
+	return tk
+
+
 func stat_effect(key: String, value: int):
-	return make_effect({"set": {"key": key, "value": value, "text_key": stat_text_key(key)}})
+	var sets = {"key": key, "value": value, "text_key": _plain_text_key(key)}
+	if key in CAP_KEYS:
+		sets.storage_method = 2
+	return make_effect({"set": sets})
 
 
 # 档案的效果 spec 列表（null = 原版效果）展开为 spec
@@ -328,6 +420,8 @@ func build_effects(id: String, p: Dictionary) -> Array:
 		var e = start_item_effect(s)
 		if e != null:
 			out.push_back(e)
+	if p.graph is Dictionary and not p.graph.get("nodes", []).empty():
+		out.push_back(GraphEffect.make(p.graph))
 	return out
 
 
@@ -768,3 +862,127 @@ static func place_button(back_button: Node, btn: Button) -> void:
 		base_x = left_neighbour.rect_position.x + left_neighbour.rect_size.x
 	btn.rect_position = Vector2(base_x + 18.0, 0.0)
 	btn.focus_neighbour_left = btn.get_path_to(left_neighbour if left_neighbour != null else back_button)
+
+
+# ============================================================
+# 蓝图：商店阶段事件
+# ============================================================
+func fire_shop(event: String, player_index: int) -> void:
+	if runtime == null:
+		return
+	if runtime.wave_over:
+		runtime.rebuild_all()
+	runtime.fire(event, player_index)
+
+
+# ============================================================
+# 开局状态（同 cave-modtools）：材料、等级（直接 / 结算）、箱子、额外禁用次数、起始波次、波次时长
+# ============================================================
+func _player_profile(rd, player_index: int):
+	if player_index < 0 or player_index >= rd.players_data.size():
+		return null
+	var c = rd.players_data[player_index].current_character
+	if c == null:
+		return null
+	var p = profiles.get(c.my_id)
+	if p == null or not (p.enabled or p.custom):
+		return null
+	return p
+
+
+# RunData.add_starting_items_and_weapons 之后（选完武器 / 重新开始）
+func apply_start_state() -> void:
+	var rd = _autoload("RunData")
+	_pending_start = {}
+	for i in rd.get_player_count():
+		var p = _player_profile(rd, i)
+		if p == null:
+			continue
+		rd.players_data[i].gold += max(0, start_value(p, "materials"))
+		var levels = max(0, start_value(p, "levels"))
+		if levels > 0 and not start_value(p, "level_settle"):
+			rd.players_data[i].current_level += levels
+			levels = 0
+		var pend = {"levels": levels, "crates": max(0, start_value(p, "crates")), "legendary": max(0, start_value(p, "legendary_crates"))}
+		if pend.levels + pend.crates + pend.legendary > 0:
+			_pending_start[i] = pend
+
+
+# 第一波开始：结算升级（波末选择升级）、开局箱子（波末开箱）
+func apply_pending_start(main: Node) -> void:
+	if _pending_start.empty():
+		return
+	var rd = _autoload("RunData")
+	var isvc = _isvc()
+	for i in _pending_start:
+		if i >= rd.get_player_count():
+			continue
+		var pend = _pending_start[i]
+		for _l in pend.levels:
+			rd.level_up(i)
+		for k in [["crates", Keys.consumable_item_box_hash], ["legendary", Keys.consumable_legendary_item_box_hash]]:
+			var data = isvc.get_element(isvc.consumables, k[1])
+			if data == null:
+				continue
+			for _c in pend[k[0]]:
+				var ctp = UpgradesUI.ConsumableToProcess.new()
+				ctp.consumable_data = data
+				ctp.player_index = i
+				main._consumables_to_process[i].push_back(ctp)
+				main._things_to_process_player_containers[i].consumables.add_element(data)
+	_pending_start = {}
+
+
+# 选定难度后（原版在此时发放禁用次数）/ 重新开始本局
+func apply_start_bans() -> void:
+	var rd = _autoload("RunData")
+	if not rd.is_ban_active_in_current_run():
+		return
+	for i in rd.get_player_count():
+		var p = _player_profile(rd, i)
+		if p != null:
+			rd.players_data[i].remaining_ban_token += max(0, start_value(p, "ban_tokens"))
+
+
+# 选定难度后：起始波次（取玩家 1 的角色；超过最后一波即为无尽）
+func apply_start_wave() -> void:
+	var rd = _autoload("RunData")
+	var dbg = _autoload("DebugService")
+	var p = _player_profile(rd, 0)
+	var w = int(start_value(p, "start_wave")) if p != null else 1
+	if w > 1:
+		dbg.starting_wave = w
+		rd.current_wave = w
+		rd.is_endless_run = w > rd.nb_of_waves
+		_start_wave_set = true
+	else:
+		clear_start_wave()
+
+
+# 新一局（回到选角界面）：撤销上一局设置的起始波次
+func clear_start_wave() -> void:
+	if _start_wave_set:
+		_autoload("DebugService").starting_wave = 1
+		_start_wave_set = false
+
+
+# 每波开始前（main._ready 之前）：波次时长 = 固定值，或原版时长 + 增减
+func apply_wave_duration() -> void:
+	var rd = _autoload("RunData")
+	var dbg = _autoload("DebugService")
+	var p = _player_profile(rd, 0)
+	var lock = int(start_value(p, "wave_lock")) if p != null else 0
+	var delta = int(start_value(p, "wave_delta")) if p != null else 0
+	if lock > 0:
+		dbg.custom_wave_duration = lock
+		_wave_duration_set = true
+	elif delta != 0:
+		var base = 60
+		var wd = _autoload("ZoneService").get_wave_data(rd.current_zone, rd.current_wave)
+		if wd != null and "wave_duration" in wd:
+			base = int(wd.wave_duration)
+		dbg.custom_wave_duration = max(1, base + delta)
+		_wave_duration_set = true
+	elif _wave_duration_set:
+		dbg.custom_wave_duration = -1
+		_wave_duration_set = false

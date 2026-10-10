@@ -344,21 +344,15 @@ func test_51_ui_edits() -> void:
 	ui._on_tab_pressed("stats")
 	ui._on_stat_changed(4.0, "stat_armor", Label.new())
 	_eq(m.profiles[CH].stats, {"stat_armor": 4}, "stat edit")
-	# 蓝图：升级时 +3 幸运
+	# 效果：升级时 +3 幸运（原版扳机模板）
 	ui._on_tab_pressed("effects")
 	var n = m.effect_specs(CH, m.profiles[CH]).size()
-	for i in ui._bp_trigger.get_item_count():
-		if ui._bp_trigger.get_item_metadata(i) == "stats_on_level_up":
-			ui._bp_trigger.select(i)
-	for i in ui._bp_stat.get_item_count():
-		if ui._bp_stat.get_item_metadata(i) == "stat_luck":
-			ui._bp_stat.select(i)
-	ui._bp_value.value = 3
-	ui._on_blueprint_add()
+	var t = m.trigger_template("stats_on_level_up")
+	ui._add_spec({"from": t.from, "i": t.i, "set": {"key": "stat_luck", "value": 3}})
 	var specs = m.profiles[CH].effects
-	_eq(specs.size(), n + 1, "blueprint added")
+	_eq(specs.size(), n + 1, "effect added")
 	var e = m.make_effect(specs[-1])
-	_eq([e.key, e.value, e.custom_key], ["stat_luck", 3, "stats_on_level_up"], "blueprint effect")
+	_eq([e.key, e.value, e.custom_key], ["stat_luck", 3, "stats_on_level_up"], "trigger effect")
 	_eq(ui._expanded, specs.size() - 1, "new effect expanded")
 	# 编辑字段
 	ui._on_field_changed(6.0, specs.size() - 1, "value")
@@ -447,3 +441,285 @@ func test_60_entry_button() -> void:
 			n += 1
 	_eq(n, 1, "button added exactly once")
 	screen.queue_free()
+
+
+# ============================================================
+# 蓝图
+# ============================================================
+const GraphEffectScript = "res://mods-unpacked/Mojimoon-BroEditor/graph/graph_effect.gd"
+
+
+func _graph_char(g: Dictionary):
+	var p = m.new_profile()
+	p.graph = g
+	m.profiles[CH] = p
+	m.apply_all()
+	var c = m.find_character(CH)
+	rd.set_player_count(1, true)
+	rd.add_character(c, 0)
+	m.runtime.start_wave(null)
+	return c
+
+
+func _armor() -> int:
+	return int(rd.get_player_effect(Keys.generate_hash("stat_armor"), 0))
+
+
+func test_70_graph_text_and_runtime() -> void:
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	var t = GE.add_node(g, "level_up", Vector2.ZERO)
+	var every = GE.add_node(g, "every", Vector2.ZERO, {"n": 2})
+	var eff = GE.add_node(g, "perm_stat", Vector2.ZERO, {"stat": "stat_armor", "value": 3})
+	var gold = GE.add_node(g, "add_gold", Vector2.ZERO, {"value": 7})
+	GE.add_link(g, t, every)
+	GE.add_link(g, every, eff)
+	GE.add_link(g, t, gold)
+	GE.add_link(g, t, every)
+	_eq(g.links.size(), 3, "duplicate link ignored")
+	_eq(GE.paths(g).size(), 2, "two paths")
+	var c = _graph_char(g)
+	var ge = null
+	for e in c.effects:
+		if e is GE:
+			ge = e
+	_check(ge != null, "graph effect on character")
+	var text = ge.get_text(0, false)
+	_check(text.find("2") >= 0 and text.split("\n").size() == 2, "path text: " + text)
+	var a0 = _armor()
+	var g0 = rd.players_data[0].gold
+	m.runtime.fire("level_up", 0)
+	_eq(_armor(), a0, "every 2: first fire blocked")
+	_eq(rd.players_data[0].gold, g0 + 7, "parallel path fired")
+	m.runtime.fire("level_up", 0)
+	_eq(_armor(), a0 + 3, "every 2: second fire passes")
+	m.runtime.fire("kill", 0)
+	_eq(_armor(), a0 + 3, "other events ignored")
+	m.runtime.end_wave()
+	m.runtime.fire("level_up", 0)
+	m.runtime.fire("level_up", 0)
+	_eq(_armor(), a0 + 3, "no firing after wave end")
+
+
+func test_71_graph_conditions_and_cycles() -> void:
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	var t = GE.add_node(g, "kill", Vector2.ZERO)
+	var cap = GE.add_node(g, "cap", Vector2.ZERO, {"n": 2})
+	var wave = GE.add_node(g, "wave_min", Vector2.ZERO, {"n": 99})
+	var eff = GE.add_node(g, "perm_stat", Vector2.ZERO, {"stat": "stat_armor", "value": 1})
+	var eff2 = GE.add_node(g, "perm_stat", Vector2.ZERO, {"stat": "stat_luck", "value": 1})
+	GE.add_link(g, t, cap)
+	GE.add_link(g, cap, eff)
+	GE.add_link(g, cap, cap)	# 环：不应死循环
+	GE.add_link(g, t, wave)
+	GE.add_link(g, wave, eff2)
+	_graph_char(g)
+	var a0 = _armor()
+	var l0 = rd.get_player_effect(Keys.generate_hash("stat_luck"), 0)
+	for i in 5:
+		m.runtime.fire("kill", 0)
+	_check(_armor() - a0 >= 2, "cap passes (cycle re-enters cap)")
+	_check(_armor() - a0 <= 6, "cap/cycle bounded")
+	_eq(rd.get_player_effect(Keys.generate_hash("stat_luck"), 0), l0, "wave_min blocks")
+	m.runtime.end_wave()
+
+
+func test_72_graph_grant_and_shop() -> void:
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	var t = GE.add_node(g, "reroll", Vector2.ZERO)
+	var gr = GE.add_node(g, "grant", Vector2.ZERO, {"ref": {"set": {"key": "stat_armor", "value": 2}}, "n": 3, "mode": "perm"})
+	GE.add_link(g, t, gr)
+	_graph_char(g)
+	m.runtime.end_wave()
+	var a0 = _armor()
+	m.fire_shop("reroll", 0)
+	_eq(_armor(), a0 + 6, "shop trigger + permanent grant x3")
+	_check(GE.graph_text(g, false).find("6") >= 0, "grant text scaled")
+
+
+func test_73_graph_serialize() -> void:
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	GE.add_link(g, GE.add_node(g, "dodge", Vector2(1, 2)), GE.add_node(g, "heal_hp", Vector2.ZERO, {"value": 4}))
+	var e = GE.make(g)
+	var s = e.serialize()
+	_eq(s.effect_id, "broeditor_graph", "effect id")
+	var e2 = GE.new()
+	e2.deserialize_and_merge(JSON.parse(JSON.print(s)).result)
+	var p = m.normalize_profile({"graph": e2.graph})
+	_eq(GE.paths(p.graph).size(), 1, "ids normalized")
+	_check(isvc.effects.has(GE), "registered for save loading")
+
+
+func test_74_split_native() -> void:
+	var t = m.trigger_template("stats_on_level_up")
+	var p = m.new_profile()
+	p.effects = [{"from": t.from, "i": t.i, "set": {"key": "stat_luck", "value": 4}}]
+	m.profiles[CH] = p
+	var ui = yield(_open_ui(CH), "completed")
+	ui._on_tab_pressed("effects")
+	ui._on_effect_split(0)
+	_eq(m.profiles[CH].effects.size(), 0, "removed from effect list")
+	var g = m.profiles[CH].graph
+	_eq(g.nodes.size(), 2, "trigger + effect nodes")
+	_eq(g.nodes[0].kind, "level_up", "trigger")
+	_eq([g.nodes[1].kind, g.nodes[1].params.stat, g.nodes[1].params.value], ["perm_stat", "stat_luck", 4], "effect node")
+	# 蓝图页
+	ui._on_tab_pressed("blueprint")
+	yield(tree, "idle_frame")
+	_eq(ui.blueprint.ge.get_child_count() >= 2, true, "graph nodes shown")
+	_check(ui.blueprint.preview.bbcode_text.find("4") >= 0, "path preview")
+	var pop = PopupMenu.new()
+	pop.add_item("x")
+	pop.set_item_metadata(0, "chance")
+	ui.blueprint._on_add_pressed(0, pop)
+	_eq(g.nodes.size(), 3, "node added from menu")
+	var cid = g.nodes[2].id
+	ui.blueprint._on_connect("n" + str(g.nodes[0].id), 0, "n" + str(cid), 0)
+	ui.blueprint._on_connect("n" + str(cid), 0, "n" + str(g.nodes[1].id), 0)
+	_eq(g.links.size(), 3, "links added")
+	ui.blueprint._on_param(50.0, cid, "pct")
+	_eq(g.nodes[2].params.pct, 50, "param edit")
+	ui.blueprint._on_close_node(cid)
+	_eq(g.links.size(), 1, "node removal drops links")
+	ui.queue_free()
+	yield(tree, "idle_frame")
+
+
+# ============================================================
+# 开局状态 / 属性获取修改
+# ============================================================
+func test_80_start_state() -> void:
+	var p = m.new_profile()
+	p.start = {"materials": 50, "levels": 3, "crates": 2}
+	m.profiles[CH] = p
+	m.apply_all()
+	rd.set_player_count(1, true)
+	rd.add_character(m.find_character(CH), 0)
+	var g0 = rd.players_data[0].gold
+	var l0 = rd.players_data[0].current_level
+	rd.add_starting_items_and_weapons()
+	_eq(rd.players_data[0].gold, g0 + 50, "materials")
+	_eq(rd.players_data[0].current_level, l0 + 3, "levels direct")
+	_eq(m._pending_start[0].crates, 2, "crates pending for first wave")
+	p.start = {"levels": 2, "level_settle": true}
+	m.profiles[CH] = m.normalize_profile(p)
+	rd.add_starting_items_and_weapons()
+	_eq(m._pending_start[0].levels, 2, "settle levels pending")
+	m._pending_start = {}
+	_eq(m.normalize_profile({"start": {"materials": 0, "start_wave": 1.0, "levels": 2.0}}).start, {"levels": 2}, "defaults dropped")
+
+
+func test_81_gain_and_cap_stats() -> void:
+	var e = m.stat_effect("gain_stat_max_hp", 20)
+	var t = e.get_text(0, false)
+	_check(t.find("GAIN_STAT") < 0 and t.find("20") >= 0, "gain stat text: " + t)
+	_check(t.find("+20") >= 0, "signed: " + t)
+	_eq(m.stat_effect("hp_cap", 30).storage_method, 2, "cap replaces")
+
+
+# ============================================================
+# 真实场景：选择界面入口、战斗中的蓝图（较慢）
+# ============================================================
+func _frames(n: int):
+	for i in n:
+		yield(tree, "idle_frame")
+
+
+func test_90_menu_buttons() -> void:
+	for path in [MenuData.character_selection_scene, MenuData.weapon_selection_scene, MenuData.difficulty_selection_scene]:
+		_setup_player(CH)
+		var _e = tree.change_scene(path)
+		yield(_frames(6), "completed")
+		var sc = tree.current_scene
+		var back = sc.get_node_or_null("%BackButton") if sc != null else null
+		_check(back != null and back.has_node("BroEditorBtn"), "button on " + path)
+		if back == null or not back.has_node("BroEditorBtn"):
+			continue
+		back.get_node("BroEditorBtn").emit_signal("pressed")
+		yield(tree, "idle_frame")
+		var opened = false
+		for c in sc.get_children():
+			if c is CanvasLayer and c.get_child_count() > 0 and c.get_child(0).name == "BroEditor":
+				opened = true
+				c.get_child(0)._on_close_pressed()
+		_check(opened, "editor opens on " + path)
+	_setup_player(CH)
+
+
+func test_85_battle_graph() -> void:
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	var pairs = [
+		["interval", {"secs": 1}, "add_gold", {"value": 1}],
+		["still", {}, "temp_stat", {"stat": "stat_luck", "value": 50}],
+		["hit", {}, "add_gold", {"value": 100}],
+		["level_up", {}, "perm_stat", {"stat": "stat_armor", "value": 7}],
+		["kill", {}, "add_gold", {"value": 1000}],
+		["wave_start", {}, "perm_stat", {"stat": "stat_engineering", "value": 3}],
+	]
+	for pr in pairs:
+		GE.add_link(g, GE.add_node(g, pr[0], Vector2.ZERO, pr[1]), GE.add_node(g, pr[2], Vector2.ZERO, pr[3]))
+	var p = m.new_profile()
+	p.graph = g
+	m.profiles[CH] = p
+	m.apply_all()
+	_setup_player(CH)
+	rd.players_data[0].items = []
+	rd.add_character(m.find_character(CH), 0)
+	rd.add_weapon(isvc.get_element_safe(isvc.weapons, "weapon_fist_1"), 0)
+	rd.current_wave = 1
+	TempStats.reset()
+	var eng0 = rd.get_player_effect(Keys.generate_hash("stat_engineering"), 0)
+	var _e = tree.change_scene("res://main.tscn")
+	yield(_frames(10), "completed")
+	var main = tree.current_scene
+	_check(not m.runtime.wave_over, "runtime started")
+	_eq(rd.get_player_effect(Keys.generate_hash("stat_engineering"), 0), eng0 + 3, "wave_start fired")
+	var player = main._players[0]
+	player.disable_hurtbox()
+	main._wave_timer.start(600)
+	var gold0 = rd.players_data[0].gold
+	yield(tree.create_timer(1.5), "timeout")
+	_check(rd.players_data[0].gold - gold0 >= 1, "interval fired")
+	_eq(TempStats.get_stat(Keys.generate_hash("stat_luck"), 0), 50, "still state holds temp stat")
+	player._move_locked = true
+	player._current_movement = Vector2(1, 0)
+	yield(tree.create_timer(0.6), "timeout")
+	_eq(TempStats.get_stat(Keys.generate_hash("stat_luck"), 0), 0, "leaving state reverts")
+	player._current_movement = Vector2.ZERO
+	player._move_locked = false
+	gold0 = rd.players_data[0].gold
+	var hit_args = TakeDamageArgs.new(-1)
+	hit_args.bypass_invincibility = true
+	hit_args.dodgeable = false
+	var _r = player.take_damage(1, hit_args)
+	yield(tree, "physics_frame")
+	yield(tree, "idle_frame")
+	_check(rd.players_data[0].gold - gold0 >= 100, "hit fired")
+	player._invincibility_timer.stop()
+	player.disable_hurtbox()
+	var armor0 = _armor()
+	rd.add_xp(int(rd.get_next_level_xp_needed(0)) + 1, 0)
+	yield(_frames(2), "completed")
+	_eq(_armor(), armor0 + 7, "level_up fired")
+	var enemy = null
+	for i in 300:
+		var es = main._entity_spawner.get_all_enemies(false)
+		if not es.empty():
+			enemy = es[0]
+			break
+		yield(tree, "idle_frame")
+	_check(enemy != null, "enemy spawned")
+	if enemy != null:
+		gold0 = rd.players_data[0].gold
+		var _k = enemy.take_damage(999999, TakeDamageArgs.new(0))
+		yield(_frames(3), "completed")
+		_check(rd.players_data[0].gold - gold0 >= 1000, "kill fired")
+	main._on_WaveTimer_timeout()
+	yield(_frames(2), "completed")
+	_check(m.runtime.wave_over, "wave end stops runtime")
+	var _b = tree.change_scene(MenuData.character_selection_scene)
+	yield(_frames(4), "completed")
