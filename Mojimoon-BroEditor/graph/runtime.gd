@@ -75,7 +75,8 @@ func rebuild_all() -> void:
 					if e is GraphEffect:
 						var en = old.get(e.get_instance_id())
 						if en == null:
-							en = {"effect": e, "g": e.graph, "by_id": GraphEffect.nodes_by_id(e.graph), "st": {}, "granted": []}
+							var g = e.live_graph()
+							en = {"effect": e, "g": g, "by_id": GraphEffect.nodes_by_id(g), "st": {}, "granted": []}
 						list.push_back(en)
 		entries[p] = list
 

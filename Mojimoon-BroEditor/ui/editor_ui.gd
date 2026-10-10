@@ -1128,7 +1128,7 @@ func _effect_lines(effects: Array, parent: Control = null) -> void:
 		parent = _preview_text
 	for e in effects:
 		if e.get_script() == GraphEffect:
-			_graph_lines(e.graph, parent)
+			_graph_lines(e.live_graph(), parent)
 			continue
 		var path = e.get_script().resource_path if e.get_script() != null else ""
 		var native = false

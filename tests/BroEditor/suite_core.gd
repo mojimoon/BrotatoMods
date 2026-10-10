@@ -1006,7 +1006,7 @@ func test_181_cursed_effects() -> void:
 	m.graph_dirty = true
 	m.runtime.start_wave(null)
 	m.runtime.fire("wave_start", 0)
-	_eq(rd.get_player_effect(Keys.generate_hash("stat_engineering"), 0), eng0 + 3, "blueprint on the cursed item fires")
+	_eq(rd.get_player_effect(Keys.generate_hash("stat_engineering"), 0), eng0 + _good(3), "blueprint on the cursed item fires (cursed value)")
 	m.runtime.end_wave()
 	# 自定义武器诅咒：伤害提高，效果保留（原版另加一条诅咒属性）
 	var base_w = null
@@ -1030,3 +1030,163 @@ func test_181_cursed_effects() -> void:
 	_eq(ckeys, keys, "custom weapon effects kept through the curse")
 	m.delete_custom_item(iid)
 	m.delete_custom_weapon(m.find_target("weapon", wt).weapon_id)
+
+
+# ---------------- 蓝图诅咒 ----------------
+const CURSE_M = 0.5
+
+
+static func _good(v: int) -> int:
+	return int(sign(v)) * int(ceil(abs(v) * (1.0 + CURSE_M)))
+
+
+static func _bad(v: int) -> int:
+	return int(sign(v)) * int(max(1.0, floor(abs(v) / (1.0 + CURSE_M))))
+
+
+# 自定义道具挂上蓝图后诅咒（系数固定 0.5），返回 [诅咒后的道具, 蓝图效果, 道具 id]
+func _cursed_graph_item(g: Dictionary, suffix: String) -> Array:
+	var dlc = tree.root.get_node("ProgressData").get_dlc_data("abyssal_terrors")
+	var iid = m.create_custom_item(_plain_item().my_id, suffix)
+	m.item_profiles[iid].effects = []
+	m.item_profiles[iid].graph = g
+	m.apply_all()
+	var cursed = dlc.curse_item(m.find_target("item", iid), 0, true, CURSE_M)
+	var ge = null
+	for e in cursed.effects:
+		if e.get_script() == load(GraphEffectScript):
+			ge = e
+	return [cursed, ge, iid]
+
+
+func _burn_ref(dmg: int) -> Dictionary:
+	for entry in m.library(true):
+		if "burning_data" in m.Catalog.sub_fields(entry.effect) and entry.effect.get_script().resource_path.find("burn_chance") >= 0:
+			return {"from": entry.from, "i": entry.i, "sub": {"burning_data": {"damage": dmg, "duration": 3}}}
+	return {}
+
+
+# 各种节点与组合在诅咒后的数值：常规放大、负面的正数缩小、正面的负数放大、中立不变、原版特判
+func test_190_cursed_blueprint_values() -> void:
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	var ids = {}
+	var rows = {
+		"armor": [["perm_stat", {"stat": "stat_armor", "value": 3}]],
+		"armor_neg": [["perm_stat", {"stat": "stat_armor", "value": -4}]],
+		"price_good": [["perm_stat", {"stat": "items_price", "value": -5}]],
+		"price_bad": [["perm_stat", {"stat": "items_price", "value": 5}]],
+		"enemies": [["temp_stat", {"stat": "number_of_enemies", "value": 10}]],
+		"dodge_cap": [["temp_stat", {"stat": "dodge_cap", "value": 60}]],
+		"timed": [["timed_stat", {"stat": "stat_attack_speed", "value": 20, "secs": 3}]],
+		"gold": [["every", {"n": 6}], ["add_gold", {"value": 2}]],
+		"every1": [["every", {"n": 1}], ["heal_hp", {"value": 3}]],
+		"chance": [["chance", {"pct": 40}], ["xp", {"value": 5}]],
+		"chance_cap": [["chance", {"pct": 80}], ["damage", {"stat": "stat_ranged_damage", "pct": 100}]],
+		"waves": [["wave_min", {"n": 10}], ["wave_max", {"n": 10}], ["explode", {"stat": "stat_elemental_damage", "pct": 100}]],
+		"cap": [["cap", {"n": 4}], ["cooldown", {"secs": 3}], ["hp_dmg", {"pct": 5}]],
+		"hp": [["hp_below", {"pct": 50}], ["hp_above", {"pct": 50}], ["ignite", {"value": 5}]],
+		"stats": [["stat_min", {"stat": "stat_armor", "n": 10}], ["stat_max", {"stat": "stat_luck", "n": 10}], ["slow", {"pct": 10}]],
+		"misc": [["rand_stats", {"value": 1}]],
+		"fruit": [["fruit", {"value": 1}]],
+	}
+	var triggers = {"gold": "kill", "every1": "crit", "chance": "level_up", "cap": "hit", "hp": "hit", "stats": "kill"}
+	for r in rows:
+		var prev = GE.add_node(g, triggers.get(r, "wave_start"), Vector2.ZERO)
+		for step in rows[r]:
+			var id = GE.add_node(g, step[0], Vector2.ZERO, step[1].duplicate())
+			ids[r + ":" + step[0]] = id
+			GE.add_link(g, prev, id)
+			prev = id
+	var it = GE.add_node(g, "interval", Vector2.ZERO, {"secs": 5})
+	ids["interval"] = it
+	var gr = GE.add_node(g, "grant", Vector2.ZERO, {"ref": _burn_ref(20), "n": 1, "mode": "temp"})
+	ids["grant"] = gr
+	GE.add_link(g, it, gr)
+	var res = _cursed_graph_item(g, "cursegraph")
+	var ge = res[1]
+	_check(ge != null, "blueprint on the cursed item")
+	if ge == null:
+		return
+	_check(abs(ge.curse_modifier() - CURSE_M) < 0.002, "curse modifier recovered: %s" % ge.curse_modifier())
+	var by = GE.nodes_by_id(ge.live_graph())
+	var cases = [
+		["armor:perm_stat", "value", _good(3), "positive stat grows"],
+		["armor_neg:perm_stat", "value", _bad(-4), "negative stat shrinks"],
+		["price_good:perm_stat", "value", _good(-5), "-X% price: X grows"],
+		["price_bad:perm_stat", "value", _bad(5), "+X% price: X shrinks"],
+		["enemies:temp_stat", "value", 10, "+X% enemies: neutral, unchanged"],
+		["timed:timed_stat", "value", _good(20), "timed stat grows"],
+		["timed:timed_stat", "secs", _good(3), "timed duration grows"],
+		["gold:every", "n", _bad(6), "every X kills: X shrinks"],
+		["gold:add_gold", "value", _good(2), "materials grow"],
+		["every1:every", "n", 1, "every 1 stays 1"],
+		["every1:heal_hp", "value", _good(3), "heal grows"],
+		["chance:chance", "pct", _good(40), "chance grows"],
+		["chance:xp", "value", _good(5), "xp grows"],
+		["chance_cap:chance", "pct", 100, "chance capped at 100"],
+		["chance_cap:damage", "pct", _good(100), "damage % grows"],
+		["waves:wave_min", "n", _bad(10), "from wave X: X shrinks"],
+		["waves:wave_max", "n", _good(10), "until wave X: X grows"],
+		["waves:explode", "pct", _good(100), "explosion % grows"],
+		["cap:cap", "n", _good(4), "per-wave cap grows"],
+		["cap:cooldown", "secs", _bad(3), "cooldown shrinks"],
+		["cap:hp_dmg", "pct", _good(5), "hp damage grows"],
+		["hp:hp_below", "pct", _good(50), "below X% HP: X grows"],
+		["hp:hp_above", "pct", _bad(50), "above X% HP: X shrinks"],
+		["hp:ignite", "value", _good(5), "ignite grows"],
+		["stats:stat_min", "n", _bad(10), "stat >= X: X shrinks"],
+		["stats:stat_max", "n", _good(10), "stat <= X: X grows"],
+		["stats:slow", "pct", _good(10), "slow grows"],
+		["misc:rand_stats", "value", _good(1), "random stats grow"],
+		["fruit:fruit", "value", _good(1), "fruit grows"],
+		["interval", "secs", _bad(5), "every X seconds: X shrinks"],
+		["grant", "n", _good(1), "grant count grows"],
+	]
+	for c in cases:
+		_eq(int(by[ids[c[0]]].params[c[1]]), c[2], c[3])
+	var dc = int(by[ids["dodge_cap:temp_stat"]].params.value)
+	_check(dc >= 72 and dc <= 76, "dodge cap uses the vanilla special case (72-76): %d" % dc)
+	var be = m.make_effect(by[ids["grant"]].params.ref)
+	_check(be.burning_data.damage == _good(20) and be.burning_data.duration == _good(3), "granted burning cursed like vanilla: %d dmg / %d s" % [be.burning_data.damage, be.burning_data.duration])
+	_eq(int(GE.nodes_by_id(ge.graph)[ids["armor:perm_stat"]].params.value), 3, "original graph untouched")
+	_check(ge.get_text(0, false).find(str(_good(3))) >= 0, "text shows cursed values")
+	m.delete_custom_item(res[2])
+
+
+# 诅咒后的蓝图在一局中按诅咒后的数值触发；存档往返保留诅咒
+func test_191_cursed_blueprint_runtime() -> void:
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	GE.add_link(g, GE.add_node(g, "wave_start", Vector2.ZERO), GE.add_node(g, "perm_stat", Vector2.ZERO, {"stat": "stat_armor", "value": 3}))
+	var ev = GE.add_node(g, "every", Vector2.ZERO, {"n": 6})
+	GE.add_link(g, GE.add_node(g, "kill", Vector2.ZERO), ev)
+	GE.add_link(g, ev, GE.add_node(g, "add_gold", Vector2.ZERO, {"value": 2}))
+	GE.add_link(g, GE.add_node(g, "level_up", Vector2.ZERO), GE.add_node(g, "perm_stat", Vector2.ZERO, {"stat": "items_price", "value": -5}))
+	var res = _cursed_graph_item(g, "curserun")
+	_setup_player(CH)
+	rd.players_data[0].items = []
+	rd.add_character(m.find_character(CH), 0)
+	rd.add_item(res[0], 0)
+	var h_armor = Keys.generate_hash("stat_armor")
+	var h_price = Keys.generate_hash("items_price")
+	var a0 = rd.get_player_effect(h_armor, 0)
+	var p0 = rd.get_player_effect(h_price, 0)
+	m.graph_dirty = true
+	m.runtime.start_wave(null)
+	m.runtime.fire("wave_start", 0)
+	_eq(rd.get_player_effect(h_armor, 0), a0 + _good(3), "wave start: cursed armor")
+	m.runtime.fire("level_up", 0)
+	_eq(rd.get_player_effect(h_price, 0), p0 + _good(-5), "level up: cursed price reduction")
+	var g0 = rd.players_data[0].gold
+	for i in _bad(6):
+		m.runtime.fire("kill", 0)
+	_eq(rd.players_data[0].gold - g0, _good(2), "every %d kills (cursed from 6): +%d materials" % [_bad(6), _good(2)])
+	m.runtime.end_wave()
+	var ge = res[1]
+	var copy = GE.new()
+	copy.deserialize_and_merge(ge.serialize())
+	_check(abs(copy.curse_modifier() - CURSE_M) < 0.002, "curse survives save / load")
+	var uncursed = GE.make(g)
+	_check(uncursed.curse_modifier() == 0.0 and uncursed.live_graph() == uncursed.graph, "uncursed blueprint uses its own values")
+	m.delete_custom_item(res[2])

@@ -1895,6 +1895,125 @@ func library(with_weapons: bool = false) -> Array:
 	return _library
 
 
+# ============================================================
+# 诅咒蓝图：节点数值做成代理效果交给原版 curse_item（同一系数），按 effect key 走原版的规则与特判，再写回
+# ============================================================
+const CURSE_TAG = "be_curse:"
+var _good_dirs = null
+
+
+# 属性在原版效果里的好方向：+1 = 越大越好，-1 = 越小越好（如价格），0 = 中立（如敌人数量）
+func _good_dir(key: String) -> int:
+	if _good_dirs == null:
+		_good_dirs = {}
+		for entry in library(true):
+			var e = entry.effect
+			if e.custom_key != "" or e.key == "" or _good_dirs.has(e.key) or e.value == 0 or not "effect_sign" in e:
+				continue
+			var s = e.get_sign(e.effect_sign, e.value)
+			var v = 1 if e.value > 0 else -1
+			_good_dirs[e.key] = v if s in [0, 5] else (-v if s == 1 else 0)
+	return _good_dirs.get(key, 1)
+
+
+func curse_graph(g: Dictionary, modifier: float) -> Dictionary:
+	var out = g.duplicate(true)
+	var pd = _autoload("ProgressData")
+	var dlc = pd.get_dlc_data("abyssal_terrors") if pd != null else null
+	if dlc == null or modifier <= 0.0:
+		return out
+	var proxies = []
+	for n in out.nodes:
+		var kind = str(n.get("kind", ""))
+		var params = n.get("params", {})
+		var defs = Catalog.CURSE_PARAMS.get(kind, {})
+		for pname in defs:
+			var v = int(params.get(pname, _node_default(kind, pname)))
+			if v == 0:
+				continue
+			var e = load(EFFECT_SCRIPT).new()
+			e.value = v
+			match defs[pname]:
+				"stat":
+					e.key = str(params.get("stat", ""))
+					var d = _good_dir(e.key)
+					e.effect_sign = 2 if d == 0 else (0 if sign(v) == d else 1)
+				"good":
+					e.key = "broeditor_param"
+					e.effect_sign = 0 if v > 0 else 1
+				_:
+					e.key = "broeditor_param"
+					e.effect_sign = 1 if v > 0 else 0
+			e.resource_name = CURSE_TAG + str(n.id) + ":" + pname
+			e._generate_hashes()
+			proxies.push_back(e)
+		# 获得效果：引用的效果本身按原版规则诅咒（燃烧、投射物等按类型处理）
+		if kind == "grant" and params.get("ref") is Dictionary:
+			var ge = make_effect(params.ref)
+			if ge != null:
+				ge.resource_name = CURSE_TAG + str(n.id) + ":ref"
+				proxies.push_back(ge)
+	if proxies.empty():
+		return out
+	var item = load("res://items/global/item_data.gd").new()
+	item.my_id = "broeditor_graph_curse"
+	item.effects = proxies
+	# 用给定系数：关掉随机，并临时压低基础系数，使 max(最低系数, 基础系数) = 给定系数
+	var base = dlc.cursed_item_base_percent_modifier
+	dlc.cursed_item_base_percent_modifier = -100000
+	var cursed = dlc.curse_item(item, 0, true, modifier)
+	dlc.cursed_item_base_percent_modifier = base
+	var by_id = {}
+	for n in out.nodes:
+		by_id[str(n.id)] = n
+	for ce in cursed.effects:
+		var tag = str(ce.resource_name)
+		if not tag.begins_with(CURSE_TAG):
+			continue
+		var parts = tag.substr(CURSE_TAG.length()).split(":")
+		var n = by_id.get(parts[0])
+		if n == null:
+			continue
+		if parts[1] == "ref":
+			n.params.ref = _effect_to_spec(n.params.ref, ce)
+			continue
+		var v = int(ce.value)
+		if Catalog.CURSE_MAX.has(n.kind):
+			v = int(min(v, Catalog.CURSE_MAX[n.kind]))
+		n.params[parts[1]] = v
+	return out
+
+
+static func _node_default(kind: String, pname: String):
+	var d = Catalog.node_def(kind)
+	if d != null:
+		for p in d[2]:
+			if p[0] == pname:
+				return p[2]
+	return 0
+
+
+# 诅咒后的效果写回 spec：数值与子资源（燃烧、武器属性）
+func _effect_to_spec(spec: Dictionary, e) -> Dictionary:
+	var out = spec.duplicate(true)
+	if not out.get("set") is Dictionary:
+		out["set"] = {}
+	for f in Catalog.editable_fields(e):
+		if f.type in [TYPE_INT, TYPE_REAL]:
+			out.set[f.name] = e.get(f.name)
+	for f in Catalog.sub_fields(e):
+		var r = e.get(f)
+		var vals = {}
+		for cf in Catalog.sub_child_fields(r):
+			vals[cf.name] = r.get(cf.name)
+		if "scaling_stats" in r:
+			vals["scaling_stats"] = scaling_names(r.scaling_stats)
+		if not out.get("sub") is Dictionary:
+			out["sub"] = {}
+		out.sub[f] = vals
+	return out
+
+
 func set_library_dedup(on: bool) -> void:
 	library_dedup = on
 	_library = null

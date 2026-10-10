@@ -7,8 +7,12 @@ extends Effect
 const ID = "broeditor_graph"
 const Catalog = preload("res://mods-unpacked/Mojimoon-BroEditor/catalog.gd")
 const MAX_PATHS = 40
+# 诅咒探针：value 固定为 CURSE_PROBE、效果符号为"正面"。原版诅咒把它当作普通正面效果放大为
+# ceil(CURSE_PROBE × (1 + 诅咒系数))，据此还原诅咒系数，再按系数诅咒图里的数值（mod_main.curse_graph）
+const CURSE_PROBE = 1000
 
 var graph: Dictionary = {}
+var _cursed: Dictionary = {}	# 诅咒系数 -> 诅咒后的图（缓存）
 
 
 static func get_id() -> String:
@@ -21,10 +25,26 @@ static func make(g: Dictionary) -> Effect:
 	e.key_hash = Keys.generate_hash(ID)
 	e.custom_key_hash = Keys.empty_hash
 	e.text_key = ""
-	e.value = 0
-	e.effect_sign = 3
+	e.value = CURSE_PROBE
+	e.effect_sign = 0	# POSITIVE
 	e.graph = g.duplicate(true)
 	return e
+
+
+# 诅咒系数（未诅咒为 0；旧存档里 value = 0 也视为未诅咒）
+func curse_modifier() -> float:
+	return max(0.0, float(value) / CURSE_PROBE - 1.0) if value > CURSE_PROBE else 0.0
+
+
+# 实际生效的图：未诅咒为原图；诅咒后为数值按系数调整后的图
+func live_graph() -> Dictionary:
+	var m = curse_modifier()
+	if m <= 0.0:
+		return graph
+	if not _cursed.has(m):
+		var mod = _mod()
+		_cursed[m] = mod.curse_graph(graph, m) if mod != null else graph
+	return _cursed[m]
 
 
 static func _mod():
@@ -99,7 +119,7 @@ static func _walk_paths(g: Dictionary, by_id: Dictionary, path: Array, out: Arra
 # 文本：每条路径一行 "扳机，条件，条件：效果"
 # ============================================================
 func get_text(_player_index: int, colored: bool = true) -> String:
-	return graph_text(graph, colored)
+	return graph_text(live_graph(), colored)
 
 
 # 一条路径的文本，句式同 AutoAnthony / 原版："扳机 + 效果"，几率与"每 N 次"并入句式，
