@@ -894,7 +894,39 @@ func _on_tab_pressed(id: String) -> void:
 	_build_page()
 
 
+var _page_key: Array = []
+
+
+# 页面里各滚动区域的位置（按树中顺序）
+func _scroll_values(n: Node, out: Array) -> Array:
+	for c in n.get_children():
+		if c is ScrollContainer:
+			out.push_back([c.scroll_vertical, c.scroll_horizontal])
+		_scroll_values(c, out)
+	return out
+
+
+func _restore_scroll(n: Node, values: Array, i: int = 0) -> int:
+	for c in n.get_children():
+		if c is ScrollContainer and i < values.size():
+			c.scroll_vertical = values[i][0]
+			c.scroll_horizontal = values[i][1]
+			i += 1
+		i = _restore_scroll(c, values, i)
+	return i
+
+
+# 新页面排版完成后再恢复（排版前滚动范围为 0，会被截断）
+func _restore_scroll_later(values: Array) -> void:
+	yield(get_tree(), "idle_frame")
+	if is_instance_valid(_page):
+		var _n = _restore_scroll(_page, values)
+
+
 func _build_page() -> void:
+	var page_key = [_kind, _id, _tab]
+	var scrolls = _scroll_values(_page, []) if page_key == _page_key else []
+	_page_key = page_key
 	for c in _page.get_children():
 		_page.remove_child(c)
 		c.queue_free()
@@ -924,6 +956,8 @@ func _build_page() -> void:
 			_build_gear()
 		"bans":
 			_build_bans()
+	if not scrolls.empty():
+		_restore_scroll_later(scrolls)
 
 
 # ---------------- 概览 ----------------
@@ -1053,7 +1087,8 @@ func _refresh_preview() -> void:
 			_effect_lines(_mod.build_effects(w.my_id, pv), box)
 		return
 	if _kind == "item":
-		_preview_text.add_child(_label(_price_text(_character(), v), FONT_SMALL, C_TEXT_DIM))
+		var limit = _limit_text(v.max_nb if v.max_nb != -2 else int(_mod.backup_value(_character(), "max_nb")))
+		_preview_text.add_child(_label(_price_text(_character(), v) + ("  ·  " + limit if limit != "" else ""), FONT_SMALL, C_TEXT_DIM))
 	_effect_lines(_mod.build_effects(_id, v))
 	if _kind != "character":
 		return
@@ -1067,6 +1102,16 @@ func _refresh_preview() -> void:
 		grid.add_child(_icon_tile(w.icon, ItemService.get_color_from_tier(w.tier), 60))
 	if v.ban_items.size() + v.ban_weapons.size() > 0:
 		_preview_text.add_child(_desc(tr("BE_PREVIEW_BANS").replace("{0}", str(v.ban_items.size())).replace("{1}", str(v.ban_weapons.size()))))
+
+
+# 数量限制（原版字符串）：1 = 独特；大于 1 = 限制 (X)；不限 = ""
+func _limit_text(max_nb: int) -> String:
+	if max_nb == 1:
+		return tr("UNIQUE")
+	if max_nb <= 0:
+		return ""
+	var t = tr("LIMITED")
+	return t.replace("{0}/{1}", str(max_nb)).replace("{0}", "0").replace("{1}", str(max_nb))
 
 
 func _price_text(r, v: Dictionary) -> String:
@@ -1696,9 +1741,7 @@ func _build_start_state(parent: Control, v: Dictionary) -> void:
 		sb.connect("value_changed", self, "_on_start_changed", [f[0]])
 		row.add_child(sb)
 		_mark_name(f[0], int(sb.value), BEMain.START_DEFAULT[f[0]])
-	var settle = CheckBox.new()
-	settle.text = tr("BE_START_LEVEL_SETTLE")
-	settle.add_font_override("font", FONT_DESC)
+	var settle = _checkbox(tr("BE_START_LEVEL_SETTLE"), FONT_DESC)
 	settle.pressed = bool(BEMain.start_value(v, "level_settle"))
 	settle.connect("toggled", self, "_on_start_changed", ["level_settle"])
 	box.add_child(settle)
@@ -2382,9 +2425,7 @@ func _build_gear() -> void:
 		sb.connect("value_changed", self, "_on_start_item_count", [i])
 		row.add_child(sb)
 		if dlc:
-			var cb = CheckBox.new()
-			cb.text = tr("BE_CURSED")
-			cb.add_font_override("font", FONT_DESC)
+			var cb = _checkbox(tr("BE_CURSED"), FONT_DESC)
 			cb.pressed = bool(s.get("cursed", false))
 			cb.connect("toggled", self, "_on_start_item_cursed", [i])
 			row.add_child(cb)
@@ -2938,10 +2979,8 @@ func _on_reset_kind() -> void:
 	m.body.add_child(_desc(tr("BE_RESET_KIND_PICK").replace("{0}", kind_name)))
 	_reset_parts = {}
 	for d in RESET_PARTS:
-		var cb = CheckBox.new()
-		cb.text = tr(d[1])
+		var cb = _checkbox(tr(d[1]), FONT_SMALL)
 		cb.pressed = true
-		cb.add_font_override("font", FONT_SMALL)
 		m.body.add_child(cb)
 		_reset_parts[d[0]] = cb
 	m.add_button(tr("BE_CANCEL"), C_TEXT_DIM, m, "close")
@@ -3198,6 +3237,21 @@ func _small_switch_icon(src: Texture) -> Texture:
 	tex.create_from_image(img, Texture.FLAG_FILTER)
 	_switch_icons[key] = tex
 	return tex
+
+
+# 勾选框：各状态用同一个样式（游戏主题的悬停样式边距不同，文字会左移、压到勾上）
+func _checkbox(text: String, font: Font) -> CheckBox:
+	var cb = CheckBox.new()
+	cb.text = text
+	cb.add_font_override("font", font)
+	var sb = StyleBoxEmpty.new()
+	sb.content_margin_left = 4
+	sb.content_margin_right = 4
+	sb.content_margin_top = 2
+	sb.content_margin_bottom = 2
+	for st in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
+		cb.add_stylebox_override(st, sb)
+	return cb
 
 
 func _button(text: String, font: Font) -> Button:

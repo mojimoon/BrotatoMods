@@ -640,3 +640,71 @@ func test_158_modals_reset_and_blueprint_codes() -> void:
 	_check(not m.item_profiles.has(it.my_id) and not m.is_disabled("item", it.my_id), "edits and disabled reset")
 	ui.queue_free()
 	yield(tree, "idle_frame")
+
+
+# 修改过的原版武器（有备份但不备份 tier）列表正常；点标签不回到顶部；勾选框各状态同一样式；道具预览的独特 / 限制
+func test_159_regressions_090() -> void:
+	var fam = _family_from(0, 0)
+	m.weapon_families[fam[0].weapon_id] = m.new_family()
+	m.weapon_families[fam[0].weapon_id].name = "Renamed family"
+	m.apply_all()
+	_eq(m.backup_value(fam[1], "tier"), fam[1].tier, "weapon tier read from the resource")
+	var ui = yield(_open_ui(CH), "completed")
+	ui.set_kind("weapon")
+	yield(tree, "idle_frame")
+	var ok = ui._char_grid.get_child_count() > 0
+	for b in ui._char_grid.get_children():
+		ok = ok and b.has_meta("tier") and typeof(b.get_meta("tier")) == TYPE_INT
+	_check(ok, "weapon list built with a modified vanilla family")
+	# 页面重建（点标签 / 改稀有度等）后滚动位置保持：道具属性页足够长
+	ui.set_kind("item")
+	var it = _plain_item()
+	ui._select(it.my_id)
+	ui._on_tab_pressed("stats")
+	yield(_frames(3), "completed")
+	var sc = null
+	var scrolls = []
+	_collect_scrolls(ui._page, scrolls)
+	for s in scrolls:
+		if sc == null and s.get_v_scrollbar().max_value > s.rect_size.y + 300:
+			sc = s
+	_check(sc != null, "stats page scrolls")
+	if sc != null:
+		sc.scroll_vertical = 250
+		yield(tree, "idle_frame")
+		var before = sc.scroll_vertical
+		ui._on_attr_changed(2, "tier", it.tier)
+		yield(_frames(3), "completed")
+		var after = []
+		_collect_scrolls(ui._page, after)
+		var kept = false
+		for s in after:
+			kept = kept or (s.scroll_vertical == before and s != sc)
+		_check(before > 0 and kept, "scroll position kept after the page is rebuilt (%d)" % before)
+	# 换到别的页 / 对象时从顶部开始
+	ui._on_tab_pressed("overview")
+	ui._on_tab_pressed("stats")
+	yield(_frames(3), "completed")
+	var fresh = []
+	_collect_scrolls(ui._page, fresh)
+	var top = true
+	for s in fresh:
+		top = top and s.scroll_vertical == 0
+	_check(top, "another page starts at the top")
+	# 独特 / 限制
+	_eq(ui._limit_text(1), tr("UNIQUE"), "unique")
+	_check(ui._limit_text(3).find("3") >= 0 and ui._limit_text(3).find("{") < 0, "limited (3): " + ui._limit_text(3))
+	_eq(ui._limit_text(-1), "", "no limit")
+	# 勾选框
+	var cb = ui._checkbox("x", ui.FONT_SMALL)
+	_check(cb.get_stylebox("hover") == cb.get_stylebox("normal"), "checkbox hover keeps the same margins")
+	cb.free()
+	ui.queue_free()
+	yield(tree, "idle_frame")
+
+
+func _collect_scrolls(n: Node, out: Array) -> void:
+	for c in n.get_children():
+		if c is ScrollContainer:
+			out.push_back(c)
+		_collect_scrolls(c, out)

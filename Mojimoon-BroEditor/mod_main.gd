@@ -1053,8 +1053,11 @@ func _backup(c) -> void:
 	_backups[c.my_id] = {"res": c, "fields": fields}
 
 
+# 备份里的原值；该种类不备份的字段（如武器的 tier）取当前值
 func backup_value(c, field: String):
-	return _backups[c.my_id].fields[field] if _backups.has(c.my_id) else c.get(field)
+	if _backups.has(c.my_id) and _backups[c.my_id].fields.has(field):
+		return _backups[c.my_id].fields[field]
+	return c.get(field)
 
 
 func restore() -> void:
