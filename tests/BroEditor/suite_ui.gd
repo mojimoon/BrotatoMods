@@ -93,9 +93,9 @@ func test_52_ui_custom_create_delete() -> void:
 	_eq(m.profiles[id].icon, isvc.items[2].my_id, "single picker applies immediately")
 	_eq(ui._picker, null, "single picker closed")
 	ui._on_delete_custom()
-	_check(m.is_custom(id), "first click only arms")
-	ui._on_delete_custom()
-	_check(not m.is_custom(id), "second click deletes")
+	_check(m.is_custom(id) and ui._modals.size() == 1, "delete asks first")
+	ui._modals[-1].ok_button.emit_signal("pressed")
+	_check(not m.is_custom(id) and ui._modals.empty(), "deleted after confirming")
 	ui.queue_free()
 	yield(tree, "idle_frame")
 
@@ -163,12 +163,22 @@ func test_104_tier_weapons_and_reset_button() -> void:
 	var ui = yield(_open_ui(CH), "completed")
 	_check(ui._reset_btn.visible and ui._reset_btn.disabled, "reset visible, disabled without changes")
 	ui._on_tab_pressed("gear")
-	var t1 = ui._tier_weapon_ids(0)
-	ui._on_tier_weapons(0)
+	# 武器弹窗：筛选 T1 后"选中当前全部"，再"取消当前全部"
+	var t1 = []
+	for w in isvc.weapons:
+		if w.tier == 0:
+			t1.push_back(w.my_id)
+	ui._open_picker("start_weapons")
+	ui._on_picker_chip("tier", 0)
+	ui._on_picker_shown(true)
+	ui._on_picker_confirm()
 	for id in t1:
 		_check(id in m.profiles[CH].weapons, "T1 added " + id)
 	_check(not ui._reset_btn.disabled, "reset enabled after change")
-	ui._on_tier_weapons(0)
+	ui._open_picker("start_weapons")
+	ui._on_picker_chip("tier", 0)
+	ui._on_picker_shown(false)
+	ui._on_picker_confirm()
 	for id in t1:
 		_check(not id in m.profiles[CH].weapons, "T1 removed " + id)
 	ui.queue_free()
@@ -337,7 +347,7 @@ func test_145_ui_custom_and_disable() -> void:
 	ui._on_attr_changed(2, "tier", -999)
 	_eq(m.find_target("item", iid).tier, 2, "custom item tier live")
 	ui._on_delete_custom()
-	ui._on_delete_custom()
+	ui._modals[-1].ok_button.emit_signal("pressed")
 	_check(m.find_target("item", iid) == null, "custom item deleted from ui")
 	# 武器：每个家族一格
 	ui.set_kind("weapon")
@@ -382,7 +392,7 @@ func test_145_ui_custom_and_disable() -> void:
 	ui._on_tab_pressed("stats")
 	_check(ui._aspd_label != null and ui._aspd_label.text != "", "attack speed shown")
 	ui._on_delete_custom()
-	ui._on_delete_custom()
+	ui._modals[-1].ok_button.emit_signal("pressed")
 	_check(not m.weapon_families.has(wid), "custom weapon deleted from ui")
 	ui.queue_free()
 	yield(tree, "idle_frame")
@@ -512,5 +522,121 @@ func test_157_stats_and_effects_per_kind() -> void:
 		lib_sizes[kind] = ui._lib_list.get_child_count()
 	_eq(m.library(false).size() < m.library(true).size(), true, "weapon library has weapon effects")
 	_check(lib_sizes.character == lib_sizes.item, "characters and items share one library (%d / %d)" % [lib_sizes.character, lib_sizes.item])
+	ui.queue_free()
+	yield(tree, "idle_frame")
+
+
+# 弹窗类、确认、全部重置、蓝图分享码、从角色导入初始武器、武器弹窗筛选、预览中的蓝图效果
+const NL = "\n"
+
+
+func test_158_modals_reset_and_blueprint_codes() -> void:
+	var ui = yield(_open_ui(CH), "completed")
+	ui.test_clipboard = ""
+	# 重置单个：确认后才重置；Esc 关闭弹窗
+	m.profiles[CH] = m.new_profile()
+	m.profiles[CH].stats = {"stat_luck": 4}
+	ui._select(CH)
+	ui._on_reset_pressed()
+	_check(m.profiles.has(CH), "reset asks first")
+	var ev = InputEventAction.new()
+	ev.action = "ui_cancel"
+	ev.pressed = true
+	ui._unhandled_input(ev)
+	_check(ui._modals.empty() and m.profiles.has(CH) and ui.is_inside_tree(), "Esc closes only the dialog")
+	ui._on_reset_pressed()
+	ui._modals[-1].ok_button.emit_signal("pressed")
+	_check(not m.profiles.has(CH), "reset after confirming")
+	# 蓝图：导出 / 导入 / 清空（确认）
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	GE.add_link(g, GE.add_node(g, "wave_start", Vector2.ZERO), GE.add_node(g, "perm_stat", Vector2.ZERO, {"stat": "stat_engineering", "value": 3}))
+	GE.add_link(g, GE.add_node(g, "interval", Vector2.ZERO, {"secs": 1}), GE.add_node(g, "add_gold", Vector2.ZERO, {"value": 1}))
+	ui._p().graph = g
+	ui._on_tab_pressed("blueprint")
+	yield(tree, "idle_frame")
+	ui.blueprint._on_export()
+	_check(ui.test_clipboard.begins_with(m.GRAPH_PREFIX), "blueprint exported as BEB:")
+	var code = ui.test_clipboard
+	ui.blueprint._on_clear()
+	_check(m.profiles[CH].graph != null, "clear asks first")
+	ui._modals[-1].ok_button.emit_signal("pressed")
+	_eq(m.profiles[CH].graph, null, "cleared after confirming")
+	ui.test_clipboard = m.SHARE_PREFIX + "x"
+	ui.blueprint._on_import()
+	_eq(m.profiles[CH].graph, null, "other codes are not blueprints")
+	ui.test_clipboard = code
+	ui.blueprint._on_import()
+	_eq(GE.paths(m.profiles[CH].graph).size(), 2, "blueprint imported")
+	# 预览：蓝图每条路径一行，和其他效果一样（带属性图标）
+	ui._on_tab_pressed("overview")
+	yield(tree, "idle_frame")
+	var lines = []
+	for c in ui._preview_text.get_children():
+		if c.get("text_descr") != null:
+			lines.push_back(c)
+	var eng = null
+	for l in lines:
+		if l.text_descr.bbcode_text.find(NL) < 0 and l.text_descr.bbcode_text.find("3") >= 0 and l.effect_icon.texture != null:
+			eng = l
+	_check(eng != null, "blueprint path rendered as its own effect line with an icon")
+	var multi = false
+	for l in lines:
+		multi = multi or l.text_descr.bbcode_text.find(NL) >= 0
+	_check(not multi, "no multi-line effect block")
+	# 从角色导入初始武器
+	var other = null
+	for c in isvc.characters:
+		if c.my_id != CH and c.starting_weapons.size() >= 2:
+			other = c
+			break
+	ui._on_tab_pressed("gear")
+	ui._open_char_weapons()
+	_eq(ui._modals.size(), 1, "character table opened")
+	ui._on_char_weapons_picked(other.my_id, ui._modals[-1])
+	var want = []
+	for w in other.starting_weapons:
+		if not w.my_id in want:
+			want.push_back(w.my_id)
+	_eq(m.profiles[CH].weapons, want, "starting weapons copied from " + other.my_id)
+	_check(ui._modals.empty(), "table closed")
+	# 武器弹窗：近 / 远战与来源筛选、重置全部
+	ui._open_picker("start_weapons")
+	ui._on_picker_chip("type", 1)
+	ui._on_picker_chip("src", "vanilla")
+	var ok = ui._picker_grid.get_child_count() > 0
+	for r in ui._picker_res:
+		if ui._picker_shown(r):
+			ok = ok and r.type == 1 and ui._source(r) == "vanilla"
+	_check(ok, "ranged + vanilla filter")
+	ui._on_picker_reset()
+	var orig = []
+	for w in m.backup_value(m.find_character(CH), "starting_weapons"):
+		if not w.my_id in orig:
+			orig.push_back(w.my_id)
+	_eq(ui._picker_sel, orig, "reset all = original starting weapons")
+	ui._close_picker()
+	# 全部重置：先勾选内容，再最终确认；只重置自定义内容时保留修改与禁用，编号重新开始
+	ui.set_kind("item")
+	var it = _plain_item()
+	m.item_profiles[it.my_id] = m.new_profile()
+	m.item_profiles[it.my_id].price = 99
+	m.set_disabled("item", it.my_id, true)
+	var iid = m.create_custom_item(it.my_id)
+	_check(m.next_id > 1, "numbering advanced")
+	ui._fill_left()
+	ui._on_reset_kind()
+	ui._reset_parts.disabled.pressed = false
+	ui._reset_parts.edits.pressed = false
+	ui._modals[-1].ok_button.emit_signal("pressed")
+	_check(m.find_target("item", iid) != null and ui._modals.size() == 1, "second dialog before anything is reset")
+	ui._modals[-1].ok_button.emit_signal("pressed")
+	_check(m.find_target("item", iid) == null, "custom items removed")
+	_eq(m.next_id, 1, "numbering reset")
+	_check(m.item_profiles.has(it.my_id) and m.is_disabled("item", it.my_id), "edits and disabled kept")
+	ui._on_reset_kind()
+	ui._modals[-1].ok_button.emit_signal("pressed")
+	ui._modals[-1].ok_button.emit_signal("pressed")
+	_check(not m.item_profiles.has(it.my_id) and not m.is_disabled("item", it.my_id), "edits and disabled reset")
 	ui.queue_free()
 	yield(tree, "idle_frame")

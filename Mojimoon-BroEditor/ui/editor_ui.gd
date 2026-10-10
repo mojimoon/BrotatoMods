@@ -13,6 +13,7 @@ const GraphEffect = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/graph_
 const BlueprintPage = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/blueprint_page.gd")
 const SearchSelect = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/search_select.gd")
 const DragRow = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/drag_row.gd")
+const Modal = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/modal.gd")
 const FONT_TITLE = preload("res://resources/fonts/actual/base/font_32_outline.tres")
 const FONT_NORMAL = preload("res://resources/fonts/actual/base/font_26.tres")
 const FONT_SMALL = preload("res://resources/fonts/actual/base/font_22.tres")
@@ -84,7 +85,6 @@ var _filters := {
 	"weapon": {"q": "", "src": "all", "tier": -1, "tag": "", "sort": "tier"},
 }
 var _start_sig := ""
-var _delete_armed := false
 var _switch_icons: Dictionary = {}
 var _regex_bb := RegEx.new()
 
@@ -146,6 +146,11 @@ var _picker_grid: GridContainer
 var _picker_filter := ""
 var _picker_count: Label
 var _picker_multi := true
+# 武器选择弹窗的筛选：稀有度（-1 = 全部）、近 / 远战（-1 = 全部）、来源
+var _picker_f := {"tier": -1, "type": -1, "src": "all"}
+var _picker_chips: Dictionary = {}
+# 打开中的弹窗（Modal），Esc 关闭最上面的一个
+var _modals: Array = []
 
 var test_clipboard = null
 
@@ -171,10 +176,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
 		if active_popup != null and is_instance_valid(active_popup):
 			active_popup.close()
-		elif _picker != null:
-			_close_picker()
-		elif blueprint != null and blueprint.close_picker():
-			pass
+		elif not _modals.empty():
+			_modals[-1].close()
 		else:
 			_on_close_pressed()
 		get_tree().set_input_as_handled()
@@ -426,6 +429,10 @@ func _fill_left() -> void:
 		_apply_action_style(_delete_btn, C_DANGER)
 		_delete_btn.connect("pressed", self, "_on_delete_custom")
 		row.add_child(_delete_btn)
+	var reset_all = _button(tr("BE_RESET_KIND"), FONT_SMALL)
+	_apply_action_style(reset_all, C_DANGER)
+	reset_all.connect("pressed", self, "_on_reset_kind")
+	box.add_child(reset_all)
 	_refresh_char_list()
 
 
@@ -675,7 +682,6 @@ func _select(id: String) -> void:
 		return
 	_id = id
 	_expanded = -1
-	_delete_armed = false
 	_refresh_header()
 	_refresh_char_marks()
 	_build_page()
@@ -732,7 +738,6 @@ func _refresh_header() -> void:
 	_refresh_tier_box()
 	if _delete_btn != null:
 		_delete_btn.disabled = not _look_custom()
-		_delete_btn.text = tr("BE_DELETE_CONFIRM" if _delete_armed else "BE_DELETE")
 	for t in _tab_buttons:
 		var tb = _tab_buttons[t]
 		_apply_chip_style(tb[0], t == _tab, tb[1])
@@ -868,7 +873,7 @@ func _is_modified(id: String) -> bool:
 
 # 列表与筛选用的来源：武器按家族（含原版成员则取原版成员的来源）
 func _source(r) -> String:
-	if _kind == "weapon":
+	if r is WeaponData:
 		var vm = _mod._vanilla_members(r.weapon_id)
 		return BEMain.source_of(vm[0]) if not vm.empty() else "mod"
 	return BEMain.source_of(r)
@@ -1078,6 +1083,9 @@ func _effect_lines(effects: Array, parent: Control = null) -> void:
 	if parent == null:
 		parent = _preview_text
 	for e in effects:
+		if e.get_script() == GraphEffect:
+			_graph_lines(e.graph, parent)
+			continue
 		var path = e.get_script().resource_path if e.get_script() != null else ""
 		var native = false
 		for dir in SAFE_TEXT_DIRS:
@@ -1090,6 +1098,18 @@ func _effect_lines(effects: Array, parent: Control = null) -> void:
 		else:
 			# 本 mod / 其他 mod 的效果：只显示文本（没有原版图标）
 			line._display_special_text(_mod.effect_text(e), null)
+
+
+# 蓝图：每条路径一行效果行，图标取效果节点的属性
+func _graph_lines(g: Dictionary, parent: Control) -> void:
+	var by_id = GraphEffect.nodes_by_id(g)
+	for path in GraphEffect.paths(g):
+		var stat = str(by_id[path[-1]].get("params", {}).get("stat", ""))
+		var icon = ItemService.get_stat_small_icon(Keys.generate_hash(stat)) if stat != "" else null
+		var line = EFFECT_LINE.instance()
+		line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		parent.add_child(line)
+		line._display_special_text(GraphEffect.path_text(by_id, path, true), icon)
 
 
 # 武器属性文本（同原版武器面板：在武器副本上换成改写后的属性）
@@ -2312,24 +2332,15 @@ func _build_gear() -> void:
 	_apply_action_style(pick, C_CUSTOM_2)
 	pick.connect("pressed", self, "_open_picker", ["start_weapons"])
 	wrow.add_child(pick)
+	var from_char = _button(tr("BE_IMPORT_FROM_CHARACTER"), FONT_SMALL)
+	_apply_action_style(from_char, C_CUSTOM_2)
+	from_char.connect("pressed", self, "_open_char_weapons")
+	wrow.add_child(from_char)
 	if not _mod.is_custom(_id):
 		var orig = _button(tr("BE_RESTORE_ORIGINAL"), FONT_SMALL)
 		_apply_action_style(orig, C_ACCENT)
 		orig.connect("pressed", self, "_on_weapons_original")
 		wrow.add_child(orig)
-	# 全部 T1–T4：点击全部加入，再次点击全部移除
-	var cur_ids = _start_weapon_ids()
-	for t in 4:
-		var tier_ids = _tier_weapon_ids(t)
-		var all_in = not tier_ids.empty()
-		for id in tier_ids:
-			if not id in cur_ids:
-				all_in = false
-				break
-		var tb = _button(tr("BE_ALL_TIER").replace("{0}", str(t + 1)), FONT_SMALL)
-		_apply_chip_style(tb, all_in, ItemService.get_color_from_tier(t))
-		tb.connect("pressed", self, "_on_tier_weapons", [t])
-		wrow.add_child(tb)
 	var ws = _mod._weapons_by_ids(v.weapons) if v.weapons is Array else c.starting_weapons
 	var wgrid = _icon_grid(14)
 	wbox.add_child(wgrid)
@@ -2393,26 +2404,47 @@ func _start_weapon_ids() -> Array:
 	return out
 
 
-func _tier_weapon_ids(t: int) -> Array:
-	var out = []
-	for w in _isvc().weapons:
-		if w.tier == t and not w.my_id in out:
-			out.push_back(w.my_id)
-	return out
+# 从角色导入初始武器：表格列出每个角色（本角色除外）的初始武器，点击一行即采用
+func _open_char_weapons() -> void:
+	var m = Modal.open(self, tr("BE_PICKER_CHAR_WEAPONS"), C_CUSTOM_2, Vector2(1240, 820))
+	m.add_button(tr("BE_CANCEL"), C_TEXT_DIM, m, "close")
+	var scroll = _scroll()
+	m.body.add_child(scroll)
+	var grid = GridContainer.new()
+	grid.columns = 2
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_constant_override("hseparation", 14)
+	grid.add_constant_override("vseparation", 6)
+	scroll.add_child(grid)
+	var chars = []
+	for c in _isvc().characters:
+		if c != null and c.my_id != _id:
+			chars.push_back(c)
+	chars.sort_custom(self, "_sort_by_name")
+	for c in chars:
+		var b = _button(tr(c.name), FONT_SMALL)
+		b.icon = c.icon
+		b.expand_icon = true
+		b.align = Button.ALIGN_LEFT
+		b.clip_text = true
+		b.rect_min_size = Vector2(300, 56)
+		_apply_action_style(b, C_CUSTOM_2)
+		b.connect("pressed", self, "_on_char_weapons_picked", [c.my_id, m])
+		grid.add_child(b)
+		var row = HBoxContainer.new()
+		row.add_constant_override("separation", 4)
+		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		grid.add_child(row)
+		for w in c.starting_weapons:
+			row.add_child(_icon_tile(w.icon, ItemService.get_color_from_tier(w.tier), 48))
 
 
-func _on_tier_weapons(t: int) -> void:
-	var ids = _start_weapon_ids()
-	var tier_ids = _tier_weapon_ids(t)
-	var all_in = true
-	for id in tier_ids:
-		if not id in ids:
-			all_in = false
-	for id in tier_ids:
-		if all_in:
-			ids.erase(id)
-		elif not id in ids:
-			ids.push_back(id)
+func _on_char_weapons_picked(char_id: String, m) -> void:
+	var ids = []
+	for w in _mod.find_character(char_id).starting_weapons:
+		if not w.my_id in ids:
+			ids.push_back(w.my_id)
+	m.close()
 	_p().weapons = ids
 	_changed()
 	_build_page()
@@ -2612,57 +2644,111 @@ func _open_picker(mode: String) -> void:
 			_picker_sel = [_look_view().icon]
 	_picker_res.sort_custom(self, "_sort_by_tier_name")
 
-	_picker = Control.new()
-	_picker.set_anchors_preset(Control.PRESET_WIDE)
-	add_child(_picker)
-	var shade = ColorRect.new()
-	shade.color = Color(0, 0, 0, 0.55)
-	shade.set_anchors_preset(Control.PRESET_WIDE)
-	_picker.add_child(shade)
-	var center = CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_WIDE)
-	_picker.add_child(center)
-	var panel = PanelContainer.new()
-	panel.rect_min_size = Vector2(1240, 820)
-	panel.add_stylebox_override("panel", _style(C_BG_PANEL, C_ACCENT_2, 12, 2, 18, 14))
-	center.add_child(panel)
-	var box = VBoxContainer.new()
-	box.add_constant_override("separation", 8)
-	panel.add_child(box)
-	var head = HBoxContainer.new()
-	head.add_constant_override("separation", 10)
-	box.add_child(head)
-	var title = _label(tr("BE_PICKER_" + mode.to_upper() + ("_" + _kind.to_upper() if mode == "base" and _kind != "character" else "")), FONT_NORMAL, C_ACCENT_2)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(title)
+	var title = tr("BE_PICKER_" + mode.to_upper() + ("_" + _kind.to_upper() if mode == "base" and _kind != "character" else ""))
+	_picker = Modal.open(self, title, C_ACCENT_2, Vector2(1240, 820))
+	_picker.connect("closed", self, "_on_picker_closed")
 	_picker_count = _label("", FONT_SMALL, C_TEXT_DIM)
-	head.add_child(_picker_count)
+	_picker.head.add_child(_picker_count)
+	var box = _picker.body
 	var search = _line_edit(tr("BE_SEARCH"))
 	search.connect("text_changed", self, "_on_picker_search")
 	box.add_child(search)
+	_picker_f = {"tier": -1, "type": -1, "src": "all"}
+	_picker_chips = {}
+	if _picker_weapons():
+		var tiers = [[-1, "BE_FILTER_ALL"]]
+		for t in 4:
+			tiers.push_back([t, "T" + str(t + 1)])
+		var frow = HBoxContainer.new()
+		frow.add_constant_override("separation", 16)
+		box.add_child(frow)
+		_picker_chip_row(frow, "tier", tiers)
+		_picker_chip_row(frow, "type", [[-1, "BE_FILTER_ALL"], [0, "MELEE"], [1, "RANGED"]])
+		_picker_chip_row(frow, "src", SOURCES)
 	var scroll = _scroll()
 	box.add_child(scroll)
 	_picker_grid = _icon_grid(16)
 	scroll.add_child(_picker_grid)
-	var foot = HBoxContainer.new()
-	foot.add_constant_override("separation", 10)
-	box.add_child(foot)
-	foot.add_child(_desc(tr("BE_PICKER_MULTI_DESC" if _picker_multi else "BE_PICKER_SINGLE_DESC")))
-	if _picker_multi:
-		var clear = _button(tr("BE_PICKER_CLEAR"), FONT_SMALL)
-		_apply_action_style(clear, C_DANGER)
-		clear.connect("pressed", self, "_on_picker_clear")
-		foot.add_child(clear)
-	var cancel = _button(tr("BE_CANCEL"), FONT_SMALL)
-	_apply_action_style(cancel, C_TEXT_DIM)
-	cancel.connect("pressed", self, "_close_picker")
-	foot.add_child(cancel)
-	var ok = _button(tr("BE_CONFIRM"), FONT_SMALL)
-	_apply_action_style(ok, C_ACCENT_3)
-	ok.connect("pressed", self, "_on_picker_confirm")
-	foot.add_child(ok)
+	var hint = _desc(tr("BE_PICKER_MULTI_DESC" if _picker_multi else "BE_PICKER_SINGLE_DESC"))
+	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_picker.foot.add_child(hint)
+	if mode == "start_weapons":
+		_picker.add_button(tr("BE_PICKER_SELECT_SHOWN"), C_ACCENT_3, self, "_on_picker_shown", [true])
+		_picker.add_button(tr("BE_PICKER_DESELECT_SHOWN"), C_TEXT_DIM, self, "_on_picker_shown", [false])
+		_picker.add_button(tr("BE_PICKER_RESET_ALL"), C_DANGER, self, "_on_picker_reset")
+	elif _picker_multi:
+		_picker.add_button(tr("BE_PICKER_CLEAR"), C_DANGER, self, "_on_picker_clear")
+	_picker.add_button(tr("BE_CANCEL"), C_TEXT_DIM, self, "_close_picker")
+	_picker.add_button(tr("BE_CONFIRM"), C_ACCENT_3, self, "_on_picker_confirm")
 	_fill_picker()
 	search.call_deferred("grab_focus")
+
+
+func _picker_weapons() -> bool:
+	return _picker_mode in ["start_weapons", "start_items_w"]
+
+
+# 一组筛选按钮（稀有度 / 近远战 / 来源）
+func _picker_chip_row(parent: Control, key: String, defs: Array) -> void:
+	var row = HBoxContainer.new()
+	row.add_constant_override("separation", 4)
+	parent.add_child(row)
+	_picker_chips[key] = []
+	for d in defs:
+		var b = _button(tr(d[1]), FONT_DESC)
+		b.rect_min_size = Vector2(56, 0)
+		b.connect("pressed", self, "_on_picker_chip", [key, d[0]])
+		row.add_child(b)
+		_picker_chips[key].push_back([b, d[0]])
+	_style_picker_chips(key)
+
+
+func _style_picker_chips(key: String) -> void:
+	for bv in _picker_chips[key]:
+		_apply_chip_style(bv[0], bv[1] == _picker_f[key], C_ACCENT_2)
+
+
+func _on_picker_chip(key: String, value) -> void:
+	_picker_f[key] = value
+	_style_picker_chips(key)
+	_fill_picker()
+
+
+func _picker_shown(r) -> bool:
+	if _picker_filter != "" and tr(r.name).to_lower().find(_picker_filter) < 0 and r.my_id.find(_picker_filter) < 0:
+		return false
+	if not _picker_weapons():
+		return true
+	return (_picker_f.tier < 0 or r.tier == _picker_f.tier) and (_picker_f.type < 0 or r.type == _picker_f.type) and (_picker_f.src == "all" or _source(r) == _picker_f.src)
+
+
+# 选中 / 取消当前筛选出的全部
+func _on_picker_shown(on: bool) -> void:
+	for r in _picker_res:
+		if not _picker_shown(r):
+			continue
+		if on and not r.my_id in _picker_sel:
+			_picker_sel.push_back(r.my_id)
+		elif not on:
+			_picker_sel.erase(r.my_id)
+	_fill_picker()
+
+
+# 重置全部：恢复为原版初始武器（自定义角色取基底角色的）
+func _on_picker_reset() -> void:
+	var c = _character()
+	if _mod.is_custom(_id):
+		c = _mod.find_character(_view().base)
+	_picker_sel = []
+	if c != null:
+		for w in _mod.backup_value(c, "starting_weapons"):
+			if not w.my_id in _picker_sel:
+				_picker_sel.push_back(w.my_id)
+	_fill_picker()
+
+
+func _on_picker_closed() -> void:
+	_picker = null
 
 
 func _native_items() -> Array:
@@ -2694,7 +2780,7 @@ func _fill_picker() -> void:
 		_picker_grid.remove_child(c)
 		c.queue_free()
 	for r in _picker_res:
-		if _picker_filter != "" and tr(r.name).to_lower().find(_picker_filter) < 0 and r.my_id.find(_picker_filter) < 0:
+		if not _picker_shown(r):
 			continue
 		var b = _res_button(r)
 		var on = r.my_id in _picker_sel
@@ -2758,7 +2844,7 @@ func _kind_base(id: String) -> String:
 
 func _close_picker() -> void:
 	if _picker != null and is_instance_valid(_picker):
-		_picker.queue_free()
+		_picker.close()
 	_picker = null
 
 
@@ -2786,6 +2872,10 @@ func _on_enable_toggled(pressed: bool) -> void:
 
 
 func _on_reset_pressed() -> void:
+	Modal.confirm(self, [tr("BE_RESET_CONFIRM_MSG").replace("{0}", _head_name.text)], C_DANGER, self, "_do_reset")
+
+
+func _do_reset() -> void:
 	_mod.reset_profile(_id, _kind)
 	if _kind == "weapon" and not _look_custom() and _mod.weapon_families.has(_obj_key()):
 		var f = _mod.weapon_families[_obj_key()]
@@ -2815,11 +2905,10 @@ func _on_new_custom() -> void:
 func _on_delete_custom() -> void:
 	if not _look_custom():
 		return
-	if not _delete_armed:
-		_delete_armed = true
-		_refresh_header()
-		return
-	_delete_armed = false
+	Modal.confirm(self, [tr("BE_DELETE_CONFIRM_MSG").replace("{0}", _head_name.text)], C_DANGER, self, "_do_delete")
+
+
+func _do_delete() -> void:
 	var ok = false
 	match _kind:
 		"character":
@@ -2836,6 +2925,53 @@ func _on_delete_custom() -> void:
 		if _kind == "character":
 			_set_status(tr("BE_CUSTOM_IN_USE"))
 		_refresh_header()
+
+
+# 全部重置：第一个弹窗勾选重置哪些（禁用状态 / 修改内容 / 自定义内容），第二个弹窗最终确认
+const RESET_PARTS = [["disabled", "BE_RESET_PART_DISABLED"], ["edits", "BE_RESET_PART_EDITS"], ["custom", "BE_RESET_PART_CUSTOM"]]
+var _reset_parts: Dictionary = {}
+
+
+func _on_reset_kind() -> void:
+	var kind_name = tr("BE_KIND_" + _kind.to_upper())
+	var m = Modal.open(self, tr("BE_RESET_KIND"), C_DANGER, Vector2(720, 0))
+	m.body.add_child(_desc(tr("BE_RESET_KIND_PICK").replace("{0}", kind_name)))
+	_reset_parts = {}
+	for d in RESET_PARTS:
+		var cb = CheckBox.new()
+		cb.text = tr(d[1])
+		cb.pressed = true
+		cb.add_font_override("font", FONT_SMALL)
+		m.body.add_child(cb)
+		_reset_parts[d[0]] = cb
+	m.add_button(tr("BE_CANCEL"), C_TEXT_DIM, m, "close")
+	m.ok_button = m.add_button(tr("BE_NEXT"), C_DANGER, self, "_on_reset_kind_next", [m])
+
+
+func _on_reset_kind_next(m) -> void:
+	var parts = []
+	var names = []
+	for d in RESET_PARTS:
+		if _reset_parts[d[0]].pressed:
+			parts.push_back(d[0])
+			names.push_back(tr(d[1]))
+	if parts.empty():
+		return
+	m.close()
+	var msg = tr("BE_RESET_KIND_CONFIRM").replace("{0}", tr("BE_KIND_" + _kind.to_upper())).replace("{1}", PoolStringArray(names).join(tr("BE_LIST_SEP")))
+	Modal.confirm(self, [msg], C_DANGER, self, "_do_reset_kind", [parts])
+
+
+func _do_reset_kind(parts: Array) -> void:
+	var kept = _mod.reset_kind(_kind, parts)
+	_mod.apply_all()
+	_expanded = -1
+	_fill_left()
+	if _mod.find_target(_kind, _id) == null:
+		_id = _first_listed()
+	_select(_id)
+	_changed()
+	_set_status(tr("BE_RESET_KIND_DONE") if kept == 0 else tr("BE_RESET_KIND_KEPT").replace("{0}", str(kept)))
 
 
 func _clipboard_get() -> String:

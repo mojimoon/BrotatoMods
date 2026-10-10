@@ -38,10 +38,15 @@ func build(p_ui, parent: Control) -> void:
 		ui._apply_action_style(mb, TYPE_COLORS[t[0]])
 		mb.connect("selected", self, "add_node_kind")
 		bar.add_child(mb)
-	var clear = ui._button(ui.tr("BE_GRAPH_CLEAR"), ui.FONT_SMALL)
-	ui._apply_action_style(clear, ui.C_DANGER)
-	clear.connect("pressed", self, "_on_clear")
-	bar.add_child(clear)
+	var gap = Control.new()
+	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar.add_child(gap)
+	# 蓝图自己的分享码（BEB:），与顶部的导入 / 导出分开
+	for d in [["BE_GRAPH_EXPORT", "_on_export", ui.C_ACCENT_2], ["BE_GRAPH_IMPORT", "_on_import", ui.C_ACCENT_2], ["BE_GRAPH_CLEAR", "_on_clear", ui.C_DANGER]]:
+		var b = ui._button(ui.tr(d[0]), ui.FONT_SMALL)
+		ui._apply_action_style(b, d[2])
+		b.connect("pressed", self, d[1])
+		bar.add_child(b)
 	parent.add_child(ui._desc(ui.tr("BE_GRAPH_DESC")))
 
 	var cols = HBoxContainer.new()
@@ -265,9 +270,34 @@ func _on_param_option(value, id: int, key: String) -> void:
 
 
 func _on_clear() -> void:
+	ui.Modal.confirm(ui, [ui.tr("BE_GRAPH_CLEAR_CONFIRM")], ui.C_DANGER, self, "_do_clear")
+
+
+func _do_clear() -> void:
 	ui._p().graph = null
 	rebuild()
 	_changed()
+
+
+func _on_export() -> void:
+	var code = ui._mod.export_graph(_graph())
+	if code == "":
+		ui._set_status(ui.tr("BE_GRAPH_EXPORT_EMPTY"))
+		return
+	ui._clipboard_set(code)
+	ui._set_status(ui.tr("BE_GRAPH_EXPORTED"))
+
+
+# 导入：替换当前蓝图
+func _on_import() -> void:
+	var g = ui._mod.import_graph(ui._clipboard_get())
+	if g == null:
+		ui._set_status(ui.tr("BE_GRAPH_IMPORT_FAILED"))
+		return
+	ui._p().graph = g
+	rebuild()
+	_changed()
+	ui._set_status(ui.tr("BE_GRAPH_IMPORTED"))
 
 
 # ============================================================
@@ -276,32 +306,10 @@ func _on_clear() -> void:
 func _open_effect_picker(id: int) -> void:
 	_picker_node = id
 	_picker_filter = ""
-	_picker = Control.new()
-	_picker.set_anchors_preset(Control.PRESET_WIDE)
-	ui.add_child(_picker)
-	var shade = ColorRect.new()
-	shade.color = Color(0, 0, 0, 0.55)
-	shade.set_anchors_preset(Control.PRESET_WIDE)
-	_picker.add_child(shade)
-	var center = CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_WIDE)
-	_picker.add_child(center)
-	var panel = PanelContainer.new()
-	panel.rect_min_size = Vector2(1000, 800)
-	panel.add_stylebox_override("panel", ui._style(ui.C_BG_PANEL, TYPE_COLORS.effect, 12, 2, 18, 14))
-	center.add_child(panel)
-	var box = VBoxContainer.new()
-	box.add_constant_override("separation", 8)
-	panel.add_child(box)
-	var head = HBoxContainer.new()
-	box.add_child(head)
-	var title = ui._label(ui.tr("BE_GRANT_PICK"), ui.FONT_NORMAL, TYPE_COLORS.effect)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(title)
-	var cancel = ui._button(ui.tr("BE_CANCEL"), ui.FONT_SMALL)
-	ui._apply_action_style(cancel, ui.C_TEXT_DIM)
-	cancel.connect("pressed", self, "close_picker")
-	head.add_child(cancel)
+	_picker = ui.Modal.open(ui, ui.tr("BE_GRANT_PICK"), TYPE_COLORS.effect, Vector2(1000, 800))
+	_picker.connect("closed", self, "_on_picker_closed")
+	_picker.add_button(ui.tr("BE_CANCEL"), ui.C_TEXT_DIM, self, "close_picker")
+	var box = _picker.body
 	var search = ui._line_edit(ui.tr("BE_LIBRARY_SEARCH"))
 	search.connect("text_changed", self, "_on_picker_search")
 	box.add_child(search)
@@ -359,6 +367,10 @@ func _on_picked(ref: Dictionary) -> void:
 func close_picker() -> bool:
 	if _picker == null or not is_instance_valid(_picker):
 		return false
-	_picker.queue_free()
+	_picker.close()
 	_picker = null
 	return true
+
+
+func _on_picker_closed() -> void:
+	_picker = null

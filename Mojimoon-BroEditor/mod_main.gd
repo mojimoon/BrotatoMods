@@ -28,6 +28,8 @@ const SHARE_PREFIX = "BE0:"
 # 批量导出：一栏全部（角色 / 道具 / 武器）与三栏全部，前缀不同
 const BUNDLE_PREFIX = {"character": "BEC:", "item": "BEI:", "weapon": "BEW:"}
 const ALL_PREFIX = "BEA:"
+# 蓝图分享码（只含节点图）
+const GRAPH_PREFIX = "BEB:"
 const BUNDLE_KEYS = {"character": "profiles", "item": "items", "weapon": "weapons"}
 const MAX_DESC = 300
 
@@ -310,6 +312,50 @@ func reset_profile(id: String, kind: String = "character") -> void:
 		ps.erase(id)
 
 
+# 重置一整栏。parts：disabled = 禁用状态，edits = 对原版对象的修改（武器含补的低级版本、家族名称 / 类别），
+# custom = 自定义对象（并重置编号：从剩余的其他栏自定义对象之后重新开始）。
+# 存档中进行中的一局正在使用的自定义角色保留；返回保留的个数
+func reset_kind(kind: String, parts: Array) -> int:
+	var kept = 0
+	var ps = profiles_of(kind)
+	if "custom" in parts:
+		match kind:
+			"character":
+				for id in ps.keys():
+					if ps[id].custom and not delete_custom(id):
+						kept += 1
+			"item":
+				for id in ps.keys():
+					if ps[id].custom:
+						var _ok = delete_custom_item(id)
+			"weapon":
+				for wid in weapon_families.keys():
+					if weapon_families[wid].custom:
+						var _ok = delete_custom_weapon(wid)
+		next_id = 1
+		for e in custom_entries():
+			var num = weapon_families[e[1]].num if e[0] == "weapon" else profiles_of(e[0])[e[1]].num
+			next_id = int(max(next_id, num + 1))
+	if "edits" in parts:
+		if kind == "weapon":
+			for wid in weapon_families.keys():
+				var f = weapon_families[wid]
+				if f.custom:
+					continue
+				for t in f.tiers:
+					_unregister_weapon(tier_id(wid, t, false))
+				weapon_families.erase(wid)
+				_link_family(wid)
+		for id in ps.keys():
+			if not ps[id].custom:
+				ps.erase(id)
+	if "disabled" in parts:
+		disabled[kind] = []
+	_library = null
+	_weapon_library = null
+	return kept
+
+
 func is_custom(id: String) -> bool:
 	for ps in [profiles, item_profiles, weapon_profiles]:
 		if ps.has(id) and ps[id].custom:
@@ -514,6 +560,24 @@ func export_code(id: String, kind: String = "character") -> String:
 	if not ps.has(id):
 		return ""
 	return SHARE_PREFIX + Marshalls.utf8_to_base64(JSON.print({"kind": kind, "id": id, "profile": ps[id]}))
+
+
+# 蓝图分享码：空图返回 ""
+static func export_graph(g) -> String:
+	if not g is Dictionary or g.get("nodes", []).empty():
+		return ""
+	return GRAPH_PREFIX + Marshalls.utf8_to_base64(JSON.print(g))
+
+
+# 读取蓝图分享码；无法识别返回 null
+static func import_graph(code: String):
+	code = code.strip_edges()
+	if not code.begins_with(GRAPH_PREFIX):
+		return null
+	var parsed = JSON.parse(Marshalls.base64_to_utf8(code.substr(GRAPH_PREFIX.length())))
+	if parsed.error != OK:
+		return null
+	return normalize_profile({"graph": parsed.result}).graph
 
 
 # 返回导入后的角色 id；无法识别返回 ""
