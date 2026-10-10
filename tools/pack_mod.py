@@ -18,6 +18,8 @@ def main() -> int:
         print("usage: python pack_mod.py <MOD> [workshop_dir]")
         return 2
     mod = sys.argv[1]
+    if not mod.startswith("Mojimoon-"):
+        mod = "Mojimoon-" + mod
     workshop = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_WORKSHOP
     project = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     src = os.path.join(project, "mods", mod)
