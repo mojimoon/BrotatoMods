@@ -82,6 +82,7 @@ func add_button(text: String, accent: Color, target: Object, method: String, arg
 func close() -> void:
 	if is_queued_for_deletion():
 		return
+	ui._commit_focus()
 	ui._modals.erase(self)
 	emit_signal("closed")
 	queue_free()

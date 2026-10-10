@@ -339,6 +339,7 @@ func _on_kind_switch(pressed: bool, kind: String) -> void:
 
 
 func set_kind(kind: String) -> void:
+	_commit_focus()
 	if kind == _kind:
 		return
 	_kind_ids[_kind] = _id
@@ -674,6 +675,7 @@ func _on_char_search(t: String) -> void:
 
 
 func _select(id: String) -> void:
+	_commit_focus()
 	if _mod.find_target(_kind, id) == null:
 		return
 	_id = id
@@ -920,6 +922,7 @@ func _restore_scroll_later(values: Array) -> void:
 
 
 func _build_page() -> void:
+	_commit_focus()
 	var page_key = [_kind, _id, _tab]
 	var scrolls = _scroll_values(_page, []) if page_key == _page_key else []
 	_page_key = page_key
@@ -1260,18 +1263,11 @@ func _id_row(parent: Control) -> void:
 	le.text = _obj_key().trim_prefix(prefix)
 	le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	le.connect("text_entered", self, "_on_id_entered")
-	# 失去焦点也保存（与原 id 相同时不处理）
-	le.connect("focus_exited", self, "_on_id_focus_exited", [le])
 	row.add_child(le)
 	var ok = _button(tr("BE_ID_APPLY"), FONT_SMALL)
 	_apply_action_style(ok, C_CUSTOM)
 	ok.connect("pressed", self, "_on_id_apply", [le])
 	row.add_child(ok)
-
-
-func _on_id_focus_exited(le: LineEdit) -> void:
-	if is_instance_valid(le) and BEMain.clean_suffix(le.text) != _obj_key().trim_prefix(BEMain.ID_PREFIX[_kind]):
-		_on_id_entered(le.text)
 
 
 func _on_id_apply(le: LineEdit) -> void:
@@ -1915,6 +1911,7 @@ func _build_effects() -> void:
 
 
 func _fill_effect_list() -> void:
+	_commit_focus()
 	for c in _effect_list.get_children():
 		_effect_list.remove_child(c)
 		c.queue_free()
@@ -3121,6 +3118,7 @@ func _set_status(text: String) -> void:
 
 
 func _on_close_pressed() -> void:
+	_commit_focus()
 	if _mod != null:
 		_mod.on_editor_closed(_sig() != _start_sig)
 	queue_free()
@@ -3355,7 +3353,27 @@ func _spin(lo: float, hi: float, step: float) -> SpinBox:
 	le.add_color_override("font_color", C_TEXT)
 	le.add_stylebox_override("normal", _style(C_BG_CHIP, C_BORDER, 6, 1, 8, 2))
 	le.add_stylebox_override("focus", _style(C_BG_CHIP, C_ACCENT, 6, 1, 8, 2))
+	le.connect("focus_exited", self, "_commit_spin", [sb])
 	return sb
+
+
+# 把数值框里输入了但没按回车的文字写入数值（Godot 3 的 SpinBox 只在回车时提交）
+func _commit_spin(sb) -> void:
+	if not is_instance_valid(sb) or sb.is_queued_for_deletion():
+		return
+	var expr = Expression.new()
+	if expr.parse(sb.get_line_edit().text.replace(",", ".")) != OK:
+		return
+	var v = expr.execute([], null, false)
+	if typeof(v) in [TYPE_INT, TYPE_REAL] and not expr.has_execute_failed() and float(v) != sb.value:
+		sb.value = v
+
+
+# 当前焦点在数值框上时先提交（页面重建会直接移除控件，不会触发失去焦点）
+func _commit_focus() -> void:
+	var f = get_focus_owner()
+	if f is LineEdit and f.get_parent() is SpinBox:
+		_commit_spin(f.get_parent())
 
 
 # 可搜索下拉框：items = [[名称, 键]...]

@@ -765,7 +765,7 @@ func test_160_sort_and_char_weapons_popup() -> void:
 
 
 # 详细信息弹窗（效果页 / 蓝图的获得效果节点）；ID 失去焦点即保存；从角色导入的头像不随行高变大
-func test_161_effect_details_and_focus_save() -> void:
+func test_161_effect_details_and_popup_buttons() -> void:
 	var burn = null
 	for entry in m.library():
 		if "burning_data" in m.Catalog.sub_fields(entry.effect):
@@ -804,21 +804,6 @@ func test_161_effect_details_and_focus_save() -> void:
 	var ref = GE.nodes_by_id(m.profiles[CH].graph)[gn].params.ref
 	_eq(m.make_effect(ref).burning_data.damage, 66, "blueprint grant uses the detail")
 	ui._modals[-1].close()
-	# ID：失去焦点即保存
-	var cid = m.create_custom(CH, "focustest")
-	ui._refresh_char_list()
-	ui._select(cid)
-	ui._on_tab_pressed("overview")
-	yield(tree, "idle_frame")
-	var le = null
-	for n in _all_nodes(ui._page):
-		if n is LineEdit and n.text == "focustest":
-			le = n
-	_check(le != null, "id field found")
-	if le != null:
-		le.text = "focus_saved"
-		le.emit_signal("focus_exited")
-		_check(m.profiles.has("character_focus_saved") and not m.profiles.has(cid), "id saved on focus loss")
 	# 从角色导入：头像按钮不拉伸
 	ui._on_tab_pressed("gear")
 	ui._open_char_weapons()
@@ -840,3 +825,65 @@ func _all_nodes(n: Node) -> Array:
 		out.push_back(c)
 		out += _all_nodes(c)
 	return out
+
+
+# 数值框里输入了但没按回车：切换编辑行、武器等级、页面、关闭弹窗时都不丢
+func test_162_typed_values_kept_without_enter() -> void:
+	var fam = _family_from(0, 0)
+	var ui = yield(_open_ui(CH), "completed")
+	ui.set_kind("weapon")
+	ui._select(fam[0].my_id)
+	ui._on_tab_pressed("stats")
+	yield(tree, "idle_frame")
+	var sb = _spin_for(ui, "damage")
+	_check(sb != null, "damage box found")
+	sb.get_line_edit().grab_focus()
+	sb.get_line_edit().text = "77"
+	ui._select(fam[1].my_id)
+	_eq(m.weapon_profiles.get(fam[0].my_id, {}).get("wstats", {}).get("damage"), 77, "typed damage kept when switching tier")
+	# 效果页：数值字段输入后点开另一条
+	ui.set_kind("character")
+	var p = m.new_profile()
+	p.effects = m.effect_specs(CH, p).duplicate()
+	m.profiles[CH] = p
+	ui._select(CH)
+	ui._on_tab_pressed("effects")
+	ui._on_effect_edit(0)
+	yield(tree, "idle_frame")
+	var vb = null
+	for n in _all_nodes(ui._effect_list):
+		if n is SpinBox:
+			vb = n
+			break
+	_check(vb != null, "effect value box found")
+	if vb != null:
+		vb.get_line_edit().grab_focus()
+		vb.get_line_edit().text = "123"
+		ui._on_effect_edit(1)
+		_eq(int(m.profiles[CH].effects[0].get("set", {}).get("value", -1)), 123, "typed effect value kept when opening another row")
+		# 失去焦点
+		ui._on_effect_edit(0)
+		yield(tree, "idle_frame")
+		for n in _all_nodes(ui._effect_list):
+			if n is SpinBox:
+				vb = n
+				break
+		vb.get_line_edit().text = "45"
+		vb.get_line_edit().emit_signal("focus_exited")
+		_eq(int(m.profiles[CH].effects[0].set.value), 45, "committed on focus loss")
+	ui.queue_free()
+	yield(tree, "idle_frame")
+
+
+func _spin_for(ui, key: String):
+	var lbl = ui._name_labels.get(key)
+	if lbl == null:
+		return null
+	var n = lbl
+	while n != null and not n.get_parent() is GridContainer:
+		n = n.get_parent()
+	if n == null:
+		return null
+	var grid = n.get_parent()
+	var idx = n.get_index() + 1
+	return grid.get_child(idx) if idx < grid.get_child_count() and grid.get_child(idx) is SpinBox else null
