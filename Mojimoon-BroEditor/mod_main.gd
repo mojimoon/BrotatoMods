@@ -637,10 +637,7 @@ func _register_custom(id: String) -> void:
 func _fill_custom(c, id: String, p: Dictionary) -> void:
 	var base = find_character(p.base)
 	c.name = p.name if p.name != "" else tr("BE_NEW_CHARACTER")
-	var icon_src = _find_any(p.icon) if p.icon != "" else null
-	if icon_src == null:
-		icon_src = base
-	c.icon = icon_src.icon if icon_src != null else load("res://items/characters/well_rounded/well_rounded_icon.png")
+	c.icon = custom_icon(id, p)
 	if base != null:
 		c.item_appearances = base.item_appearances
 	c.effects = build_effects(id, p)
@@ -811,6 +808,164 @@ func open_editor(screen: Node) -> void:
 	screen.get_tree().current_scene.add_child(layer)
 	layer.add_child(ui)
 	ui.connect("tree_exited", layer, "queue_free")
+	ui.connect("tree_exited", self, "_on_editor_exited")
+	_block_input(true)
+
+
+# 编辑器打开期间：原版的焦点模拟器（把 WASD / 方向键当作界面导航并吞掉按键）与选择界面本身
+# （松开 Esc 返回上一页）都不处理输入，文字输入框才能正常输入字母
+var _input_blocked: Array = []
+var _unblock_pending := false
+
+
+func _block_input(on: bool) -> void:
+	if on:
+		_unblock_pending = false
+		for n in _input_blocked:
+			if is_instance_valid(n):
+				n.set_process_input(true)
+		_input_blocked = []
+		var stack = [get_tree().root]
+		var scene = get_tree().current_scene
+		while not stack.empty():
+			var n = stack.pop_back()
+			if (n is FocusEmulator or n == scene) and n.is_processing_input():
+				n.set_process_input(false)
+				_input_blocked.push_back(n)
+			for c in n.get_children():
+				stack.push_back(c)
+	else:
+		for n in _input_blocked:
+			if is_instance_valid(n):
+				n.set_process_input(true)
+		_input_blocked = []
+
+
+# 编辑器关闭：等 Esc 松开后再恢复（否则松开 Esc 会被选择界面当作"返回"）
+func _on_editor_exited() -> void:
+	_unblock_pending = true
+
+
+func _process(_delta: float) -> void:
+	if _unblock_pending and not Input.is_action_pressed("ui_cancel"):
+		_unblock_pending = false
+		_block_input(false)
+
+
+# ============================================================
+# 自定义角色图标：导入的图片，或原版贴图 + 右下角编号（与原角色区分）
+# ============================================================
+const ICON_DIR = "user://Mojimoon-BroEditor/icons/"
+const ICON_SIZE = 96
+# 3×5 点阵数字
+const DIGITS = ["111101101101111", "010110010010111", "111001111100111", "111001111001111", "101101111001001",
+	"111100111001111", "111100111101111", "111001001001001", "111101111101111", "111101111001111"]
+var _icon_cache: Dictionary = {}
+
+
+func custom_icon(id: String, p: Dictionary) -> Texture:
+	if p.icon.begins_with("file:"):
+		var t = _load_icon_file(p.icon.substr(5))
+		if t != null:
+			return t
+	var src = _find_any(p.icon) if p.icon != "" and not p.icon.begins_with("file:") else null
+	if src == null:
+		src = find_character(p.base)
+	var tex = src.icon if src != null else load("res://items/characters/well_rounded/well_rounded_icon.png")
+	return numbered_icon(tex, int(id.trim_prefix(CUSTOM_PREFIX)))
+
+
+func _load_icon_file(name: String):
+	var key = "file:" + name
+	if _icon_cache.has(key):
+		return _icon_cache[key]
+	var img = Image.new()
+	if img.load(ICON_DIR + name) != OK:
+		return null
+	var tex = ImageTexture.new()
+	tex.create_from_image(img, Texture.FLAG_FILTER)
+	_icon_cache[key] = tex
+	return tex
+
+
+# 导入图片：缩放到 96×96（保持比例、居中）存入 user://，返回档案 icon 字段的值；失败返回 ""
+func import_icon(path: String, id: String) -> String:
+	var img = Image.new()
+	if img.load(path) != OK:
+		return ""
+	img.convert(Image.FORMAT_RGBA8)
+	var s = float(ICON_SIZE) / max(img.get_width(), img.get_height())
+	img.resize(int(max(1, img.get_width() * s)), int(max(1, img.get_height() * s)), Image.INTERPOLATE_BILINEAR)
+	var out = Image.new()
+	out.create(ICON_SIZE, ICON_SIZE, false, Image.FORMAT_RGBA8)
+	out.blit_rect(img, Rect2(Vector2.ZERO, img.get_size()), (Vector2(ICON_SIZE, ICON_SIZE) - img.get_size()) / 2)
+	var dir = Directory.new()
+	if not dir.dir_exists(ICON_DIR):
+		dir.make_dir_recursive(ICON_DIR)
+	var name = id + "_" + str(OS.get_unix_time()) + ".png"
+	if out.save_png(ICON_DIR + name) != OK:
+		return ""
+	return "file:" + name
+
+
+func numbered_icon(tex: Texture, n: int) -> Texture:
+	if tex == null or n <= 0:
+		return tex
+	var key = str(tex.get_rid().get_id()) + "#" + str(n)
+	if _icon_cache.has(key):
+		return _icon_cache[key]
+	var img: Image = tex.get_data()
+	if img == null:
+		return tex
+	img = img.duplicate()
+	if img.is_compressed():
+		img.decompress()
+	img.convert(Image.FORMAT_RGBA8)
+	var digits = str(n)
+	var scale = max(2, int(img.get_width() / 24))
+	var w = digits.length() * 4 * scale - scale
+	var x0 = img.get_width() - w - scale * 2
+	var y0 = img.get_height() - 5 * scale - scale * 2
+	img.lock()
+	# 先画黑色描边，再画白色数字
+	for pass_i in 2:
+		var col = Color(0, 0, 0, 1) if pass_i == 0 else Color(1, 0.85, 0.3, 1)
+		var grow = scale if pass_i == 0 else 0
+		for di in digits.length():
+			var pat = DIGITS[int(digits[di])]
+			for py in 5:
+				for px in 3:
+					if pat[py * 3 + px] != "1":
+						continue
+					var rx = x0 + (di * 4 + px) * scale
+					var ry = y0 + py * scale
+					for yy in range(ry - grow, ry + scale + grow):
+						for xx in range(rx - grow, rx + scale + grow):
+							if xx >= 0 and yy >= 0 and xx < img.get_width() and yy < img.get_height():
+								img.set_pixel(xx, yy, col)
+	img.unlock()
+	var out = ImageTexture.new()
+	out.create_from_image(img, Texture.FLAG_FILTER)
+	_icon_cache[key] = out
+	return out
+
+
+# ============================================================
+# 效果文本：原版（及本 mod）的效果脚本用自身的 get_text；其他 mod 的效果脚本按原版默认规则渲染，
+# 避免它们的自定义文本在编辑器里（没有本局数据时）出错
+# ============================================================
+const TEXT_SAFE_DIRS = ["res://items/", "res://dlcs/", "res://effects/", "res://weapons/", "res://mods-unpacked/Mojimoon-BroEditor/"]
+
+
+func effect_text(e, colored: bool = true) -> String:
+	if e == null:
+		return ""
+	var path = e.get_script().resource_path if e.get_script() != null else ""
+	for d in TEXT_SAFE_DIRS:
+		if path.begins_with(d):
+			return e.get_text(0, colored)
+	var key_text = str(e.key).to_upper() if str(e.text_key) == "" else str(e.text_key).to_upper()
+	return _autoload("Text").text(key_text, [str(e.value), tr(str(e.key).to_upper())])
 
 
 func _screen_character_id(screen: Node) -> String:

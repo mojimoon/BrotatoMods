@@ -25,18 +25,18 @@ func build(p_ui, parent: Control) -> void:
 	bar.add_constant_override("separation", 8)
 	parent.add_child(bar)
 	for t in [["trigger", "BE_ADD_TRIGGER"], ["cond", "BE_ADD_COND"], ["effect", "BE_ADD_EFFECT"]]:
-		var mb = MenuButton.new()
-		mb.text = ui.tr(t[1])
-		mb.flat = false
-		mb.add_font_override("font", ui.FONT_SMALL)
-		ui._apply_action_style(mb, TYPE_COLORS[t[0]])
-		var pop: PopupMenu = mb.get_popup()
-		pop.add_font_override("font", ui.FONT_SMALL)
+		var items = []
 		for d in Catalog.NODES:
 			if d[1] == t[0]:
-				pop.add_item(ui.tr("BE_N_" + d[0].to_upper()))
-				pop.set_item_metadata(pop.get_item_count() - 1, d[0])
-		pop.connect("index_pressed", self, "_on_add_pressed", [pop])
+				items.push_back([ui.tr("BE_N_" + d[0].to_upper()), d[0]])
+		var mb = ui._search_select(items)
+		mb.fixed_text = ui.tr(t[1])
+		mb.set_key(null)
+		mb.add_font_override("font", ui.FONT_SMALL)
+		mb.align = Button.ALIGN_CENTER
+		mb.rect_min_size = Vector2(110, 0)
+		ui._apply_action_style(mb, TYPE_COLORS[t[0]])
+		mb.connect("selected", self, "add_node_kind")
 		bar.add_child(mb)
 	var clear = ui._button(ui.tr("BE_GRAPH_CLEAR"), ui.FONT_SMALL)
 	ui._apply_action_style(clear, ui.C_DANGER)
@@ -168,19 +168,15 @@ func _param_control(n: Dictionary, p: Array) -> Control:
 		return sb
 	if ptype == "stat":
 		var opt = ui._stat_option(str(cur))
-		opt.rect_min_size = Vector2(160, 0)
-		opt.connect("item_selected", self, "_on_param_option", [int(n.id), p[0], opt])
+		opt.rect_min_size = Vector2(170, 0)
+		opt.connect("selected", self, "_on_param_option", [int(n.id), p[0]])
 		return opt
 	if ptype.begins_with("mode:"):
-		var opt = ui._option()
-		var sel = 0
+		var items = []
 		for m in ptype.substr(5).split("|"):
-			opt.add_item(ui.tr("BE_MODE_" + m.to_upper()))
-			opt.set_item_metadata(opt.get_item_count() - 1, m)
-			if m == str(cur):
-				sel = opt.get_item_count() - 1
-		opt.select(sel)
-		opt.connect("item_selected", self, "_on_param_option", [int(n.id), p[0], opt])
+			items.push_back([ui.tr("BE_MODE_" + m.to_upper()), m])
+		var opt = ui._search_select(items, str(cur))
+		opt.connect("selected", self, "_on_param_option", [int(n.id), p[0]])
 		return opt
 	# effect：效果库引用
 	var b = ui._button("", ui.FONT_DESC)
@@ -199,8 +195,7 @@ func _find(g: Dictionary, id: int):
 	return null
 
 
-func _on_add_pressed(index: int, pop: PopupMenu) -> void:
-	var kind = pop.get_item_metadata(index)
+func add_node_kind(kind: String) -> void:
 	var g = _edit_graph()
 	# 新节点放在可见区域中间，按类型错开
 	var center = (ge.scroll_offset + ge.rect_size / 2.0) / ge.zoom
@@ -260,10 +255,10 @@ func _on_param(value, id: int, key: String) -> void:
 		_changed()
 
 
-func _on_param_option(idx: int, id: int, key: String, opt: OptionButton) -> void:
+func _on_param_option(value, id: int, key: String) -> void:
 	var n = _find(_edit_graph(), id)
 	if n != null:
-		n.params[key] = opt.get_item_metadata(idx)
+		n.params[key] = value
 		_changed()
 
 
@@ -323,7 +318,7 @@ func _fill_picker() -> void:
 		c.queue_free()
 	var shown = 0
 	for entry in ui._mod.library():
-		var text = entry.effect.get_text(0)
+		var text = ui._mod.effect_text(entry.effect)
 		if text == "":
 			continue
 		if _picker_filter != "" and (ui._strip(text) + " " + ui.tr(entry.src) + " " + str(entry.effect.key)).to_lower().find(_picker_filter) < 0:

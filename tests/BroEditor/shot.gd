@@ -42,6 +42,22 @@ func _initialize() -> void:
 			var img = root.get_texture().get_data()
 			img.flip_y()
 			img.save_png(out + "/" + target + "_" + t + ".png")
+			if t == "blueprint":
+				var gn = null
+				for c in ui.blueprint.ge.get_children():
+					if c is GraphNode and c.title.find("属性") >= 0:
+						gn = c
+				var sel = ui.blueprint.ge.get_parent().get_parent().get_child(0).get_child(2)
+				for c in ui.find_node("*", true, false).get_children() if false else []:
+					pass
+				sel.open()
+				sel._on_search("")
+				for i in 4:
+					yield(self, "idle_frame")
+				var img3 = root.get_texture().get_data()
+				img3.flip_y()
+				img3.save_png(out + "/" + target + "_select.png")
+				sel.close()
 		if target == ch:
 			ui._open_picker("start_weapons")
 			for i in 6:

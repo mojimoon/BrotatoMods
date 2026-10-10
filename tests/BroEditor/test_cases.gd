@@ -230,13 +230,13 @@ func test_20_custom_character_lifecycle() -> void:
 	_eq(isvc.characters.size(), n + 1, "registered")
 	var c = m.find_character(id)
 	_eq(c.effects.size(), m.orig_effects(CH).size(), "copies base effects")
-	_eq(c.icon, m.find_character(CH).icon, "base icon")
+	_check(c.icon is ImageTexture and c.icon.get_size() == m.find_character(CH).icon.get_size(), "base icon, numbered copy")
 	_check(not c.starting_weapons.empty(), "has starting weapons")
 	_check(tree.root.get_node("ProgressData").characters_unlocked.has(c.my_id_hash), "unlocked")
 	# 改图标
 	m.profiles[id].icon = isvc.items[0].my_id
 	m.apply_all()
-	_eq(c.icon, isvc.items[0].icon, "icon from item")
+	_check(c.icon is ImageTexture and c.icon.get_size() == isvc.items[0].icon.get_size(), "icon from item, numbered copy")
 	# 存档往返
 	m.save_profiles()
 	m.load_profiles()
@@ -358,10 +358,7 @@ func test_51_ui_edits() -> void:
 	ui._on_field_changed(6.0, specs.size() - 1, "value")
 	_eq(m.make_effect(specs[-1]).value, 6, "field edit")
 	# 换扳机：保留属性和数值
-	var opt = OptionButton.new()
-	opt.add_item("x")
-	opt.set_item_metadata(0, "")
-	ui._on_effect_trigger(0, specs.size() - 1, opt)
+	ui._on_effect_trigger("", specs.size() - 1)
 	e = m.make_effect(m.profiles[CH].effects[-1])
 	_eq([e.key, e.value, e.custom_key], ["stat_luck", 6, ""], "trigger switched to permanent")
 	# 效果库
@@ -571,10 +568,7 @@ func test_74_split_native() -> void:
 	yield(tree, "idle_frame")
 	_eq(ui.blueprint.ge.get_child_count() >= 2, true, "graph nodes shown")
 	_check(ui.blueprint.preview.bbcode_text.find("4") >= 0, "path preview")
-	var pop = PopupMenu.new()
-	pop.add_item("x")
-	pop.set_item_metadata(0, "chance")
-	ui.blueprint._on_add_pressed(0, pop)
+	ui.blueprint.add_node_kind("chance")
 	_eq(g.nodes.size(), 3, "node added from menu")
 	var cid = g.nodes[2].id
 	ui.blueprint._on_connect("n" + str(g.nodes[0].id), 0, "n" + str(cid), 0)
@@ -723,3 +717,127 @@ func test_85_battle_graph() -> void:
 	_check(m.runtime.wave_over, "wave end stops runtime")
 	var _b = tree.change_scene(MenuData.character_selection_scene)
 	yield(_frames(4), "completed")
+
+
+# ============================================================
+# 0.3.0：图标、分类、文本兼容、下拉框、输入、武器稀有度
+# ============================================================
+func test_100_icons() -> void:
+	var id = m.create_custom(CH)
+	var c = m.find_character(id)
+	var base_img = m.find_character(CH).icon.get_data()
+	base_img.decompress()
+	var img = c.icon.get_data()
+	var w = img.get_width()
+	var h = img.get_height()
+	img.lock()
+	base_img.lock()
+	_check(img.get_pixel(w - 6, h - 6) != base_img.get_pixel(w - 6, h - 6) or img.get_pixel(w - 10, h - 10) != base_img.get_pixel(w - 10, h - 10), "badge drawn bottom-right")
+	_eq(img.get_pixel(2, 2), base_img.get_pixel(2, 2), "rest of icon untouched")
+	img.unlock()
+	base_img.unlock()
+	# 导入图片
+	var src = Image.new()
+	src.create(200, 100, false, Image.FORMAT_RGBA8)
+	src.fill(Color(1, 0, 0, 1))
+	var path = OS.get_user_data_dir() + "/be_test_icon.png"
+	src.save_png(path)
+	var v = m.import_icon(path, id)
+	_check(v.begins_with("file:"), "imported")
+	m.profiles[id].icon = v
+	m.apply_all()
+	_eq(c.icon.get_size(), Vector2(96, 96), "imported icon 96x96")
+	var im = c.icon.get_data()
+	im.lock()
+	_eq(im.get_pixel(48, 48), Color(1, 0, 0, 1), "imported content")
+	_eq(im.get_pixel(48, 5).a, 0.0, "aspect kept (letterbox transparent)")
+	im.unlock()
+	_eq(m.import_icon("C:/nope/none.png", id), "", "bad path")
+
+
+func test_101_categories() -> void:
+	var cats = {}
+	for e in m.library():
+		if not cats.has(e.cat):
+			cats[e.cat] = []
+		cats[e.cat].push_back(str(e.effect.key) + "|" + str(e.effect.custom_key) + "|" + str(e.effect.text_key))
+	for c in ["stat", "stat_mod", "trigger", "scaling", "combat", "economy", "weapon", "structure", "pet", "start"]:
+		_check(cats.has(c), "category " + c)
+	for s in cats.get("economy", []):
+		_check(s.find("dmg_") < 0 and s.find("explo") < 0, "economy has no damage effect: " + s)
+	var pets = PoolStringArray(cats.get("pet", [])).join(" ").to_lower()
+	_check(pets.find("pet") >= 0, "pets grouped")
+	_check(PoolStringArray(cats.get("structure", [])).join(" ").find("turret") >= 0, "turrets in structure")
+
+
+func test_102_mod_effect_text_fallback() -> void:
+	var script = GDScript.new()
+	script.source_code = PoolStringArray(["extends \"res://items/global/effect.gd\"", "func get_text(_p, _c = true):", "	return \"CUSTOM\"", ""]).join("\n")
+	script.reload()
+	var e = script.new()
+	e.key = "stat_armor"
+	e.value = 3
+	var t = m.effect_text(e, false)
+	_check(t.find("CUSTOM") < 0 and t.find("3") >= 0, "non-vanilla script uses default text: " + t)
+	_eq(m.effect_text(m.stat_effect("stat_armor", 3), false), m.stat_effect("stat_armor", 3).get_text(0, false), "vanilla uses own text")
+
+
+func test_103_search_select() -> void:
+	var ui = yield(_open_ui(CH), "completed")
+	var sel = ui._stat_option("stat_luck")
+	ui.add_child(sel)
+	_eq(sel.key, "stat_luck", "current key")
+	_check(sel.text != "stat_luck", "shows localized name")
+	var got = []
+	sel.connect("selected", self, "_on_sel", [got])
+	sel.open()
+	_eq(ui.active_popup, sel, "popup open")
+	sel._on_search("stat_armor")
+	_eq(sel._list.get_child_count(), 2, "search by key (stat + its gain modifier)")
+	sel._on_enter("")
+	_eq(got, ["stat_armor"], "enter picks first match")
+	_eq(sel.key, "stat_armor", "key updated")
+	_eq(ui.active_popup, null, "popup closed")
+	ui.queue_free()
+	yield(tree, "idle_frame")
+
+
+func _on_sel(k, got: Array) -> void:
+	got.push_back(k)
+
+
+func test_104_tier_weapons_and_reset_button() -> void:
+	var ui = yield(_open_ui(CH), "completed")
+	_check(ui._reset_btn.visible and ui._reset_btn.disabled, "reset visible, disabled without changes")
+	ui._on_tab_pressed("gear")
+	var t1 = ui._tier_weapon_ids(0)
+	ui._on_tier_weapons(0)
+	for id in t1:
+		_check(id in m.profiles[CH].weapons, "T1 added " + id)
+	_check(not ui._reset_btn.disabled, "reset enabled after change")
+	ui._on_tier_weapons(0)
+	for id in t1:
+		_check(not id in m.profiles[CH].weapons, "T1 removed " + id)
+	ui.queue_free()
+	yield(tree, "idle_frame")
+
+
+func test_105_input_blocked_while_open() -> void:
+	_setup_player(CH)
+	var _e = tree.change_scene(MenuData.character_selection_scene)
+	yield(_frames(6), "completed")
+	var sc = tree.current_scene
+	_check(sc.is_processing_input(), "screen handles input normally")
+	sc.get_node("%BackButton").get_node("BroEditorBtn").emit_signal("pressed")
+	yield(tree, "idle_frame")
+	_check(not sc.is_processing_input(), "screen input off while editor open")
+	var fe_blocked = true
+	for n in m._input_blocked:
+		if n is FocusEmulator:
+			fe_blocked = fe_blocked and not n.is_processing_input()
+	_check(fe_blocked, "focus emulators off")
+	for c in sc.get_children():
+		if c is CanvasLayer and c.get_child_count() > 0 and c.get_child(0).name == "BroEditor":
+			c.get_child(0)._on_close_pressed()
+	yield(_frames(3), "completed")
+	_check(sc.is_processing_input(), "input restored after close")

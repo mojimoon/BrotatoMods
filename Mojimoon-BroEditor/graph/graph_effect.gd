@@ -145,7 +145,7 @@ static func _grant_text(n: Dictionary, colored: bool) -> String:
 	if e == null:
 		return TranslationServer.translate("BE_GRANT_NONE")
 	e.value = e.value * int(n.params.get("n", 1))
-	return e.get_text(0, colored)
+	return m.effect_text(e, colored)
 
 
 static func _stat_name(key: String) -> String:

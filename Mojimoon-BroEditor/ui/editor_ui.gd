@@ -11,6 +11,7 @@ const BEMain = preload("res://mods-unpacked/Mojimoon-BroEditor/mod_main.gd")
 const Catalog = preload("res://mods-unpacked/Mojimoon-BroEditor/catalog.gd")
 const GraphEffect = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/graph_effect.gd")
 const BlueprintPage = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/blueprint_page.gd")
+const SearchSelect = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/search_select.gd")
 const FONT_TITLE = preload("res://resources/fonts/actual/base/font_32_outline.tres")
 const FONT_NORMAL = preload("res://resources/fonts/actual/base/font_26.tres")
 const FONT_SMALL = preload("res://resources/fonts/actual/base/font_22.tres")
@@ -47,6 +48,8 @@ const TABS = [
 ]
 
 var initial_id := ""
+# 打开中的可搜索下拉框（Esc 先关闭它）
+var active_popup = null
 
 var _mod = null
 var _id := ""
@@ -113,7 +116,9 @@ func _ready() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
-		if _picker != null:
+		if active_popup != null and is_instance_valid(active_popup):
+			active_popup.close()
+		elif _picker != null:
 			_close_picker()
 		elif blueprint != null and blueprint.close_picker():
 			pass
@@ -371,7 +376,7 @@ func _refresh_header() -> void:
 	_enable_switch.set_block_signals(true)
 	_enable_switch.pressed = v.enabled
 	_enable_switch.set_block_signals(false)
-	_reset_btn.visible = not custom and _mod.profiles.has(_id)
+	_reset_btn.disabled = custom or not _mod.profiles.has(_id)
 	_delete_btn.disabled = not custom
 	_delete_btn.text = tr("BE_DELETE_CONFIRM" if _delete_armed else "BE_DELETE")
 	for t in _tab_buttons:
@@ -472,6 +477,10 @@ func _build_overview() -> void:
 		_apply_action_style(icon_btn, C_CUSTOM)
 		icon_btn.connect("pressed", self, "_open_picker", ["icon"])
 		row.add_child(icon_btn)
+		var import_btn = _button(tr("BE_IMPORT_ICON"), FONT_SMALL)
+		_apply_action_style(import_btn, C_CUSTOM)
+		import_btn.connect("pressed", self, "_on_import_icon")
+		row.add_child(import_btn)
 		cbox.add_child(_desc(tr("BE_LOOK_DESC")))
 
 	var tbox = _section(left, "BE_SEC_TAGS", C_ACCENT_3)
@@ -515,7 +524,7 @@ func _refresh_preview() -> void:
 	var v = _view()
 	var lines = []
 	for e in _mod.build_effects(_id, v):
-		var t = e.get_text(0)
+		var t = _mod.effect_text(e)
 		if t != "":
 			lines.push_back(t)
 	var text = PoolStringArray(lines).join("\n")
@@ -597,6 +606,7 @@ func stat_name(key: String) -> String:
 	return _mod.stat_name(key)
 
 
+# 三列：开局状态；属性表（基础属性 | 属性获取修改 % | 次要属性，同一行对齐）；其余分组
 func _build_stats() -> void:
 	var head = HBoxContainer.new()
 	_page.add_child(head)
@@ -608,40 +618,101 @@ func _build_stats() -> void:
 	head.add_child(clear)
 	var scroll = _scroll()
 	_page.add_child(scroll)
-	var grid = GridContainer.new()
-	grid.columns = 2
-	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	grid.add_constant_override("hseparation", 12)
-	grid.add_constant_override("vseparation", 12)
-	scroll.add_child(grid)
+	var col = VBoxContainer.new()
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.add_constant_override("separation", 10)
+	scroll.add_child(col)
 	var v = _view()
-	_build_start_state(grid, v)
+	_build_start_state(col, v)
+
+	var groups = {}
 	for g in Catalog.STAT_GROUPS:
-		var box = _section(grid, g[0], C_ACCENT_3)
-		box.get_parent().size_flags_vertical = 0
-		var sub = GridContainer.new()
-		sub.columns = 2
-		sub.add_constant_override("hseparation", 16)
-		sub.add_constant_override("vseparation", 4)
-		box.add_child(sub)
-		for key in g[1]:
-			if not _is_valid_stat(key):
-				continue
-			var row = HBoxContainer.new()
-			row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			row.add_constant_override("separation", 6)
-			sub.add_child(row)
-			var lbl = _label(stat_name(key), FONT_DESC, C_TEXT)
-			lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			lbl.clip_text = true
-			lbl.mouse_filter = Control.MOUSE_FILTER_PASS
-			row.add_child(lbl)
-			var sb = _spin(-9999, 9999, 1)
-			sb.rect_min_size = Vector2(120, 0)
-			sb.value = int(v.stats.get(key, 0))
-			sb.connect("value_changed", self, "_on_stat_changed", [key, lbl])
-			row.add_child(sb)
-			_mark_stat_label(lbl, int(sb.value))
+		groups[g[0]] = []
+		for k in g[1]:
+			if _is_valid_stat(k):
+				groups[g[0]].push_back(k)
+	# 基础属性（含诅咒）与其属性获取修改逐行对齐；多出的获取修改接在后面
+	var primary = groups.BE_GRP_PRIMARY.duplicate()
+	var secondary = groups.BE_GRP_SECONDARY.duplicate()
+	if "stat_curse" in secondary:
+		secondary.erase("stat_curse")
+		primary.push_back("stat_curse")
+	var gains = []
+	var extra_gains = groups.BE_GRP_GAIN.duplicate()
+	for k in primary:
+		var gk = "gain_" + k
+		gains.push_back(gk if gk in extra_gains else "")
+		extra_gains.erase(gk)
+	for gk in extra_gains:
+		primary.push_back("")
+		gains.push_back(gk)
+	var box = _section(col, "BE_GRP_STATS", C_ACCENT_3)
+	var table = _stat_grid(box)
+	for t in ["BE_GRP_PRIMARY", "BE_GRP_GAIN", "BE_GRP_SECONDARY"]:
+		table.add_child(_label(tr(t), FONT_SMALL, C_ACCENT_3))
+	for r in max(primary.size(), secondary.size()):
+		for k in [primary[r] if r < primary.size() else "", gains[r] if r < gains.size() else "", secondary[r] if r < secondary.size() else ""]:
+			table.add_child(_stat_row(k, v) if k != "" else Control.new())
+	for g in ["BE_GRP_WORLD", "BE_GRP_CAPS", "BE_GRP_RULES"]:
+		var gb = _section(col, g, C_ACCENT_3)
+		var grid = _stat_grid(gb)
+		for k in groups[g]:
+			grid.add_child(_stat_row(k, v))
+
+
+func _stat_grid(parent: Control) -> GridContainer:
+	var grid = GridContainer.new()
+	grid.columns = 3
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_constant_override("hseparation", 24)
+	grid.add_constant_override("vseparation", 4)
+	parent.add_child(grid)
+	return grid
+
+
+# 一行属性：图标 + 名称 + 数值
+func _stat_row(key: String, v: Dictionary) -> Control:
+	var row = HBoxContainer.new()
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_constant_override("separation", 6)
+	var icon = TextureRect.new()
+	icon.texture = _stat_icon(key)
+	icon.expand = true
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.rect_min_size = Vector2(22, 22)
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(icon)
+	var lbl = _label(stat_name(key), FONT_DESC, C_TEXT)
+	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lbl.clip_text = true
+	row.add_child(lbl)
+	var sb = _spin(-9999, 9999, 1)
+	sb.rect_min_size = Vector2(110, 0)
+	sb.value = int(v.stats.get(key, 0))
+	sb.connect("value_changed", self, "_on_stat_changed", [key, lbl])
+	row.add_child(sb)
+	_mark_stat_label(lbl, int(sb.value))
+	return row
+
+
+# 属性图标：原版属性图标；属性获取修改用对应属性的图标；其余按 cave-modtools 的对应表
+var _icon_cache: Dictionary = {}
+
+
+func _stat_icon(key: String) -> Texture:
+	if _icon_cache.has(key):
+		return _icon_cache[key]
+	var base = key
+	if key.begins_with("gain_") and key != "gain_pct_gold_start_wave":
+		base = key.substr(5)
+	var tex = null
+	for k in [base, Catalog.STAT_ICON_ALIASES.get(base, "")]:
+		if k != "" and tex == null:
+			tex = ItemService.get_stat_small_icon(Keys.generate_hash(k))
+	if tex == null and Catalog.STAT_ICON_PATHS.has(base) and ResourceLoader.exists(Catalog.STAT_ICON_PATHS[base]):
+		tex = load(Catalog.STAT_ICON_PATHS[base])
+	_icon_cache[key] = tex
+	return tex
 
 
 # 开局状态（同 cave-modtools）：[字段, 名称 key, 最小, 最大]
@@ -659,10 +730,9 @@ const START_FIELDS = [
 
 func _build_start_state(parent: Control, v: Dictionary) -> void:
 	var box = _section(parent, "BE_GRP_START", C_ACCENT)
-	box.get_parent().size_flags_vertical = 0
 	var sub = GridContainer.new()
-	sub.columns = 2
-	sub.add_constant_override("hseparation", 16)
+	sub.columns = 3
+	sub.add_constant_override("hseparation", 24)
 	sub.add_constant_override("vseparation", 4)
 	box.add_child(sub)
 	for f in START_FIELDS:
@@ -825,7 +895,7 @@ func _effect_text(spec) -> String:
 	var e = _mod.make_effect(spec) if spec is Dictionary else null
 	if e == null:
 		return "[color=#" + C_DANGER.to_html(false) + "]" + tr("BE_EFFECT_MISSING") + "[/color]"
-	var t = e.get_text(0)
+	var t = _mod.effect_text(e)
 	if t == "":
 		t = "[color=#" + C_TEXT_DIM.to_html(false) + "]" + tr("BE_EFFECT_NO_TEXT").replace("{0}", str(e.key if e.key != "" else e.custom_key)) + "[/color]"
 	return t
@@ -895,16 +965,12 @@ func _build_effect_fields(col: Control, i: int, spec: Dictionary) -> void:
 	col.add_child(grid)
 	if Catalog.is_plain_effect(e) and Catalog.is_stat_key(e.key) and (e.custom_key == "" or e.custom_key in Catalog.trigger_keys()):
 		grid.add_child(_label(tr("BE_FIELD_TRIGGER"), FONT_DESC, C_TEXT_DIM))
-		var opt = _option()
-		var sel = 0
+		var items = []
 		for t in Catalog.TRIGGERS:
 			if t[0] == "" or _mod.trigger_template(t[0]) != null:
-				opt.add_item(tr(t[1]))
-				opt.set_item_metadata(opt.get_item_count() - 1, t[0])
-				if t[0] == e.custom_key:
-					sel = opt.get_item_count() - 1
-		opt.select(sel)
-		opt.connect("item_selected", self, "_on_effect_trigger", [i, opt])
+				items.push_back([tr(t[1]), t[0]])
+		var opt = _search_select(items, e.custom_key)
+		opt.connect("selected", self, "_on_effect_trigger", [i])
 		grid.add_child(opt)
 	for f in Catalog.editable_fields(e):
 		var name_key = "BE_FIELD_" + f.name.to_upper()
@@ -930,7 +996,7 @@ func _build_effect_fields(col: Control, i: int, spec: Dictionary) -> void:
 			TYPE_STRING:
 				if Catalog.is_stat_key(str(cur)) or (f.name in ["key", "stat", "stat_scaled", "stat_displayed"] and str(cur).begins_with("stat_")):
 					var opt = _stat_option(str(cur))
-					opt.connect("item_selected", self, "_on_field_option", [i, f.name, opt])
+					opt.connect("selected", self, "_on_field_option", [i, f.name])
 					grid.add_child(opt)
 				else:
 					var le = _line_edit("")
@@ -1016,17 +1082,17 @@ func _on_field_changed(value, i: int, field: String) -> void:
 	_set_field(i, field, value)
 
 
-func _on_field_option(idx: int, i: int, field: String, opt: OptionButton) -> void:
-	_set_field(i, field, opt.get_item_metadata(idx))
+func _on_field_option(key, i: int, field: String) -> void:
+	_set_field(i, field, key)
 
 
 # 换扳机：换模板（text_key、额外参数随模板），保留属性与数值
-func _on_effect_trigger(idx: int, i: int, opt: OptionButton) -> void:
+func _on_effect_trigger(custom_key, i: int) -> void:
 	var specs = _edit_specs()
 	var e = _mod.make_effect(specs[i])
 	if e == null:
 		return
-	specs[i] = _trigger_spec(opt.get_item_metadata(idx), e.key, e.value)
+	specs[i] = _trigger_spec(custom_key, e.key, e.value)
 	_fill_effect_list()
 	_changed()
 
@@ -1066,7 +1132,7 @@ func _fill_library() -> void:
 	for entry in _mod.library():
 		if _lib_cat != "all" and entry.cat != _lib_cat:
 			continue
-		var text = entry.effect.get_text(0)
+		var text = _mod.effect_text(entry.effect)
 		if text == "":
 			continue
 		if _lib_search != "":
@@ -1122,6 +1188,19 @@ func _build_gear() -> void:
 		_apply_action_style(orig, C_ACCENT)
 		orig.connect("pressed", self, "_on_weapons_original")
 		wrow.add_child(orig)
+	# 全部 T1–T4：点击全部加入，再次点击全部移除
+	var cur_ids = _start_weapon_ids()
+	for t in 4:
+		var tier_ids = _tier_weapon_ids(t)
+		var all_in = not tier_ids.empty()
+		for id in tier_ids:
+			if not id in cur_ids:
+				all_in = false
+				break
+		var tb = _button(tr("BE_ALL_TIER").replace("{0}", str(t + 1)), FONT_SMALL)
+		_apply_chip_style(tb, all_in, ItemService.get_color_from_tier(t))
+		tb.connect("pressed", self, "_on_tier_weapons", [t])
+		wrow.add_child(tb)
 	var ws = _mod._weapons_by_ids(v.weapons) if v.weapons is Array else c.starting_weapons
 	var wgrid = _icon_grid(14)
 	wbox.add_child(wgrid)
@@ -1173,6 +1252,67 @@ func _build_gear() -> void:
 		_apply_action_style(del, C_DANGER)
 		del.connect("pressed", self, "_on_start_item_delete", [i])
 		row.add_child(del)
+
+
+func _start_weapon_ids() -> Array:
+	var v = _view()
+	if v.weapons is Array:
+		return v.weapons.duplicate()
+	var out = []
+	for w in _character().starting_weapons:
+		out.push_back(w.my_id)
+	return out
+
+
+func _tier_weapon_ids(t: int) -> Array:
+	var out = []
+	for w in _isvc().weapons:
+		if w.tier == t and not w.my_id in out:
+			out.push_back(w.my_id)
+	return out
+
+
+func _on_tier_weapons(t: int) -> void:
+	var ids = _start_weapon_ids()
+	var tier_ids = _tier_weapon_ids(t)
+	var all_in = true
+	for id in tier_ids:
+		if not id in ids:
+			all_in = false
+	for id in tier_ids:
+		if all_in:
+			ids.erase(id)
+		elif not id in ids:
+			ids.push_back(id)
+	_p().weapons = ids
+	_changed()
+	_build_page()
+
+
+# 导入图片（同 BroLab）：系统文件对话框选择 png / jpg
+func _on_import_icon() -> void:
+	var fd = FileDialog.new()
+	fd.mode = FileDialog.MODE_OPEN_FILE
+	fd.access = FileDialog.ACCESS_FILESYSTEM
+	fd.filters = PoolStringArray(["*.png ; PNG", "*.jpg, *.jpeg ; JPG", "*.webp ; WEBP"])
+	fd.window_title = tr("BE_IMPORT_ICON")
+	fd.connect("file_selected", self, "_on_icon_file_selected")
+	fd.connect("popup_hide", fd, "queue_free")
+	add_child(fd)
+	fd.popup_centered(Vector2(1100, 720))
+
+
+func _on_icon_file_selected(path: String) -> void:
+	var v = _mod.import_icon(path, _id)
+	if v == "":
+		_set_status(tr("BE_IMPORT_ICON_FAILED"))
+		return
+	_p().icon = v
+	_mod._register_custom(_id)
+	_changed()
+	_refresh_char_list()
+	_build_page()
+	_set_status(tr("BE_IMPORT_ICON_DONE"))
 
 
 func _on_weapons_original() -> void:
@@ -1455,6 +1595,7 @@ func _on_picker_confirm() -> void:
 	_close_picker()
 	if _mod.is_custom(_id):
 		_mod._register_custom(_id)
+		_refresh_char_list()
 	_changed()
 	_build_page()
 
@@ -1743,28 +1884,22 @@ func _spin(lo: float, hi: float, step: float) -> SpinBox:
 	return sb
 
 
-func _option() -> OptionButton:
-	var o = OptionButton.new()
-	o.focus_mode = Control.FOCUS_NONE
-	o.add_font_override("font", FONT_DESC)
-	o.get_popup().add_font_override("font", FONT_SMALL)
-	return o
+# 可搜索下拉框：items = [[名称, 键]...]
+func _search_select(items: Array, current = null) -> Button:
+	var b = SearchSelect.new()
+	b.setup(self, items, current)
+	b.rect_min_size = Vector2(170, 0)
+	return b
 
 
-# 属性下拉框（选中 current；current 不在列表中时追加）
-func _stat_option(current: String) -> OptionButton:
-	var o = _option()
-	var sel = -1
+# 属性下拉框（current 不在列表中时追加）
+func _stat_option(current: String) -> Button:
+	var items = []
+	var found = false
 	for k in Catalog.stat_keys():
-		if not _is_valid_stat(k):
-			continue
-		o.add_item(stat_name(k))
-		o.set_item_metadata(o.get_item_count() - 1, k)
-		if k == current:
-			sel = o.get_item_count() - 1
-	if sel < 0 and current != "":
-		o.add_item(current)
-		o.set_item_metadata(o.get_item_count() - 1, current)
-		sel = o.get_item_count() - 1
-	o.select(max(0, sel))
-	return o
+		if _is_valid_stat(k):
+			items.push_back([stat_name(k), k])
+			found = found or k == current
+	if not found and current != "":
+		items.push_back([stat_name(current), current])
+	return _search_select(items, current)

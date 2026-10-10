@@ -71,22 +71,36 @@ const TRIGGERS = [
 const CATEGORIES = [
 	["all", "BE_CAT_ALL"],
 	["stat", "BE_CAT_STAT"],
+	["stat_mod", "BE_CAT_STAT_MOD"],
 	["trigger", "BE_CAT_TRIGGER"],
 	["scaling", "BE_CAT_SCALING"],
 	["combat", "BE_CAT_COMBAT"],
 	["economy", "BE_CAT_ECONOMY"],
 	["weapon", "BE_CAT_WEAPON"],
-	["summon", "BE_CAT_SUMMON"],
+	["structure", "BE_CAT_STRUCTURE"],
+	["pet", "BE_CAT_PET"],
 	["start", "BE_CAT_START"],
 	["other", "BE_CAT_OTHER"],
 ]
 
 const START_KEYS = ["starting_item", "starting_weapon", "cursed_starting_item", "cursed_starting_weapon"]
-# ponytail: 关键字分类，覆盖原版常见 key；新机制落到"其他"，需要时再补关键字
-const WEAPON_WORDS = ["weapon", "melee", "ranged", "tier_i", "tier_iv", "lock_current"]
-const SUMMON_WORDS = ["turret", "structure", "landmine", "pet_", "wandering_bot", "tree_turret", "garden", "builder", "minion"]
-const ECONOMY_WORDS = ["gold", "price", "reroll", "harvest", "crate", "shop", "material", "loot_alien", "recycling", "xp", "item_box", "duplicate_item", "hourglass", "mirror"]
-const COMBAT_WORDS = ["explo", "burn", "pierc", "bounce", "projectile", "crit", "knockback", "dmg", "damage", "heal", "slow", "speed", "dodge", "hp", "enemy", "boss", "curse"]
+# 普通属性效果（"属性"分类）里 stat_ 以外的 key
+const PLAIN_STAT_KEYS = [
+	"xp_gain", "pickup_range", "knockback", "consumable_heal", "explosion_damage", "explosion_size", "piercing",
+	"piercing_damage", "bounce", "bounce_damage", "projectiles", "damage_against_bosses", "burning_spread",
+	"burning_cooldown_reduction", "accuracy", "structure_attack_speed", "structure_percent_damage", "structure_range",
+]
+# 分类关键词：按词（key / custom_key / text_key 以非字母切分）匹配，顺序 = 优先级。
+# 有 custom_key 时不看 key（key 常是"属性"本身，例如"闪避时造成近战伤害"的 key 是近战伤害）
+# ponytail: 词表覆盖原版；mod 的新机制按同样的词归类，匹配不到落到"其他"
+const CATEGORY_WORDS = [
+	["pet", ["pet"]],
+	["structure", ["turret", "turrets", "structure", "structures", "landmine", "landmines", "builder", "garden", "bot", "tyler"]],
+	["combat", ["dmg", "heal", "explode", "explosion", "projectile", "projectiles", "eyes"]],
+	["weapon", ["weapon", "weapons", "melee", "ranged", "tier", "unarmed", "lock"]],
+	["economy", ["gold", "material", "materials", "price", "reroll", "rerolls", "harvesting", "harvest", "crate", "shop", "loot", "alien", "aliens", "recycling", "box", "piggy"]],
+	["combat", ["burn", "burning", "pierce", "piercing", "bounce", "crit", "knockback", "damage", "slow", "speed", "dodge", "hp", "enemy", "enemies", "boss", "bosses", "curse", "cursed", "hit", "death", "lifesteal", "armor", "regen", "charm"]],
+]
 
 
 static func stat_keys() -> Array:
@@ -111,6 +125,11 @@ static func is_plain_effect(e) -> bool:
 	return e.get_script() != null and e.get_script().resource_path == "res://items/global/effect.gd"
 
 
+# 属性修改：属性获取 %（gain_stat_x / gain_x）、上限、升级属性修改、属性转换 / 互换
+static func is_stat_mod_key(key: String) -> bool:
+	return (key.begins_with("gain_") and key != "gain_pct_gold_start_wave" and not key.begins_with("gain_stat_for")) or key.ends_with("_cap") or key.find("stat_gains") >= 0 or key.find("modifications") >= 0
+
+
 static func category_of(e) -> String:
 	var key: String = str(e.key).to_lower()
 	var ck: String = str(e.custom_key).to_lower()
@@ -118,29 +137,40 @@ static func category_of(e) -> String:
 	var script_path = e.get_script().resource_path.to_lower() if e.get_script() != null else ""
 	if ck in START_KEYS:
 		return "start"
-	if ck != "" and ck in trigger_keys() and is_plain_effect(e):
+	if ck != "" and ck in trigger_keys():
 		return "trigger"
-	if tk.find("gain_stat_for_every") >= 0 or script_path.find("gain_stat_for_every") >= 0 or script_path.find("stat_links") >= 0:
+	if tk.find("gain_stat_for") >= 0 or script_path.find("gain_stat_for_every") >= 0 or ck == "stat_links":
 		return "scaling"
-	if ck == "" and is_plain_effect(e) and is_stat_key(key) and e.storage_method == 0:
-		return "stat" if key.begins_with("stat_") or key in ["xp_gain", "pickup_range", "knockback", "consumable_heal"] else _keyword_category(key + " " + ck + " " + tk + " " + script_path)
-	return _keyword_category(key + " " + ck + " " + tk + " " + script_path)
-
-
-static func _keyword_category(s: String) -> String:
-	for w in SUMMON_WORDS:
-		if s.find(w) >= 0:
-			return "summon"
-	for w in WEAPON_WORDS:
-		if s.find(w) >= 0:
-			return "weapon"
-	for w in ECONOMY_WORDS:
-		if s.find(w) >= 0:
-			return "economy"
-	for w in COMBAT_WORDS:
-		if s.find(w) >= 0:
-			return "combat"
+	if is_stat_mod_key(key) or is_stat_mod_key(tk.trim_prefix("effect_")) or ck.begins_with("convert_stats") or tk.find("swap") >= 0 or tk.find("candy_bag") >= 0:
+		return "stat_mod"
+	if ck == "" and e.storage_method == 0 and (key.begins_with("stat_") or key in PLAIN_STAT_KEYS):
+		return "stat"
+	var words = {}
+	for part in [ck, tk, script_path.get_file().get_basename()] + ([] if ck != "" else [key]):
+		for w in _split_words(part):
+			words[w] = true
+	if tk.begins_with("effect_pet"):
+		return "pet"
+	for c in CATEGORY_WORDS:
+		for w in c[1]:
+			if words.has(w):
+				return c[0]
 	return "other"
+
+
+static func _split_words(s: String) -> Array:
+	var out = []
+	var cur = ""
+	for i in s.length():
+		var ch = s[i]
+		if ch >= "a" and ch <= "z":
+			cur += ch
+		elif cur != "":
+			out.push_back(cur)
+			cur = ""
+	if cur != "":
+		out.push_back(cur)
+	return out
 
 
 # 效果库：原版角色与道具上的全部效果，按 (脚本, text_key, custom_key, key) 去重。
@@ -296,3 +326,59 @@ static func default_params(kind: String) -> Dictionary:
 		for p in d[2]:
 			out[p[0]] = p[2]
 	return out
+
+
+# 属性图标（同 cave-modtools）：没有原版属性图标的 key 借用相近属性的图标，或使用道具图标
+const STAT_ICON_ALIASES = {
+	"accuracy": "stat_ranged_damage", "bounce": "stat_ranged_damage", "bounce_damage": "stat_ranged_damage",
+	"burning_cooldown_increase": "stat_elemental_damage", "burning_cooldown_reduction": "stat_elemental_damage",
+	"burning_spread": "stat_elemental_damage", "chance_double_gold": "stat_luck", "consumable_heal": "stat_max_hp",
+	"crit_chance_cap": "stat_crit_chance", "damage_against_bosses": "stat_percent_damage", "dodge_cap": "stat_dodge",
+	"enemy_damage": "stat_percent_damage", "enemy_health": "stat_max_hp", "enemy_speed": "stat_speed",
+	"explosion_size": "explosion_damage", "free_rerolls": "stat_materials", "gold_drops": "stat_materials",
+	"harvesting_growth": "stat_harvesting", "heal_when_pickup_gold": "stat_luck", "hit_protection": "stat_armor",
+	"hp_cap": "stat_max_hp", "item_box_gold": "stat_materials", "items_price": "stat_materials",
+	"knockback": "stat_melee_damage", "lose_hp_per_second": "stat_max_hp", "map_size": "stat_range",
+	"number_of_enemies": "stat_luck", "pickup_range": "stat_range", "piercing": "stat_ranged_damage",
+	"piercing_damage": "stat_ranged_damage", "reroll_price": "stat_materials", "speed_cap": "stat_speed",
+	"structure_attack_speed": "stat_attack_speed", "structure_percent_damage": "stat_engineering",
+	"structure_range": "stat_engineering", "trees": "stat_luck", "weapon_slot": "stat_levels",
+	"weapons_price": "stat_materials", "enemy_gold_drops": "stat_materials", "neutral_gold_drops": "stat_materials",
+	"crate_chance": "stat_luck", "recycling_gains": "stat_materials", "increase_material_value": "stat_materials",
+	"next_level_xp_needed": "xp_gain", "hp_start_wave": "stat_max_hp", "hp_start_next_wave": "stat_max_hp",
+	"boss_strength": "stat_percent_damage", "gain_pct_gold_start_wave": "stat_materials", "enemy_fruit_drops": "stat_max_hp",
+}
+const STAT_ICON_PATHS = {
+	"accuracy": "res://dlcs/dlc_1/items/eyepatch/eyepatch_icon.png",
+	"bounce": "res://items/all/ricochet/ricochet_icon.png",
+	"bounce_damage": "res://items/all/ricochet/ricochet_icon.png",
+	"damage_against_bosses": "res://ui/icons/misc/elite_icon.png",
+	"boss_strength": "res://ui/icons/misc/elite_icon.png",
+	"stronger_elites_on_kill": "res://ui/icons/misc/elite_icon.png",
+	"double_boss": "res://ui/icons/misc/elite_icon.png",
+	"enemy_damage": "res://ui/icons/misc/horde_icon.png",
+	"enemy_health": "res://ui/icons/misc/horde_icon.png",
+	"enemy_speed": "res://ui/icons/misc/horde_icon.png",
+	"number_of_enemies": "res://ui/icons/misc/horde_icon.png",
+	"extra_loot_aliens": "res://entities/units/enemies/looter/looter_icon.png",
+	"loot_alien_chance": "res://entities/units/enemies/looter/looter_icon.png",
+	"loot_alien_speed": "res://entities/units/enemies/looter/looter_icon.png",
+	"stronger_loot_aliens_on_kill": "res://entities/units/enemies/looter/looter_icon.png",
+	"free_rerolls": "res://items/all/dangerous_bunny/dangerous_bunny_icon.png",
+	"gain_pct_gold_start_wave": "res://items/all/piggy_bank/piggy_bank_icon.png",
+	"hit_protection": "res://items/all/tardigrade/tardigrade_icon.png",
+	"item_steals": "res://dlcs/dlc_1/characters/gangster/gangster_icon.png",
+	"knockback": "res://items/all/boxing_glove/boxing_glove_icon.png",
+	"lose_hp_per_second": "res://items/all/blood_donation/blood_donation_icon.png",
+	"minimum_weapons_in_shop": "res://weapons/ranged/pistol/pistol_icon.png",
+	"piercing": "res://items/all/pumpkin/pumpkin_icon.png",
+	"piercing_damage": "res://items/all/pumpkin/pumpkin_icon.png",
+	"pickup_range": "res://items/all/alien_tongue/alien_tongue_icon.png",
+	"projectiles": "res://weapons/ranged/pistol/pistol_icon.png",
+	"recycling_gains": "res://items/all/recycling_machine/recycling_machine_icon.png",
+	"trees": "res://items/all/tree/tree_icon.png",
+	"trees_start_wave": "res://items/all/tree/tree_icon.png",
+	"weapon_slot": "res://weapons/ranged/pistol/pistol_icon.png",
+	"crate_chance": "res://items/consumables/item_box/item_box.png",
+	"item_box_gold": "res://items/consumables/item_box/item_box.png",
+}
