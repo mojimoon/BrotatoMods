@@ -42,6 +42,15 @@ func _initialize() -> void:
 			var img = root.get_texture().get_data()
 			img.flip_y()
 			img.save_png(out + "/" + target + "_" + t + ".png")
+			if t == "stats" and target != "":
+				var sc = ui._page.get_child(1)
+				for off in [560, 1100]:
+					sc.scroll_vertical = off
+					for i in 4:
+						yield(self, "idle_frame")
+					var im = root.get_texture().get_data()
+					im.flip_y()
+					im.save_png(out + "/" + target + "_stats_" + str(off) + ".png")
 			if t == "blueprint":
 				var gn = null
 				for c in ui.blueprint.ge.get_children():

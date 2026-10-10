@@ -166,7 +166,7 @@ func _on_enter(_t: String) -> void:
 
 
 func _on_backdrop_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed:
+	if event is InputEventMouseButton and event.pressed and event.button_index in [BUTTON_LEFT, BUTTON_RIGHT]:
 		close()
 
 

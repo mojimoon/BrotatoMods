@@ -633,6 +633,7 @@ func _build_stats() -> void:
 				groups[g[0]].push_back(k)
 	# 基础属性（含诅咒）与其属性获取修改逐行对齐；多出的获取修改接在后面
 	var primary = groups.BE_GRP_PRIMARY.duplicate()
+	var caps = groups.BE_GRP_CAPS.duplicate()
 	var secondary = groups.BE_GRP_SECONDARY.duplicate()
 	if "stat_curse" in secondary:
 		secondary.erase("stat_curse")
@@ -643,17 +644,30 @@ func _build_stats() -> void:
 		var gk = "gain_" + k
 		gains.push_back(gk if gk in extra_gains else "")
 		extra_gains.erase(gk)
+	gains += extra_gains
+	extra_gains = []
 	for gk in extra_gains:
 		primary.push_back("")
 		gains.push_back(gk)
+	# 第一列：基础属性之后是"属性上限"小标题与上限（与右边两列的剩余行并排）
+	var first = []
+	for k in primary:
+		if k != "":
+			first.push_back(k)
+	first.push_back("#BE_GRP_CAPS")
+	first += caps
+	primary = first
 	var box = _section(col, "BE_GRP_STATS", C_ACCENT_3)
 	var table = _stat_grid(box)
 	for t in ["BE_GRP_PRIMARY", "BE_GRP_GAIN", "BE_GRP_SECONDARY"]:
 		table.add_child(_label(tr(t), FONT_SMALL, C_ACCENT_3))
 	for r in max(primary.size(), secondary.size()):
 		for k in [primary[r] if r < primary.size() else "", gains[r] if r < gains.size() else "", secondary[r] if r < secondary.size() else ""]:
-			table.add_child(_stat_row(k, v) if k != "" else Control.new())
-	for g in ["BE_GRP_WORLD", "BE_GRP_CAPS", "BE_GRP_RULES"]:
+			if k.begins_with("#"):
+				table.add_child(_label(tr(k.substr(1)), FONT_SMALL, C_ACCENT_3))
+			else:
+				table.add_child(_stat_row(k, v) if k != "" else Control.new())
+	for g in ["BE_GRP_SHOP", "BE_GRP_MAP", "BE_GRP_RULES"]:
 		var gb = _section(col, g, C_ACCENT_3)
 		var grid = _stat_grid(gb)
 		for k in groups[g]:
@@ -706,11 +720,12 @@ func _stat_icon(key: String) -> Texture:
 	if key.begins_with("gain_") and key != "gain_pct_gold_start_wave":
 		base = key.substr(5)
 	var tex = null
+	for path in Catalog.STAT_ICON_PATHS.get(base, []):
+		if tex == null and ResourceLoader.exists(path):
+			tex = load(path)
 	for k in [base, Catalog.STAT_ICON_ALIASES.get(base, "")]:
 		if k != "" and tex == null:
 			tex = ItemService.get_stat_small_icon(Keys.generate_hash(k))
-	if tex == null and Catalog.STAT_ICON_PATHS.has(base) and ResourceLoader.exists(Catalog.STAT_ICON_PATHS[base]):
-		tex = load(Catalog.STAT_ICON_PATHS[base])
 	_icon_cache[key] = tex
 	return tex
 

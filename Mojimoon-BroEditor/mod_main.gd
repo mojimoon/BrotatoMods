@@ -816,6 +816,8 @@ func open_editor(screen: Node) -> void:
 # （松开 Esc 返回上一页）都不处理输入，文字输入框才能正常输入字母
 var _input_blocked: Array = []
 var _unblock_pending := false
+# [动作, 事件]：编辑器打开期间从 ui_* 动作中移除的字母 / 数字按键
+var _removed_keys: Array = []
 
 
 func _block_input(on: bool) -> void:
@@ -834,11 +836,27 @@ func _block_input(on: bool) -> void:
 				_input_blocked.push_back(n)
 			for c in n.get_children():
 				stack.push_back(c)
+		for action in InputMap.get_actions():
+			if not str(action).begins_with("ui_") or action == "ui_cancel":
+				continue
+			for ev in InputMap.get_action_list(action):
+				if ev is InputEventKey and _is_text_key(ev):
+					InputMap.action_erase_event(action, ev)
+					_removed_keys.push_back([action, ev])
 	else:
+		for r in _removed_keys:
+			if InputMap.has_action(r[0]) and not InputMap.action_has_event(r[0], r[1]):
+				InputMap.action_add_event(r[0], r[1])
+		_removed_keys = []
 		for n in _input_blocked:
 			if is_instance_valid(n):
 				n.set_process_input(true)
 		_input_blocked = []
+
+
+static func _is_text_key(ev: InputEventKey) -> bool:
+	var sc = ev.physical_scancode if ev.scancode == 0 else ev.scancode
+	return (sc >= KEY_A and sc <= KEY_Z) or (sc >= KEY_0 and sc <= KEY_9) or sc == KEY_SPACE
 
 
 # 编辑器关闭：等 Esc 松开后再恢复（否则松开 Esc 会被选择界面当作"返回"）

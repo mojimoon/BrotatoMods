@@ -836,8 +836,18 @@ func test_105_input_blocked_while_open() -> void:
 		if n is FocusEmulator:
 			fe_blocked = fe_blocked and not n.is_processing_input()
 	_check(fe_blocked, "focus emulators off")
+	_check(not _action_has_key("ui_up", KEY_W) and not _action_has_key("ui_down", KEY_S), "W/S removed from ui_up/ui_down while open")
+	_check(_action_has_key("ui_up", KEY_UP), "arrow keys kept")
 	for c in sc.get_children():
 		if c is CanvasLayer and c.get_child_count() > 0 and c.get_child(0).name == "BroEditor":
 			c.get_child(0)._on_close_pressed()
 	yield(_frames(3), "completed")
 	_check(sc.is_processing_input(), "input restored after close")
+	_check(_action_has_key("ui_up", KEY_W) and _action_has_key("ui_down", KEY_S), "W/S restored after close")
+
+
+func _action_has_key(action: String, sc: int) -> bool:
+	for ev in InputMap.get_action_list(action):
+		if ev is InputEventKey and (ev.scancode == sc or ev.physical_scancode == sc):
+			return true
+	return false
