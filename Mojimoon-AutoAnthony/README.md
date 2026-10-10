@@ -1,12 +1,16 @@
-# Brotato: Auto-Anthonyology
+# Brotato: Auto-Anthonyology / 土豆兄弟：东尼算法
 
 [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3671094202) | [Open in Steam Client](https://link.steam.watch/url/CommunityFilePage/3671094202)
 
-> Brotato: Auto-Anthonyology / 土豆兄弟：东尼算法
+[English](#english) | [中文](#中文)
+
+![](../img/aa-icon.png)
+
+> modid: Mojimoon-AutoAnthony
 
 > Design Docs / 设计文档：[DESIGN.md](DESIGN.md)
 
-![](../img/aa-icon.png)
+## English
 
 **Every run, brand-new items and weapons.** Auto-Anthonyology breaks every item and weapon into its parts — stats, triggers, effects, mechanics — and puts them back together at random, at the same value. Same icons, same rarities, completely different items.
 
@@ -139,6 +143,8 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 </details>
 
 ---
+
+## 中文
 
 **每一局，都是全新的道具和武器。** 东尼算法把每件道具和武器拆成零件——属性、触发条件、效果、机制——再按同等价值随机拼回去。图标和稀有度不变，内容却完全不同。
 

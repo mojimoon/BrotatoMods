@@ -1,21 +1,27 @@
 # BrotatoMods
 
-A collection of mods for the game [Brotato](https://store.steampowered.com/app/1942280/Brotato/).
+[English](#english) | [中文](#中文)
 
-| Mod | Description | Workshop |
-| --- | --- | --- |
-| [Double Sided Upgrades](Mojimoon-DoubleSidedUpgrades) | Customizable upgrades with positive and negative effects and curse. | [Link](https://steamcommunity.com/sharedfiles/filedetails/?id=3671945570) |
-| [One Item to Rule Them All v2](Mojimoon-OneItemToRuleThemAllv2) | Replace all items in shops and crates with your chosen items. | [Link](https://steamcommunity.com/sharedfiles/filedetails/?id=3808638762) |
-| [Brotato: Auto-Anthonyology](Mojimoon-AutoAnthony) | Randomly reassemble all items, weapons and characters every single run. | [Link](https://steamcommunity.com/sharedfiles/filedetails/?id=3671094202) |
-| [BroEditor](Mojimoon-BroEditor) | Edit any character, item or weapon, or create your own, in-game. | Coming soon |
+## English
+
+A collection of mods for [Brotato](https://store.steampowered.com/app/1942280/Brotato/) that you will like, all by [mojimoon](https://steamcommunity.com/id/unreset/).
+
+| Mod | Description | Workshop | Version |
+| --- | --- | --- | --- |
+| [Cursed & Double Sided Upgrades](Mojimoon-DoubleSidedUpgrades) | Customize your upgrades with positive and negative effects, or curses. | [Link](https://steamcommunity.com/sharedfiles/filedetails/?id=3671945570) | 1.2.5 <br> (2026-03-05) |
+| [One Item to Rule Them All v2](Mojimoon-OneItemToRuleThemAllv2) | Replace all items in shops and crates with your chosen items. | [Link](https://steamcommunity.com/sharedfiles/filedetails/?id=3808638762) | 2.1.0 <br> (2026-10-01) |
+| [Brotato: Auto-Anthonyology](Mojimoon-AutoAnthony) | Every run, brand-new items, weapons and characters. | [Link](https://steamcommunity.com/sharedfiles/filedetails/?id=3671094202) | 1.7.1 <br> (2026-10-08) |
+| [BroEditor](Mojimoon-BroEditor) | Edit any character, item or weapon, or create your own, all with in-game visual editor. | | |
 
 ---
 
-土豆兄弟（[Brotato](https://store.steampowered.com/app/1942280/Brotato/)）的 mod 合集。
+## 中文
 
-| Mod | 简介 | 创意工坊 |
-| --- | --- | --- |
-| [诅咒和双面升级](Mojimoon-DoubleSidedUpgrades) | 可自定义的升级：正负双面效果与诅咒。 | [链接](https://steamcommunity.com/sharedfiles/filedetails/?id=3671945570) |
-| [假如所有道具变成](Mojimoon-OneItemToRuleThemAllv2) | 把商店和箱子里的所有道具换成你选的道具。 | [链接](https://steamcommunity.com/sharedfiles/filedetails/?id=3808638762) |
-| [土豆兄弟：东尼算法](Mojimoon-AutoAnthony) | 每局随机重组全部道具、武器和角色。 | [链接](https://steamcommunity.com/sharedfiles/filedetails/?id=3671094202) |
-| [BroEditor](Mojimoon-BroEditor) | 在游戏里修改任意角色、道具、武器，或新建自己的。 | 即将上线 |
+你绝对会喜欢的 [Brotato](https://store.steampowered.com/app/1942280/Brotato/) mod 集合，由 [mojimoon](https://steamcommunity.com/id/unreset/) 出品。
+
+| Mod | 简介 | 创意工坊 | 版本 |
+| --- | --- | --- | --- |
+| [诅咒和双面升级](Mojimoon-DoubleSidedUpgrades) | 引入正面和负面效果或诅咒，让升级更有趣。 | [链接](https://steamcommunity.com/sharedfiles/filedetails/?id=3671945570) | 1.2.5 <br> (2026-03-05) |
+| [假如所有道具变成](Mojimoon-OneItemToRuleThemAllv2) | 假如所有道具变成同一个…… | [链接](https://steamcommunity.com/sharedfiles/filedetails/?id=3808638762) | 2.1.0 <br> (2026-10-01) |
+| [土豆兄弟：东尼算法](Mojimoon-AutoAnthony) | 每一局，都是全新的道具、武器和角色。 | [链接](https://steamcommunity.com/sharedfiles/filedetails/?id=3671094202) | 1.7.1 <br> (2026-10-08) |
+| [BroEditor](Mojimoon-BroEditor) | 修改原版角色、道具、武器，或者原创一个——都能在游戏中可视化编辑。 | | |

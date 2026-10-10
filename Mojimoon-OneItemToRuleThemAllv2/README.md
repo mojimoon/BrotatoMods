@@ -1,10 +1,14 @@
-# One Item to Rule Them All v2
+# One Item to Rule Them All v2 / 假如所有道具变成
 
 [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3808638762) | [Open in Steam Client](https://link.steam.watch/url/CommunityFilePage/3808638762)
 
-> One Item to Rule Them All v2 / 假如所有道具变成
+[English](#english) | [中文](#中文)
 
 ![](../img/oitrta-v2-icon.png)
+
+> modid: Mojimoon-OneItemToRuleThemAllv2
+
+## English
 
 **What if every item turned into a Potato, a Gentle Alien, a Candy Bag...?** This mod is all you need: One Item to Rule Them All.
 
@@ -166,6 +170,8 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 </details>
 
 ---
+
+## 中文
 
 **假如所有道具变成土豆、外星绅士、糖果袋……** 你只需要这个 mod，One Item to Rule Them All。
 

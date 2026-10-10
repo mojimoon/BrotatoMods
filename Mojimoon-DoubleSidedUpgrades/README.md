@@ -1,10 +1,14 @@
-# Double Sided Upgrades
+# Cursed & Double Sided Upgrades / 诅咒和双面升级
 
 [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3671945570) | [Open in Steam Client](https://link.steam.watch/url/CommunityFilePage/3671945570)
 
-> Cursed & Double Sided Upgrades / 诅咒和双面升级
+[English](#english) | [中文](#中文)
 
 ![](../img/dsu-icon-v2.png)
+
+> modid: Mojimoon-DoubleSidedUpgrades
+
+## English
 
 Have you ever thought about the upgrades in Brotato being a bit too fixed? Then this mod is for you! It introduces the **cursed** and **double-sided** upgrade system and **configurable upgrades effect** strength. **And now supports co-op!**
 
@@ -66,6 +70,8 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 -->
 
 ---
+
+## 中文
 
 你是否觉得Brotato中的升级有点过于固定了？那你可找对地方了！这个 mod 引入了 **诅咒** 和 **双面** 升级系统，以及 **可自定义的升级效果** 强度。**现已支持合作模式！**
 
@@ -129,7 +135,7 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 
 <details>
 
-<summary>Screenshots</summary>
+<summary>Screenshots / 截图</summary>
 
 ![](../img/dsu-mod-1.png)
 
