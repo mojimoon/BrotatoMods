@@ -23,6 +23,9 @@ const LEFT_WIDTH = 380
 const CHAR_ICON = 62
 const GRID_ICON = 64
 const LIBRARY_LIMIT = 150
+# 预览栏（概览 / 武器属性页右侧）固定宽度；里面的图标格列数要能放下
+const PREVIEW_WIDTH = 460
+const PREVIEW_ICON_COLUMNS = 6
 
 const C_TEXT = Color(0.94, 0.96, 1.0)
 const C_TEXT_DIM = Color(0.62, 0.67, 0.76)
@@ -1049,12 +1052,13 @@ func _refresh_preview() -> void:
 	var c = _character()
 	var ws = _mod._weapons_by_ids(v.weapons) if v.weapons is Array else c.starting_weapons
 	_preview_text.add_child(_label(tr("BE_PREVIEW_WEAPONS"), FONT_DESC, C_TEXT_DIM))
-	var grid = _icon_grid(10)
+	# 6 列 × 60 像素正好放进固定宽度的预览栏（列数多了会把预览栏撑宽）
+	var grid = _icon_grid(PREVIEW_ICON_COLUMNS)
 	_preview_text.add_child(grid)
 	for w in ws:
 		grid.add_child(_icon_tile(w.icon, ItemService.get_color_from_tier(w.tier), 60))
 	if v.ban_items.size() + v.ban_weapons.size() > 0:
-		_preview_text.add_child(_label(tr("BE_PREVIEW_BANS").replace("{0}", str(v.ban_items.size())).replace("{1}", str(v.ban_weapons.size())), FONT_DESC, C_TEXT_DIM))
+		_preview_text.add_child(_desc(tr("BE_PREVIEW_BANS").replace("{0}", str(v.ban_items.size())).replace("{1}", str(v.ban_weapons.size()))))
 
 
 func _price_text(r, v: Dictionary) -> String:
@@ -1229,7 +1233,7 @@ func _left_column(cols: Control) -> VBoxContainer:
 func _preview_card(cols: Control) -> void:
 	var pcard = _card(cols)
 	pcard.size_flags_horizontal = 0
-	pcard.rect_min_size = Vector2(460, 0)
+	pcard.rect_min_size = Vector2(PREVIEW_WIDTH, 0)
 	pcard.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var pbox = VBoxContainer.new()
 	pbox.add_constant_override("separation", 8)

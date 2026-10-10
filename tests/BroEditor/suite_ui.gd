@@ -465,14 +465,18 @@ func test_156_name_colors_and_shared_layout() -> void:
 	ui._on_stat_changed(0.0, "stat_armor")
 	_eq(lbl.get_color("font_color"), ui.C_TEXT, "back to white")
 	# 概览：三栏用同一套组件，预览栏宽度一致
+	# 比较排版后的实际宽度（内容可能把最小宽度撑大）；角色选初始武器最多的全能者
 	var widths = []
 	for kind in ["character", "item", "weapon"]:
 		ui.set_kind(kind)
+		if kind == "character":
+			ui._select("character_well_rounded")
 		ui._on_tab_pressed("overview")
-		yield(tree, "idle_frame")
+		yield(_frames(3), "completed")
 		var card = ui._preview_text.get_parent().get_parent().get_parent()
-		widths.push_back([card.rect_min_size.x, card.size_flags_horizontal])
-	_check(widths[0] == widths[1] and widths[1] == widths[2], "same preview column on every tab: " + str(widths))
+		widths.push_back(card.rect_size.x)
+	_check(widths[0] == widths[1] and widths[1] == widths[2], "same preview column width on every tab: " + str(widths))
+	_eq(widths[0], float(ui.PREVIEW_WIDTH), "preview column keeps its fixed width")
 	ui.set_kind("weapon")
 	ui._on_tab_pressed("attrs")
 	ui._on_wstat_changed(999.0, ["damage", "int", ""])
