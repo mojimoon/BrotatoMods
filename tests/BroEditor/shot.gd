@@ -30,6 +30,10 @@ func _initialize() -> void:
 	m.profiles[ch] = p
 	m.apply_all()
 	for target in [ch, custom]:
+		m.debug = target == custom
+		if target == custom:
+			m.profiles[custom].stats = {"stat_armor": 2}
+			m.profiles[custom].graph = p.graph.duplicate(true)
 		var ui = load("res://mods-unpacked/Mojimoon-BroEditor/ui/editor_ui.tscn").instance()
 		ui.initial_id = target
 		root.add_child(ui)

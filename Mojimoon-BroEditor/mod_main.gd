@@ -37,6 +37,8 @@ const START_DEFAULT = {
 # id -> 档案
 var profiles: Dictionary = {}
 var next_id: int = 1
+# 调试模式：编辑器里在效果与属性旁显示键名
+var debug := false
 
 # 原版角色 id -> 原始字段（还原用）
 var _backups: Dictionary = {}
@@ -217,6 +219,8 @@ func load_profiles() -> void:
 		ModLoaderLog.error("profiles.json is invalid; ignored", MOD_ID)
 		return
 	next_id = max(1, int(parsed.result.get("next_id", 1)))
+	var settings = parsed.result.get("settings", {})
+	debug = bool(settings.get("debug", false)) if settings is Dictionary else false
 	var ps = parsed.result.get("profiles", {})
 	if ps is Dictionary:
 		for id in ps:
@@ -231,7 +235,7 @@ func save_profiles() -> void:
 	if file.open(SAVE_PATH, File.WRITE) != OK:
 		ModLoaderLog.error("Failed to save profiles", MOD_ID)
 		return
-	file.store_string(JSON.print({"version": 1, "next_id": next_id, "profiles": profiles}, "\t"))
+	file.store_string(JSON.print({"version": 1, "next_id": next_id, "settings": {"debug": debug}, "profiles": profiles}, "\t"))
 	file.close()
 
 
@@ -413,46 +417,80 @@ func effect_specs(id: String, p: Dictionary) -> Array:
 
 
 # 档案 -> 角色的完整效果列表
+# 效果列表中每条"生成的效果"（初始属性的每一项、每件额外初始装备、蓝图）用一个占位标记它的位置：
+#   {"group": "stats", "key": 属性} / {"group": "start", "id": 道具 id, "n": 同 id 的第几件} / {"group": "graph"}
+# 只有 group 的旧占位 = 该分组中其余全部条目；列表里没有占位的条目接在最后。
 func build_effects(id: String, p: Dictionary) -> Array:
 	var out = []
 	if p.desc != "":
 		out.push_back(_desc_effect(id, p.desc))
+	var entries = group_entries(p)
 	var used = {}
 	for spec in effect_specs(id, p):
 		if not spec is Dictionary:
 			continue
 		if spec.has("group"):
-			if not used.has(spec.group):
-				used[spec.group] = true
-				out += group_effects(p, str(spec.group))
+			for en in entries_for_marker(entries, spec):
+				var s = entry_sig(en.marker)
+				if not used.has(s):
+					used[s] = true
+					out.push_back(en.effect)
 			continue
 		var e = make_effect(spec)
 		if e != null:
 			out.push_back(e)
-	for g in GROUPS:
-		if not used.has(g):
-			out += group_effects(p, g)
+	for en in entries:
+		if not used.has(entry_sig(en.marker)):
+			out.push_back(en.effect)
 	return out
 
 
-# 分组生成的效果：stats = 初始属性，start = 额外初始装备，graph = 蓝图
+# 生成的效果条目（默认顺序）：[{marker, effect}]
+func group_entries(p: Dictionary) -> Array:
+	var out = []
+	var keys = p.stats.keys()
+	keys.sort()
+	for k in keys:
+		if int(p.stats[k]) != 0 or k in SET_KEYS:
+			out.push_back({"marker": {"group": "stats", "key": k}, "effect": stat_effect(k, int(p.stats[k]))})
+	var seen = {}
+	for s in p.start_items:
+		var e = start_item_effect(s)
+		if e == null:
+			continue
+		var sid = str(s.get("id", ""))
+		seen[sid] = seen.get(sid, 0) + 1
+		out.push_back({"marker": {"group": "start", "id": sid, "n": seen[sid]}, "effect": e})
+	if p.graph is Dictionary and not p.graph.get("nodes", []).empty():
+		out.push_back({"marker": {"group": "graph"}, "effect": GraphEffect.make(p.graph)})
+	return out
+
+
+static func entry_sig(m: Dictionary) -> String:
+	return str(m.get("group", "")) + "|" + str(m.get("key", m.get("id", ""))) + "|" + str(int(m.get("n", 1)))
+
+
+# 是否是只有分组名的旧占位（graph 本身只有一条，按条目处理）
+static func is_group_marker(m: Dictionary) -> bool:
+	return m.has("group") and m.group != "graph" and not m.has("key") and not m.has("id")
+
+
+func entries_for_marker(entries: Array, m: Dictionary) -> Array:
+	var out = []
+	for en in entries:
+		if is_group_marker(m):
+			if en.marker.group == m.group:
+				out.push_back(en)
+		elif entry_sig(en.marker) == entry_sig(m):
+			out.push_back(en)
+	return out
+
+
 func group_effects(p: Dictionary, g: String) -> Array:
 	var out = []
-	match g:
-		"stats":
-			var keys = p.stats.keys()
-			keys.sort()
-			for k in keys:
-				if int(p.stats[k]) != 0 or k in SET_KEYS:
-					out.push_back(stat_effect(k, int(p.stats[k])))
-		"start":
-			for s in p.start_items:
-				var e = start_item_effect(s)
-				if e != null:
-					out.push_back(e)
-		"graph":
-			if p.graph is Dictionary and not p.graph.get("nodes", []).empty():
-				out.push_back(GraphEffect.make(p.graph))
+	for en in group_entries(p):
+		if en.marker.group == g:
+			out.push_back(en.effect)
 	return out
 
 

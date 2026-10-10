@@ -12,6 +12,7 @@ const Catalog = preload("res://mods-unpacked/Mojimoon-BroEditor/catalog.gd")
 const GraphEffect = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/graph_effect.gd")
 const BlueprintPage = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/blueprint_page.gd")
 const SearchSelect = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/search_select.gd")
+const DragRow = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/drag_row.gd")
 const FONT_TITLE = preload("res://resources/fonts/actual/base/font_32_outline.tres")
 const FONT_NORMAL = preload("res://resources/fonts/actual/base/font_26.tres")
 const FONT_SMALL = preload("res://resources/fonts/actual/base/font_22.tres")
@@ -189,6 +190,9 @@ func _build_header(root: Control) -> void:
 	_status.align = Label.ALIGN_RIGHT
 	_status.clip_text = true
 	header.add_child(_status)
+	var dbg = _switch(tr("BE_DEBUG"), _mod.debug)
+	dbg.connect("toggled", self, "_on_debug_toggled")
+	header.add_child(dbg)
 	var import_btn = _button(tr("BE_IMPORT"), FONT_SMALL)
 	_apply_action_style(import_btn, C_ACCENT_2)
 	import_btn.connect("pressed", self, "_on_import_pressed")
@@ -546,10 +550,7 @@ func _refresh_preview() -> void:
 	var grid = _icon_grid(10)
 	_preview_text.add_child(grid)
 	for w in ws:
-		var b = _icon_button(w.icon, 44)
-		_set_icon_style(b, ItemService.get_color_from_tier(w.tier), 2)
-		b.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		grid.add_child(b)
+		grid.add_child(_icon_tile(w.icon, ItemService.get_color_from_tier(w.tier), 60))
 	if v.ban_items.size() + v.ban_weapons.size() > 0:
 		_preview_text.add_child(_label(tr("BE_PREVIEW_BANS").replace("{0}", str(v.ban_items.size())).replace("{1}", str(v.ban_weapons.size())), FONT_DESC, C_TEXT_DIM))
 
@@ -707,6 +708,10 @@ func _stat_row(key: String, v: Dictionary) -> Control:
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lbl.clip_text = true
 	row.add_child(lbl)
+	if _mod.debug:
+		var k = _key_label(key)
+		k.clip_text = false
+		row.add_child(k)
 	var sb = _spin(-9999, 9999, 1)
 	sb.rect_min_size = Vector2(110, 0)
 	sb.value = int(v.stats.get(key, _stat_default(key)))
@@ -819,34 +824,63 @@ func _on_stats_clear() -> void:
 
 # ---------------- 效果 ----------------
 func _specs() -> Array:
-	return _with_groups(_mod.effect_specs(_id, _view()))
+	return _with_groups(_view())
 
 
-# 列表里没有的分组占位接在最后（与 build_effects 的顺序一致）
-func _with_groups(specs: Array) -> Array:
-	var out = specs.duplicate()
-	var have = {}
+# 档案的效果列表 + 生成效果（初始属性每项 / 每件额外初始装备 / 蓝图）的占位：
+# 已有占位保持位置，旧的整组占位就地展开为条目，没有占位的条目接在最后，失效的占位丢弃
+func _with_groups(p: Dictionary) -> Array:
+	var specs = _mod.effect_specs(_id, p)
+	var entries = _mod.group_entries(p)
+	var sigs = {}
+	for en in entries:
+		sigs[BEMain.entry_sig(en.marker)] = en
+	var referenced = {}
+	for s in specs:
+		if s is Dictionary and s.has("group") and not BEMain.is_group_marker(s):
+			referenced[BEMain.entry_sig(s)] = true
+	var out = []
+	var placed = {}
 	for s in specs:
 		if s is Dictionary and s.has("group"):
-			have[s.group] = true
-	for g in BEMain.GROUPS:
-		if not have.has(g):
-			out.push_back({"group": g})
+			var group_entries = []
+			if BEMain.is_group_marker(s):
+				for en in entries:
+					var sig = BEMain.entry_sig(en.marker)
+					if en.marker.group == s.group and not referenced.has(sig):
+						group_entries.push_back(en)
+			elif sigs.has(BEMain.entry_sig(s)):
+				group_entries.push_back(sigs[BEMain.entry_sig(s)])
+			for en in group_entries:
+				var sig = BEMain.entry_sig(en.marker)
+				if not placed.has(sig):
+					placed[sig] = true
+					out.push_back(en.marker.duplicate())
+			continue
+		out.push_back(s)
+	for en in entries:
+		if not placed.has(BEMain.entry_sig(en.marker)):
+			out.push_back(en.marker.duplicate())
 	return out
 
 
-# 编辑前把"原版效果"展开为 spec 列表（含分组占位）
+# 编辑前把"原版效果"展开为 spec 列表（含生成效果的占位）
 func _edit_specs() -> Array:
 	var p = _p()
-	var full = _with_groups(_mod.effect_specs(_id, p))
-	if not p.effects is Array or full.size() != p.effects.size():
+	var full = _with_groups(p)
+	if not p.effects is Array or JSON.print(full) != JSON.print(p.effects):
 		p.effects = full.duplicate(true)
 	return p.effects
 
 
-# 分组占位是否显示（该分组当前有效果）
-func _row_visible(spec) -> bool:
-	return not (spec is Dictionary and spec.has("group")) or not _mod.group_effects(_view(), str(spec.group)).empty()
+func _is_marker(spec) -> bool:
+	return spec is Dictionary and spec.has("group")
+
+
+# 占位对应的生成效果
+func _marker_effect(spec):
+	var found = _mod.entries_for_marker(_mod.group_entries(_view()), spec)
+	return found[0].effect if not found.empty() else null
 
 
 func _build_effects() -> void:
@@ -933,43 +967,103 @@ func _fill_effect_list() -> void:
 		c.queue_free()
 	_effect_rows = {}
 	var specs = _specs()
-	var shown = 0
 	for i in specs.size():
-		if not _row_visible(specs[i]):
-			continue
-		shown += 1
-		if specs[i] is Dictionary and specs[i].has("group"):
-			_effect_list.add_child(_group_row(i, str(specs[i].group)))
+		if _is_marker(specs[i]):
+			_effect_list.add_child(_group_row(i, specs[i]))
 		else:
 			_effect_list.add_child(_effect_row(i, specs[i]))
-	if shown == 0:
+	if specs.empty():
 		_effect_list.add_child(_desc(tr("BE_EFFECTS_EMPTY")))
 
 
-# 初始属性 / 额外初始装备 / 蓝图生成的效果：只读，显示来源，可调整顺序
-func _group_row(i: int, g: String) -> Control:
-	var card = PanelContainer.new()
+# 可拖动的行（左侧把手；拖到另一行上松开即可移动）
+func _drag_card(i: int, bg: Color, border: Color) -> PanelContainer:
+	var card = DragRow.new()
+	card.editor = self
+	card.index = i
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	card.add_stylebox_override("panel", _style(C_BG_CHIP, C_BORDER, 6, 1, 10, 6))
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.mouse_default_cursor_shape = Control.CURSOR_DRAG
+	card.add_stylebox_override("panel", _style(bg, border, 6, 1, 10, 6))
+	return card
+
+
+func _drag_handle() -> Label:
+	var h = _label("::", FONT_SMALL, C_TEXT_DIM)
+	h.valign = Label.VALIGN_CENTER
+	h.size_flags_vertical = Control.SIZE_FILL
+	return h
+
+
+# 键名（灰色小字）：key · custom_key · text_key · 脚本
+func _key_info(e) -> String:
+	if e == null:
+		return ""
+	var parts = []
+	for v in [e.key, e.custom_key, e.text_key]:
+		if str(v) != "":
+			parts.push_back(str(v))
+	if e.get_script() != null and not Catalog.is_plain_effect(e):
+		parts.push_back(e.get_script().resource_path.get_file())
+	return PoolStringArray(parts).join("  ·  ")
+
+
+func _key_label(text: String) -> Label:
+	var l = _label(text, FONT_DESC, C_TEXT_DIM)
+	l.modulate.a = 0.8
+	l.clip_text = true
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return l
+
+
+# 初始属性 / 额外初始装备 / 蓝图生成的一条效果：只读，显示来源，可拖动排序
+func _group_row(i: int, spec: Dictionary) -> Control:
+	var card = _drag_card(i, C_BG_CHIP, C_BORDER)
+	card.set_meta("be_group", spec.group)
 	var row = HBoxContainer.new()
-	row.add_constant_override("separation", 6)
+	row.add_constant_override("separation", 8)
+	row.mouse_filter = Control.MOUSE_FILTER_PASS
 	card.add_child(row)
-	var lines = []
-	for e in _mod.group_effects(_view(), g):
-		var t = _mod.effect_text(e)
-		if t != "":
-			lines.push_back(t)
-	row.add_child(_rich(PoolStringArray(lines).join("\n")))
-	var src = _label(tr("BE_SRC_GROUP_" + g.to_upper()), FONT_DESC, C_ACCENT)
+	row.add_child(_drag_handle())
+	var col = VBoxContainer.new()
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.mouse_filter = Control.MOUSE_FILTER_PASS
+	row.add_child(col)
+	var e = _marker_effect(spec)
+	col.add_child(_rich(_mod.effect_text(e) if e != null else ""))
+	if _mod.debug:
+		col.add_child(_key_label(_key_info(e)))
+	var src = _label(tr("BE_SRC_GROUP_" + str(spec.group).to_upper()), FONT_DESC, C_ACCENT)
 	src.rect_min_size = Vector2(120, 0)
 	src.align = Label.ALIGN_RIGHT
 	row.add_child(src)
-	for a in [["▲", -1], ["▼", 1]]:
-		var b = _button(a[0], FONT_DESC)
-		_apply_action_style(b, C_ACCENT_2)
-		b.connect("pressed", self, "_on_effect_move", [i, a[1]])
-		row.add_child(b)
 	return card
+
+
+# 拖动预览的文字
+func drag_text(i: int) -> String:
+	var specs = _specs()
+	if i < 0 or i >= specs.size():
+		return ""
+	var e = _marker_effect(specs[i]) if _is_marker(specs[i]) else _mod.make_effect(specs[i])
+	return _strip(_mod.effect_text(e)) if e != null else ""
+
+
+# 把第 from 行移到第 to 行之前（after = 之后）
+func move_effect_to(from: int, to: int, after: bool) -> void:
+	var specs = _edit_specs()
+	if from < 0 or from >= specs.size() or to < 0 or to >= specs.size() or from == to:
+		return
+	var item = specs[from]
+	var expanded_item = specs[_expanded] if _expanded >= 0 and _expanded < specs.size() else null
+	specs.remove(from)
+	var t = to - 1 if from < to else to
+	if after:
+		t += 1
+	specs.insert(clamp(t, 0, specs.size()), item)
+	_expanded = specs.find(expanded_item) if expanded_item != null else -1
+	_fill_effect_list()
+	_changed()
 
 
 func _effect_text(spec) -> String:
@@ -993,28 +1087,30 @@ func _source_name(spec) -> String:
 
 
 func _effect_row(i: int, spec) -> Control:
-	var card = PanelContainer.new()
-	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	card.add_stylebox_override("panel", _style(C_BG_ITEM, C_ACCENT_2 if i == _expanded else C_BORDER, 6, 1, 10, 6))
+	var card = _drag_card(i, C_BG_ITEM, C_ACCENT_2 if i == _expanded else C_BORDER)
 	var col = VBoxContainer.new()
 	col.add_constant_override("separation", 4)
+	col.mouse_filter = Control.MOUSE_FILTER_PASS
 	card.add_child(col)
 	var row = HBoxContainer.new()
 	row.add_constant_override("separation", 6)
+	row.mouse_filter = Control.MOUSE_FILTER_PASS
 	col.add_child(row)
+	row.add_child(_drag_handle())
+	var e = _mod.make_effect(spec) if spec is Dictionary else null
+	var tcol = VBoxContainer.new()
+	tcol.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tcol.mouse_filter = Control.MOUSE_FILTER_PASS
+	row.add_child(tcol)
 	var txt = _rich(_effect_text(spec))
-	row.add_child(txt)
+	tcol.add_child(txt)
+	if _mod.debug and i != _expanded:
+		tcol.add_child(_key_label(_key_info(e)))
 	var src = _label(_source_name(spec), FONT_DESC, C_TEXT_DIM)
 	src.rect_min_size = Vector2(120, 0)
 	src.clip_text = true
 	src.align = Label.ALIGN_RIGHT
 	row.add_child(src)
-	for a in [["▲", "_on_effect_move", -1], ["▼", "_on_effect_move", 1]]:
-		var b = _button(a[0], FONT_DESC)
-		_apply_action_style(b, C_ACCENT_2)
-		b.connect("pressed", self, a[1], [i, a[2]])
-		row.add_child(b)
-	var e = _mod.make_effect(spec) if spec is Dictionary else null
 	if e != null and Catalog.NATIVE_SPLIT.has(e.custom_key) and Catalog.is_plain_effect(e):
 		var split = _button(tr("BE_SPLIT"), FONT_DESC)
 		_apply_action_style(split, Color(1.0, 0.55, 0.35))
@@ -1039,6 +1135,7 @@ func _build_effect_fields(col: Control, i: int, spec: Dictionary) -> void:
 	var e = _mod.make_effect(spec)
 	if e == null:
 		return
+	col.add_child(_key_label(_key_info(e) + ("  ·  " + str(spec.get("from", "")) + "#" + str(spec.get("i", "")) if spec.has("from") else "")))
 	var grid = GridContainer.new()
 	grid.columns = 4
 	grid.add_constant_override("hseparation", 10)
@@ -1103,20 +1200,7 @@ func _on_effect_edit(i: int) -> void:
 
 
 func _on_effect_move(i: int, d: int) -> void:
-	var specs = _edit_specs()
-	# 跳过不显示的空分组占位
-	var j = i + d
-	while j >= 0 and j < specs.size() and not _row_visible(specs[j]):
-		j += d
-	if j < 0 or j >= specs.size():
-		return
-	var t = specs[i]
-	specs[i] = specs[j]
-	specs[j] = t
-	if _expanded == i:
-		_expanded = j
-	_fill_effect_list()
-	_changed()
+	move_effect_to(i, i + d, d > 0)
 
 
 func _on_effect_delete(i: int) -> void:
@@ -1244,7 +1328,14 @@ func _fill_library() -> void:
 		_apply_action_style(add, C_ACCENT_3)
 		add.connect("pressed", self, "_add_spec", [{"from": entry.from, "i": entry.i}])
 		row.add_child(add)
-		row.add_child(_rich(text))
+		if _mod.debug:
+			var tcol = VBoxContainer.new()
+			tcol.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			tcol.add_child(_rich(text))
+			tcol.add_child(_key_label(_key_info(entry.effect)))
+			row.add_child(tcol)
+		else:
+			row.add_child(_rich(text))
 		var src = _label(tr(entry.src), FONT_DESC, C_TEXT_DIM)
 		src.rect_min_size = Vector2(110, 0)
 		src.clip_text = true
@@ -1711,6 +1802,11 @@ func _close_picker() -> void:
 # ============================================================
 # 顶部事件
 # ============================================================
+func _on_debug_toggled(pressed: bool) -> void:
+	_mod.debug = pressed
+	_build_page()
+
+
 func _on_enable_toggled(pressed: bool) -> void:
 	_p().enabled = pressed
 	_changed()
@@ -1871,6 +1967,21 @@ func _icon_button(tex: Texture, size: int) -> Button:
 # 道具 / 武器 / 角色图标按钮
 func _res_button(r) -> Button:
 	return _icon_button(r.icon, GRID_ICON)
+
+
+# 方形图标格（同原版物品格：稀有度色底 + 边框）
+func _icon_tile(tex: Texture, color: Color, size: int) -> Control:
+	var tile = PanelContainer.new()
+	tile.rect_min_size = Vector2(size, size)
+	tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tile.add_stylebox_override("panel", _style(color.darkened(0.75), color, 6, 2, 4, 4))
+	var icon = TextureRect.new()
+	icon.texture = tex
+	icon.expand = true
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.rect_min_size = Vector2(size - 8, size - 8)
+	tile.add_child(icon)
+	return tile
 
 
 func _set_icon_style(b: Button, color: Color, w: int) -> void:

@@ -34,7 +34,7 @@ func build(p_ui, parent: Control) -> void:
 		mb.set_key(null)
 		mb.add_font_override("font", ui.FONT_SMALL)
 		mb.align = Button.ALIGN_CENTER
-		mb.rect_min_size = Vector2(110, 0)
+		mb.rect_min_size = Vector2(170, 0)
 		ui._apply_action_style(mb, TYPE_COLORS[t[0]])
 		mb.connect("selected", self, "add_node_kind")
 		bar.add_child(mb)
@@ -42,7 +42,7 @@ func build(p_ui, parent: Control) -> void:
 	ui._apply_action_style(clear, ui.C_DANGER)
 	clear.connect("pressed", self, "_on_clear")
 	bar.add_child(clear)
-	bar.add_child(ui._desc(ui.tr("BE_GRAPH_DESC")))
+	parent.add_child(ui._desc(ui.tr("BE_GRAPH_DESC")))
 
 	var cols = HBoxContainer.new()
 	cols.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -135,8 +135,10 @@ func _make_node(n: Dictionary) -> GraphNode:
 	gn.rect_min_size = Vector2(240, 0)
 	var pos = n.get("pos", [0, 0])
 	gn.offset = Vector2(float(pos[0]), float(pos[1]))
-	gn.add_stylebox_override("frame", ui._style(ui.C_BG_CARD, color.darkened(0.3), 8, 2, 12, 30))
-	gn.add_stylebox_override("selectedframe", ui._style(ui.C_BG_CARD, color, 8, 3, 12, 30))
+	gn.add_stylebox_override("frame", ui._style(ui.C_BG_CARD, color.darkened(0.3), 8, 2, 12, 46))
+	gn.add_stylebox_override("selectedframe", ui._style(ui.C_BG_CARD, color, 8, 3, 12, 46))
+	gn.add_constant_override("title_offset", 30)
+	gn.add_constant_override("close_offset", 28)
 	gn.add_font_override("title_font", ui.FONT_SMALL)
 	gn.add_color_override("title_color", color)
 	gn.add_constant_override("separation", 4)

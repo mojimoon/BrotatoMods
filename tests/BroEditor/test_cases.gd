@@ -954,12 +954,12 @@ func test_120_effect_groups_order() -> void:
 	m.apply_all()
 	_check(c.effects[n0] is GE, "blueprint moved before the stats group")
 	_eq(c.effects[n0 + 1].key, "stat_armor", "stats after blueprint")
-	# 只读行没有编辑按钮
+	# 生成的效果各占一行（只读）
 	var group_rows = 0
 	for row in ui._effect_list.get_children():
-		if row is PanelContainer and row.get_child(0) is HBoxContainer and row.get_child(0).get_child_count() == 4:
+		if row.has_meta("be_group"):
 			group_rows += 1
-	_eq(group_rows, 2, "two visible read-only group rows (stats + blueprint)")
+	_eq(group_rows, 2, "two read-only rows (stat + blueprint)")
 	ui.queue_free()
 	yield(tree, "idle_frame")
 
@@ -987,3 +987,58 @@ func test_121_attack_while_moving_rule() -> void:
 	_eq(m.stat_name("next_level_xp_needed"), "%升级需要经验值", "label without placeholder")
 	_eq(m.stat_name("torture"), "拷问", "torture label")
 	TranslationServer.set_locale("en")
+
+
+func test_122_entry_rows_and_drag() -> void:
+	var p = m.new_profile()
+	p.stats = {"stat_armor": 3, "stat_luck": 5}
+	p.start_items = [{"id": isvc.items[3].my_id, "n": 1}, {"id": isvc.items[3].my_id, "n": 1}]
+	p.effects = [{"set": {"key": "stat_dodge", "value": 7}}, {"group": "stats"}]
+	m.profiles[CH] = m.normalize_profile(p)
+	var c = m.find_character(CH)
+	m.apply_all()
+	var keys = []
+	for e in c.effects:
+		keys.push_back(e.key)
+	_eq(keys.slice(0, 1), ["stat_dodge", "stat_armor"], "legacy group marker expands in place")
+	var ui = yield(_open_ui(CH), "completed")
+	ui._on_tab_pressed("effects")
+	var specs = ui._specs()
+	_eq(specs.size(), 5, "own effect + 2 stats + 2 start items, one row each")
+	var rows = ui._effect_list.get_children()
+	_eq(rows.size(), 5, "five rows")
+	# 把幸运拖到最前面
+	var li = -1
+	for i in specs.size():
+		if specs[i].get("key") == "stat_luck":
+			li = i
+	rows[0].drop_data(Vector2(0, 0), rows[li].get_drag_data(Vector2.ZERO))
+	m.apply_all()
+	_eq(c.effects[0].key, "stat_luck", "dragged stat entry to the top")
+	_eq(c.effects[1].key, "stat_dodge", "own effect follows")
+	# 拖到某行的下半部分 = 插到它后面
+	rows = ui._effect_list.get_children()
+	rows[1].drop_data(Vector2(0, rows[1].rect_size.y), rows[0].get_drag_data(Vector2.ZERO))
+	m.apply_all()
+	_eq([c.effects[0].key, c.effects[1].key], ["stat_dodge", "stat_luck"], "drop on lower half inserts after")
+	# 删除一项属性后，它的占位被丢弃
+	ui._p().stats.erase("stat_armor")
+	_eq(ui._specs().size(), 4, "stale marker dropped")
+	# 调试模式：键名显示
+	m.debug = true
+	ui._build_page()
+	_check(_tree_has_text(ui._effect_list, "stat_dodge"), "debug shows keys in effect rows")
+	ui._on_tab_pressed("stats")
+	_check(_tree_has_text(ui._page, "stat_max_hp"), "debug shows keys on stats page")
+	m.debug = false
+	ui.queue_free()
+	yield(tree, "idle_frame")
+
+
+func _tree_has_text(n: Node, t: String) -> bool:
+	if n is Label and n.text.find(t) >= 0:
+		return true
+	for c in n.get_children():
+		if _tree_has_text(c, t):
+			return true
+	return false
