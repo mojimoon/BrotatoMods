@@ -4,6 +4,8 @@
 
 > Brotato: Auto-Anthonyology / 土豆兄弟：东尼算法
 
+> Design Docs / 设计文档：[DESIGN.md](DESIGN.md)
+
 ![](../img/aa-icon.png)
 
 **Every run, brand-new items and weapons.** Auto-Anthonyology breaks every item and weapon into its parts — stats, triggers, effects, mechanics — and puts them back together at random, at the same value. Same icons, same rarities, completely different items.
