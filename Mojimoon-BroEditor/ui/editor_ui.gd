@@ -35,34 +35,35 @@ const C_BG_CARD = Color(0.11, 0.13, 0.18, 0.95)
 const C_BG_ITEM = Color(0.08, 0.09, 0.13, 0.95)
 const C_BG_CHIP = Color(0.13, 0.16, 0.22, 0.95)
 const C_BORDER = Color(0.28, 0.33, 0.42)
-const C_ACCENT = Color(1.0, 0.72, 0.30)
-const C_ACCENT_2 = Color(0.40, 0.72, 1.0)
-const C_ACCENT_3 = Color(0.55, 0.85, 0.55)
-const C_DANGER = Color(0.92, 0.38, 0.44)
-const C_CUSTOM = Color(0.78, 0.55, 1.0)
+const C_ACCENT = Color(1.0, 0.72, 0.30) #FFB84D
+const C_ACCENT_2 = Color(0.40, 0.72, 1.0) #66B8FF
+const C_ACCENT_3 = Color(0.55, 0.85, 0.55) #8CD98C
+const C_DANGER = Color(0.92, 0.38, 0.44) #E95C70
+const C_CUSTOM = Color(0.78, 0.55, 1.0) #C8B0FF
+const C_CUSTOM_2 = Color(1.0, 0.55, 0.35) #FF8C59
 
 # 页签：[id, 名称 key, 颜色]
 const TABS = [
-	["overview", "BE_TAB_OVERVIEW", Color(1.0, 0.72, 0.30)],
-	["stats", "BE_TAB_STATS", Color(0.55, 0.85, 0.55)],
-	["effects", "BE_TAB_EFFECTS", Color(0.40, 0.72, 1.0)],
-	["blueprint", "BE_TAB_BLUEPRINT", Color(1.0, 0.55, 0.35)],
-	["gear", "BE_TAB_GEAR", Color(0.78, 0.55, 1.0)],
-	["bans", "BE_TAB_BANS", Color(0.92, 0.38, 0.44)],
+	["overview", "BE_TAB_OVERVIEW", C_ACCENT],
+	["effects", "BE_TAB_EFFECTS", C_CUSTOM],
+	["stats", "BE_TAB_STATS", C_ACCENT_3],
+	["blueprint", "BE_TAB_BLUEPRINT", C_ACCENT_2],
+	["gear", "BE_TAB_GEAR", C_CUSTOM_2],
+	["bans", "BE_TAB_BANS", C_DANGER],
 ]
 
 # 三栏：[种类, 名称 key, 颜色]（同 AutoAnthony：整个页签可点，右侧是本栏总开关）
 const KIND_TABS = [
-	["character", "BE_KIND_CHARACTER", Color(1.0, 0.72, 0.30)],
-	["item", "BE_KIND_ITEM", Color(0.55, 0.85, 0.55)],
-	["weapon", "BE_KIND_WEAPON", Color(0.40, 0.72, 1.0)],
+	["character", "BE_KIND_CHARACTER", C_ACCENT],
+	["item", "BE_KIND_ITEM", C_ACCENT_3],
+	["weapon", "BE_KIND_WEAPON", C_ACCENT_2],
 ]
 # 道具 / 武器的页签
 const OBJECT_TABS = [
-	["overview", "BE_TAB_OVERVIEW", Color(1.0, 0.72, 0.30)],
-	["attrs", "BE_TAB_ATTRS", Color(0.55, 0.85, 0.55)],
-	["effects", "BE_TAB_EFFECTS", Color(0.40, 0.72, 1.0)],
-	["blueprint", "BE_TAB_BLUEPRINT", Color(1.0, 0.55, 0.35)],
+	["overview", "BE_TAB_OVERVIEW", C_ACCENT],
+	["effects", "BE_TAB_EFFECTS", C_CUSTOM],
+	["stats", "BE_TAB_STATS", C_ACCENT_3],
+	["blueprint", "BE_TAB_BLUEPRINT", C_ACCENT_2],
 ]
 const SOURCES = [["all", "BE_FILTER_ALL"], ["vanilla", "BE_SRC_VANILLA"], ["dlc1", "BE_SRC_DLC1"], ["mod", "BE_SRC_MOD"]]
 const SORTS = [["tier", "BE_SORT_TIER"], ["name", "BE_SORT_NAME"], ["price", "BE_SORT_PRICE"]]
@@ -112,8 +113,8 @@ const WSTAT_LAYOUT = [
 	["crit_chance", "crit_damage"], ["max_range", "min_range"], ["accuracy", "knockback"],
 	["speed_percent_modifier", "effect_scale"], ["lifesteal", "#type"],
 	["#attack"],
-	["nb_projectiles", "projectile_spread"], ["piercing", "piercing_dmg_reduction"],
-	["bounce", "bounce_dmg_reduction"], ["projectile_speed"],
+	["nb_projectiles"], ["piercing", "piercing_dmg_reduction"],
+	["bounce", "bounce_dmg_reduction"], ["projectile_speed", "projectile_spread"],
 ]
 # 界面显示方式：pct = 内部 0–1 显示为百分比
 const WSTAT_SHOW = {
@@ -1782,7 +1783,7 @@ func _build_effects() -> void:
 	var head = HBoxContainer.new()
 	head.add_constant_override("separation", 8)
 	lbox.add_child(head)
-	var title = _label(tr("BE_SEC_EFFECTS" if _kind == "character" else "BE_SEC_EFFECTS_" + _kind.to_upper()), FONT_NORMAL, C_ACCENT_2)
+	var title = _label(tr("BE_SEC_EFFECTS" if _kind == "character" else "BE_SEC_EFFECTS_" + _kind.to_upper()), FONT_NORMAL, C_CUSTOM)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(title)
 	if not _mod.is_custom(_id):
@@ -2300,12 +2301,12 @@ func _build_gear() -> void:
 	var v = _view()
 	var c = _character()
 
-	var wbox = _section(box, "BE_SEC_START_WEAPONS", C_CUSTOM)
+	var wbox = _section(box, "BE_SEC_START_WEAPONS", C_CUSTOM_2)
 	var wrow = HBoxContainer.new()
 	wrow.add_constant_override("separation", 8)
 	wbox.add_child(wrow)
 	var pick = _button(tr("BE_PICK_WEAPONS"), FONT_SMALL)
-	_apply_action_style(pick, C_CUSTOM)
+	_apply_action_style(pick, C_CUSTOM_2)
 	pick.connect("pressed", self, "_open_picker", ["start_weapons"])
 	wrow.add_child(pick)
 	if not _mod.is_custom(_id):
