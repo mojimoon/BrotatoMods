@@ -865,3 +865,56 @@ func test_160_custom_files() -> void:
 	m.profiles = {}
 	m.save_profiles()
 	_eq(m.custom_files(), [], "all custom files removed")
+
+
+# 新建自定义武器、补等级时复制效果；效果库去重开关
+func test_170_weapon_effects_copied_and_library_dedup() -> void:
+	var fam = null
+	var seen = {}
+	for w in isvc.weapons:
+		if seen.has(w.weapon_id):
+			continue
+		seen[w.weapon_id] = true
+		var ms = m.family_members(w.weapon_id)
+		if ms[0].tier == 1 and not ms[0].effects.empty():
+			fam = ms
+			break
+	_check(fam != null, "a vanilla family starting at T2 with effects")
+	if fam == null:
+		return
+	var wid = fam[0].weapon_id
+	# 补低级版本：复制相邻（较高）等级的效果
+	var low = m.add_weapon_tier(wid, 0)
+	m.apply_all()
+	_eq(m.find_target("weapon", low).effects.size(), fam[0].effects.size(), "lower tier copies the next tier's effects")
+	# 新建自定义武器：每级复制基底同级的效果
+	var top = m.create_custom_weapon(wid)
+	m.apply_all()
+	var cwid = m.find_target("weapon", top).weapon_id
+	var cms = m.family_members(cwid)
+	var ok = cms.size() >= 1
+	for w in cms:
+		var vm = null
+		for v in fam:
+			if v.tier == w.tier:
+				vm = v
+		ok = ok and vm != null and w.effects.size() == vm.effects.size()
+	_check(ok, "custom weapon tiers copy the base tiers' effects")
+	# 自定义武器补高级 / 低级：复制相邻等级（含档案里的修改）
+	m.weapon_profiles[cms[0].my_id].effects = [{"from": fam[0].my_id, "i": 0}]
+	var cl = m.add_weapon_tier(cwid, cms[0].tier - 1)
+	_eq(JSON.print(m.weapon_profiles[cl].effects), JSON.print([{"from": fam[0].my_id, "i": 0}]), "custom lower tier copies the edited neighbour")
+	# 去重开关
+	m.set_library_dedup(false)
+	var full = m.library(true).size()
+	var keys = {}
+	var dup = false
+	for e in m.library(true):
+		var k = str(e.effect.get_script()) + e.effect.text_key + e.effect.custom_key + e.effect.key
+		dup = dup or keys.has(k)
+		keys[k] = true
+	_check(dup, "dedup off keeps duplicates")
+	m.set_library_dedup(true)
+	_check(m.library(true).size() < full, "dedup on is smaller (%d < %d)" % [m.library(true).size(), full])
+	m.set_library_dedup(false)
+	m.delete_custom_weapon(cwid)

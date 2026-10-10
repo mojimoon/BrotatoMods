@@ -256,6 +256,9 @@ func _build_header(root: Control) -> void:
 	_status.align = Label.ALIGN_RIGHT
 	_status.clip_text = true
 	header.add_child(_status)
+	var dedup = _switch(tr("BE_LIBRARY_DEDUP"), _mod.library_dedup)
+	dedup.connect("toggled", self, "_on_library_dedup_toggled")
+	header.add_child(dedup)
 	var nums = _switch(tr("BE_HIDE_NUMBERS"), _mod.hide_numbers)
 	nums.connect("toggled", self, "_on_hide_numbers_toggled")
 	header.add_child(nums)
@@ -619,17 +622,7 @@ func _refresh_char_list() -> void:
 	for r in _all_of_kind():
 		if _matches(r, f):
 			list.push_back(r)
-	if _kind == "character":
-		# 自定义角色排在最前
-		var customs = []
-		var natives = []
-		for c in list:
-			if _mod.is_custom(c.my_id):
-				customs.push_back(c)
-			else:
-				natives.push_back(c)
-		list = customs + natives
-	else:
+	if _kind != "character":
 		match f.sort:
 			"name":
 				list.sort_custom(self, "_sort_by_name")
@@ -638,6 +631,8 @@ func _refresh_char_list() -> void:
 			_:
 				list.sort_custom(self, "_sort_by_tier_then_name")
 		_list_count.text = str(list.size())
+	# 本模组新增的对象总在最前（各自保持上面的顺序）
+	list = _customs_first(list)
 	for r in list:
 		var b = _icon_button(r.icon, CHAR_ICON)
 		b.set_meta("id", r.my_id)
@@ -2445,10 +2440,16 @@ func _start_weapon_ids() -> Array:
 	return out
 
 
+const CHAR_WEAPON_COLUMNS = 14
+
+
 # 从角色导入初始武器：表格列出每个角色（本角色除外）的初始武器，点击一行即采用
 func _open_char_weapons() -> void:
 	var m = Modal.open(self, tr("BE_PICKER_CHAR_WEAPONS"), C_CUSTOM_2, Vector2(1240, 820))
-	m.add_button(tr("BE_CANCEL"), C_TEXT_DIM, m, "close")
+	var back = _button(tr("MENU_BACK"), FONT_SMALL)
+	_apply_action_style(back, C_TEXT_DIM)
+	back.connect("pressed", m, "close")
+	m.head.add_child(back)
 	var scroll = _scroll()
 	m.body.add_child(scroll)
 	var grid = GridContainer.new()
@@ -2458,10 +2459,9 @@ func _open_char_weapons() -> void:
 	grid.add_constant_override("vseparation", 6)
 	scroll.add_child(grid)
 	var chars = []
-	for c in _isvc().characters:
+	for c in _customs_first(_isvc().characters):
 		if c != null and c.my_id != _id:
 			chars.push_back(c)
-	chars.sort_custom(self, "_sort_by_name")
 	for c in chars:
 		var b = _button(tr(c.name), FONT_SMALL)
 		b.icon = c.icon
@@ -2472,8 +2472,8 @@ func _open_char_weapons() -> void:
 		_apply_action_style(b, C_CUSTOM_2)
 		b.connect("pressed", self, "_on_char_weapons_picked", [c.my_id, m])
 		grid.add_child(b)
-		var row = HBoxContainer.new()
-		row.add_constant_override("separation", 4)
+		# 每行最多 CHAR_WEAPON_COLUMNS 个图标，多的换行（不把弹窗撑宽）
+		var row = _icon_grid(CHAR_WEAPON_COLUMNS)
 		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		grid.add_child(row)
 		for w in c.starting_weapons:
@@ -2597,7 +2597,30 @@ func _ban_candidates(kind: String) -> Array:
 func _sort_by_tier_then_name(a, b) -> bool:
 	if a.tier != b.tier:
 		return a.tier < b.tier
-	return tr(a.name) < tr(b.name)
+	return _en_name(a) < _en_name(b)
+
+
+# 本模组新增的对象在前，其余保持原顺序
+func _customs_first(list: Array) -> Array:
+	var customs = []
+	var natives = []
+	for r in list:
+		if r != null and _mod.is_custom(r.my_id):
+			customs.push_back(r)
+		else:
+			natives.push_back(r)
+	return customs + natives
+
+
+# 英文名（排序用，不随语言变化）：原版英文翻译；没有英文翻译的（其他 mod）用 id
+var _en: Translation = null
+
+
+func _en_name(r) -> String:
+	if _en == null:
+		_en = load("res://resources/translations/translations.en.translation")
+	var t = _en.get_message(str(r.name)) if _en != null else ""
+	return (t if t != "" else r.my_id).to_lower()
 
 
 func _sort_by_name(a, b) -> bool:
@@ -2813,7 +2836,7 @@ func _sort_by_tier_name(a, b) -> bool:
 		return a.get_category() > b.get_category()
 	if a.tier != b.tier:
 		return a.tier < b.tier
-	return tr(a.name) < tr(b.name)
+	return _en_name(a) < _en_name(b)
 
 
 func _fill_picker() -> void:
@@ -2902,6 +2925,11 @@ func _on_hide_numbers_toggled(pressed: bool) -> void:
 	_build_page()
 
 
+func _on_library_dedup_toggled(pressed: bool) -> void:
+	_mod.set_library_dedup(pressed)
+	_build_page()
+
+
 func _on_debug_toggled(pressed: bool) -> void:
 	_mod.debug = pressed
 	_build_page()
@@ -2980,7 +3008,6 @@ func _on_reset_kind() -> void:
 	_reset_parts = {}
 	for d in RESET_PARTS:
 		var cb = _checkbox(tr(d[1]), FONT_SMALL, C_DANGER)
-		cb.pressed = true
 		m.body.add_child(cb)
 		_reset_parts[d[0]] = cb
 	m.add_button(tr("BE_CANCEL"), C_TEXT_DIM, m, "close")

@@ -192,7 +192,8 @@ static func _split_words(s: String) -> Array:
 # 效果库：原版角色与道具上的全部效果，按 (脚本, text_key, custom_key, key) 去重。
 # sources: [[来源 id, 来源名称 key, 效果数组]...]（效果数组须为原版未改动的版本）
 # 返回 [{from, i, effect, src, cat}...]
-static func build_library(sources: Array) -> Array:
+# dedup：同脚本、同 text_key / custom_key / key 的效果只保留第一条
+static func build_library(sources: Array, dedup: bool = true) -> Array:
 	var seen = {}
 	var out = []
 	for s in sources:
@@ -201,11 +202,11 @@ static func build_library(sources: Array) -> Array:
 			var e = effects[i]
 			if e == null or not e is Resource or not "key" in e:
 				continue
-			var sig = [e.get_script().resource_path if e.get_script() != null else "", e.text_key, e.custom_key, e.key]
-			var k = JSON.print(sig)
-			if seen.has(k):
-				continue
-			seen[k] = true
+			if dedup:
+				var k = JSON.print([e.get_script().resource_path if e.get_script() != null else "", e.text_key, e.custom_key, e.key])
+				if seen.has(k):
+					continue
+				seen[k] = true
 			out.push_back({"from": s[0], "i": i, "effect": e, "src": s[1], "cat": category_of(e)})
 	return out
 

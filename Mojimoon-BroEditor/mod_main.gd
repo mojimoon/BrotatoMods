@@ -74,6 +74,8 @@ var next_id: int = 1
 var debug := false
 # 隐藏自定义对象图标右下角的编号（使用原版图标时才有编号）
 var hide_numbers := false
+# 效果库去重（同脚本、同 key 的效果只保留一条）；默认关：保留全部，包括同一武器各等级的效果
+var library_dedup := false
 
 # 原版角色 id -> 原始字段（还原用）
 var _backups: Dictionary = {}
@@ -390,6 +392,7 @@ func _load_main_file() -> void:
 	var settings = parsed.result.get("settings", {})
 	debug = bool(settings.get("debug", false)) if settings is Dictionary else false
 	hide_numbers = bool(settings.get("hide_numbers", false)) if settings is Dictionary else false
+	library_dedup = bool(settings.get("library_dedup", false)) if settings is Dictionary else false
 	var kinds = settings.get("kinds", {}) if settings is Dictionary else {}
 	for k in KINDS:
 		kind_enabled[k] = bool(kinds.get(k, true)) if kinds is Dictionary else true
@@ -470,7 +473,7 @@ func save_profiles() -> void:
 			main.families[wid] = weapon_families[wid]
 	main["version"] = 1
 	main["next_id"] = next_id
-	main["settings"] = {"debug": debug, "hide_numbers": hide_numbers, "kinds": kind_enabled}
+	main["settings"] = {"debug": debug, "hide_numbers": hide_numbers, "library_dedup": library_dedup, "kinds": kind_enabled}
 	main["disabled"] = disabled
 	var file = File.new()
 	if file.open(SAVE_PATH, File.WRITE) != OK:
@@ -1554,10 +1557,11 @@ func create_custom_weapon(base_wid: String, suffix: String = "") -> String:
 	for w in bm:
 		f.tiers.push_back(w.tier)
 	weapon_families[wid] = f
-	for t in f.tiers:
+	for w in bm:
 		var p = new_profile()
 		p.custom = true
-		weapon_profiles[tier_id(wid, t, true)] = p
+		_copy_tier_effects(p, w.my_id)
+		weapon_profiles[tier_id(wid, w.tier, true)] = p
 	_register_weapon_families()
 	_unlock_new_characters()
 	return tier_id(wid, f.tiers[0], true)
@@ -1701,10 +1705,28 @@ func add_weapon_tier(weapon_id: String, t: int) -> String:
 	var id = tier_id(weapon_id, t, f.custom)
 	var p = new_profile()
 	p.custom = true
+	for w in family_members(weapon_id):
+		if abs(w.tier - t) == 1:
+			_copy_tier_effects(p, w.my_id)
+			break
 	weapon_profiles[id] = p
 	_register_weapon_families()
 	_unlock_new_characters()
 	return id
+
+
+# 新等级 / 新武器的效果：复制 src 等级的效果（有档案时连同档案里的效果与蓝图，否则引用其原版效果）
+func _copy_tier_effects(p: Dictionary, src_id: String) -> void:
+	var sp = weapon_profiles.get(src_id)
+	var use = sp != null and (sp.custom or sp.enabled)
+	if use and sp.graph is Dictionary:
+		p.graph = sp.graph.duplicate(true)
+	if use and (sp.effects is Array or sp.custom):
+		p.effects = sp.effects.duplicate(true) if sp.effects is Array else []
+		return
+	p.effects = []
+	for i in orig_effects(src_id).size():
+		p.effects.push_back({"from": src_id, "i": i})
 
 
 # 删除自定义等级（只能删两端，保持连续）；自定义武器删到最后一级时整把删除
@@ -1843,11 +1865,17 @@ func library(with_weapons: bool = false) -> Array:
 			for w in _isvc().weapons:
 				if w != null and not w.effects.empty() and not _custom_weapons.has(w.my_id):
 					sources.push_back([w.my_id, orig_name(w), orig_effects(w.my_id)])
-			_weapon_library = Catalog.build_library(sources)
+			_weapon_library = Catalog.build_library(sources, library_dedup)
 		return _weapon_library
 	if _library == null:
-		_library = Catalog.build_library(_library_sources())
+		_library = Catalog.build_library(_library_sources(), library_dedup)
 	return _library
+
+
+func set_library_dedup(on: bool) -> void:
+	library_dedup = on
+	_library = null
+	_weapon_library = null
 
 
 func _library_sources() -> Array:

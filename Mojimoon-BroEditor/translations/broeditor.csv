@@ -511,6 +511,7 @@ BE_WS_ATTACK_TYPE,攻击方式,Attack style,Style d'attaque,攻撃方法,공격 
 BE_WS_SWEEP,横扫,Sweep,Balayage,薙ぎ払い,휩쓸기,橫掃,Взмах,Zamach,Barrido,Varredura,Schwung,Savurma,Fendente
 BE_WS_THRUST,突刺,Thrust,Estoc,突き,찌르기,突刺,Выпад,Pchnięcie,Estocada,Estocada,Stoß,Saplama,Affondo
 BE_HIDE_NUMBERS,隐藏编号,Hide numbers,Masquer les numéros,番号を隠す,번호 숨기기,隱藏編號,Скрыть номера,Ukryj numery,Ocultar números,Ocultar números,Nummern ausblenden,Numaraları gizle,Nascondi numeri
+BE_LIBRARY_DEDUP,效果库去重,Effect Library Dedup,Dédoublonner la bibliothèque,効果ライブラリの重複除去,효과 라이브러리 중복 제거,效果庫去重,Убрать дубли в библиотеке,Bez duplikatów w bibliotece,Sin duplicados en la biblioteca,Sem duplicatas na biblioteca,Bibliothek ohne Duplikate,Kütüphane Tekrarlarını Kaldır,Libreria senza duplicati
 BE_ID_APPLY,修改,Apply,Appliquer,適用,적용,修改,Применить,Zastosuj,Aplicar,Aplicar,Übernehmen,Uygula,Applica
 BE_ID_TAKEN,ID 为空或已被占用,The ID is empty or already in use,L'ID est vide ou déjà utilisé,ID が空か、すでに使われています,ID가 비어 있거나 이미 사용 중입니다,ID 為空或已被使用,ID пуст или уже занят,ID jest puste lub zajęte,El ID está vacío o ya existe,O ID está vazio ou já em uso,Die ID ist leer oder bereits vergeben,ID boş ya da zaten kullanılıyor,L'ID è vuoto o già in uso
 BE_ID_DONE,已修改 ID,ID changed,ID modifié,ID を変更しました,ID를 변경했습니다,已修改 ID,ID изменён,Zmieniono ID,ID cambiado,ID alterado,ID geändert,ID değiştirildi,ID modificato

@@ -626,8 +626,10 @@ func test_158_modals_reset_and_blueprint_codes() -> void:
 	_check(m.next_id > 1, "numbering advanced")
 	ui._fill_left()
 	ui._on_reset_kind()
-	ui._reset_parts.disabled.pressed = false
-	ui._reset_parts.edits.pressed = false
+	_check(not ui._reset_parts.disabled.pressed and not ui._reset_parts.edits.pressed and not ui._reset_parts.custom.pressed, "nothing ticked by default")
+	ui._modals[-1].ok_button.emit_signal("pressed")
+	_eq(ui._modals.size(), 1, "nothing ticked: stays on the first dialog")
+	ui._reset_parts.custom.pressed = true
 	ui._modals[-1].ok_button.emit_signal("pressed")
 	_check(m.find_target("item", iid) != null and ui._modals.size() == 1, "second dialog before anything is reset")
 	ui._modals[-1].ok_button.emit_signal("pressed")
@@ -635,6 +637,8 @@ func test_158_modals_reset_and_blueprint_codes() -> void:
 	_eq(m.next_id, 1, "numbering reset")
 	_check(m.item_profiles.has(it.my_id) and m.is_disabled("item", it.my_id), "edits and disabled kept")
 	ui._on_reset_kind()
+	for k in ui._reset_parts:
+		ui._reset_parts[k].pressed = true
 	ui._modals[-1].ok_button.emit_signal("pressed")
 	ui._modals[-1].ok_button.emit_signal("pressed")
 	_check(not m.item_profiles.has(it.my_id) and not m.is_disabled("item", it.my_id), "edits and disabled reset")
@@ -712,3 +716,49 @@ func _collect_scrolls(n: Node, out: Array) -> void:
 		if c is ScrollContainer:
 			out.push_back(c)
 		_collect_scrolls(c, out)
+
+
+# 列表排序：本模组新增的在最前；道具按稀有度再按英文名，不随语言变化；从角色导入的弹窗不超宽、有返回
+func test_160_sort_and_char_weapons_popup() -> void:
+	var iid = m.create_custom_item(_plain_item().my_id, "sorttest")
+	var ui = yield(_open_ui(CH), "completed")
+	ui.set_kind("item")
+	var orders = []
+	for loc in ["en", "zh"]:
+		TranslationServer.set_locale(loc)
+		ui._refresh_char_list()
+		var ids = []
+		for b in ui._char_grid.get_children():
+			ids.push_back(b.get_meta("id"))
+		orders.push_back(ids)
+	TranslationServer.set_locale("en")
+	_eq(orders[0][0], iid, "custom item first")
+	_check(orders[0] == orders[1], "order does not depend on the language")
+	var ok = true
+	for i in range(2, orders[0].size()):
+		var a = m.find_target("item", orders[0][i - 1])
+		var b = m.find_target("item", orders[0][i])
+		ok = ok and (a.tier < b.tier or (a.tier == b.tier and ui._en_name(a) <= ui._en_name(b)))
+	_check(ok, "tier, then English name")
+	# 角色列表：原版顺序
+	ui.set_kind("character")
+	var cids = []
+	for b in ui._char_grid.get_children():
+		cids.push_back(b.get_meta("id"))
+	var natives = []
+	for c in isvc.characters:
+		if not m.is_custom(c.my_id):
+			natives.push_back(c.my_id)
+	_eq(cids, natives, "characters in vanilla order")
+	# 从角色导入：不超宽，右上角返回
+	ui._on_tab_pressed("gear")
+	ui._open_char_weapons()
+	yield(_frames(3), "completed")
+	var md = ui._modals[-1]
+	var panel = md.get_child(1).get_child(0)
+	_check(panel.rect_size.x <= 1240 + 1, "popup keeps its width (%d)" % panel.rect_size.x)
+	var back = md.head.get_child(md.head.get_child_count() - 1)
+	back.emit_signal("pressed")
+	_check(ui._modals.empty(), "back closes the popup")
+	ui.queue_free()
+	yield(tree, "idle_frame")
