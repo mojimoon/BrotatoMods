@@ -102,38 +102,114 @@ func get_text(_player_index: int, colored: bool = true) -> String:
 	return graph_text(graph, colored)
 
 
+# 一条路径的文本，句式同 AutoAnthony / 原版："扳机 + 效果"，几率与"每 N 次"并入句式，
+# 其余条件与每波上限以括号后缀接在后面。语序由各语言的 BE_FMT* 决定（中文"扳机在前"，英文"效果在前"）
 static func graph_text(g: Dictionary, colored: bool = true) -> String:
 	var by_id = nodes_by_id(g)
 	var lines = []
 	for path in paths(g):
-		var parts = []
-		for id in path:
-			parts.push_back(node_text(by_id[id], colored))
-		var head = PoolStringArray(parts.slice(0, parts.size() - 2)).join(TranslationServer.translate("BE_SEP_COND"))
-		lines.push_back(head + TranslationServer.translate("BE_SEP_EFFECT") + parts[-1])
+		lines.push_back(path_text(by_id, path, colored))
 	return PoolStringArray(lines).join("\n")
 
 
-static func node_text(n: Dictionary, colored: bool = true) -> String:
-	var kind: String = n.kind
-	var params: Dictionary = n.get("params", {})
-	var t = TranslationServer.translate("BE_NT_" + kind.to_upper())
-	for k in params:
-		var v = params[k]
-		var s = str(v)
-		match k:
-			"stat":
-				s = _stat_name(str(v))
-			"value":
-				s = _col(("+" if int(v) >= 0 and kind in ["temp_stat", "perm_stat", "timed_stat"] else "") + str(int(v)), int(v) >= 0, colored)
-			"pct", "n", "secs":
-				s = str(int(v))
-			"ref":
-				s = _grant_text(n, colored)
-			"mode":
-				s = TranslationServer.translate("BE_MODE_" + str(v).to_upper())
-		t = t.replace("{" + k + "}", s)
-	return t
+static func _tr(k: String) -> String:
+	return TranslationServer.translate(k)
+
+
+static func _p(n: Dictionary, k: String, default = 0):
+	return n.get("params", {}).get(k, default)
+
+
+static func path_text(by_id: Dictionary, path: Array, colored: bool = true) -> String:
+	var trig = by_id[path[0]]
+	var eff = by_id[path[-1]]
+	var chance = 100.0
+	var every = 1
+	var suffix = ""
+	for i in range(1, path.size() - 1):
+		var n = by_id[path[i]]
+		match n.kind:
+			"chance":
+				chance *= float(_p(n, "pct", 100)) / 100.0
+			"every":
+				every *= max(1, int(_p(n, "n", 1)))
+			"cap":
+				var c = int(_p(n, "n", 1))
+				suffix += _tr("BE_CAP_1") if c == 1 else _tr("BE_CAP").replace("{0}", str(c))
+			_:
+				suffix += _cond_text(n)
+	var t = _trigger_text(trig, every)
+	if every > 1 and _tr("BE_TX_" + trig.kind.to_upper() + "_EVERY") == "BE_TX_" + trig.kind.to_upper() + "_EVERY":
+		# 没有"每 N 次"句式的扳机：作为后缀
+		suffix = _tr("BE_CX_EVERY").replace("{n}", str(every)) + suffix
+	var k = "BE_FMT_GRANT" if eff.kind == "grant" else "BE_FMT"
+	if chance < 100.0:
+		k += "_CHANCE"
+	var tc = t.strip_edges().lstrip(",，")
+	if tc.length() > 0:
+		tc = tc.substr(0, 1).to_upper() + tc.substr(1)
+	var c_text = str(stepify(chance, 0.1)).trim_suffix(".0") + "%"
+	return _tr(k).replace("{T}", tc).replace("{t}", t).replace("{p}", _payload_text(eff, trig.kind, colored)).replace("{c}", _col(c_text, true, colored)) + suffix
+
+
+static func _trigger_text(trig: Dictionary, every: int) -> String:
+	var base = "BE_TX_" + trig.kind.to_upper()
+	if every > 1 and _tr(base + "_EVERY") != base + "_EVERY":
+		return _tr(base + "_EVERY").replace("{0}", str(every))
+	return _tr(base).replace("{0}", str(int(_p(trig, "secs", 1))))
+
+
+static func _cond_text(n: Dictionary) -> String:
+	var t = _tr("BE_CX_" + n.kind.to_upper())
+	for k in ["n", "pct", "secs"]:
+		t = t.replace("{" + k + "}", str(int(_p(n, k, 0))))
+	return t.replace("{stat}", _stat_name(str(_p(n, "stat", ""))))
+
+
+static func _signed(v: int) -> String:
+	return ("+" if v >= 0 else "") + str(v)
+
+
+static func _payload_text(n: Dictionary, trigger_kind: String, colored: bool) -> String:
+	var v = int(_p(n, "value", 0))
+	var good = v >= 0
+	var stat = _stat_name(str(_p(n, "stat", "")))
+	var state = trigger_kind in Catalog.STATE_TRIGGERS
+	match n.kind:
+		"temp_stat":
+			return _tr("BE_PX_STATE_STAT" if state else "BE_PX_TEMP_STAT").replace("{0}", _col(_signed(v), good, colored)).replace("{1}", stat)
+		"perm_stat":
+			return _tr("BE_PX_PERM_STAT").replace("{0}", _col(_signed(v), good, colored)).replace("{1}", stat)
+		"timed_stat":
+			return _tr("BE_PX_TIMED_STAT").replace("{0}", _col(_signed(v), good, colored)).replace("{1}", stat).replace("{2}", str(int(_p(n, "secs", 1))))
+		"heal_hp":
+			return _tr("BE_PX_HEAL").replace("{0}", _col(str(v), good, colored))
+		"add_gold":
+			if v < 0:
+				return _tr("BE_PX_LOSE_GOLD").replace("{0}", _col(str(-v), false, colored))
+			return _tr("BE_PX_GOLD").replace("{0}", _col(str(v), true, colored))
+		"xp":
+			return _tr("BE_PX_XP").replace("{0}", _col(str(v), good, colored))
+		"damage", "explode":
+			var pct = str(int(_p(n, "pct", 100))) + "%"
+			return _tr("BE_PX_" + n.kind.to_upper()).replace("{0}", _col(pct, true, colored)).replace("{1}", stat)
+		"hp_dmg":
+			var pct = int(_p(n, "pct", 1))
+			return _tr("BE_PX_HP_DMG").replace("{0}", _col(str(pct) + "%", true, colored)).replace("{1}", str(stepify(pct / 10.0, 0.1)).trim_suffix(".0") + "%")
+		"ignite":
+			return _tr("BE_PX_IGNITE").replace("{0}", _col(str(v), true, colored)).replace("{1}", "3")
+		"slow":
+			var pct = int(_p(n, "pct", 10))
+			return _tr("BE_PX_SLOW").replace("{0}", _col(str(pct) + "%", true, colored)).replace("{1}", str(int(min(90, pct * 4))) + "%")
+		"fruit":
+			return _tr("BE_PX_FRUIT_1" if v == 1 else "BE_PX_FRUIT").replace("{0}", _col(str(v), good, colored))
+		"rand_stats":
+			return _tr("BE_PX_RAND_STATS_1" if v == 1 else "BE_PX_RAND_STATS").replace("{0}", _col(str(v), good, colored))
+		"grant":
+			var inner = _grant_text(n, colored)
+			var k = "BE_PX_GRANT_PERM" if str(_p(n, "mode", "temp")) == "perm" else ("BE_PX_GRANT_STATE" if state else "BE_PX_GRANT_TEMP")
+			return _tr(k).replace("{0}", inner)
+	return ""
 
 
 static func _grant_text(n: Dictionary, colored: bool) -> String:

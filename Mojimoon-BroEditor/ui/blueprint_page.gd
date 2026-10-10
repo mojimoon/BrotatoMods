@@ -180,7 +180,7 @@ func _param_control(n: Dictionary, p: Array) -> Control:
 		return opt
 	# effect：效果库引用
 	var b = ui._button("", ui.FONT_DESC)
-	b.text = ui._strip(GraphEffect.node_text({"kind": "grant", "params": {"ref": cur, "n": 1, "mode": "perm"}}, false)) if cur is Dictionary else ui.tr("BE_GRANT_PICK")
+	b.text = ui._strip(GraphEffect._grant_text({"kind": "grant", "params": {"ref": cur, "n": 1}}, false)) if cur is Dictionary else ui.tr("BE_GRANT_PICK")
 	b.clip_text = true
 	b.rect_min_size = Vector2(200, 0)
 	ui._apply_action_style(b, TYPE_COLORS.effect)

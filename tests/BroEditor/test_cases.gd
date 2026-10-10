@@ -851,3 +851,42 @@ func _action_has_key(action: String, sc: int) -> bool:
 		if ev is InputEventKey and (ev.scancode == sc or ev.physical_scancode == sc):
 			return true
 	return false
+
+
+# ============================================================
+# 路径文本（中文 / 英文句式）与原版用语
+# ============================================================
+func _path_line(nodes: Array) -> String:
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	var prev = -1
+	for nd in nodes:
+		var id = GE.add_node(g, nd[0], Vector2.ZERO, nd[1])
+		if prev >= 0:
+			GE.add_link(g, prev, id)
+		prev = id
+	return GE.graph_text(g, false)
+
+
+func test_110_path_text() -> void:
+	TranslationServer.set_locale("zh")
+	_eq(_path_line([["level_up", {}], ["perm_stat", {"stat": "stat_melee_damage", "value": 2}]]), "升级时+2近战伤害", "zh level up")
+	_eq(_path_line([["kill", {}], ["chance", {"pct": 20}], ["add_gold", {"value": 3}]]), "杀死敌人时有20%概率获得3个材料", "zh chance")
+	_eq(_path_line([["kill", {}], ["every", {"n": 5}], ["cap", {"n": 3}], ["temp_stat", {"stat": "stat_armor", "value": 1}]]), "每杀死5个敌人，+1护甲，直至敌袭结束（每波最多3次）", "zh every + cap")
+	_eq(_path_line([["still", {}], ["temp_stat", {"stat": "stat_percent_damage", "value": 10}]]), "站立不动时+10%伤害", "zh state")
+	_eq(_path_line([["level_up", {}], ["every", {"n": 2}], ["hp_below", {"pct": 50}], ["heal_hp", {"value": 5}]]), "升级时恢复5点生命值（每2次）（生命值低于50%时）", "zh conds as suffix")
+	_eq(_path_line([["hit", {}], ["timed_stat", {"stat": "stat_dodge", "value": 20, "secs": 3}]]), "受到伤害时+20%闪避，持续3秒", "zh timed")
+	TranslationServer.set_locale("en")
+	_eq(_path_line([["kill", {}], ["chance", {"pct": 20}], ["add_gold", {"value": 3}]]), "+3 materials when you kill an enemy (20% chance)", "en chance")
+	_eq(_path_line([["interval", {"secs": 5}], ["xp", {"value": 2}]]), "+2 XP every 5 seconds", "en interval")
+
+
+func test_111_stat_names() -> void:
+	TranslationServer.set_locale("zh")
+	_eq(m.stat_name("piercing"), "贯通", "vanilla label")
+	_eq(m.stat_name("bounce_damage"), "%反弹伤害", "vanilla label with %")
+	_eq(m.stat_name("number_of_enemies"), "%敌人数量", "own label overrides vague vanilla one")
+	_eq(m.stat_name("gain_stat_max_hp"), "%最大生命值修改", "gain modifier")
+	_eq(m.stat_name("gain_stat_lifesteal"), "%生命窃取修改", "gain modifier strips %")
+	_eq(m.stat_name("loot_alien_speed"), "%战利品外星人速度", "loot alien term")
+	TranslationServer.set_locale("en")

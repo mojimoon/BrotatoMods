@@ -353,13 +353,20 @@ func stat_text_key(key: String) -> String:
 
 
 # 属性显示名：原版 STAT_X；属性获取修改（gain_stat_x / gain_x）= "<属性> 获取 %"；其余用本 mod 的 BE_K_X
+# 原版标签含义不清（NUMBER_OF_ENEMIES = "敌人"）的 key：用本 mod 的标签
+const OWN_LABEL_KEYS = ["number_of_enemies"]
+
+
 func stat_name(key: String) -> String:
 	if key.begins_with("gain_") and key != "gain_pct_gold_start_wave":
-		var base = key.substr(5)
-		return tr("BE_GAIN_FMT").replace("{0}", stat_name(base).trim_suffix(" %").trim_prefix("% "))
-	if key.begins_with("stat_"):
-		return tr(key.to_upper())
-	var k = "BE_K_" + key.to_upper()
+		var base = stat_name(key.substr(5)).strip_edges()
+		for pfx in ["%", "％"]:
+			base = base.trim_prefix(pfx).trim_suffix(pfx).strip_edges()
+		return tr("BE_GAIN_FMT").replace("{0}", base)
+	var native = key.to_upper()
+	if key.begins_with("stat_") or (not key in OWN_LABEL_KEYS and tr(native) != native):
+		return tr(native).strip_edges()
+	var k = "BE_K_" + native
 	var t = tr(k)
 	return t if t != k else key
 

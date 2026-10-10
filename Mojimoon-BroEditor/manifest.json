@@ -1,7 +1,7 @@
 {
     "name": "BroEditor",
     "namespace": "Mojimoon",
-    "version_number": "0.3.1",
+    "version_number": "0.3.2",
     "description": "土豆兄弟角色编辑器 BroEditor — 修改任意角色的效果、初始属性、初始武器 / 道具、禁用道具 / 武器，或以任意角色为基底创建自定义角色；效果可从全部原版角色与道具中挑选并修改数值。Brotato character editor: edit any character's effects, starting stats, starting weapons / items and banned items / weapons, or create custom characters; effects can be picked from every vanilla character and item and tuned.",
     "website_url": "",
     "dependencies": [],
