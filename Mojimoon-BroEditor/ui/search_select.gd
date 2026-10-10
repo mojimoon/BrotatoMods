@@ -15,6 +15,8 @@ var fixed_text := ""	# 非空时按钮始终显示这段文字（例如"+ 扳机
 var ui = null
 
 var _popup: Control = null
+var _panel: PanelContainer
+var _scroll: ScrollContainer
 var _list: VBoxContainer
 var _search: LineEdit
 
@@ -59,6 +61,7 @@ func open() -> void:
 	ui.add_child(_popup)
 	ui.active_popup = self
 	var panel = PanelContainer.new()
+	_panel = panel
 	panel.add_stylebox_override("panel", ui._style(ui.C_BG_PANEL, ui.C_ACCENT_2, 8, 2, 8, 8))
 	_popup.add_child(panel)
 	var box = VBoxContainer.new()
@@ -69,25 +72,39 @@ func open() -> void:
 	_search.connect("text_entered", self, "_on_enter")
 	box.add_child(_search)
 	var scroll = ScrollContainer.new()
+	_scroll = scroll
 	scroll.scroll_horizontal_enabled = false
-	scroll.rect_min_size = Vector2(0, min(LIST_HEIGHT, max(1, items.size()) * (ROW_HEIGHT + 2) + 4))
 	box.add_child(scroll)
 	_list = VBoxContainer.new()
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_list.add_constant_override("separation", 2)
 	scroll.add_child(_list)
 	_fill("")
-	# 位置：按钮下方，超出屏幕时放到上方 / 向左收
-	var w = max(rect_size.x, 380)
-	panel.rect_min_size = Vector2(w, 0)
+	panel.rect_min_size = Vector2(max(rect_size.x, 380), 0)
+	_fit()
+	# 行的实际高度在排版后才确定：下一帧按实际高度再适配一次
+	call_deferred("_fit")
+	_search.call_deferred("grab_focus")
+
+
+# 列表高度 = 全部行的实际高度（最多 LIST_HEIGHT，超过才出现滚动条）；
+# 位置：按钮下方，超出屏幕时放到上方 / 向左收
+func _fit() -> void:
+	if _popup == null or not is_instance_valid(_panel):
+		return
+	var rows = _list.get_child_count()
+	var need = _list.get_combined_minimum_size().y
+	need = max(need, rows * (ROW_HEIGHT + 2))
+	_scroll.rect_min_size = Vector2(0, min(LIST_HEIGHT, max(ROW_HEIGHT, need) + 4))
+	_panel.rect_size = Vector2.ZERO
+	var w = _panel.rect_min_size.x
 	var vp = get_viewport_rect().size
-	var h = scroll.rect_min_size.y + 70
+	var h = _panel.get_combined_minimum_size().y
 	var pos = rect_global_position + Vector2(0, rect_size.y + 4)
 	if pos.y + h > vp.y:
 		pos.y = max(4, rect_global_position.y - h - 4)
 	pos.x = clamp(pos.x, 4, max(4, vp.x - w - 4))
-	panel.rect_global_position = pos
-	_search.call_deferred("grab_focus")
+	_panel.rect_global_position = pos
 
 
 func close() -> void:
@@ -136,6 +153,7 @@ func _row(it: Array) -> Button:
 	name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(name_lbl)
 	var key_lbl = ui._label(str(it[1]), ui.FONT_DESC, ui.C_TEXT_DIM)
+	key_lbl.set_message_translation(false)
 	key_lbl.valign = Label.VALIGN_CENTER
 	key_lbl.size_flags_vertical = Control.SIZE_FILL
 	key_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE

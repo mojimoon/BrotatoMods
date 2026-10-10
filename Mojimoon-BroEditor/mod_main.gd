@@ -22,10 +22,10 @@ const ID_PREFIX = {"character": CHAR_PREFIX, "item": ITEM_PREFIX, "weapon": WEAP
 # 给原版武器家族补的低级版本：<weapon_id>_<等级>_broeditor
 const TIER_SUFFIX = "_broeditor"
 const EFFECT_SCRIPT = "res://items/global/effect.gd"
-const SHARE_PREFIX = "BE1:"
+const SHARE_PREFIX = "BE0:"
 # 批量导出：一栏全部（角色 / 道具 / 武器）与三栏全部，前缀不同
-const BUNDLE_PREFIX = {"character": "BEC1:", "item": "BEI1:", "weapon": "BEW1:"}
-const ALL_PREFIX = "BEA1:"
+const BUNDLE_PREFIX = {"character": "BEC:", "item": "BEI:", "weapon": "BEW:"}
+const ALL_PREFIX = "BEA:"
 const BUNDLE_KEYS = {"character": "profiles", "item": "items", "weapon": "weapons"}
 const MAX_DESC = 300
 

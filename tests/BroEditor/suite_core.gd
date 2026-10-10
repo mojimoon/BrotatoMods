@@ -181,7 +181,7 @@ func test_40_share_code() -> void:
 	m.profiles = {}
 	_eq(m.import_code(code, CH), CH, "imported into native")
 	_eq(m.profiles[CH].stats, {"stat_luck": 12}, "content")
-	for bad in ["", "x", "BE1:", "BE1:!!", "AA1:" + Marshalls.utf8_to_base64("{}")]:
+	for bad in ["", "x", m.SHARE_PREFIX, m.SHARE_PREFIX + "!!", "AA1:" + Marshalls.utf8_to_base64("{}")]:
 		_eq(m.import_code(bad, CH), "", "rejects " + bad)
 	# 自定义角色 -> 导入为新的自定义角色
 	var id = m.create_custom(CH)
@@ -586,10 +586,10 @@ func test_132_bundle_codes() -> void:
 	_check(single.begins_with(m.SHARE_PREFIX), "single prefix")
 	_eq(m.import_code(single, CH, "character"), "", "item code rejected for characters")
 	var kind_code = m.export_bundle("item")
-	_check(kind_code.begins_with("BEI1:"), "item bundle prefix")
+	_check(kind_code.begins_with(m.BUNDLE_PREFIX.item), "item bundle prefix")
 	_eq(m.export_bundle("weapon"), "", "empty bundle exports nothing")
 	var all_code = m.export_bundle("")
-	_check(all_code.begins_with("BEA1:"), "all prefix")
+	_check(all_code.begins_with(m.ALL_PREFIX), "all prefix")
 	m.item_profiles = {}
 	m.profiles = {}
 	_eq(m.import_bundle(kind_code), 1, "item bundle imported")
@@ -797,3 +797,4 @@ func test_152_weapon_effect_categories() -> void:
 			"res://weapons/ranged/crossbow/1/crossbow_effect.tres"]:
 		if ResourceLoader.exists(path):
 			_eq(m.Catalog.category_of(load(path)), "combat", path.get_file() + " is combat")
+

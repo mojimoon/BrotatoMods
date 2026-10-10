@@ -72,7 +72,7 @@ func test_51_ui_edits() -> void:
 	_check(ui._preview_text.get_child_count() > 2, "preview filled")
 	# 导出 / 导入
 	ui.test_clipboard = ""
-	ui._on_export_selected("BE1:")
+	ui._on_export_selected(m.SHARE_PREFIX)
 	_check(ui.test_clipboard.begins_with(m.SHARE_PREFIX), "export to clipboard")
 	# 关闭：保存
 	ui._on_close_pressed()
@@ -294,18 +294,15 @@ func test_133_ui_items_and_weapons() -> void:
 	ui._on_attr_changed((it.tier + 1) % 4, "tier", it.tier)
 	_eq(ui._p().tier, (it.tier + 1) % 4, "tier edit")
 	# 导出：本栏全部
-	ui._on_export_selected("BEI1:")
-	_check(ui.test_clipboard.begins_with("BEI1:"), "export item bundle from ui")
-	ui._on_export_selected("BEA1:")
-	_check(ui.test_clipboard.begins_with("BEA1:"), "export all from ui")
+	ui._on_export_selected(m.BUNDLE_PREFIX.item)
+	_check(ui.test_clipboard.begins_with(m.BUNDLE_PREFIX.item), "export item bundle from ui")
+	ui._on_export_selected(m.ALL_PREFIX)
+	_check(ui.test_clipboard.begins_with(m.ALL_PREFIX), "export all from ui")
 	# 键名：非调试 = 只有主键名
 	ui.set_kind("character")
 	_eq(ui._kind, "character", "back to characters")
 	var e = m.make_effect({"set": {"key": "stat_luck", "custom_key": "ck", "text_key": "tk"}})
-	_eq(ui._key_info(e), "stat_luck", "main key only")
-	m.debug = true
-	_eq(ui._key_info(e), "stat_luck  ·  ck  ·  tk", "debug: all keys, no file")
-	m.debug = false
+	_eq(ui._key_info(e), "stat_luck  ·  ck  ·  tk", "all keys, no file")
 	ui.queue_free()
 	yield(tree, "idle_frame")
 
@@ -404,5 +401,52 @@ func test_153_weapon_attack_type() -> void:
 	_eq(ui._p().wstats.get("speed_percent_modifier"), -30, "enemy speed on hit keeps the vanilla sign")
 	m.apply_all()
 	_eq(fam[0].stats.attack_type, sweep, "applied")
+	ui.queue_free()
+	yield(tree, "idle_frame")
+
+
+func _find_label(n: Node, t: String):
+	if n is Label and n.text == t:
+		return n
+	for c in n.get_children():
+		var f = _find_label(c, t)
+		if f != null:
+			return f
+	return null
+
+
+func test_154_key_names() -> void:
+	m.debug = true
+	var ui = yield(_open_ui("character_brawler"), "completed")
+	ui._on_tab_pressed("effects")
+	var l = null
+	for e in m.find_character("character_brawler").effects:
+		if e.key == "EFFECT_WEAPON_CLASS_BONUS":
+			l = _find_label(ui._effect_list, ui._key_info(e))
+	_check(l != null and not l.can_translate_messages(), "upper-case key label is not auto-translated")
+	ui._on_effect_edit(0)
+	_check(_find_label(ui._effect_list, ui._key_info(m.make_effect(ui._specs()[0]))) != null, "key shown on the expanded row in key mode")
+	ui._on_tab_pressed("overview")
+	_check(_tree_has_text(ui._page, "stat_max_hp") or _tree_has_text(ui._page, m.find_character("character_brawler").wanted_tags[0] if not m.find_character("character_brawler").wanted_tags.empty() else "stat_"), "tag keys shown in key mode")
+	ui._on_tab_pressed("stats")
+	_check(_tree_has_text(ui._page, "materials"), "start state keys shown in key mode")
+	m.debug = false
+	ui._on_tab_pressed("effects")
+	ui._on_effect_edit(0)
+	_check(not _tree_has_text(ui._effect_list, "stat_"), "no keys when key mode is off, even expanded")
+	ui.queue_free()
+	yield(tree, "idle_frame")
+
+
+func test_155_short_dropdown_fits() -> void:
+	var ui = yield(_open_ui(CH), "completed")
+	var sel = ui._search_select([["A", "a"], ["B", "b"], ["C", "c"], ["D", "d"], ["E", "e"]], "a")
+	ui.add_child(sel)
+	sel.open()
+	yield(tree, "idle_frame")
+	yield(tree, "idle_frame")
+	_check(sel._scroll.rect_size.y + 1 >= sel._list.get_combined_minimum_size().y, "short menu shows every row without scrolling")
+	_check(not sel._scroll.get_v_scrollbar().visible, "no scrollbar for a short menu")
+	sel.close()
 	ui.queue_free()
 	yield(tree, "idle_frame")

@@ -982,10 +982,7 @@ func _build_overview() -> void:
 	tbox.add_child(grid)
 	var tags = v.wanted_tags if v.wanted_tags is Array else c.wanted_tags
 	for tag in _all_tags():
-		var b = _button(_tag_name(tag), FONT_DESC)
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.clip_text = true
-		_apply_chip_style(b, tag in tags, C_ACCENT_3)
+		var b = _chip(_tag_name(tag), tag, tag in tags, C_ACCENT_3)
 		b.connect("pressed", self, "_on_tag_pressed", [tag])
 		grid.add_child(b)
 
@@ -1227,10 +1224,7 @@ func _build_object_overview() -> void:
 		var v = _view()
 		var tags = v.tags if v.tags is Array else _mod.backup_value(r, "tags")
 		for tag in _all_tags():
-			var b = _button(_tag_name(tag), FONT_DESC)
-			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			b.clip_text = true
-			_apply_chip_style(b, tag in tags, C_ACCENT_3)
+			var b = _chip(_tag_name(tag), tag, tag in tags, C_ACCENT_3)
 			b.connect("pressed", self, "_on_tag_pressed", [tag])
 			tgrid.add_child(b)
 	else:
@@ -1238,10 +1232,7 @@ func _build_object_overview() -> void:
 		for st in _isvc().sets:
 			if st == null:
 				continue
-			var b = _button(tr(st.name), FONT_DESC)
-			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			b.clip_text = true
-			_apply_chip_style(b, st.my_id in cur, C_ACCENT_3)
+			var b = _chip(tr(st.name), st.my_id, st.my_id in cur, C_ACCENT_3)
 			b.connect("pressed", self, "_on_set_pressed", [st.my_id])
 			tgrid.add_child(b)
 	_preview_card(cols)
@@ -1331,13 +1322,13 @@ func _build_attrs() -> void:
 	var price = _spin(0, 99999, 1)
 	price.value = v.price if v.price >= 0 else int(_mod.backup_value(r, "value"))
 	price.connect("value_changed", self, "_on_attr_changed", ["price", orig_price])
-	_attr_row(grid, tr("BE_PRICE"), price, v.price >= 0)
+	_attr_row(grid, tr("BE_PRICE"), price, "value")
 	if _kind == "item":
 		var orig_nb = -999 if custom_item else int(_mod.backup_value(r, "max_nb"))
 		var nb = _spin(-1, 999, 1)
 		nb.value = v.max_nb if v.max_nb != -2 else int(_mod.backup_value(r, "max_nb"))
 		nb.connect("value_changed", self, "_on_attr_changed", ["max_nb", orig_nb])
-		_attr_row(grid, tr("BE_MAX_NB"), nb, v.max_nb != -2)
+		_attr_row(grid, tr("BE_MAX_NB"), nb, "max_nb")
 		var tiers = HBoxContainer.new()
 		tiers.add_constant_override("separation", 6)
 		var orig_tier = int(_mod.backup_value(r, "tier"))
@@ -1348,7 +1339,7 @@ func _build_attrs() -> void:
 			_apply_chip_style(tb, t == cur_tier, ItemService.get_color_from_tier(t))
 			tb.connect("pressed", self, "_on_attr_changed", [t, "tier", -999 if custom_item else orig_tier])
 			tiers.add_child(tb)
-		_attr_row(grid, tr("BE_TIER"), tiers, v.tier >= 0)
+		_attr_row(grid, tr("BE_TIER"), tiers, "tier")
 		box.add_child(_desc(tr("BE_ITEM_BASIC_DESC")))
 		_build_stat_tables(left, v)
 	else:
@@ -1358,15 +1349,12 @@ func _build_attrs() -> void:
 
 
 # 一行：名称（改过时绿色）+ 控件
-func _attr_row(grid: Control, text: String, ctl: Control, modified: bool) -> Label:
-	var lbl = _label(text, FONT_DESC, C_ACCENT_3 if modified else C_TEXT)
-	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	lbl.clip_text = true
-	grid.add_child(lbl)
+func _attr_row(grid: Control, text: String, ctl: Control, key: String = "") -> void:
+	grid.add_child(_name_cell(text, key))
 	if ctl is SpinBox:
 		ctl.rect_min_size = Vector2(150, 0)
+	ctl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	grid.add_child(ctl)
-	return lbl
 
 
 # 价格 / 数量限制 / 稀有度：等于原值时记为"不修改"
@@ -1453,9 +1441,8 @@ func _wstat_cell(grid: Control, k: String, type: String, base, v: Dictionary, w)
 		grid.add_child(Control.new())
 		return
 	if k == "#type":
-		var lbl = _label(tr("BE_WS_TYPE"), FONT_DESC, C_TEXT)
-		grid.add_child(lbl)
-		grid.add_child(_label(tr("RANGED" if w.type == 1 else "MELEE"), FONT_SMALL, C_TEXT_DIM))
+		grid.add_child(_name_cell(tr("BE_WS_TYPE"), "type"))
+		grid.add_child(_label(tr("RANGED" if w.type == 1 else "MELEE"), FONT_SMALL, C_TEXT))
 		return
 	if k == "#attack":
 		var sweep = int(v.wstats.get("attack_type", base.attack_type)) == 1
@@ -1464,17 +1451,14 @@ func _wstat_cell(grid: Control, k: String, type: String, base, v: Dictionary, w)
 		tb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		_apply_chip_style(tb, sweep, C_ACCENT_2)
 		tb.connect("pressed", self, "_on_wstat_changed", [0 if sweep else 1, ["attack_type", "int", ""]])
-		_attr_row(grid, tr("BE_WS_ATTACK_TYPE"), tb, v.wstats.has("attack_type"))
+		_attr_row(grid, tr("BE_WS_ATTACK_TYPE"), tb, "attack_type")
 		return
 	var mode = WSTAT_SHOW.get(k, "")
 	var cur = v.wstats.get(k, base.get(k))
 	var ctl = _spin(-99999, 99999, 0.01 if type == "float" and mode == "" else 1)
 	ctl.value = _wstat_shown(cur, mode)
 	ctl.connect("value_changed", self, "_on_wstat_changed", [[k, type, mode]])
-	var name = tr("BE_WS_" + k.to_upper())
-	if _mod.debug:
-		name += "  " + k
-	_attr_row(grid, name, ctl, v.wstats.has(k))
+	_attr_row(grid, tr("BE_WS_" + k.to_upper()), ctl, k)
 
 
 # 界面显示值：pct = 百分比整数，neg = 取负
@@ -1666,20 +1650,13 @@ func _stat_row(key: String, v: Dictionary) -> Control:
 	icon.rect_min_size = Vector2(22, 22)
 	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(icon)
-	var lbl = _label(stat_name(key), FONT_DESC, C_TEXT)
-	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	lbl.clip_text = true
-	row.add_child(lbl)
-	if _mod.debug:
-		var k = _key_label(key)
-		k.clip_text = false
-		row.add_child(k)
+	row.add_child(_name_cell(stat_name(key), key))
 	var sb = _spin(-9999, 9999, 1)
 	sb.rect_min_size = Vector2(110, 0)
+	sb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	sb.value = int(v.stats.get(key, _stat_default(key)))
-	sb.connect("value_changed", self, "_on_stat_changed", [key, lbl])
+	sb.connect("value_changed", self, "_on_stat_changed", [key, null])
 	row.add_child(sb)
-	_mark_stat_label(lbl, int(sb.value) - _stat_default(key))
 	return row
 
 
@@ -1734,11 +1711,9 @@ func _build_start_state(parent: Control, v: Dictionary) -> void:
 		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_constant_override("separation", 6)
 		sub.add_child(row)
-		var lbl = _label(tr(f[1]), FONT_DESC, C_TEXT)
-		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		lbl.clip_text = true
-		row.add_child(lbl)
+		row.add_child(_name_cell(tr(f[1]), f[0]))
 		var sb = _spin(f[2], f[3], 1)
+		sb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		sb.allow_greater = false
 		sb.allow_lesser = false
 		sb.rect_min_size = Vector2(120, 0)
@@ -1764,17 +1739,12 @@ func _on_start_changed(value, key: String) -> void:
 	_changed()
 
 
-func _mark_stat_label(lbl: Label, value: int) -> void:
-	lbl.add_color_override("font_color", C_ACCENT_3 if value > 0 else (C_DANGER if value < 0 else C_TEXT_DIM))
-
-
-func _on_stat_changed(value: float, key: String, lbl: Label) -> void:
+func _on_stat_changed(value: float, key: String, _lbl = null) -> void:
 	var p = _p()
 	if int(value) == _stat_default(key):
 		p.stats.erase(key)
 	else:
 		p.stats[key] = int(value)
-	_mark_stat_label(lbl, int(value) - _stat_default(key))
 	_changed()
 
 
@@ -1957,12 +1927,10 @@ func _drag_handle() -> Label:
 	return h
 
 
-# 键名（灰色小字）：调试模式 = key · custom_key · text_key；否则只有主键名
+# 键名（灰色小字，只在"显示键名"下显示）：key · custom_key · text_key
 func _key_info(e) -> String:
 	if e == null:
 		return ""
-	if not _mod.debug:
-		return str(e.key)
 	var parts = []
 	for v in [e.key, e.custom_key, e.text_key]:
 		if str(v) != "":
@@ -1972,10 +1940,52 @@ func _key_info(e) -> String:
 
 func _key_label(text: String) -> Label:
 	var l = _label(text, FONT_DESC, C_TEXT_DIM)
+	l.set_message_translation(false)
 	l.modulate.a = 0.8
 	l.clip_text = true
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return l
+
+
+# 属性名称格：白字；显示键名时下方另起一行灰色键名
+func _name_cell(text: String, key: String = "") -> Control:
+	var lbl = _label(text, FONT_DESC, C_TEXT)
+	lbl.clip_text = true
+	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if not _mod.debug or key == "":
+		return lbl
+	var col = VBoxContainer.new()
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.add_constant_override("separation", 0)
+	col.add_child(lbl)
+	col.add_child(_key_label(key))
+	return col
+
+
+# 词条 / 类别按钮：显示键名时按钮里另起一行灰色键名
+func _chip(text: String, key: String, on: bool, accent: Color) -> Button:
+	var b = _button(text, FONT_DESC)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.clip_text = true
+	_apply_chip_style(b, on, accent)
+	if _mod.debug:
+		b.text = ""
+		b.rect_min_size = Vector2(0, 44)
+		var col = VBoxContainer.new()
+		col.set_anchors_preset(Control.PRESET_WIDE)
+		col.alignment = BoxContainer.ALIGN_CENTER
+		col.add_constant_override("separation", 0)
+		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(col)
+		var name = _label(text, FONT_DESC, C_TEXT if on else C_TEXT_DIM)
+		name.align = Label.ALIGN_CENTER
+		name.clip_text = true
+		name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		col.add_child(name)
+		var k = _key_label(key)
+		k.align = Label.ALIGN_CENTER
+		col.add_child(k)
+	return b
 
 
 # 初始属性 / 额外初始装备 / 蓝图生成的一条效果：只读，显示来源，可拖动排序
@@ -2066,7 +2076,7 @@ func _effect_row(i: int, spec) -> Control:
 	row.add_child(tcol)
 	var txt = _rich(_effect_text(spec))
 	tcol.add_child(txt)
-	if _mod.debug and i != _expanded:
+	if _mod.debug:
 		tcol.add_child(_key_label(_key_info(e)))
 	var src = _label(_source_name(spec), FONT_DESC, C_TEXT_DIM)
 	src.rect_min_size = Vector2(120, 0)
@@ -2097,7 +2107,6 @@ func _build_effect_fields(col: Control, i: int, spec: Dictionary) -> void:
 	var e = _mod.make_effect(spec)
 	if e == null:
 		return
-	col.add_child(_key_label(_key_info(e)))
 	var grid = GridContainer.new()
 	grid.columns = 4
 	grid.add_constant_override("hseparation", 10)

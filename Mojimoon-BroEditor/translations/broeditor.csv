@@ -427,7 +427,7 @@ BE_SRC_GROUP_START,初始装备,Starting Gear,Équipement de départ,初期装�
 BE_SRC_GROUP_GRAPH,蓝图,Blueprint,Plan,設計図,설계도,藍圖,Схема,Schemat,Plano,Projeto,Bauplan,Şema,Progetto
 BE_YES,是,Yes,Oui,はい,예,是,Да,Tak,Sí,Sim,Ja,Evet,Sì
 BE_NO,否,No,Non,いいえ,아니요,否,Нет,Nie,No,Não,Nein,Hayır,No
-BE_DEBUG,调试,Debug,Débogage,デバッグ,디버그,偵錯,Отладка,Debug,Depuración,Depuração,Debug,Hata Ayıklama,Debug
+BE_DEBUG,显示键名,Show keys,Afficher les clés,キー名を表示,키 이름 표시,顯示鍵名,Показывать ключи,Pokaż klucze,Mostrar claves,Mostrar chaves,Schlüssel anzeigen,Anahtarları göster,Mostra chiavi
 BE_KIND_CHARACTER,角色,Character,Personnage,キャラクター,캐릭터,角色,Персонаж,Bohater,Personaje,Personagem,Charakter,Karakter,Personaggio
 BE_KIND_ITEM,道具,Items,Objets,アイテム,아이템,道具,Предметы,Przedmioty,Objetos,Itens,Items,Eşyalar,Oggetti
 BE_KIND_WEAPON,武器,Weapons,Armes,武器,무기,武器,Оружие,Bronie,Armas,Armas,Waffen,Silahlar,Armi
