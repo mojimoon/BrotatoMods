@@ -2979,7 +2979,7 @@ func _on_reset_kind() -> void:
 	m.body.add_child(_desc(tr("BE_RESET_KIND_PICK").replace("{0}", kind_name)))
 	_reset_parts = {}
 	for d in RESET_PARTS:
-		var cb = _checkbox(tr(d[1]), FONT_SMALL)
+		var cb = _checkbox(tr(d[1]), FONT_SMALL, C_DANGER)
 		cb.pressed = true
 		m.body.add_child(cb)
 		_reset_parts[d[0]] = cb
@@ -3239,11 +3239,16 @@ func _small_switch_icon(src: Texture) -> Texture:
 	return tex
 
 
-# 勾选框：各状态用同一个样式（游戏主题的悬停样式边距不同，文字会左移、压到勾上）
-func _checkbox(text: String, font: Font) -> CheckBox:
+# 勾选框：各状态用同一个样式（游戏主题的悬停样式边距不同，文字会左移、压到勾上）；
+# 文字默认白色，悬停为 hover 色
+func _checkbox(text: String, font: Font, hover: Color = C_ACCENT) -> CheckBox:
 	var cb = CheckBox.new()
 	cb.text = text
 	cb.add_font_override("font", font)
+	for k in ["font_color", "font_color_pressed", "font_color_focus"]:
+		cb.add_color_override(k, C_TEXT)
+	for k in ["font_color_hover", "font_color_hover_pressed"]:
+		cb.add_color_override(k, hover)
 	var sb = StyleBoxEmpty.new()
 	sb.content_margin_left = 4
 	sb.content_margin_right = 4

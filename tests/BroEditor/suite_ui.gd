@@ -698,6 +698,10 @@ func test_159_regressions_090() -> void:
 	# 勾选框
 	var cb = ui._checkbox("x", ui.FONT_SMALL)
 	_check(cb.get_stylebox("hover") == cb.get_stylebox("normal"), "checkbox hover keeps the same margins")
+	_eq(cb.get_color("font_color"), ui.C_TEXT, "checkbox text white")
+	var red = ui._checkbox("x", ui.FONT_SMALL, ui.C_DANGER)
+	_eq([red.get_color("font_color_hover"), red.get_color("font_color_hover_pressed")], [ui.C_DANGER, ui.C_DANGER], "reset options turn red on hover")
+	red.free()
 	cb.free()
 	ui.queue_free()
 	yield(tree, "idle_frame")
