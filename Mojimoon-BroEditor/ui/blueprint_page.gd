@@ -319,7 +319,7 @@ func _fill_picker() -> void:
 		_picker_list.remove_child(c)
 		c.queue_free()
 	var shown = 0
-	for entry in ui._mod.library():
+	for entry in ui._mod.library(ui._kind == "weapon"):
 		var text = ui._mod.effect_text(entry.effect)
 		if text == "":
 			continue

@@ -48,13 +48,36 @@ const TABS = [
 	["bans", "BE_TAB_BANS", Color(0.92, 0.38, 0.44)],
 ]
 
+# 三栏：[种类, 名称 key, 颜色]（同 AutoAnthony：整个页签可点，右侧是本栏总开关）
+const KIND_TABS = [
+	["character", "BE_KIND_CHARACTER", Color(1.0, 0.72, 0.30)],
+	["item", "BE_KIND_ITEM", Color(0.55, 0.85, 0.55)],
+	["weapon", "BE_KIND_WEAPON", Color(0.40, 0.72, 1.0)],
+]
+# 道具 / 武器的页签
+const OBJECT_TABS = [
+	["attrs", "BE_TAB_ATTRS", Color(0.55, 0.85, 0.55)],
+	["effects", "BE_TAB_EFFECTS", Color(0.40, 0.72, 1.0)],
+	["blueprint", "BE_TAB_BLUEPRINT", Color(1.0, 0.55, 0.35)],
+]
+const SOURCES = [["all", "BE_FILTER_ALL"], ["vanilla", "BE_SRC_VANILLA"], ["dlc", "BE_SRC_DLC"], ["mod", "BE_SRC_MOD"]]
+const SORTS = [["tier", "BE_SORT_TIER"], ["name", "BE_SORT_NAME"], ["price", "BE_SORT_PRICE"]]
+
 var initial_id := ""
 # 打开中的可搜索下拉框（Esc 先关闭它）
 var active_popup = null
 
 var _mod = null
+var _kind := "character"
 var _id := ""
 var _tab := "overview"
+var _kind_ids: Dictionary = {}
+var _kind_tabs: Dictionary = {}
+var _filters := {
+	"character": {"q": ""},
+	"item": {"q": "", "src": "all", "tier": -1, "tag": "", "sort": "tier"},
+	"weapon": {"q": "", "src": "all", "tier": -1, "tag": "", "sort": "tier"},
+}
 var _start_sig := ""
 var _delete_armed := false
 var _switch_icons: Dictionary = {}
@@ -64,6 +87,9 @@ var _regex_bb := RegEx.new()
 var _status: Label
 var _search: LineEdit
 var _char_grid: GridContainer
+var _left_box: VBoxContainer
+var _list_count: Label
+var _tabs_row: HBoxContainer
 var _head_icon: TextureRect
 var _head_name: Label
 var _head_info: Label
@@ -104,13 +130,13 @@ func _ready() -> void:
 		queue_free()
 		return
 	_regex_bb.compile("\\[[^\\]]*\\]")
-	_start_sig = JSON.print(_mod.profiles)
+	_start_sig = _sig()
 	_id = initial_id
 	if _mod.find_character(_id) == null:
 		var isvc = _isvc()
 		_id = isvc.characters[0].my_id if not isvc.characters.empty() else ""
 	_build_ui()
-	_refresh_char_list()
+	_fill_left()
 	_select(_id)
 	set_process_unhandled_input(true)
 
@@ -132,16 +158,26 @@ func _isvc():
 	return get_node("/root/ItemService")
 
 
-# 当前角色的档案（只读；没有档案时返回空档案）
+func _sig() -> String:
+	return JSON.print([_mod.profiles, _mod.item_profiles, _mod.weapon_profiles, _mod.kind_enabled])
+
+
+func _profiles() -> Dictionary:
+	return _mod.profiles_of(_kind)
+
+
+# 当前对象的档案（只读；没有档案时返回空档案）
 func _view() -> Dictionary:
-	return _mod.profiles[_id] if _mod.profiles.has(_id) else BEMain.new_profile()
+	var ps = _profiles()
+	return ps[_id] if ps.has(_id) else BEMain.new_profile()
 
 
-# 当前角色的档案（编辑；没有时新建）
+# 当前对象的档案（编辑；没有时新建）
 func _p() -> Dictionary:
-	if not _mod.profiles.has(_id):
-		_mod.profiles[_id] = BEMain.new_profile()
-	return _mod.profiles[_id]
+	var ps = _profiles()
+	if not ps.has(_id):
+		ps[_id] = BEMain.new_profile()
+	return ps[_id]
 
 
 func _changed() -> void:
@@ -172,6 +208,7 @@ func _build_ui() -> void:
 	root.add_constant_override("separation", 10)
 	panel.add_child(root)
 	_build_header(root)
+	_build_kind_tabs(root)
 	var body = HBoxContainer.new()
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_constant_override("separation", 12)
@@ -197,9 +234,20 @@ func _build_header(root: Control) -> void:
 	_apply_action_style(import_btn, C_ACCENT_2)
 	import_btn.connect("pressed", self, "_on_import_pressed")
 	header.add_child(import_btn)
-	var export_btn = _button(tr("BE_EXPORT"), FONT_SMALL)
-	_apply_action_style(export_btn, C_ACCENT_2)
-	export_btn.connect("pressed", self, "_on_export_pressed")
+	# 导出：当前 / 本栏全部 / 三栏全部（右侧灰字是码的前缀）
+	var export_btn = SearchSelect.new()
+	export_btn.fixed_text = tr("BE_EXPORT")
+	export_btn.setup(self, [
+		[tr("BE_EXPORT_CURRENT"), BEMain.SHARE_PREFIX],
+		[tr("BE_EXPORT_KIND_character"), BEMain.BUNDLE_PREFIX.character],
+		[tr("BE_EXPORT_KIND_item"), BEMain.BUNDLE_PREFIX.item],
+		[tr("BE_EXPORT_KIND_weapon"), BEMain.BUNDLE_PREFIX.weapon],
+		[tr("BE_EXPORT_ALL"), BEMain.ALL_PREFIX],
+	])
+	export_btn.add_font_override("font", FONT_SMALL)
+	export_btn.align = Button.ALIGN_CENTER
+	export_btn.clip_text = false
+	export_btn.connect("selected", self, "_on_export_selected")
 	header.add_child(export_btn)
 	var close_btn = _button("X", FONT_NORMAL)
 	close_btn.rect_min_size = Vector2(48, 44)
@@ -208,17 +256,125 @@ func _build_header(root: Control) -> void:
 	header.add_child(close_btn)
 
 
+# | 角色 [开关] | 道具 [开关] | 武器 [开关] |：总开关关闭时该栏的全部修改都不生效
+func _build_kind_tabs(root: Control) -> void:
+	var tabs = HBoxContainer.new()
+	tabs.add_constant_override("separation", 10)
+	root.add_child(tabs)
+	for d in KIND_TABS:
+		var tab = PanelContainer.new()
+		tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tab.mouse_filter = Control.MOUSE_FILTER_STOP
+		tab.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		tab.connect("gui_input", self, "_on_kind_input", [d[0]])
+		tabs.add_child(tab)
+		var row = HBoxContainer.new()
+		row.add_constant_override("separation", 8)
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tab.add_child(row)
+		var lbl = _label(tr(d[1]), FONT_NORMAL, C_TEXT_DIM)
+		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		lbl.align = Label.ALIGN_CENTER
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(lbl)
+		var sw = _switch("", _mod.kind_enabled[d[0]])
+		sw.connect("toggled", self, "_on_kind_switch", [d[0]])
+		row.add_child(sw)
+		_kind_tabs[d[0]] = [tab, lbl, d[2]]
+	_refresh_kind_tabs()
+
+
+func _refresh_kind_tabs() -> void:
+	for k in _kind_tabs:
+		var t = _kind_tabs[k]
+		var on = k == _kind
+		t[0].add_stylebox_override("panel", _style(t[2].darkened(0.65) if on else C_BG_CHIP, t[2] if on else C_BORDER, 8, 2 if on else 1, 14, 6))
+		t[1].add_color_override("font_color", C_TEXT if on else C_TEXT_DIM)
+
+
+func _on_kind_input(event: InputEvent, kind: String) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == BUTTON_LEFT:
+		set_kind(kind)
+
+
+func _on_kind_switch(pressed: bool, kind: String) -> void:
+	_mod.kind_enabled[kind] = pressed
+	_refresh_header()
+
+
+func set_kind(kind: String) -> void:
+	if kind == _kind:
+		return
+	_kind_ids[_kind] = _id
+	_kind = kind
+	_tab = _tab_defs()[0][0]
+	_id = _kind_ids.get(kind, "")
+	_fill_left()
+	if _mod.find_target(_kind, _id) == null:
+		_id = _first_listed()
+	_rebuild_tabs()
+	_refresh_kind_tabs()
+	_select(_id)
+
+
+func _tab_defs() -> Array:
+	return TABS if _kind == "character" else OBJECT_TABS
+
+
 func _build_left(body: Control) -> void:
 	var card = _card(body)
 	card.size_flags_horizontal = 0
 	card.rect_min_size = Vector2(LEFT_WIDTH, 0)
-	var box = VBoxContainer.new()
-	box.add_constant_override("separation", 8)
-	card.add_child(box)
-	box.add_child(_label(tr("BE_CHARACTERS"), FONT_NORMAL, C_ACCENT))
+	_left_box = VBoxContainer.new()
+	_left_box.add_constant_override("separation", 8)
+	card.add_child(_left_box)
+
+
+# 左栏：角色 = 图标格 + 自定义角色按钮；道具 / 武器 = 搜索 + 来源 / 稀有度 / 标签筛选 + 排序
+func _fill_left() -> void:
+	for c in _left_box.get_children():
+		_left_box.remove_child(c)
+		c.queue_free()
+	_delete_btn = null
+	var box = _left_box
+	var f = _filters[_kind]
 	_search = _line_edit(tr("BE_SEARCH"))
+	_search.text = f.q
 	_search.connect("text_changed", self, "_on_char_search")
-	box.add_child(_search)
+	if _kind == "character":
+		box.add_child(_label(tr("BE_CHARACTERS"), FONT_NORMAL, C_ACCENT))
+		box.add_child(_search)
+	else:
+		var head = HBoxContainer.new()
+		box.add_child(head)
+		var title = _label(tr("BE_KIND_" + _kind.to_upper()), FONT_NORMAL, _kind_tabs[_kind][2])
+		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		head.add_child(title)
+		_list_count = _label("", FONT_DESC, C_TEXT_DIM)
+		head.add_child(_list_count)
+		box.add_child(_search)
+		_filter_chips(box, "src", SOURCES)
+		var tiers = [[-1, "BE_FILTER_ALL"]]
+		for t in 4:
+			tiers.push_back([t, "T" + str(t + 1)])
+		_filter_chips(box, "tier", tiers)
+		var row = HBoxContainer.new()
+		row.add_constant_override("separation", 6)
+		box.add_child(row)
+		var tags = [[tr("BE_FILTER_ALL_TAGS"), ""]]
+		for t in _list_tags():
+			tags.push_back(t)
+		var tag_sel = _search_select(tags, f.tag)
+		tag_sel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tag_sel.connect("selected", self, "_on_filter", ["tag"])
+		row.add_child(tag_sel)
+		var sorts = []
+		for s in SORTS:
+			sorts.push_back([tr(s[1]), s[0]])
+		var sort_sel = _search_select(sorts, f.sort)
+		sort_sel.rect_min_size = Vector2(140, 0)
+		sort_sel.connect("selected", self, "_on_filter", ["sort"])
+		row.add_child(sort_sel)
 	var scroll = _scroll()
 	box.add_child(scroll)
 	_char_grid = GridContainer.new()
@@ -226,19 +382,115 @@ func _build_left(body: Control) -> void:
 	_char_grid.add_constant_override("hseparation", 6)
 	_char_grid.add_constant_override("vseparation", 6)
 	scroll.add_child(_char_grid)
-	box.add_child(_desc(tr("BE_CHARACTERS_DESC")))
-	var row = HBoxContainer.new()
-	row.add_constant_override("separation", 8)
-	box.add_child(row)
-	var new_btn = _button(tr("BE_NEW_CUSTOM"), FONT_SMALL)
-	new_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_apply_action_style(new_btn, C_CUSTOM)
-	new_btn.connect("pressed", self, "_on_new_custom")
-	row.add_child(new_btn)
-	_delete_btn = _button(tr("BE_DELETE"), FONT_SMALL)
-	_apply_action_style(_delete_btn, C_DANGER)
-	_delete_btn.connect("pressed", self, "_on_delete_custom")
-	row.add_child(_delete_btn)
+	if _kind == "character":
+		box.add_child(_desc(tr("BE_CHARACTERS_DESC")))
+		var row = HBoxContainer.new()
+		row.add_constant_override("separation", 8)
+		box.add_child(row)
+		var new_btn = _button(tr("BE_NEW_CUSTOM"), FONT_SMALL)
+		new_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_apply_action_style(new_btn, C_CUSTOM)
+		new_btn.connect("pressed", self, "_on_new_custom")
+		row.add_child(new_btn)
+		_delete_btn = _button(tr("BE_DELETE"), FONT_SMALL)
+		_apply_action_style(_delete_btn, C_DANGER)
+		_delete_btn.connect("pressed", self, "_on_delete_custom")
+		row.add_child(_delete_btn)
+	_refresh_char_list()
+
+
+# 一行筛选按钮（等宽）
+func _filter_chips(parent: Control, key: String, defs: Array) -> void:
+	var row = GridContainer.new()
+	row.columns = defs.size()
+	row.add_constant_override("hseparation", 6)
+	parent.add_child(row)
+	for d in defs:
+		var b = _button(tr(d[1]), FONT_DESC)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.clip_text = true
+		b.rect_min_size = Vector2(40, 0)
+		_apply_chip_style(b, _filters[_kind][key] == d[0], _kind_tabs[_kind][2])
+		b.connect("pressed", self, "_on_filter", [d[0], key])
+		row.add_child(b)
+
+
+func _on_filter(value, key: String) -> void:
+	_filters[_kind][key] = value
+	_fill_left()
+
+
+# 道具的词条 / 武器的类别（筛选用）：[[名称, 键]]
+func _list_tags() -> Array:
+	var seen = {}
+	var out = []
+	for r in _all_of_kind():
+		for t in _tags_of(r):
+			if not seen.has(t[1]):
+				seen[t[1]] = true
+				out.push_back(t)
+	out.sort_custom(self, "_sort_by_first")
+	return out
+
+
+func _sort_by_first(a, b) -> bool:
+	return a[0] < b[0]
+
+
+func _tags_of(r) -> Array:
+	var out = []
+	if r is WeaponData:
+		for s in r.sets:
+			if s != null:
+				out.push_back([tr(s.name), s.my_id])
+	elif "tags" in r and r.tags is Array:
+		for t in r.tags:
+			out.push_back([_tag_name(t), t])
+	return out
+
+
+func _all_of_kind() -> Array:
+	var isvc = _isvc()
+	var arr = isvc.characters if _kind == "character" else (isvc.items if _kind == "item" else isvc.weapons)
+	var out = []
+	for r in arr:
+		if r != null:
+			out.push_back(r)
+	return out
+
+
+func _first_listed() -> String:
+	if _char_grid != null and _char_grid.get_child_count() > 0:
+		return _char_grid.get_child(0).get_meta("id")
+	var all = _all_of_kind()
+	return all[0].my_id if not all.empty() else ""
+
+
+func _matches(r, f: Dictionary) -> bool:
+	var q = f.q.strip_edges().to_lower()
+	if q != "" and tr(_mod.orig_name(r)).to_lower().find(q) < 0 and r.my_id.find(q) < 0:
+		return false
+	if _kind == "character":
+		return true
+	if f.src != "all" and BEMain.source_of(r) != f.src:
+		return false
+	if f.tier >= 0 and int(_mod.backup_value(r, "tier")) != f.tier:
+		return false
+	if f.tag != "":
+		var found = false
+		for t in _tags_of(r):
+			found = found or t[1] == f.tag
+		if not found:
+			return false
+	return true
+
+
+func _sort_by_price(a, b) -> bool:
+	var va = int(_mod.backup_value(a, "value"))
+	var vb = int(_mod.backup_value(b, "value"))
+	if va != vb:
+		return va < vb
+	return _sort_by_tier_then_name(a, b)
 
 
 func _build_right(body: Control) -> void:
@@ -273,75 +525,97 @@ func _build_right(body: Control) -> void:
 	_reset_btn.connect("pressed", self, "_on_reset_pressed")
 	head.add_child(_reset_btn)
 	# 页签
-	var tabs = HBoxContainer.new()
-	tabs.add_constant_override("separation", 8)
-	right.add_child(tabs)
-	for d in TABS:
-		var b = _button(tr(d[1]), FONT_SMALL)
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.connect("pressed", self, "_on_tab_pressed", [d[0]])
-		tabs.add_child(b)
-		_tab_buttons[d[0]] = [b, d[2]]
+	_tabs_row = HBoxContainer.new()
+	_tabs_row.add_constant_override("separation", 8)
+	right.add_child(_tabs_row)
+	_rebuild_tabs()
 	_page = VBoxContainer.new()
 	_page.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_page.add_constant_override("separation", 10)
 	right.add_child(_page)
 
 
+func _rebuild_tabs() -> void:
+	for c in _tabs_row.get_children():
+		_tabs_row.remove_child(c)
+		c.queue_free()
+	_tab_buttons = {}
+	for d in _tab_defs():
+		var b = _button(tr(d[1]), FONT_SMALL)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.connect("pressed", self, "_on_tab_pressed", [d[0]])
+		_tabs_row.add_child(b)
+		_tab_buttons[d[0]] = [b, d[2]]
+
+
 # ============================================================
-# 角色列表
+# 左栏列表（角色 / 道具 / 武器）
 # ============================================================
 func _refresh_char_list() -> void:
 	for c in _char_grid.get_children():
 		_char_grid.remove_child(c)
 		c.queue_free()
-	var filter = _search.text.strip_edges().to_lower()
-	var chars = []
-	for c in _isvc().characters:
-		if c == null:
-			continue
-		if filter != "" and tr(c.name).to_lower().find(filter) < 0 and c.my_id.find(filter) < 0:
-			continue
-		chars.push_back(c)
-	# 自定义角色排在最前
-	var customs = []
-	var natives = []
-	for c in chars:
-		if _mod.is_custom(c.my_id):
-			customs.push_back(c)
-		else:
-			natives.push_back(c)
-	for c in customs + natives:
-		var b = _icon_button(c.icon, CHAR_ICON)
-		b.set_meta("id", c.my_id)
-		b.connect("pressed", self, "_select", [c.my_id])
+	var f = _filters[_kind]
+	var list = []
+	for r in _all_of_kind():
+		if _matches(r, f):
+			list.push_back(r)
+	if _kind == "character":
+		# 自定义角色排在最前
+		var customs = []
+		var natives = []
+		for c in list:
+			if _mod.is_custom(c.my_id):
+				customs.push_back(c)
+			else:
+				natives.push_back(c)
+		list = customs + natives
+	else:
+		match f.sort:
+			"name":
+				list.sort_custom(self, "_sort_by_name")
+			"price":
+				list.sort_custom(self, "_sort_by_price")
+			_:
+				list.sort_custom(self, "_sort_by_tier_then_name")
+		_list_count.text = str(list.size())
+	for r in list:
+		var b = _icon_button(r.icon, CHAR_ICON)
+		b.set_meta("id", r.my_id)
+		b.set_meta("tier", -1 if _kind == "character" else int(_mod.backup_value(r, "tier")))
+		b.connect("pressed", self, "_select", [r.my_id])
 		_char_grid.add_child(b)
 	_refresh_char_marks()
 
 
 func _refresh_char_marks() -> void:
+	if _char_grid == null:
+		return
+	var ps = _profiles()
 	for b in _char_grid.get_children():
 		var id = b.get_meta("id")
-		var color = C_BORDER
+		var tier = b.get_meta("tier")
+		var color = C_BORDER if tier < 0 else ItemService.get_color_from_tier(tier).darkened(0.3)
 		var w = 1
 		if _mod.is_custom(id):
 			color = C_CUSTOM
 			w = 2
-		elif _mod.profiles.has(id) and _mod.profiles[id].enabled:
+		elif ps.has(id) and ps[id].enabled:
 			color = C_ACCENT_3
-			w = 2
+			w = 3
 		if id == _id:
 			color = C_ACCENT
 			w = 3
 		_set_icon_style(b, color, w)
 
 
-func _on_char_search(_t: String) -> void:
+func _on_char_search(t: String) -> void:
+	_filters[_kind].q = t
 	_refresh_char_list()
 
 
 func _select(id: String) -> void:
-	if _mod.find_character(id) == null:
+	if _mod.find_target(_kind, id) == null:
 		return
 	_id = id
 	_expanded = -1
@@ -351,8 +625,9 @@ func _select(id: String) -> void:
 	_build_page()
 
 
+# 当前对象（角色 / 道具 / 武器）
 func _character():
-	return _mod.find_character(_id)
+	return _mod.find_target(_kind, _id)
 
 
 func _refresh_header() -> void:
@@ -366,23 +641,28 @@ func _refresh_header() -> void:
 	_head_name.text = nm
 	_head_name.add_color_override("font_color", C_CUSTOM if custom else C_TEXT)
 	var info = _id
+	if _kind != "character" and BEMain.source_of(c) != "vanilla":
+		info += "  ·  " + tr("BE_SRC_" + BEMain.source_of(c).to_upper())
 	if custom:
 		info += "  ·  " + tr("BE_CUSTOM_TAG")
 		var base = _mod.find_character(v.base)
 		if base != null:
 			info += "  ·  " + tr("BE_BASE").replace("{0}", tr(_mod.orig_name(base)))
-	elif _mod.profiles.has(_id):
+	elif _profiles().has(_id):
 		info += "  ·  " + tr("BE_MODIFIED_TAG" if v.enabled else "BE_DISABLED_TAG")
 	else:
 		info += "  ·  " + tr("BE_ORIGINAL_TAG")
+	if not _mod.kind_enabled[_kind]:
+		info += "  ·  " + tr("BE_KIND_OFF")
 	_head_info.text = info
 	_enable_switch.visible = not custom
 	_enable_switch.set_block_signals(true)
 	_enable_switch.pressed = v.enabled
 	_enable_switch.set_block_signals(false)
-	_reset_btn.disabled = custom or not _mod.profiles.has(_id)
-	_delete_btn.disabled = not custom
-	_delete_btn.text = tr("BE_DELETE_CONFIRM" if _delete_armed else "BE_DELETE")
+	_reset_btn.disabled = custom or not _profiles().has(_id)
+	if _delete_btn != null:
+		_delete_btn.disabled = not custom
+		_delete_btn.text = tr("BE_DELETE_CONFIRM" if _delete_armed else "BE_DELETE")
 	for t in _tab_buttons:
 		var tb = _tab_buttons[t]
 		_apply_chip_style(tb[0], t == _tab, tb[1])
@@ -428,6 +708,8 @@ func _build_page() -> void:
 			_build_gear()
 		"bans":
 			_build_bans()
+		"attrs":
+			_build_attrs()
 
 
 # ---------------- 概览 ----------------
@@ -530,9 +812,27 @@ func _refresh_preview() -> void:
 		_preview_text.remove_child(c)
 		c.queue_free()
 	var v = _view()
-	if not _mod.is_custom(_id) and _mod.profiles.has(_id) and not v.enabled:
+	if not _mod.is_custom(_id) and _profiles().has(_id) and not v.enabled:
 		_preview_text.add_child(_desc(tr("BE_PREVIEW_DISABLED")))
-	for e in _mod.build_effects(_id, v):
+	if _kind == "weapon":
+		_weapon_preview(v)
+	_effect_lines(_mod.build_effects(_id, v))
+	if _kind != "character":
+		return
+	var c = _character()
+	var ws = _mod._weapons_by_ids(v.weapons) if v.weapons is Array else c.starting_weapons
+	_preview_text.add_child(_label(tr("BE_PREVIEW_WEAPONS"), FONT_DESC, C_TEXT_DIM))
+	var grid = _icon_grid(10)
+	_preview_text.add_child(grid)
+	for w in ws:
+		grid.add_child(_icon_tile(w.icon, ItemService.get_color_from_tier(w.tier), 60))
+	if v.ban_items.size() + v.ban_weapons.size() > 0:
+		_preview_text.add_child(_label(tr("BE_PREVIEW_BANS").replace("{0}", str(v.ban_items.size())).replace("{1}", str(v.ban_weapons.size())), FONT_DESC, C_TEXT_DIM))
+
+
+# 原版效果行（左边图标，右边文本）
+func _effect_lines(effects: Array) -> void:
+	for e in effects:
 		var path = e.get_script().resource_path if e.get_script() != null else ""
 		var native = false
 		for dir in SAFE_TEXT_DIRS:
@@ -544,15 +844,18 @@ func _refresh_preview() -> void:
 		else:
 			# 本 mod / 其他 mod 的效果：只显示文本（没有原版图标）
 			line._display_special_text(_mod.effect_text(e), null)
-	var c = _character()
-	var ws = _mod._weapons_by_ids(v.weapons) if v.weapons is Array else c.starting_weapons
-	_preview_text.add_child(_label(tr("BE_PREVIEW_WEAPONS"), FONT_DESC, C_TEXT_DIM))
-	var grid = _icon_grid(10)
-	_preview_text.add_child(grid)
-	for w in ws:
-		grid.add_child(_icon_tile(w.icon, ItemService.get_color_from_tier(w.tier), 60))
-	if v.ban_items.size() + v.ban_weapons.size() > 0:
-		_preview_text.add_child(_label(tr("BE_PREVIEW_BANS").replace("{0}", str(v.ban_items.size())).replace("{1}", str(v.ban_weapons.size())), FONT_DESC, C_TEXT_DIM))
+
+
+# 武器属性文本（同原版武器面板：在武器副本上换成改写后的属性）
+func _weapon_preview(v: Dictionary) -> void:
+	var w = _character()
+	var stats = _mod.weapon_stats_for(w, v)
+	if stats == null:
+		return
+	var copy = w.duplicate()
+	copy.stats = stats
+	copy.effects = _mod.build_effects(_id, v)
+	_preview_text.add_child(_rich(copy.get_weapon_stats_text(0)))
 
 
 func _all_tags() -> Array:
@@ -583,14 +886,262 @@ func _on_desc_changed(edit: TextEdit) -> void:
 	_changed()
 
 
+# 角色 = 偏好词条（wanted_tags），道具 = 道具词条（tags）
 func _on_tag_pressed(tag: String) -> void:
 	var p = _p()
-	if not p.wanted_tags is Array:
-		p.wanted_tags = _character().wanted_tags.duplicate()
-	if tag in p.wanted_tags:
-		p.wanted_tags.erase(tag)
+	var field = "wanted_tags" if _kind == "character" else "tags"
+	if not p[field] is Array:
+		p[field] = _mod.backup_value(_character(), field).duplicate()
+	if tag in p[field]:
+		p[field].erase(tag)
 	else:
-		p.wanted_tags.push_back(tag)
+		p[field].push_back(tag)
+	_changed()
+	_build_page()
+
+
+# ---------------- 道具 / 武器：属性 ----------------
+# 左：基础信息（名称、价格；道具另有稀有度、数量限制、词条、属性表；武器另有武器属性与属性加成）；右：预览
+func _build_attrs() -> void:
+	var cols = HBoxContainer.new()
+	cols.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	cols.add_constant_override("separation", 12)
+	_page.add_child(cols)
+	var v = _view()
+	var r = _character()
+	var scroll = _scroll()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cols.add_child(scroll)
+	var left = VBoxContainer.new()
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left.add_constant_override("separation", 10)
+	scroll.add_child(left)
+
+	var box = _section(left, "BE_SEC_BASIC", C_ACCENT)
+	var grid = _stat_grid(box)
+	grid.columns = 2
+	var name_edit = _line_edit(tr(_mod.orig_name(r)))
+	name_edit.text = v.name
+	name_edit.connect("text_changed", self, "_on_name_changed")
+	_attr_row(grid, tr("BE_NAME"), name_edit, v.name != "")
+	var orig_price = int(_mod.backup_value(r, "value"))
+	var price = _spin(0, 99999, 1)
+	price.value = v.price if v.price >= 0 else orig_price
+	price.connect("value_changed", self, "_on_attr_changed", ["price", orig_price])
+	_attr_row(grid, tr("BE_PRICE"), price, v.price >= 0)
+	if _kind == "item":
+		var orig_nb = int(_mod.backup_value(r, "max_nb"))
+		var nb = _spin(-1, 999, 1)
+		nb.value = v.max_nb if v.max_nb != -2 else orig_nb
+		nb.connect("value_changed", self, "_on_attr_changed", ["max_nb", orig_nb])
+		_attr_row(grid, tr("BE_MAX_NB"), nb, v.max_nb != -2)
+		var tiers = HBoxContainer.new()
+		tiers.add_constant_override("separation", 6)
+		var cur_tier = v.tier if v.tier >= 0 else int(_mod.backup_value(r, "tier"))
+		for t in 4:
+			var tb = _button("T" + str(t + 1), FONT_SMALL)
+			tb.rect_min_size = Vector2(64, 0)
+			_apply_chip_style(tb, t == cur_tier, ItemService.get_color_from_tier(t))
+			tb.connect("pressed", self, "_on_attr_changed", [t, "tier", int(_mod.backup_value(r, "tier"))])
+			tiers.add_child(tb)
+		_attr_row(grid, tr("BE_TIER"), tiers, v.tier >= 0)
+		box.add_child(_desc(tr("BE_ITEM_BASIC_DESC")))
+		var tbox = _section(left, "BE_SEC_ITEM_TAGS", C_ACCENT_3)
+		var tgrid = GridContainer.new()
+		tgrid.columns = 4
+		tgrid.add_constant_override("hseparation", 6)
+		tgrid.add_constant_override("vseparation", 6)
+		tbox.add_child(tgrid)
+		var tags = v.tags if v.tags is Array else _mod.backup_value(r, "tags")
+		for tag in _all_tags():
+			var b = _button(_tag_name(tag), FONT_DESC)
+			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			b.clip_text = true
+			_apply_chip_style(b, tag in tags, C_ACCENT_3)
+			b.connect("pressed", self, "_on_tag_pressed", [tag])
+			tgrid.add_child(b)
+		_build_stat_tables(left, v)
+	else:
+		_build_weapon_stats(left, v, r)
+
+	var pcard = _card(cols)
+	pcard.size_flags_horizontal = 0
+	pcard.rect_min_size = Vector2(460, 0)
+	pcard.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var pbox = VBoxContainer.new()
+	pbox.add_constant_override("separation", 8)
+	pcard.add_child(pbox)
+	pbox.add_child(_label(tr("BE_SEC_PREVIEW"), FONT_NORMAL, C_ACCENT_2))
+	var pscroll = _scroll()
+	pbox.add_child(pscroll)
+	_preview_text = VBoxContainer.new()
+	_preview_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_preview_text.add_constant_override("separation", 4)
+	pscroll.add_child(_preview_text)
+	_refresh_preview()
+
+
+# 一行：名称（改过时绿色）+ 控件
+func _attr_row(grid: Control, text: String, ctl: Control, modified: bool) -> Label:
+	var lbl = _label(text, FONT_DESC, C_ACCENT_3 if modified else C_TEXT)
+	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lbl.clip_text = true
+	grid.add_child(lbl)
+	if ctl is SpinBox:
+		ctl.rect_min_size = Vector2(150, 0)
+	grid.add_child(ctl)
+	return lbl
+
+
+# 价格 / 数量限制 / 稀有度：等于原值时记为"不修改"
+func _on_attr_changed(value, field: String, orig: int) -> void:
+	var unset = {"price": -1, "max_nb": -2, "tier": -1}[field]
+	_p()[field] = unset if int(value) == orig else int(value)
+	_changed()
+	if field == "tier":
+		_build_page()
+
+
+# 武器属性：原版字段（近战武器没有投射物字段）+ 属性加成
+func _build_weapon_stats(parent: Control, v: Dictionary, w) -> void:
+	var base = _mod.backup_value(w, "stats")
+	if base == null:
+		return
+	var box = _section(parent, "BE_SEC_WEAPON_STATS", C_ACCENT_2)
+	var head = HBoxContainer.new()
+	box.add_child(head)
+	var d = _desc(tr("BE_WEAPON_STATS_DESC"))
+	head.add_child(d)
+	var reset = _button(tr("BE_RESET"), FONT_SMALL)
+	_apply_action_style(reset, C_DANGER)
+	reset.connect("pressed", self, "_on_wstats_reset")
+	head.add_child(reset)
+	var grid = _stat_grid(box)
+	grid.columns = 4
+	for f in BEMain.WSTAT_FIELDS:
+		if not f[0] in base:
+			continue
+		var orig = base.get(f[0])
+		var cur = v.wstats.get(f[0], orig)
+		var ctl
+		if f[1] == "bool":
+			ctl = _button(tr("BE_YES" if cur else "BE_NO"), FONT_DESC)
+			ctl.toggle_mode = true
+			ctl.pressed = bool(cur)
+			ctl.rect_min_size = Vector2(150, 0)
+			_apply_chip_style(ctl, bool(cur), C_ACCENT_3)
+			ctl.connect("toggled", self, "_on_wstat_changed", [f])
+		else:
+			ctl = _spin(-99999, 99999, 0.01 if f[2] == "sec" or (f[1] == "float" and f[2] == "") else 1)
+			ctl.value = _wstat_shown(cur, f[2])
+			ctl.connect("value_changed", self, "_on_wstat_changed", [f])
+		var name = tr("BE_WS_" + f[0].to_upper())
+		if _mod.debug:
+			name += "  " + f[0]
+		_attr_row(grid, name, ctl, v.wstats.has(f[0]))
+
+	var sbox = _section(parent, "BE_SEC_SCALING", C_ACCENT_2)
+	sbox.add_child(_desc(tr("BE_SCALING_DESC")))
+	var scaling = v.scaling if v.scaling is Array else BEMain.scaling_names(base.scaling_stats)
+	for i in scaling.size():
+		var row = HBoxContainer.new()
+		row.add_constant_override("separation", 8)
+		sbox.add_child(row)
+		var icon = TextureRect.new()
+		icon.texture = _stat_icon(str(scaling[i][0]))
+		icon.expand = true
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.rect_min_size = Vector2(22, 22)
+		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(icon)
+		var opt = _stat_option(str(scaling[i][0]))
+		opt.rect_min_size = Vector2(260, 0)
+		opt.connect("selected", self, "_on_scaling_stat", [i])
+		row.add_child(opt)
+		var sb = _spin(-9999, 9999, 1)
+		sb.suffix = "%"
+		sb.rect_min_size = Vector2(150, 0)
+		sb.value = round(float(scaling[i][1]) * 100)
+		sb.connect("value_changed", self, "_on_scaling_coef", [i])
+		row.add_child(sb)
+		var del = _button("X", FONT_DESC)
+		_apply_action_style(del, C_DANGER)
+		del.connect("pressed", self, "_on_scaling_delete", [i])
+		row.add_child(del)
+	var add = _button(tr("BE_SCALING_ADD"), FONT_SMALL)
+	add.size_flags_horizontal = 0
+	_apply_action_style(add, C_ACCENT_3)
+	add.connect("pressed", self, "_on_scaling_add")
+	sbox.add_child(add)
+
+
+# 界面显示值：pct = 百分比整数，sec = 秒
+static func _wstat_shown(value, mode: String) -> float:
+	match mode:
+		"pct":
+			return round(float(value) * 100)
+		"sec":
+			return stepify(float(value) / 60.0, 0.01)
+	return float(value)
+
+
+func _on_wstat_changed(value, f: Array) -> void:
+	var p = _p()
+	var base = _mod.backup_value(_character(), "stats")
+	var stored
+	match f[1]:
+		"bool":
+			stored = bool(value)
+		"int":
+			stored = int(round(value * 60)) if f[2] == "sec" else int(value)
+		_:
+			stored = float(value) / 100.0 if f[2] == "pct" else float(value)
+	if f[2] == "pct" and _wstat_shown(base.get(f[0]), "pct") == float(value):
+		stored = base.get(f[0])
+	if stored == base.get(f[0]):
+		p.wstats.erase(f[0])
+	else:
+		p.wstats[f[0]] = stored
+	if f[1] == "bool":
+		_build_page()
+	else:
+		_changed()
+
+
+func _on_wstats_reset() -> void:
+	var p = _p()
+	p.wstats = {}
+	p.scaling = null
+	_changed()
+	_build_page()
+
+
+func _scaling_edit() -> Array:
+	var p = _p()
+	if not p.scaling is Array:
+		p.scaling = BEMain.scaling_names(_mod.backup_value(_character(), "stats").scaling_stats)
+	return p.scaling
+
+
+func _on_scaling_stat(key, i: int) -> void:
+	_scaling_edit()[i][0] = str(key)
+	_changed()
+	_build_page()
+
+
+func _on_scaling_coef(value: float, i: int) -> void:
+	_scaling_edit()[i][1] = value / 100.0
+	_changed()
+
+
+func _on_scaling_delete(i: int) -> void:
+	_scaling_edit().remove(i)
+	_changed()
+	_build_page()
+
+
+func _on_scaling_add() -> void:
+	_scaling_edit().push_back(["stat_melee_damage", 1.0])
 	_changed()
 	_build_page()
 
@@ -632,7 +1183,11 @@ func _build_stats() -> void:
 	scroll.add_child(col)
 	var v = _view()
 	_build_start_state(col, v)
+	_build_stat_tables(col, v)
 
+
+# 属性表（基础属性 | 属性获取修改 % | 次要属性）与商店 / 地图 / 规则分组
+func _build_stat_tables(col: Control, v: Dictionary) -> void:
 	var groups = {}
 	for g in Catalog.STAT_GROUPS:
 		groups[g[0]] = []
@@ -898,7 +1453,7 @@ func _build_effects() -> void:
 	var head = HBoxContainer.new()
 	head.add_constant_override("separation", 8)
 	lbox.add_child(head)
-	var title = _label(tr("BE_SEC_EFFECTS"), FONT_NORMAL, C_ACCENT_2)
+	var title = _label(tr("BE_SEC_EFFECTS" if _kind == "character" else "BE_SEC_EFFECTS_" + _kind.to_upper()), FONT_NORMAL, C_ACCENT_2)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(title)
 	if not _mod.is_custom(_id):
@@ -910,7 +1465,7 @@ func _build_effects() -> void:
 	_apply_action_style(clear, C_DANGER)
 	clear.connect("pressed", self, "_on_effects_clear")
 	head.add_child(clear)
-	lbox.add_child(_desc(tr("BE_EFFECTS_DESC")))
+	lbox.add_child(_desc(tr("BE_EFFECTS_DESC" if _kind == "character" else "BE_EFFECTS_DESC_OBJ")))
 	var scroll = _scroll()
 	lbox.add_child(scroll)
 	_effect_list = VBoxContainer.new()
@@ -928,7 +1483,7 @@ func _build_effects() -> void:
 	rbox.add_constant_override("separation", 8)
 	rcard.add_child(rbox)
 	rbox.add_child(_label(tr("BE_SEC_LIBRARY"), FONT_NORMAL, C_ACCENT))
-	rbox.add_child(_desc(tr("BE_LIBRARY_DESC")))
+	rbox.add_child(_desc(tr("BE_LIBRARY_DESC_WEAPON" if _kind == "weapon" else "BE_LIBRARY_DESC")))
 	var cats = GridContainer.new()
 	cats.columns = 4
 	cats.add_constant_override("hseparation", 6)
@@ -995,16 +1550,16 @@ func _drag_handle() -> Label:
 	return h
 
 
-# 键名（灰色小字）：key · custom_key · text_key · 脚本
+# 键名（灰色小字）：调试模式 = key · custom_key · text_key；否则只有主键名
 func _key_info(e) -> String:
 	if e == null:
 		return ""
+	if not _mod.debug:
+		return str(e.key)
 	var parts = []
 	for v in [e.key, e.custom_key, e.text_key]:
 		if str(v) != "":
 			parts.push_back(str(v))
-	if e.get_script() != null and not Catalog.is_plain_effect(e):
-		parts.push_back(e.get_script().resource_path.get_file())
 	return PoolStringArray(parts).join("  ·  ")
 
 
@@ -1135,7 +1690,7 @@ func _build_effect_fields(col: Control, i: int, spec: Dictionary) -> void:
 	var e = _mod.make_effect(spec)
 	if e == null:
 		return
-	col.add_child(_key_label(_key_info(e) + ("  ·  " + str(spec.get("from", "")) + "#" + str(spec.get("i", "")) if spec.has("from") else "")))
+	col.add_child(_key_label(_key_info(e)))
 	var grid = GridContainer.new()
 	grid.columns = 4
 	grid.add_constant_override("hseparation", 10)
@@ -1307,7 +1862,7 @@ func _fill_library() -> void:
 		c.queue_free()
 	var shown = 0
 	var total = 0
-	for entry in _mod.library():
+	for entry in _mod.library(_kind == "weapon"):
 		if _lib_cat != "all" and entry.cat != _lib_cat:
 			continue
 		var text = _mod.effect_text(entry.effect)
@@ -1813,7 +2368,7 @@ func _on_enable_toggled(pressed: bool) -> void:
 
 
 func _on_reset_pressed() -> void:
-	_mod.reset_profile(_id)
+	_mod.reset_profile(_id, _kind)
 	_expanded = -1
 	_changed()
 	_build_page()
@@ -1857,16 +2412,32 @@ func _clipboard_set(text: String) -> void:
 		OS.clipboard = text
 
 
-func _on_export_pressed() -> void:
-	if not _mod.profiles.has(_id):
+func _on_export_selected(prefix: String) -> void:
+	var code = ""
+	if prefix == BEMain.SHARE_PREFIX:
+		code = _mod.export_code(_id, _kind)
+	elif prefix == BEMain.ALL_PREFIX:
+		code = _mod.export_bundle("")
+	else:
+		for k in BEMain.BUNDLE_PREFIX:
+			if BEMain.BUNDLE_PREFIX[k] == prefix:
+				code = _mod.export_bundle(k)
+	if code == "":
 		_set_status(tr("BE_EXPORT_NOTHING"))
 		return
-	_clipboard_set(_mod.export_code(_id))
+	_clipboard_set(code)
 	_set_status(tr("BE_EXPORTED"))
 
 
 func _on_import_pressed() -> void:
-	var id = _mod.import_code(_clipboard_get(), _id)
+	var text = _clipboard_get()
+	var n = _mod.import_bundle(text)
+	if n >= 0:
+		_refresh_char_list()
+		_select(_id)
+		_set_status(tr("BE_IMPORTED_N").replace("{0}", str(n)))
+		return
+	var id = _mod.import_code(text, _id, _kind)
 	if id == "":
 		_set_status(tr("BE_IMPORT_FAILED"))
 		return
@@ -1881,7 +2452,7 @@ func _set_status(text: String) -> void:
 
 func _on_close_pressed() -> void:
 	if _mod != null:
-		_mod.on_editor_closed(JSON.print(_mod.profiles) != _start_sig)
+		_mod.on_editor_closed(_sig() != _start_sig)
 	queue_free()
 
 

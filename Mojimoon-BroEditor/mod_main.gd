@@ -17,6 +17,10 @@ const FONT_26_PATH = "res://resources/fonts/actual/base/font_26.tres"
 const CUSTOM_PREFIX = "character_broeditor_"
 const EFFECT_SCRIPT = "res://items/global/effect.gd"
 const SHARE_PREFIX = "BE1:"
+# 批量导出：一栏全部（角色 / 道具 / 武器）与三栏全部，前缀不同
+const BUNDLE_PREFIX = {"character": "BEC1:", "item": "BEI1:", "weapon": "BEW1:"}
+const ALL_PREFIX = "BEA1:"
+const BUNDLE_KEYS = {"character": "profiles", "item": "items", "weapon": "weapons"}
 const MAX_DESC = 300
 
 const Catalog = preload("res://mods-unpacked/Mojimoon-BroEditor/catalog.gd")
@@ -28,6 +32,17 @@ const CAP_KEYS = ["hp_cap", "speed_cap", "dodge_cap", "crit_chance_cap"]
 const SET_KEYS = ["can_attack_while_moving"]
 # 效果列表中的分组占位：初始属性 / 额外初始装备 / 蓝图生成的效果插在占位处（没有占位时接在最后）
 const GROUPS = ["stats", "start", "graph"]
+# 三栏：角色 / 道具 / 武器（各自一份档案字典与一个总开关）
+const KINDS = ["character", "item", "weapon"]
+# 武器属性页可编辑的 WeaponStats 字段：[字段, 类型, 显示方式]；pct = 内部 0–1，界面按百分比整数编辑
+const WSTAT_FIELDS = [
+	["damage", "int", ""], ["cooldown", "int", "sec"], ["crit_chance", "float", "pct"], ["crit_damage", "float", ""],
+	["accuracy", "float", "pct"], ["min_range", "int", ""], ["max_range", "int", ""], ["knockback", "int", ""],
+	["lifesteal", "float", "pct"], ["speed_percent_modifier", "int", ""], ["effect_scale", "float", "pct"],
+	["nb_projectiles", "int", ""], ["projectile_spread", "float", ""], ["piercing", "int", ""],
+	["piercing_dmg_reduction", "float", "pct"], ["bounce", "int", ""], ["bounce_dmg_reduction", "float", "pct"],
+	["projectile_speed", "int", ""], ["is_healing", "bool", ""],
+]
 # 开局状态的默认值
 const START_DEFAULT = {
 	"materials": 0, "levels": 0, "level_settle": false, "crates": 0, "legendary_crates": 0,
@@ -36,6 +51,9 @@ const START_DEFAULT = {
 
 # id -> 档案
 var profiles: Dictionary = {}
+var item_profiles: Dictionary = {}
+var weapon_profiles: Dictionary = {}
+var kind_enabled := {"character": true, "item": true, "weapon": true}
 var next_id: int = 1
 # 调试模式：编辑器里在效果与属性旁显示键名
 var debug := false
@@ -49,6 +67,9 @@ var _customs: Dictionary = {}
 # 角色 id -> 禁用的道具 / 武器 hash（商店过滤用）
 var _ban_cache: Dictionary = {}
 var _library = null
+var _weapon_library = null
+# 道具 / 武器稀有度被改过：还原或重新应用后要重建商店分档池
+var _repool := false
 var _desc_translation: Translation = null
 # 蓝图运行时（常驻）与"需要重建触发索引"标记
 var runtime = null
@@ -121,6 +142,13 @@ static func new_profile() -> Dictionary:
 		"wanted_tags": null,
 		"graph": null,
 		"start": {},
+		# 道具 / 武器：-1 / -2 / null = 不修改
+		"price": -1,
+		"tier": -1,
+		"max_nb": -2,
+		"tags": null,
+		"wstats": {},
+		"scaling": null,
 	}
 
 
@@ -156,6 +184,25 @@ static func normalize_profile(p) -> Dictionary:
 		out.graph = null
 	if out.graph != null:
 		_int_ids(out.graph)
+	out.price = int(out.price)
+	out.tier = int(out.tier)
+	out.max_nb = int(out.max_nb)
+	if out.tags != null and not out.tags is Array:
+		out.tags = null
+	var ws = {}
+	if out.wstats is Dictionary:
+		for k in out.wstats:
+			if typeof(out.wstats[k]) in [TYPE_INT, TYPE_REAL, TYPE_BOOL]:
+				ws[str(k)] = out.wstats[k]
+	out.wstats = ws
+	if out.scaling is Array:
+		var sc = []
+		for e in out.scaling:
+			if e is Array and e.size() >= 2:
+				sc.push_back([str(e[0]), float(e[1])])
+		out.scaling = sc
+	else:
+		out.scaling = null
 	var start = {}
 	if out.start is Dictionary:
 		for k in START_DEFAULT:
@@ -191,6 +238,15 @@ static func clean_desc(text: String) -> String:
 	return text.substr(0, MAX_DESC)
 
 
+func profiles_of(kind: String) -> Dictionary:
+	match kind:
+		"item":
+			return item_profiles
+		"weapon":
+			return weapon_profiles
+	return profiles
+
+
 func get_profile(id: String) -> Dictionary:
 	return profiles.get(id, {})
 
@@ -199,9 +255,10 @@ func set_profile(id: String, p: Dictionary) -> void:
 	profiles[id] = normalize_profile(p)
 
 
-func reset_profile(id: String) -> void:
-	if profiles.has(id) and not profiles[id].custom:
-		profiles.erase(id)
+func reset_profile(id: String, kind: String = "character") -> void:
+	var ps = profiles_of(kind)
+	if ps.has(id) and not ps[id].custom:
+		ps.erase(id)
 
 
 func is_custom(id: String) -> bool:
@@ -210,6 +267,8 @@ func is_custom(id: String) -> bool:
 
 func load_profiles() -> void:
 	profiles = {}
+	item_profiles = {}
+	weapon_profiles = {}
 	var file = File.new()
 	if not file.file_exists(SAVE_PATH) or file.open(SAVE_PATH, File.READ) != OK:
 		return
@@ -221,10 +280,14 @@ func load_profiles() -> void:
 	next_id = max(1, int(parsed.result.get("next_id", 1)))
 	var settings = parsed.result.get("settings", {})
 	debug = bool(settings.get("debug", false)) if settings is Dictionary else false
-	var ps = parsed.result.get("profiles", {})
-	if ps is Dictionary:
-		for id in ps:
-			profiles[str(id)] = normalize_profile(ps[id])
+	var kinds = settings.get("kinds", {}) if settings is Dictionary else {}
+	for k in KINDS:
+		kind_enabled[k] = bool(kinds.get(k, true)) if kinds is Dictionary else true
+	for pair in [["profiles", profiles], ["items", item_profiles], ["weapons", weapon_profiles]]:
+		var ps = parsed.result.get(pair[0], {})
+		if ps is Dictionary:
+			for id in ps:
+				pair[1][str(id)] = normalize_profile(ps[id])
 
 
 func save_profiles() -> void:
@@ -235,19 +298,80 @@ func save_profiles() -> void:
 	if file.open(SAVE_PATH, File.WRITE) != OK:
 		ModLoaderLog.error("Failed to save profiles", MOD_ID)
 		return
-	file.store_string(JSON.print({"version": 1, "next_id": next_id, "settings": {"debug": debug}, "profiles": profiles}, "\t"))
+	file.store_string(JSON.print({
+		"version": 1, "next_id": next_id, "settings": {"debug": debug, "kinds": kind_enabled},
+		"profiles": profiles, "items": item_profiles, "weapons": weapon_profiles,
+	}, "\t"))
 	file.close()
 
 
 # 分享码：一个角色的档案（自定义角色导入后成为新的自定义角色）
-func export_code(id: String) -> String:
-	if not profiles.has(id):
+func export_code(id: String, kind: String = "character") -> String:
+	var ps = profiles_of(kind)
+	if not ps.has(id):
 		return ""
-	return SHARE_PREFIX + Marshalls.utf8_to_base64(JSON.print({"id": id, "profile": profiles[id]}))
+	return SHARE_PREFIX + Marshalls.utf8_to_base64(JSON.print({"kind": kind, "id": id, "profile": ps[id]}))
 
 
 # 返回导入后的角色 id；无法识别返回 ""
-func import_code(code: String, target_id: String) -> String:
+# 批量导出：kind = "" 时导出三栏全部
+func export_bundle(kind: String) -> String:
+	var data = {}
+	var prefix = ALL_PREFIX
+	if kind != "":
+		prefix = BUNDLE_PREFIX[kind]
+		data[BUNDLE_KEYS[kind]] = profiles_of(kind)
+	else:
+		for k in KINDS:
+			data[BUNDLE_KEYS[k]] = profiles_of(k)
+	for k in data:
+		if not data[k].empty():
+			return prefix + Marshalls.utf8_to_base64(JSON.print(data))
+	return ""
+
+
+# 导入批量码：同 id 的档案被覆盖（自定义角色保留 id）；返回导入条数，-1 = 不是有效的批量码
+func import_bundle(code: String) -> int:
+	code = code.strip_edges()
+	var kinds = []
+	if code.begins_with(ALL_PREFIX):
+		kinds = KINDS
+		code = code.substr(ALL_PREFIX.length())
+	else:
+		for k in BUNDLE_PREFIX:
+			if code.begins_with(BUNDLE_PREFIX[k]):
+				kinds = [k]
+				code = code.substr(BUNDLE_PREFIX[k].length())
+	if kinds.empty():
+		return -1
+	var parsed = JSON.parse(Marshalls.base64_to_utf8(code))
+	if parsed.error != OK or not parsed.result is Dictionary:
+		return -1
+	var n = 0
+	for k in kinds:
+		var src = parsed.result.get(BUNDLE_KEYS[k], {})
+		if not src is Dictionary:
+			continue
+		for id in src:
+			if not src[id] is Dictionary:
+				continue
+			var p = normalize_profile(src[id])
+			id = str(id)
+			if k == "character" and p.custom != id.begins_with(CUSTOM_PREFIX):
+				continue
+			if k != "character" and find_target(k, id) == null:
+				continue
+			if k == "character" and not p.custom and find_character(id) == null:
+				continue
+			profiles_of(k)[id] = p
+			if p.custom:
+				next_id = max(next_id, int(id.substr(CUSTOM_PREFIX.length())) + 1)
+				_register_custom(id)
+			n += 1
+	return n
+
+
+func import_code(code: String, target_id: String, kind: String = "character") -> String:
 	code = code.strip_edges()
 	if not code.begins_with(SHARE_PREFIX):
 		return ""
@@ -255,6 +379,14 @@ func import_code(code: String, target_id: String) -> String:
 	if parsed.error != OK or not parsed.result is Dictionary or not parsed.result.get("profile") is Dictionary:
 		return ""
 	var p = normalize_profile(parsed.result.profile)
+	# 道具 / 武器的档案只能导入到同种类的对象上
+	if str(parsed.result.get("kind", "character")) != kind:
+		return ""
+	if kind != "character":
+		if target_id == "":
+			return ""
+		profiles_of(kind)[target_id] = p
+		return target_id
 	if p.custom:
 		var id = create_custom(p.base if p.base != "" else target_id)
 		p.custom = true
@@ -285,6 +417,17 @@ func find_character(id: String):
 	return null
 
 
+func find_target(kind: String, id: String):
+	var isvc = _isvc()
+	if isvc == null:
+		return null
+	var arr = isvc.characters if kind == "character" else (isvc.items if kind == "item" else isvc.weapons)
+	for r in arr:
+		if r != null and r.my_id == id:
+			return r
+	return null
+
+
 func _find_any(id: String):
 	var isvc = _isvc()
 	for arr in [isvc.characters, isvc.items, isvc.weapons]:
@@ -302,8 +445,8 @@ func orig_effects(id: String) -> Array:
 	if r == null:
 		return []
 	var effects: Array = r.effects
-	if r is CharacterData and _backups.has(id):
-		effects = _backups[id].effects
+	if _backups.has(id):
+		effects = _backups[id].fields.effects
 	_orig_effects[id] = effects.duplicate()
 	return _orig_effects[id]
 
@@ -538,13 +681,32 @@ func _desc_effect(id: String, text: String):
 	return make_effect({"set": {"key": "", "value": 0, "text_key": key, "effect_sign": 2}})
 
 
+const BACKUP_FIELDS = {
+	"character": ["effects", "name", "starting_weapons", "wanted_tags"],
+	"item": ["effects", "name", "value", "tier", "max_nb", "tags"],
+	"weapon": ["effects", "name", "value", "stats"],
+}
+
+
+static func kind_of(res) -> String:
+	if res is CharacterData:
+		return "character"
+	if res is WeaponData:
+		return "weapon"
+	return "item"
+
+
 func _backup(c) -> void:
 	if _backups.has(c.my_id):
 		return
-	_backups[c.my_id] = {
-		"res": c, "effects": c.effects, "name": c.name, "starting_weapons": c.starting_weapons,
-		"wanted_tags": c.wanted_tags,
-	}
+	var fields = {}
+	for f in BACKUP_FIELDS[kind_of(c)]:
+		fields[f] = c.get(f)
+	_backups[c.my_id] = {"res": c, "fields": fields}
+
+
+func backup_value(c, field: String):
+	return _backups[c.my_id].fields[field] if _backups.has(c.my_id) else c.get(field)
 
 
 func restore() -> void:
@@ -553,10 +715,10 @@ func restore() -> void:
 		var c = b.res
 		if c == null or not is_instance_valid(c):
 			continue
-		c.effects = b.effects
-		c.name = b.name
-		c.starting_weapons = b.starting_weapons
-		c.wanted_tags = b.wanted_tags
+		for f in b.fields:
+			if f == "tier" and c.tier != b.fields.tier:
+				_repool = true
+			c.set(f, b.fields[f])
 	_backups.clear()
 
 
@@ -578,6 +740,11 @@ func apply_all() -> void:
 	restore()
 	_ban_cache.clear()
 	_register_customs()
+	_apply_items()
+	_apply_weapons()
+	if _repool and isvc.has_method("init_unlocked_pool"):
+		isvc.init_unlocked_pool()
+	_repool = false
 	for id in profiles:
 		var p = profiles[id]
 		var c = find_character(id)
@@ -586,7 +753,7 @@ func apply_all() -> void:
 		if p.custom:
 			_fill_custom(c, id, p)
 			continue
-		if not p.enabled:
+		if not p.enabled or not kind_enabled.character:
 			continue
 		# 先缓存原始效果（_backup 之后 orig_effects 也会读备份）
 		var _orig = orig_effects(id)
@@ -598,6 +765,92 @@ func apply_all() -> void:
 			c.starting_weapons = _weapons_by_ids(p.weapons)
 		if p.wanted_tags is Array:
 			c.wanted_tags = p.wanted_tags.duplicate()
+
+
+# 道具：效果、名称、价格、稀有度、数量限制、词条
+func _apply_items() -> void:
+	if not kind_enabled.item:
+		return
+	for id in item_profiles:
+		var p = item_profiles[id]
+		var it = find_target("item", id)
+		if it == null or not p.enabled:
+			continue
+		var _orig = orig_effects(id)
+		_backup(it)
+		it.effects = build_effects(id, p)
+		if p.name != "":
+			it.name = p.name
+		if p.price >= 0:
+			it.value = p.price
+		if p.tier >= 0 and p.tier != it.tier:
+			it.tier = p.tier
+			_repool = true
+		if p.max_nb != -2:
+			it.max_nb = p.max_nb
+		if p.tags is Array:
+			it.tags = p.tags.duplicate()
+
+
+# 武器：效果、名称、价格、武器属性（在原属性的副本上改写）
+func _apply_weapons() -> void:
+	if not kind_enabled.weapon:
+		return
+	for id in weapon_profiles:
+		var p = weapon_profiles[id]
+		var w = find_target("weapon", id)
+		if w == null or not p.enabled:
+			continue
+		var _orig = orig_effects(id)
+		_backup(w)
+		w.effects = build_effects(id, p)
+		if p.name != "":
+			w.name = p.name
+		if p.price >= 0:
+			w.value = p.price
+		if not p.wstats.empty() or p.scaling is Array:
+			w.stats = weapon_stats_for(w, p)
+
+
+# 按档案改写后的武器属性（不修改原资源）
+func weapon_stats_for(w, p: Dictionary):
+	var base = backup_value(w, "stats")
+	if base == null:
+		return null
+	var s = base.duplicate()
+	for f in WSTAT_FIELDS:
+		if p.wstats.has(f[0]) and f[0] in s:
+			match f[1]:
+				"int":
+					s.set(f[0], int(p.wstats[f[0]]))
+				"float":
+					s.set(f[0], float(p.wstats[f[0]]))
+				"bool":
+					s.set(f[0], bool(p.wstats[f[0]]))
+	if p.scaling is Array:
+		var sc = []
+		for e in p.scaling:
+			sc.push_back([Keys.generate_hash(e[0]), e[1]])
+		s.scaling_stats = sc
+	return s
+
+
+# 原版运行时的属性加成用属性哈希：[[hash, 系数]] -> [[属性名, 系数]]
+static func scaling_names(scaling: Array) -> Array:
+	var out = []
+	for e in scaling:
+		out.push_back([Keys.hash_to_string.get(e[0], str(e[0])) if e[0] is int else str(e[0]), float(e[1])])
+	return out
+
+
+# 对象来源：原版 / DLC / 模组（按资源路径）
+static func source_of(res) -> String:
+	var path = res.resource_path if res != null else ""
+	if path.begins_with("res://dlcs/"):
+		return "dlc"
+	if path.begins_with("res://items/") or path.begins_with("res://weapons/"):
+		return "vanilla"
+	return "mod"
 
 
 # ============================================================
@@ -624,7 +877,7 @@ func create_custom(base_id: String) -> String:
 	p.base = base_id
 	var base = find_character(base_id)
 	if base != null:
-		p.name = tr(_backups[base_id].name if _backups.has(base_id) else base.name) + " +"
+		p.name = tr(orig_name(base)) + " +"
 		var bp = profiles.get(base_id)
 		if bp != null and bp.enabled:
 			# 基底已有档案：连同档案内容一起复制
@@ -636,11 +889,11 @@ func create_custom(base_id: String) -> String:
 				p.effects.push_back({"from": base_id, "i": i})
 		if p.weapons == null:
 			var ws = []
-			for w in (_backups[base_id].starting_weapons if _backups.has(base_id) else base.starting_weapons):
+			for w in backup_value(base, "starting_weapons"):
 				ws.push_back(w.my_id)
 			p.weapons = ws
 		if p.wanted_tags == null:
-			p.wanted_tags = (_backups[base_id].wanted_tags if _backups.has(base_id) else base.wanted_tags).duplicate()
+			p.wanted_tags = backup_value(base, "wanted_tags").duplicate()
 	else:
 		p.name = tr("BE_NEW_CHARACTER")
 		p.effects = []
@@ -742,19 +995,30 @@ func _unlock_new_characters() -> void:
 # ============================================================
 # 效果库
 # ============================================================
-func library() -> Array:
-	if _library != null:
-		return _library
+func library(with_weapons: bool = false) -> Array:
+	if with_weapons:
+		if _weapon_library == null:
+			var sources = _library_sources()
+			for w in _isvc().weapons:
+				if w != null and not w.effects.empty():
+					sources.push_back([w.my_id, orig_name(w), orig_effects(w.my_id)])
+			_weapon_library = Catalog.build_library(sources)
+		return _weapon_library
+	if _library == null:
+		_library = Catalog.build_library(_library_sources())
+	return _library
+
+
+func _library_sources() -> Array:
 	var isvc = _isvc()
 	var sources = []
 	for c in isvc.characters:
 		if c != null and not c.my_id.begins_with(CUSTOM_PREFIX):
-			sources.push_back([c.my_id, _backups[c.my_id].name if _backups.has(c.my_id) else c.name, orig_effects(c.my_id)])
+			sources.push_back([c.my_id, orig_name(c), orig_effects(c.my_id)])
 	for it in isvc.items:
 		if it != null:
-			sources.push_back([it.my_id, it.name, orig_effects(it.my_id)])
-	_library = Catalog.build_library(sources)
-	return _library
+			sources.push_back([it.my_id, orig_name(it), orig_effects(it.my_id)])
+	return sources
 
 
 # 蓝图扳机的模板：custom_key -> spec（找不到返回 null）
@@ -768,7 +1032,7 @@ func trigger_template(custom_key: String):
 
 # 角色的原始名称（不受档案改名影响）
 func orig_name(c) -> String:
-	return _backups[c.my_id].name if _backups.has(c.my_id) else c.name
+	return backup_value(c, "name")
 
 
 # ============================================================
@@ -785,7 +1049,7 @@ func ban_hashes(player_index: int) -> Array:
 		return _ban_cache[c.my_id]
 	var out = []
 	var p = profiles.get(c.my_id)
-	if p != null and (p.enabled or p.custom):
+	if p != null and ((p.enabled and kind_enabled.character) or p.custom):
 		for id in p.ban_items:
 			out.push_back(Keys.generate_hash(str(id)))
 		if not p.ban_weapons.empty():
@@ -1144,7 +1408,7 @@ func _player_profile(rd, player_index: int):
 	if c == null:
 		return null
 	var p = profiles.get(c.my_id)
-	if p == null or not (p.enabled or p.custom):
+	if p == null or not ((p.enabled and kind_enabled.character) or p.custom):
 		return null
 	return p
 

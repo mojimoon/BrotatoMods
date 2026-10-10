@@ -9,6 +9,10 @@ func _initialize() -> void:
 	var out = OS.get_environment("BE_SHOT_DIR")
 	var m = root.get_node("ModLoader/Mojimoon-BroEditor")
 	var isvc = root.get_node("ItemService")
+	if OS.get_environment("BE_SHOT_KINDS") != "":
+		yield(_kinds(m, out), "completed")
+		quit()
+		return
 	var ch = isvc.characters[2].my_id
 	var custom = m.create_custom(ch)
 	var p = m.new_profile()
@@ -82,3 +86,26 @@ func _initialize() -> void:
 		ui.queue_free()
 		yield(self, "idle_frame")
 	quit()
+
+
+
+# 道具 / 武器栏的截图
+func _kinds(m, out: String):
+	var ui = load("res://mods-unpacked/Mojimoon-BroEditor/ui/editor_ui.tscn").instance()
+	root.add_child(ui)
+	yield(self, "idle_frame")
+	for kind in ["item", "weapon"]:
+		ui.set_kind(kind)
+		ui._on_filter(2, "tier")
+		ui._select(ui._first_listed())
+		if kind == "weapon":
+			ui._on_wstat_changed(99.0, ["damage", "int", ""])
+		for t in ["attrs", "effects"]:
+			ui._on_tab_pressed(t)
+			for i in 6:
+				yield(self, "idle_frame")
+			var img = root.get_texture().get_data()
+			img.flip_y()
+			img.save_png(out + "/" + kind + "_" + t + ".png")
+	ui.queue_free()
+	yield(self, "idle_frame")

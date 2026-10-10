@@ -71,6 +71,10 @@ func _reset() -> void:
 	for id in m.custom_ids():
 		m.delete_custom(id)
 	m.profiles = {}
+	m.item_profiles = {}
+	m.weapon_profiles = {}
+	for k in m.KINDS:
+		m.kind_enabled[k] = true
 	m.apply_all()
 	_setup_player(CH if CH != "" else isvc.characters[0].my_id)
 	rd.current_wave = WAVE
@@ -394,7 +398,7 @@ func test_51_ui_edits() -> void:
 	_check(ui._preview_text.get_child_count() > 2, "preview filled")
 	# 导出 / 导入
 	ui.test_clipboard = ""
-	ui._on_export_pressed()
+	ui._on_export_selected("BE1:")
 	_check(ui.test_clipboard.begins_with(m.SHARE_PREFIX), "export to clipboard")
 	# 关闭：保存
 	ui._on_close_pressed()
@@ -1042,3 +1046,156 @@ func _tree_has_text(n: Node, t: String) -> bool:
 		if _tree_has_text(c, t):
 			return true
 	return false
+
+
+# ============================================================
+# 道具 / 武器
+# ============================================================
+func _plain_item():
+	for it in isvc.items:
+		if it.tier == 0 and it.max_nb == -1 and not it.effects.empty():
+			return it
+	return isvc.items[0]
+
+
+func test_130_item_profile_apply_restore() -> void:
+	var it = _plain_item()
+	var orig = [it.name, it.value, it.tier, it.max_nb, it.tags, it.effects]
+	var p = m.new_profile()
+	p.name = "Test Item"
+	p.price = 77
+	p.tier = 2
+	p.max_nb = 1
+	p.tags = ["stat_luck"]
+	p.stats = {"stat_armor": 3}
+	m.item_profiles[it.my_id] = p
+	m.apply_all()
+	_eq([it.name, it.value, it.tier, it.max_nb, it.tags], ["Test Item", 77, 2, 1, ["stat_luck"]], "item fields applied")
+	_eq(it.effects.size(), orig[5].size() + 1, "stat effect appended")
+	_check(_find_effect(it.effects, "stat_armor") != null, "stat effect present")
+	var in_t3 = false
+	for x in isvc._tiers_data[2][isvc.TierData.ITEMS]:
+		in_t3 = in_t3 or x == it
+	_check(in_t3, "pool rebuilt with new tier")
+	# 道具栏总开关关闭 -> 原版
+	m.kind_enabled.item = false
+	m.apply_all()
+	_eq([it.name, it.value, it.tier, it.max_nb, it.tags, it.effects], orig, "kind switch off restores")
+	m.kind_enabled.item = true
+	m.apply_all()
+	m.reset_profile(it.my_id, "item")
+	m.apply_all()
+	_eq([it.name, it.value, it.tier, it.max_nb, it.tags, it.effects], orig, "reset restores")
+
+
+func test_131_weapon_stats_apply_restore() -> void:
+	var w = isvc.weapons[0]
+	var orig_stats = w.stats
+	var orig_damage = orig_stats.damage
+	var p = m.new_profile()
+	p.price = 5
+	p.wstats = {"damage": orig_damage + 90, "crit_chance": 0.5}
+	p.scaling = [["stat_luck", 2.0]]
+	m.weapon_profiles[w.my_id] = p
+	m.apply_all()
+	_check(w.stats != orig_stats, "stats replaced by a copy")
+	_eq([w.stats.damage, w.stats.crit_chance, w.value], [orig_damage + 90, 0.5, 5], "weapon stats applied")
+	_eq(JSON.print(w.stats.scaling_stats), JSON.print([[Keys.generate_hash("stat_luck"), 2.0]]), "scaling applied as hashes")
+	_eq(JSON.print(m.scaling_names(w.stats.scaling_stats)), JSON.print([["stat_luck", 2.0]]), "scaling names round trip")
+	_eq(orig_stats.damage, orig_damage, "original stats untouched")
+	_check(w.get_weapon_stats_text(0) != "", "stats text renders")
+	m.kind_enabled.weapon = false
+	m.apply_all()
+	_check(w.stats == orig_stats, "kind switch off restores stats")
+	# 武器效果库包含武器自带效果
+	var from_weapon = false
+	for e in m.library(true):
+		from_weapon = from_weapon or m.find_target("weapon", e.from) != null
+	_check(from_weapon, "weapon library has weapon effects")
+	_check(m.library(true).size() > m.library().size(), "weapon library is larger")
+
+
+func test_132_bundle_codes() -> void:
+	var it = _plain_item()
+	var p = m.new_profile()
+	p.price = 3
+	m.item_profiles[it.my_id] = p
+	m.profiles[CH] = m.new_profile()
+	var single = m.export_code(it.my_id, "item")
+	_check(single.begins_with(m.SHARE_PREFIX), "single prefix")
+	_eq(m.import_code(single, CH, "character"), "", "item code rejected for characters")
+	var kind_code = m.export_bundle("item")
+	_check(kind_code.begins_with("BEI1:"), "item bundle prefix")
+	_eq(m.export_bundle("weapon"), "", "empty bundle exports nothing")
+	var all_code = m.export_bundle("")
+	_check(all_code.begins_with("BEA1:"), "all prefix")
+	m.item_profiles = {}
+	m.profiles = {}
+	_eq(m.import_bundle(kind_code), 1, "item bundle imported")
+	_eq(m.item_profiles[it.my_id].price, 3, "bundle content")
+	_eq(m.profiles.size(), 0, "item bundle leaves characters")
+	m.item_profiles = {}
+	_eq(m.import_bundle(all_code), 2, "all bundle imported")
+	_eq(m.import_bundle(single), -1, "single code is not a bundle")
+	_eq(m.import_bundle("BEA1:!!"), -1, "bad bundle rejected")
+
+
+func test_133_ui_items_and_weapons() -> void:
+	var ui = yield(_open_ui(CH), "completed")
+	ui.test_clipboard = ""
+	for kind in ["item", "weapon"]:
+		ui.set_kind(kind)
+		yield(tree, "idle_frame")
+		_eq(ui._kind, kind, "switched to " + kind)
+		_check(ui._char_grid.get_child_count() > 0, kind + " list filled")
+		_check(m.find_target(kind, ui._id) != null, kind + " selected")
+		for t in ui.OBJECT_TABS:
+			ui._on_tab_pressed(t[0])
+			yield(tree, "idle_frame")
+			_check(ui._page.get_child_count() > 0, "%s tab %s built" % [kind, t[0]])
+		# 筛选：稀有度
+		ui._on_filter(3, "tier")
+		var ok = true
+		for b in ui._char_grid.get_children():
+			ok = ok and m.find_target(kind, b.get_meta("id")).tier == 3
+		_check(ok, kind + " tier filter")
+		ui._on_filter("vanilla", "src")
+		for b in ui._char_grid.get_children():
+			ok = ok and m.source_of(m.find_target(kind, b.get_meta("id"))) == "vanilla"
+		_check(ok, kind + " source filter")
+		ui._on_filter(-1, "tier")
+		ui._on_filter("all", "src")
+		ui._on_filter("price", "sort")
+		_check(ui._char_grid.get_child_count() > 0, kind + " sorted by price")
+	# 武器属性页编辑
+	ui._on_tab_pressed("attrs")
+	var w = m.find_target("weapon", ui._id)
+	ui._on_wstat_changed(42.0, ["damage", "int", ""])
+	_eq(ui._p().wstats.get("damage"), 42 if w.stats.damage != 42 else null, "weapon damage edit")
+	ui._on_wstat_changed(float(w.stats.damage), ["damage", "int", ""])
+	_check(not ui._p().wstats.has("damage"), "back to original clears override")
+	ui._on_scaling_add()
+	_eq(ui._p().scaling.size(), w.stats.scaling_stats.size() + 1, "scaling row added")
+	ui._on_attr_changed(9.0, "price", w.value)
+	_eq(ui._p().price, 9 if w.value != 9 else -1, "price edit")
+	# 道具：稀有度
+	ui.set_kind("item")
+	ui._on_tab_pressed("attrs")
+	var it = m.find_target("item", ui._id)
+	ui._on_attr_changed((it.tier + 1) % 4, "tier", it.tier)
+	_eq(ui._p().tier, (it.tier + 1) % 4, "tier edit")
+	# 导出：本栏全部
+	ui._on_export_selected("BEI1:")
+	_check(ui.test_clipboard.begins_with("BEI1:"), "export item bundle from ui")
+	ui._on_export_selected("BEA1:")
+	_check(ui.test_clipboard.begins_with("BEA1:"), "export all from ui")
+	# 键名：非调试 = 只有主键名
+	ui.set_kind("character")
+	_eq(ui._kind, "character", "back to characters")
+	var e = m.make_effect({"set": {"key": "stat_luck", "custom_key": "ck", "text_key": "tk"}})
+	_eq(ui._key_info(e), "stat_luck", "main key only")
+	m.debug = true
+	_eq(ui._key_info(e), "stat_luck  ·  ck  ·  tk", "debug: all keys, no file")
+	m.debug = false
+	ui.queue_free()
+	yield(tree, "idle_frame")
