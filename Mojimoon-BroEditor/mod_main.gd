@@ -1033,7 +1033,9 @@ func start_item_effect(s):
 	if r == null or r is CharacterData:
 		return null
 	var weapon = r is WeaponData
-	var cursed = bool(s.get("cursed", false))
+	# 没有 DLC 时原版会丢掉诅咒的初始装备：改为普通初始装备
+	var pd = _autoload("ProgressData")
+	var cursed = bool(s.get("cursed", false)) and pd != null and pd.is_dlc_available_and_active("abyssal_terrors")
 	var ck = ("cursed_" if cursed else "") + ("starting_weapon" if weapon else "starting_item")
 	return make_effect({"set": {
 		"key": id, "value": max(1, int(s.get("n", 1))), "custom_key": ck, "storage_method": 1, "effect_sign": 3,

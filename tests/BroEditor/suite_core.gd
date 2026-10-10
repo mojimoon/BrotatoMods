@@ -1202,3 +1202,75 @@ func test_191_cursed_blueprint_runtime() -> void:
 	var uncursed = GE.make(g)
 	_check(uncursed.curse_modifier() == 0.0 and uncursed.live_graph() == uncursed.graph, "uncursed blueprint uses its own values")
 	m.delete_custom_item(res[2])
+
+
+# 没有 DLC（未拥有或停用）时：诅咒相关的代码不报错、不改变数值；诅咒的初始装备改为普通的
+func test_192_without_dlc() -> void:
+	var pd = tree.root.get_node("ProgressData")
+	var saved = pd.available_dlcs.duplicate()
+	pd.available_dlcs = []
+	_check(pd.get_dlc_data("abyssal_terrors") == null and not pd.is_dlc_available_and_active("abyssal_terrors"), "DLC unavailable")
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	var ev = GE.add_node(g, "every", Vector2.ZERO, {"n": 6})
+	GE.add_link(g, GE.add_node(g, "kill", Vector2.ZERO), ev)
+	var gold = GE.add_node(g, "add_gold", Vector2.ZERO, {"value": 2})
+	GE.add_link(g, ev, gold)
+	GE.add_link(g, GE.add_node(g, "wave_start", Vector2.ZERO), GE.add_node(g, "perm_stat", Vector2.ZERO, {"stat": "stat_armor", "value": 3}))
+	_eq(JSON.print(m.curse_graph(g, 0.5)), JSON.print(g), "curse_graph without DLC leaves the graph unchanged")
+	# 带诅咒的蓝图（例如有 DLC 时存的档，之后停用 DLC 再读档）：按原数值运行，不报错
+	var ge = GE.make(g)
+	ge.value = 1500
+	_eq(JSON.print(ge.live_graph()), JSON.print(g), "cursed blueprint without DLC uses its own values")
+	_check(ge.get_text(0, false) != "", "text still renders")
+	var iid = m.create_custom_item(_plain_item().my_id, "nodlc")
+	m.item_profiles[iid].effects = []
+	m.item_profiles[iid].graph = g
+	m.apply_all()
+	_setup_player(CH)
+	rd.players_data[0].items = []
+	rd.add_character(m.find_character(CH), 0)
+	rd.add_item(m.find_target("item", iid), 0)
+	var h = Keys.generate_hash("stat_armor")
+	var a0 = rd.get_player_effect(h, 0)
+	m.graph_dirty = true
+	m.runtime.start_wave(null)
+	m.runtime.fire("wave_start", 0)
+	_eq(rd.get_player_effect(h, 0), a0 + 3, "blueprint fires with its own values")
+	var g0 = rd.players_data[0].gold
+	for i in 6:
+		m.runtime.fire("kill", 0)
+	_eq(rd.players_data[0].gold - g0, 2, "every 6 kills unchanged")
+	m.runtime.end_wave()
+	# 诅咒的初始道具：没有 DLC 时作为普通初始道具
+	var e = m.start_item_effect({"id": _plain_item().my_id, "n": 1, "cursed": true})
+	_eq(e.custom_key, "starting_item", "cursed starting item falls back to a normal one")
+	# 编辑器各页
+	var p = m.new_profile()
+	p.start_items = [{"id": _plain_item().my_id, "n": 1, "cursed": true}]
+	p.graph = g
+	m.profiles[CH] = p
+	var ui = yield(_open_ui(CH), "completed")
+	for t in ui._tab_defs():
+		ui._on_tab_pressed(t[0])
+		yield(tree, "idle_frame")
+		_check(ui._page.get_child_count() > 0, "tab " + t[0] + " without DLC")
+	ui._on_tab_pressed("gear")
+	var has_cursed_box = false
+	for n in _all_nodes(ui._page):
+		if n is CheckBox and n.text == tr("BE_CURSED"):
+			has_cursed_box = true
+	_check(not has_cursed_box, "no cursed checkbox without DLC")
+	ui.queue_free()
+	yield(tree, "idle_frame")
+	m.delete_custom_item(iid)
+	pd.available_dlcs = saved
+	_check(pd.get_dlc_data("abyssal_terrors") != null, "DLC restored")
+
+
+func _all_nodes(n: Node) -> Array:
+	var out = []
+	for c in n.get_children():
+		out.push_back(c)
+		out += _all_nodes(c)
+	return out
