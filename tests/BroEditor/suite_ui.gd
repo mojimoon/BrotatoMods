@@ -450,3 +450,32 @@ func test_155_short_dropdown_fits() -> void:
 	sel.close()
 	ui.queue_free()
 	yield(tree, "idle_frame")
+
+
+func test_156_name_colors_and_shared_layout() -> void:
+	var ui = yield(_open_ui(CH), "completed")
+	ui._on_tab_pressed("stats")
+	var lbl = ui._name_labels.get("stat_armor")
+	_check(lbl != null, "stat name label registered")
+	_eq(lbl.get_color("font_color"), ui.C_TEXT, "unchanged stat is white")
+	ui._on_stat_changed(4.0, "stat_armor")
+	_eq(lbl.get_color("font_color"), ui.C_ACCENT_3, "raised stat is green")
+	ui._on_stat_changed(-2.0, "stat_armor")
+	_eq(lbl.get_color("font_color"), ui.C_DANGER, "lowered stat is red")
+	ui._on_stat_changed(0.0, "stat_armor")
+	_eq(lbl.get_color("font_color"), ui.C_TEXT, "back to white")
+	# 概览：三栏用同一套组件，预览栏宽度一致
+	var widths = []
+	for kind in ["character", "item", "weapon"]:
+		ui.set_kind(kind)
+		ui._on_tab_pressed("overview")
+		yield(tree, "idle_frame")
+		var card = ui._preview_text.get_parent().get_parent().get_parent()
+		widths.push_back([card.rect_min_size.x, card.size_flags_horizontal])
+	_check(widths[0] == widths[1] and widths[1] == widths[2], "same preview column on every tab: " + str(widths))
+	ui.set_kind("weapon")
+	ui._on_tab_pressed("attrs")
+	ui._on_wstat_changed(999.0, ["damage", "int", ""])
+	_eq(ui._name_labels["damage"].get_color("font_color"), ui.C_ACCENT_3, "weapon stat raised is green")
+	ui.queue_free()
+	yield(tree, "idle_frame")
