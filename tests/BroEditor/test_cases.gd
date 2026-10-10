@@ -346,11 +346,11 @@ func test_51_ui_edits() -> void:
 	_eq(m.profiles[CH].stats, {"stat_armor": 4}, "stat edit")
 	# 效果：升级时 +3 幸运（原版扳机模板）
 	ui._on_tab_pressed("effects")
-	var n = m.effect_specs(CH, m.profiles[CH]).size()
+	var n = _real(m.effect_specs(CH, m.profiles[CH])).size()
 	var t = m.trigger_template("stats_on_level_up")
 	ui._add_spec({"from": t.from, "i": t.i, "set": {"key": "stat_luck", "value": 3}})
 	var specs = m.profiles[CH].effects
-	_eq(specs.size(), n + 1, "effect added")
+	_eq(_real(specs).size(), n + 1, "effect added")
 	var e = m.make_effect(specs[-1])
 	_eq([e.key, e.value, e.custom_key], ["stat_luck", 3, "stats_on_level_up"], "trigger effect")
 	_eq(ui._expanded, specs.size() - 1, "new effect expanded")
@@ -366,10 +366,10 @@ func test_51_ui_edits() -> void:
 	_check(ui._lib_list.get_child_count() > 0, "library rows")
 	var entry = m.library()[0]
 	ui._add_spec({"from": entry.from, "i": entry.i})
-	_eq(m.profiles[CH].effects.size(), n + 2, "library add")
+	_eq(_real(m.profiles[CH].effects).size(), n + 2, "library add")
 	ui._on_effect_move(m.profiles[CH].effects.size() - 1, -1)
 	ui._on_effect_delete(0)
-	_eq(m.profiles[CH].effects.size(), n + 1, "delete")
+	_eq(_real(m.profiles[CH].effects).size(), n + 1, "delete")
 	# 禁用
 	ui._on_tab_pressed("bans")
 	ui._on_ban_toggle("items", isvc.items[0].my_id)
@@ -391,7 +391,7 @@ func test_51_ui_edits() -> void:
 	ui._on_tab_pressed("overview")
 	ui._on_name_changed("  Renamed  ")
 	_eq(m.profiles[CH].name, "Renamed", "name trimmed")
-	_check(ui._preview_text.bbcode_text != "", "preview filled")
+	_check(ui._preview_text.get_child_count() > 2, "preview filled")
 	# 导出 / 导入
 	ui.test_clipboard = ""
 	ui._on_export_pressed()
@@ -558,7 +558,7 @@ func test_74_split_native() -> void:
 	var ui = yield(_open_ui(CH), "completed")
 	ui._on_tab_pressed("effects")
 	ui._on_effect_split(0)
-	_eq(m.profiles[CH].effects.size(), 0, "removed from effect list")
+	_eq(_real(m.profiles[CH].effects).size(), 0, "removed from effect list")
 	var g = m.profiles[CH].graph
 	_eq(g.nodes.size(), 2, "trigger + effect nodes")
 	_eq(g.nodes[0].kind, "level_up", "trigger")
@@ -916,4 +916,74 @@ func test_112_all_locales() -> void:
 		var t = _path_line([["kill", {}], ["chance", {"pct": 20}], ["every", {"n": 3}], ["cap", {"n": 2}], ["hp_below", {"pct": 50}], ["temp_stat", {"stat": "stat_armor", "value": 1}]])
 		_check(t.find("BE_") < 0 and t.find("{") < 0 and t.find("20%") >= 0, loc + ": path text " + t)
 		_check(m.stat_name("gain_stat_max_hp").find("BE_") < 0, loc + ": gain stat name")
+	TranslationServer.set_locale("en")
+
+
+# 效果列表里的真实效果（去掉初始属性 / 初始装备 / 蓝图的分组占位）
+func _real(specs: Array) -> Array:
+	var out = []
+	for s in specs:
+		if not (s is Dictionary and s.has("group")):
+			out.push_back(s)
+	return out
+
+
+func test_120_effect_groups_order() -> void:
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	GE.add_link(g, GE.add_node(g, "kill", Vector2.ZERO), GE.add_node(g, "add_gold", Vector2.ZERO, {"value": 1}))
+	var p = m.new_profile()
+	p.stats = {"stat_armor": 3}
+	p.graph = g
+	m.profiles[CH] = p
+	var c = m.find_character(CH)
+	m.apply_all()
+	var n0 = m.orig_effects(CH).size()
+	_eq(c.effects[n0].key, "stat_armor", "groups after own effects by default")
+	_check(c.effects[-1] is GE, "blueprint last by default")
+	var ui = yield(_open_ui(CH), "completed")
+	ui._on_tab_pressed("effects")
+	var specs = ui._edit_specs()
+	var gi = -1
+	for i in specs.size():
+		if specs[i] is Dictionary and specs[i].get("group") == "graph":
+			gi = i
+	_check(gi > 0, "blueprint row present")
+	# 蓝图行上移两次（跳过空的初始装备占位）
+	ui._on_effect_move(gi, -1)
+	m.apply_all()
+	_check(c.effects[n0] is GE, "blueprint moved before the stats group")
+	_eq(c.effects[n0 + 1].key, "stat_armor", "stats after blueprint")
+	# 只读行没有编辑按钮
+	var group_rows = 0
+	for row in ui._effect_list.get_children():
+		if row is PanelContainer and row.get_child(0) is HBoxContainer and row.get_child(0).get_child_count() == 4:
+			group_rows += 1
+	_eq(group_rows, 2, "two visible read-only group rows (stats + blueprint)")
+	ui.queue_free()
+	yield(tree, "idle_frame")
+
+
+func test_121_attack_while_moving_rule() -> void:
+	TranslationServer.set_locale("zh")
+	_eq(m.native_set_value(CH, "can_attack_while_moving"), 1, "default 1")
+	_eq(m.native_set_value("character_soldier", "can_attack_while_moving"), 0, "soldier 0")
+	var p = m.new_profile()
+	p.stats = {"can_attack_while_moving": 1}
+	m.profiles["character_soldier"] = m.normalize_profile(p)
+	m.apply_all()
+	rd.set_player_count(1, true)
+	rd.add_character(m.find_character("character_soldier"), 0)
+	_eq(int(rd.get_player_effect(Keys.can_attack_while_moving_hash, 0)), 1, "soldier can attack while moving after override")
+	m.profiles.erase("character_soldier")
+	var p2 = m.new_profile()
+	p2.stats = {"can_attack_while_moving": 0}
+	m.profiles[CH] = m.normalize_profile(p2)
+	_eq(m.profiles[CH].stats, {"can_attack_while_moving": 0}, "0 kept for set-value rule")
+	m.apply_all()
+	rd.set_player_count(1, true)
+	rd.add_character(m.find_character(CH), 0)
+	_eq(int(rd.get_player_effect(Keys.can_attack_while_moving_hash, 0)), 0, "can be disabled")
+	_eq(m.stat_name("next_level_xp_needed"), "%升级需要经验值", "label without placeholder")
+	_eq(m.stat_name("torture"), "拷问", "torture label")
 	TranslationServer.set_locale("en")

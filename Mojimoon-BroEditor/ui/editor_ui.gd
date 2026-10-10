@@ -71,9 +71,9 @@ var _reset_btn: Button
 var _delete_btn: Button
 var _tab_buttons: Dictionary = {}
 var _page: VBoxContainer
-var _preview_text: RichTextLabel
+var _preview_text: VBoxContainer
 # 效果页
-var _effect_rows: Array = []
+var _effect_rows: Dictionary = {}
 var _effect_list: VBoxContainer
 var _expanded := -1
 var _lib_cat := "all"
@@ -507,40 +507,51 @@ func _build_overview() -> void:
 	pbox.add_child(_label(tr("BE_SEC_PREVIEW"), FONT_NORMAL, C_ACCENT_2))
 	var pscroll = _scroll()
 	pbox.add_child(pscroll)
-	_preview_text = RichTextLabel.new()
-	_preview_text.bbcode_enabled = true
-	_preview_text.fit_content_height = true
-	_preview_text.scroll_active = false
+	_preview_text = VBoxContainer.new()
 	_preview_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_preview_text.add_font_override("normal_font", FONT_SMALL)
-	_preview_text.add_color_override("default_color", C_TEXT)
+	_preview_text.add_constant_override("separation", 4)
 	pscroll.add_child(_preview_text)
 	_refresh_preview()
 
 
+const EFFECT_LINE = preload("res://items/global/effect_line.tscn")
+const SAFE_TEXT_DIRS = ["res://items/", "res://dlcs/", "res://effects/", "res://weapons/"]
+
+
+# 预览：与原版角色面板相同的效果行（左边图标，右边文本），下面是初始武器图标与禁用统计
 func _refresh_preview() -> void:
 	if _preview_text == null or not is_instance_valid(_preview_text):
 		return
+	for c in _preview_text.get_children():
+		_preview_text.remove_child(c)
+		c.queue_free()
 	var v = _view()
-	var lines = []
+	if not _mod.is_custom(_id) and _mod.profiles.has(_id) and not v.enabled:
+		_preview_text.add_child(_desc(tr("BE_PREVIEW_DISABLED")))
 	for e in _mod.build_effects(_id, v):
-		var t = _mod.effect_text(e)
-		if t != "":
-			lines.push_back(t)
-	var text = PoolStringArray(lines).join("\n")
-	var dim = "[color=#" + C_TEXT_DIM.to_html(false) + "]"
+		var path = e.get_script().resource_path if e.get_script() != null else ""
+		var native = false
+		for dir in SAFE_TEXT_DIRS:
+			native = native or path.begins_with(dir)
+		var line = EFFECT_LINE.instance()
+		_preview_text.add_child(line)
+		if native:
+			line._display_effect(0, e, true, true)
+		else:
+			# 本 mod / 其他 mod 的效果：只显示文本（没有原版图标）
+			line._display_special_text(_mod.effect_text(e), null)
 	var c = _character()
 	var ws = _mod._weapons_by_ids(v.weapons) if v.weapons is Array else c.starting_weapons
-	var names = []
+	_preview_text.add_child(_label(tr("BE_PREVIEW_WEAPONS"), FONT_DESC, C_TEXT_DIM))
+	var grid = _icon_grid(10)
+	_preview_text.add_child(grid)
 	for w in ws:
-		names.push_back(tr(w.name))
-	text += "\n\n" + dim + tr("BE_PREVIEW_WEAPONS") + "[/color] " + PoolStringArray(names).join(" / ")
-	var bans = v.ban_items.size() + v.ban_weapons.size()
-	if bans > 0:
-		text += "\n" + dim + tr("BE_PREVIEW_BANS").replace("{0}", str(v.ban_items.size())).replace("{1}", str(v.ban_weapons.size())) + "[/color]"
-	if not _mod.is_custom(_id) and _mod.profiles.has(_id) and not v.enabled:
-		text = dim + tr("BE_PREVIEW_DISABLED") + "[/color]\n\n" + text
-	_preview_text.bbcode_text = text
+		var b = _icon_button(w.icon, 44)
+		_set_icon_style(b, ItemService.get_color_from_tier(w.tier), 2)
+		b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		grid.add_child(b)
+	if v.ban_items.size() + v.ban_weapons.size() > 0:
+		_preview_text.add_child(_label(tr("BE_PREVIEW_BANS").replace("{0}", str(v.ban_items.size())).replace("{1}", str(v.ban_weapons.size())), FONT_DESC, C_TEXT_DIM))
 
 
 func _all_tags() -> Array:
@@ -558,11 +569,7 @@ func _all_tags() -> Array:
 
 
 func _tag_name(tag: String) -> String:
-	if tag.begins_with("stat_"):
-		return tr(tag.to_upper())
-	var k = "BE_K_" + tag.to_upper()
-	var t = tr(k)
-	return t if t != k else tag
+	return _mod.stat_name(tag)
 
 
 func _on_name_changed(text: String) -> void:
@@ -702,11 +709,16 @@ func _stat_row(key: String, v: Dictionary) -> Control:
 	row.add_child(lbl)
 	var sb = _spin(-9999, 9999, 1)
 	sb.rect_min_size = Vector2(110, 0)
-	sb.value = int(v.stats.get(key, 0))
+	sb.value = int(v.stats.get(key, _stat_default(key)))
 	sb.connect("value_changed", self, "_on_stat_changed", [key, lbl])
 	row.add_child(sb)
-	_mark_stat_label(lbl, int(sb.value))
+	_mark_stat_label(lbl, int(sb.value) - _stat_default(key))
 	return row
+
+
+# 属性页的"不修改"值：一般为 0；设定值型规则为角色自身的值
+func _stat_default(key: String) -> int:
+	return _mod.native_set_value(_id, key) if key in BEMain.SET_KEYS else 0
 
 
 # 属性图标：原版属性图标；属性获取修改用对应属性的图标；其余按 cave-modtools 的对应表
@@ -791,11 +803,11 @@ func _mark_stat_label(lbl: Label, value: int) -> void:
 
 func _on_stat_changed(value: float, key: String, lbl: Label) -> void:
 	var p = _p()
-	if int(value) == 0:
+	if int(value) == _stat_default(key):
 		p.stats.erase(key)
 	else:
 		p.stats[key] = int(value)
-	_mark_stat_label(lbl, int(value))
+	_mark_stat_label(lbl, int(value) - _stat_default(key))
 	_changed()
 
 
@@ -807,15 +819,34 @@ func _on_stats_clear() -> void:
 
 # ---------------- 效果 ----------------
 func _specs() -> Array:
-	return _mod.effect_specs(_id, _view())
+	return _with_groups(_mod.effect_specs(_id, _view()))
 
 
-# 编辑前把"原版效果"展开为 spec 列表
+# 列表里没有的分组占位接在最后（与 build_effects 的顺序一致）
+func _with_groups(specs: Array) -> Array:
+	var out = specs.duplicate()
+	var have = {}
+	for s in specs:
+		if s is Dictionary and s.has("group"):
+			have[s.group] = true
+	for g in BEMain.GROUPS:
+		if not have.has(g):
+			out.push_back({"group": g})
+	return out
+
+
+# 编辑前把"原版效果"展开为 spec 列表（含分组占位）
 func _edit_specs() -> Array:
 	var p = _p()
-	if not p.effects is Array:
-		p.effects = _mod.effect_specs(_id, p).duplicate(true)
+	var full = _with_groups(_mod.effect_specs(_id, p))
+	if not p.effects is Array or full.size() != p.effects.size():
+		p.effects = full.duplicate(true)
 	return p.effects
+
+
+# 分组占位是否显示（该分组当前有效果）
+func _row_visible(spec) -> bool:
+	return not (spec is Dictionary and spec.has("group")) or not _mod.group_effects(_view(), str(spec.group)).empty()
 
 
 func _build_effects() -> void:
@@ -865,13 +896,15 @@ func _build_effects() -> void:
 	rbox.add_child(_label(tr("BE_SEC_LIBRARY"), FONT_NORMAL, C_ACCENT))
 	rbox.add_child(_desc(tr("BE_LIBRARY_DESC")))
 	var cats = GridContainer.new()
-	cats.columns = 5
+	cats.columns = 4
 	cats.add_constant_override("hseparation", 6)
 	cats.add_constant_override("vseparation", 6)
 	rbox.add_child(cats)
 	for c in Catalog.CATEGORIES:
 		var b = _button(tr(c[1]), FONT_DESC)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.clip_text = true
+		b.rect_min_size = Vector2(60, 0)
 		_apply_chip_style(b, c[0] == _lib_cat, C_ACCENT)
 		b.connect("pressed", self, "_on_lib_cat", [c[0]])
 		cats.add_child(b)
@@ -898,12 +931,45 @@ func _fill_effect_list() -> void:
 	for c in _effect_list.get_children():
 		_effect_list.remove_child(c)
 		c.queue_free()
-	_effect_rows = []
+	_effect_rows = {}
 	var specs = _specs()
-	if specs.empty():
-		_effect_list.add_child(_desc(tr("BE_EFFECTS_EMPTY")))
+	var shown = 0
 	for i in specs.size():
-		_effect_list.add_child(_effect_row(i, specs[i]))
+		if not _row_visible(specs[i]):
+			continue
+		shown += 1
+		if specs[i] is Dictionary and specs[i].has("group"):
+			_effect_list.add_child(_group_row(i, str(specs[i].group)))
+		else:
+			_effect_list.add_child(_effect_row(i, specs[i]))
+	if shown == 0:
+		_effect_list.add_child(_desc(tr("BE_EFFECTS_EMPTY")))
+
+
+# 初始属性 / 额外初始装备 / 蓝图生成的效果：只读，显示来源，可调整顺序
+func _group_row(i: int, g: String) -> Control:
+	var card = PanelContainer.new()
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.add_stylebox_override("panel", _style(C_BG_CHIP, C_BORDER, 6, 1, 10, 6))
+	var row = HBoxContainer.new()
+	row.add_constant_override("separation", 6)
+	card.add_child(row)
+	var lines = []
+	for e in _mod.group_effects(_view(), g):
+		var t = _mod.effect_text(e)
+		if t != "":
+			lines.push_back(t)
+	row.add_child(_rich(PoolStringArray(lines).join("\n")))
+	var src = _label(tr("BE_SRC_GROUP_" + g.to_upper()), FONT_DESC, C_ACCENT)
+	src.rect_min_size = Vector2(120, 0)
+	src.align = Label.ALIGN_RIGHT
+	row.add_child(src)
+	for a in [["▲", -1], ["▼", 1]]:
+		var b = _button(a[0], FONT_DESC)
+		_apply_action_style(b, C_ACCENT_2)
+		b.connect("pressed", self, "_on_effect_move", [i, a[1]])
+		row.add_child(b)
+	return card
 
 
 func _effect_text(spec) -> String:
@@ -962,7 +1028,7 @@ func _effect_row(i: int, spec) -> Control:
 	_apply_action_style(del, C_DANGER)
 	del.connect("pressed", self, "_on_effect_delete", [i])
 	row.add_child(del)
-	_effect_rows.push_back(txt)
+	_effect_rows[i] = txt
 	if i == _expanded and spec is Dictionary:
 		_build_effect_fields(col, i, spec)
 	return card
@@ -1004,10 +1070,14 @@ func _build_effect_fields(col: Control, i: int, spec: Dictionary) -> void:
 				sb.connect("value_changed", self, "_on_field_changed", [i, f.name])
 				grid.add_child(sb)
 			TYPE_BOOL:
-				var cb = CheckBox.new()
-				cb.pressed = cur
-				cb.connect("toggled", self, "_on_field_changed", [i, f.name])
-				grid.add_child(cb)
+				var tb = _button(tr("BE_YES" if cur else "BE_NO"), FONT_DESC)
+				tb.toggle_mode = true
+				tb.pressed = cur
+				tb.rect_min_size = Vector2(70, 0)
+				tb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+				_apply_chip_style(tb, cur, C_ACCENT_3)
+				tb.connect("toggled", self, "_on_bool_field", [i, f.name, tb])
+				grid.add_child(tb)
 			TYPE_STRING:
 				if Catalog.is_stat_key(str(cur)) or (f.name in ["key", "stat", "stat_scaled", "stat_displayed"] and str(cur).begins_with("stat_")):
 					var opt = _stat_option(str(cur))
@@ -1021,6 +1091,12 @@ func _build_effect_fields(col: Control, i: int, spec: Dictionary) -> void:
 					grid.add_child(le)
 
 
+func _on_bool_field(pressed: bool, i: int, field: String, tb: Button) -> void:
+	tb.text = tr("BE_YES" if pressed else "BE_NO")
+	_apply_chip_style(tb, pressed, C_ACCENT_3)
+	_set_field(i, field, pressed)
+
+
 func _on_effect_edit(i: int) -> void:
 	_expanded = -1 if _expanded == i else i
 	_fill_effect_list()
@@ -1028,7 +1104,10 @@ func _on_effect_edit(i: int) -> void:
 
 func _on_effect_move(i: int, d: int) -> void:
 	var specs = _edit_specs()
+	# 跳过不显示的空分组占位
 	var j = i + d
+	while j >= 0 and j < specs.size() and not _row_visible(specs[j]):
+		j += d
 	if j < 0 or j >= specs.size():
 		return
 	var t = specs[i]
@@ -1088,7 +1167,7 @@ func _set_field(i: int, field: String, value) -> void:
 	if not specs[i].has("set"):
 		specs[i]["set"] = {}
 	specs[i].set[field] = value
-	if i < _effect_rows.size():
+	if _effect_rows.has(i):
 		_effect_rows[i].bbcode_text = _effect_text(specs[i])
 	_changed()
 
@@ -1397,15 +1476,23 @@ func _ban_list(kind: String) -> Array:
 
 func _ban_candidates(kind: String) -> Array:
 	if kind == "items":
-		return _isvc().items
+		var items = _isvc().items.duplicate()
+		items.sort_custom(self, "_sort_by_tier_then_name")
+		return items
 	# 武器按系列（weapon_id）禁用，每个系列显示最低稀有度的那一把
 	var by_family = {}
 	for w in _isvc().weapons:
 		if not by_family.has(w.weapon_id) or w.tier < by_family[w.weapon_id].tier:
 			by_family[w.weapon_id] = w
 	var out = by_family.values()
-	out.sort_custom(self, "_sort_by_name")
+	out.sort_custom(self, "_sort_by_tier_then_name")
 	return out
+
+
+func _sort_by_tier_then_name(a, b) -> bool:
+	if a.tier != b.tier:
+		return a.tier < b.tier
+	return tr(a.name) < tr(b.name)
 
 
 func _sort_by_name(a, b) -> bool:

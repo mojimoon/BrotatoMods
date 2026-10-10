@@ -24,6 +24,10 @@ const GraphEffect = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/graph_
 const Runtime = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/runtime.gd")
 # 上限类属性：角色效果直接设定上限值（原版 REPLACE 存储），而不是加减
 const CAP_KEYS = ["hp_cap", "speed_cap", "dodge_cap", "crit_chance_cap"]
+# 设定值型规则：直接设定数值（原版士兵的"移动时不能攻击"就是 REPLACE 为 0）；界面默认显示角色自身的值，0 也是有效值
+const SET_KEYS = ["can_attack_while_moving"]
+# 效果列表中的分组占位：初始属性 / 额外初始装备 / 蓝图生成的效果插在占位处（没有占位时接在最后）
+const GROUPS = ["stats", "start", "graph"]
 # 开局状态的默认值
 const START_DEFAULT = {
 	"materials": 0, "levels": 0, "level_settle": false, "crates": 0, "legendary_crates": 0,
@@ -137,7 +141,7 @@ static func normalize_profile(p) -> Dictionary:
 	var stats = {}
 	for k in out.stats:
 		var v = int(out.stats[k])
-		if v != 0:
+		if v != 0 or str(k) in SET_KEYS:
 			stats[str(k)] = v
 	out.stats = stats
 	for k in ["effects", "weapons", "wanted_tags"]:
@@ -364,7 +368,7 @@ func stat_name(key: String) -> String:
 			base = base.trim_prefix(pfx).trim_suffix(pfx).strip_edges()
 		return tr("BE_GAIN_FMT").replace("{0}", base)
 	var native = key.to_upper()
-	if key.begins_with("stat_") or (not key in OWN_LABEL_KEYS and tr(native) != native):
+	if key.begins_with("stat_") or (not key in OWN_LABEL_KEYS and tr(native) != native and tr(native).find("{") < 0):
 		return tr(native).strip_edges()
 	var k = "BE_K_" + native
 	var t = tr(k)
@@ -391,7 +395,7 @@ func _plain_text_key(key: String) -> String:
 
 func stat_effect(key: String, value: int):
 	var sets = {"key": key, "value": value, "text_key": _plain_text_key(key)}
-	if key in CAP_KEYS:
+	if key in CAP_KEYS or key in SET_KEYS:
 		sets.storage_method = 2
 	return make_effect({"set": sets})
 
@@ -413,23 +417,56 @@ func build_effects(id: String, p: Dictionary) -> Array:
 	var out = []
 	if p.desc != "":
 		out.push_back(_desc_effect(id, p.desc))
+	var used = {}
 	for spec in effect_specs(id, p):
-		if spec is Dictionary:
-			var e = make_effect(spec)
-			if e != null:
-				out.push_back(e)
-	var keys = p.stats.keys()
-	keys.sort()
-	for k in keys:
-		if int(p.stats[k]) != 0:
-			out.push_back(stat_effect(k, int(p.stats[k])))
-	for s in p.start_items:
-		var e = start_item_effect(s)
+		if not spec is Dictionary:
+			continue
+		if spec.has("group"):
+			if not used.has(spec.group):
+				used[spec.group] = true
+				out += group_effects(p, str(spec.group))
+			continue
+		var e = make_effect(spec)
 		if e != null:
 			out.push_back(e)
-	if p.graph is Dictionary and not p.graph.get("nodes", []).empty():
-		out.push_back(GraphEffect.make(p.graph))
+	for g in GROUPS:
+		if not used.has(g):
+			out += group_effects(p, g)
 	return out
+
+
+# 分组生成的效果：stats = 初始属性，start = 额外初始装备，graph = 蓝图
+func group_effects(p: Dictionary, g: String) -> Array:
+	var out = []
+	match g:
+		"stats":
+			var keys = p.stats.keys()
+			keys.sort()
+			for k in keys:
+				if int(p.stats[k]) != 0 or k in SET_KEYS:
+					out.push_back(stat_effect(k, int(p.stats[k])))
+		"start":
+			for s in p.start_items:
+				var e = start_item_effect(s)
+				if e != null:
+					out.push_back(e)
+		"graph":
+			if p.graph is Dictionary and not p.graph.get("nodes", []).empty():
+				out.push_back(GraphEffect.make(p.graph))
+	return out
+
+
+# 设定值型规则在角色身上的原有值（原版效果里的 REPLACE；没有则为玩家效果表的默认值）
+func native_set_value(id: String, key: String) -> int:
+	var v = 1
+	var probe = load("res://singletons/player_run_data.gd").init_effects()
+	var h = Keys.generate_hash(key)
+	if probe.has(h) and typeof(probe[h]) in [TYPE_INT, TYPE_REAL]:
+		v = int(probe[h])
+	for e in orig_effects(id):
+		if e != null and "key" in e and e.key == key and e.custom_key == "" and e.storage_method == 2:
+			v = int(e.value)
+	return v
 
 
 # 额外初始装备：原版 starting_item / starting_weapon / cursed_* 效果（KEY_VALUE 存 [id_hash, 数量]）

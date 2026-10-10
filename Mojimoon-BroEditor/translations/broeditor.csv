@@ -1,5 +1,5 @@
 key,zh,en,fr,ja,ko,zh_TW,ru,pl,es,pt,de,tr,it
-BE_BTN_OPEN,角色编辑器,Character Editor,Éditeur de personnage,キャラクターエディター,캐릭터 편집기,角色編輯器,Редактор персонажей,Edytor postaci,Editor de personajes,Editor de personagens,Charakter-Editor,Karakter Düzenleyici,Editor personaggi
+BE_BTN_OPEN,BroEditor,BroEditor,BroEditor,BroEditor,BroEditor,BroEditor,BroEditor,BroEditor,BroEditor,BroEditor,BroEditor,BroEditor,BroEditor
 BE_TITLE,BroEditor 角色编辑器,BroEditor Character Editor,BroEditor – Éditeur de personnage,BroEditor キャラクターエディター,BroEditor 캐릭터 편집기,BroEditor 角色編輯器,BroEditor — редактор персонажей,BroEditor – edytor postaci,BroEditor: editor de personajes,BroEditor – Editor de personagens,BroEditor – Charakter-Editor,BroEditor Karakter Düzenleyici,BroEditor – Editor personaggi
 BE_IMPORT,导入,Import,Importer,インポート,가져오기,匯入,Импорт,Importuj,Importar,Importar,Importieren,İçe Aktar,Importa
 BE_EXPORT,导出,Export,Exporter,エクスポート,내보내기,匯出,Экспорт,Eksportuj,Exportar,Exportar,Exportieren,Dışa Aktar,Esporta
@@ -159,43 +159,43 @@ BE_PICKER_CLEAR,清空选择,Clear Selection,Tout désélectionner,選択をク�
 BE_PICKER_COUNT,已选 {0},{0} selected,{0} sélectionné(s),{0} 件選択中,{0}개 선택됨,已選 {0},Выбрано: {0},Wybrano: {0},{0} seleccionados,{0} selecionados,{0} ausgewählt,{0} seçili,{0} selezionati
 BE_CANCEL,取消,Cancel,Annuler,キャンセル,취소,取消,Отмена,Anuluj,Cancelar,Cancelar,Abbrechen,İptal Et,Annulla
 BE_CONFIRM,确认,Confirm,Confirmer,確定,확인,確認,Подтвердить,Potwierdź,Confirmar,Confirmar,Bestätigen,Onayla,Conferma
-BE_K_XP_GAIN,获得%经验,,,,,,,,,,,,
-BE_K_PICKUP_RANGE,%拾取范围,,,,,,,,,,,,
-BE_K_KNOCKBACK,击退,,,,,,,,,,,,
-BE_K_CONSUMABLE_HEAL,消耗性治疗,,,,,,,,,,,,
-BE_K_EXPLOSION_DAMAGE,%爆炸伤害,,,,,,,,,,,,
-BE_K_EXPLOSION_SIZE,%爆炸范围,,,,,,,,,,,,
-BE_K_PIERCING,贯通,,,,,,,,,,,,
-BE_K_PIERCING_DAMAGE,%贯通伤害,,,,,,,,,,,,
-BE_K_BOUNCE,反弹,,,,,,,,,,,,
-BE_K_BOUNCE_DAMAGE,%反弹伤害,,,,,,,,,,,,
-BE_K_PROJECTILES,投射物,,,,,,,,,,,,
-BE_K_DAMAGE_AGAINST_BOSSES,%对头目伤害,,,,,,,,,,,,
-BE_K_BURNING_SPREAD,燃烧蔓延,,,,,,,,,,,,
-BE_K_BURNING_COOLDOWN_REDUCTION,%燃烧速度,,,,,,,,,,,,
-BE_K_STRUCTURE_ATTACK_SPEED,%构筑物的攻击速度,,,,,,,,,,,,
+BE_K_XP_GAIN,获得%经验,% XP Gain,% Gain d’XP,経験値の獲得量(%),% XP 획득,獲得%XP,% бонусного опыта,Zdobywany % PD,% de XP recibida,% de EXP ganha,% XP-Gewinn,% TP Kazanımı,% di guadagno PE
+BE_K_PICKUP_RANGE,%拾取范围,% Pickup Range,% Portée d’attraction,ピックアップ範囲%,% 획득 범위,%撿拾範圍,% дальности сбора,% zasięgu podnoszenia,% de alcance de recogida,% de alcance de coleta,% Sammelreichweite,% Toplama Menzili,% di raggio di raccolta
+BE_K_KNOCKBACK,击退,Knockback,Poussée,ノックバック,넉백,擊退,Отталкивание,Odrzut,Derribo,Empurrão,Rückstoß,İtme,Respinta
+BE_K_CONSUMABLE_HEAL,消耗性治疗,Consumable Heal,Soin des consommables,消費アイテムの回復量,소모품 치료,消耗品治癒,Потребляемое лечение,Znajdźka lecząca,Curación consumible,Cura consumível,Heilung durch Verbrauchsgegenstände,Tüketilebilirlerle Yenilenen Sağlık,PS dai consumabili
+BE_K_EXPLOSION_DAMAGE,%爆炸伤害,% Explosion Damage,% Dégâts d’Explosion,爆発ダメージ(%),% 폭발 대미지,%爆炸傷害,% взрывного урона,% obr. od wybuchów,% de daño de explosión,% de dano de explosão,% Explosionsschaden,% Patlama Hasarı,% di danni da esplosione
+BE_K_EXPLOSION_SIZE,%爆炸范围,% Explosion Size,% Taille d’Explosion,爆発範囲(%),% 폭발 크기,%爆炸範圍,% радиус взрыва,% wielkości wybuchu,% de tamaño de explosión,% de área da explosão,% Explosionsgröße,% Patlama Büyüklüğü,% dimensioni esplosione
+BE_K_PIERCING,贯通,Piercing,Perforation,貫通,관통,貫穿,Пробивание,Przeszywanie,Perforación,Perfuração,Durchbohren,Delici,Perforazione
+BE_K_PIERCING_DAMAGE,%贯通伤害,% Piercing Damage,% Dégâts de Perforation,貫通ダメージ(%),% 관통 대미지,%貫穿傷害,% урона при пробивании,% obr. od przeszywania,% de daño de perforación,% de dano de perfuração,% Durchbohrungsschaden,% Delici Hasar,% di danni da perforazione
+BE_K_BOUNCE,反弹,Bounces,Rebonds,跳弾,튕김,反彈,Отскоки,Odbijanie,Rebote,Rebote,Abpraller,Sekme,Rimbalzi
+BE_K_BOUNCE_DAMAGE,%反弹伤害,% Bounce Damage,% Dégâts de Rebond,跳弾ダメージ(%),% 튕김 대미지,%反彈傷害,% урона при отскоке,% obr. od odbijania,% de daño de rebote,% de dano de rebote,% Abprallschaden,% Sekme Hasarı,% di danni da rimbalzo
+BE_K_PROJECTILES,投射物,projectiles,projectiles,同時発射数,발사체,投射物,снарядов,Pociski,proyectiles,projéteis.,Projektile,roket,proiettili.
+BE_K_DAMAGE_AGAINST_BOSSES,%对头目伤害,% Damage against bosses,% Dégâts contre les boss,ボスへの最終ダメージ(%),% 보스에 대한 데미지,%對頭目傷害,% урона против боссов,% Obrażenia przeciwko bossom,% Daño contra jefes,% de dano contra chefes,% Schaden gegen Bosse,Patronlara karşı % Hasar,% Danni contro i boss
+BE_K_BURNING_SPREAD,燃烧蔓延,Burning Spread,Propagation des brûlures,炎上の伝播数,화상 속도,燃燒蔓延,Распространение огня,Szybkość płonięcia,Propagación de quemadura,Espalhamento de queimadura,Brandreichweite,Yanma Yayılması,Propagazione delle bruciature
+BE_K_BURNING_COOLDOWN_REDUCTION,%燃烧速度,% Burning Speed,% Rapidité des brûlures,炎上ダメージ発生間隔短縮率(%),% 화상 속도,%燃燒速度,% скорости горения,% szybkości płonięcia,% de vel. de quemadura,% de velocidade de queimadura,% Brandtempo,% Yanma Hızı,% di velocità delle bruciature
+BE_K_STRUCTURE_ATTACK_SPEED,%构筑物的攻击速度,% Structure attack speed,% Vitesse d'attaque de vos structures,建造物の攻撃速度(%),% 건축물 공격 속도,%結構物攻擊速度,% скорости атаки построек,% do szybkości ataku budowli,% de velocidad de ataque de las estructuras,% de velocidade de ataque da estrutura,% Struktur-Angriffstempo,% Yapı saldırı hızı,% velocità di attacco delle strutture
 BE_K_STRUCTURE_PERCENT_DAMAGE,%构筑物伤害,% Structure Damage,% Dégâts des structures,% 設置物ダメージ,% 구조물 대미지,%構築物傷害,% урона строений,% obrażeń budowli,% Daño de estructuras,% Dano de estruturas,% Struktur-Schaden,% Yapı Hasarı,% Danni delle strutture
-BE_K_STRUCTURE_RANGE,构筑物范围,,,,,,,,,,,,
-BE_K_ACCURACY,%命中率,,,,,,,,,,,,
+BE_K_STRUCTURE_RANGE,构筑物范围,Structure Range,Portée des Structures,建造物の攻撃範囲,구조 범위,結構物傷害,Дальность атак построек,Zasięg budowli,Alcance de estructuras,Alcance de estrutura,Konstruktionsreichweite,Yapı Menzili,Portata delle strutture
+BE_K_ACCURACY,%命中率,Accuracy,Précision,精度,정확도,命中率,Точность,Celność,Precisión,Precisão,Genauigkeit,İsabet,Precisione
 BE_K_HARVESTING_GROWTH,%收获成长,% Harvesting Growth,% Croissance de la récolte,% 収穫の成長,% 수확 성장,%收穫成長,% роста сбора урожая,% wzrostu zbierania,% Crecimiento de cosecha,% Crescimento da coleta,% Ernte-Wachstum,% Hasat Büyümesi,% Crescita della raccolta
-BE_K_WEAPON_SLOT,武器栏,,,,,,,,,,,,
-BE_K_ITEMS_PRICE,%道具价格,,,,,,,,,,,,
-BE_K_WEAPONS_PRICE,%武器价格,,,,,,,,,,,,
-BE_K_REROLL_PRICE,%刷新价格,,,,,,,,,,,,
-BE_K_FREE_REROLLS,免费刷新,,,,,,,,,,,,
+BE_K_WEAPON_SLOT,武器栏,Weapon Slot,Emplacement d'arme,武器スロット,무기 슬롯,武器欄位,Ячейка оружия,Pole broni,Ranura de arma,Espaço de arma,Waffenslot,Silah Yuvası,Spazio per arma
+BE_K_ITEMS_PRICE,%道具价格,% Items Price,% Prix des objets,アイテム価格(%),% 아이템 가격,%道具價格,% цены предметов,% ceny przedmiotów,% de precio de objetos,% do preço dos itens,% Item-Preis,% Eşya Fiyatı,% prezzo oggetti
+BE_K_WEAPONS_PRICE,%武器价格,Weapons Price,Prix des Armes,武器の価格,무기 가격,武器價格,Цена оружия,Cena broni,Precio de armas,Preço das armas,Waffenpreis,Silah Fiyatı,Prezzo delle armi
+BE_K_REROLL_PRICE,%刷新价格,% Reroll Price,% Prix de Randomisation,リロール価格(%),% 초기화 가격,%重骰價格,% цены замены,koszt przerzucenia %,% de precio de repeticiones,% do preço de renovação,"% ""Neu würfeln""-Preis",% Yenileme Fiyatı,% prezzo cambi
+BE_K_FREE_REROLLS,免费刷新,Free Rerolls,Randomisations gratuites,無料リロール,무료 초기화,免費重骰,Бесплатные замены,Darmowe przerzucenia,Repeticiones gratis,Renovações grátis,Gratis neu würfeln,Ücretsiz Yenileme,Cambi gratuiti
 BE_K_GOLD_DROPS,%材料掉落,% Material Drops,% Matériaux lâchés,% マテリアルドロップ,% 재료 드롭,%材料掉落,% выпадения материалов,% upuszczanych materiałów,% Materiales soltados,% Materiais derrubados,% Material-Drops,% Malzeme Düşürme,% Materiali rilasciati
 BE_K_ENEMY_GOLD_DROPS,%敌人材料掉落,% Enemy Material Drops,% Matériaux lâchés par les ennemis,% 敵のマテリアルドロップ,% 적 재료 드롭,%敵人材料掉落,% материалов с врагов,% materiałów z wrogów,% Materiales de enemigos,% Materiais de inimigos,% Material-Drops von Gegnern,% Düşmanlardan Malzeme,% Materiali dai nemici
 BE_K_NEUTRAL_GOLD_DROPS,%树木材料掉落,% Tree Material Drops,% Matériaux lâchés par les arbres,% 木のマテリアルドロップ,% 나무 재료 드롭,%樹木材料掉落,% материалов с деревьев,% materiałów z drzew,% Materiales de árboles,% Materiais de árvores,% Material-Drops von Bäumen,% Ağaçlardan Malzeme,% Materiali dagli alberi
 BE_K_CRATE_CHANCE,%树木掉落箱子几率,% Crates Dropped by Trees,% Caisses lâchées par les arbres,% 木から箱が出る確率,% 나무의 상자 드롭,%樹木掉落箱子機率,% ящиков с деревьев,% skrzyń z drzew,% Cajas de árboles,% Caixas de árvores,% Kisten von Bäumen,% Ağaçlardan Sandık,% Casse dagli alberi
 BE_K_LOOT_ALIEN_CHANCE,%战利品外星人几率,% Loot Alien Chance,% Chance de Pillard,% 戦利品エイリアンの出現率,% 전리품 외계인 확률,%戰利品異形機率,% шанс пришельца с добычей,% szansy na obcego z łupami,% Probabilidad de botín alienígena,% Chance de alienígena do tesouro,% Beute-Alien-Chance,% Yağmacı Uzaylı Şansı,% Probabilità di alieno con bottino
 BE_K_RECYCLING_GAINS,%回收收益,% Recycling Gains,% Gains de recyclage,% リサイクル収益,% 재활용 수익,%回收收益,% выгоды от разбора,% zysku z przetwarzania,% Ganancias de reciclaje,% Ganhos de reciclagem,% Verwertungsertrag,% Geri Dönüşüm Kazancı,% Guadagni dal riciclo
-BE_K_MAP_SIZE,%地图尺寸,,,,,,,,,,,,
+BE_K_MAP_SIZE,%地图尺寸,Map Size,Taille de la carte,マップサイズ,맵 크기,地圖尺寸,Размер карты,Rozmiar mapy,Tamaño de mapa,Tamanho do mapa,Kartengröße,Harita Boyutu,Dimensioni mappa
 BE_K_NUMBER_OF_ENEMIES,%敌人数量,% Number of Enemies,% Nombre d'ennemis,% 敵の数,% 적 수,%敵人數量,% количества врагов,% liczby wrogów,% Número de enemigos,% Número de inimigos,% Anzahl der Gegner,% Düşman Sayısı,% Numero di nemici
-BE_K_ENEMY_HEALTH,%敌人生命值,,,,,,,,,,,,
-BE_K_ENEMY_DAMAGE,%敌人伤害,,,,,,,,,,,,
-BE_K_ENEMY_SPEED,%敌人速度,,,,,,,,,,,,
+BE_K_ENEMY_HEALTH,%敌人生命值,% Enemy health,% Santé des ennemis,敵のHP(%),% 적 체력,%敵人生命值,% здоровья врагов,% zdrowia wroga,% de salud de enemigos,% de vida dos inimigos,% Gegnerleben,% Düşman sağlığı,% salute nemici
+BE_K_ENEMY_DAMAGE,%敌人伤害,% Enemy damage,% Dégâts des ennemis,敵のダメージ(%),% 적 대미지,%敵人傷害,% урона врагов,% obrażeń wroga,% de daño de enemigos,% de dano dos inimigos,% Gegnerschaden,% Düşman hasarı,% danni nemici
+BE_K_ENEMY_SPEED,%敌人速度,% Enemy Speed,% Vitesse des Ennemis,敵の移動速度(%),% 적 속도,%敵人速度,% скорости врагов,% szybkości wroga,% de vel. de enemigos,% de velocidade dos inimigos,% Gegnertempo,% Düşman Hızı,% velocità nemici
 BE_K_BOSS_STRENGTH,%头目强度,% Boss Strength,% Force des boss,% ボスの強さ,% 보스 강도,%頭目強度,% силы боссов,% siły bossów,% Fuerza de los jefes,% Força dos chefes,% Boss-Stärke,% Boss Gücü,% Forza dei boss
-BE_K_TREES,树木,,,,,,,,,,,,
+BE_K_TREES,树木,Trees,Arbres,樹木,나무,樹木,Деревья,Drzewa,Árboles,Árvores,Bäume,Ağaçlar,Alberi
 BE_K_TREES_START_WAVE,每波敌袭开始时的树木,Trees at Wave Start,Arbres en début de vague,ウェーブ開始時の木,웨이브 시작 시 나무,每波敵襲開始時的樹木,Деревья в начале волны,Drzewa na początku fali,Árboles al inicio de la oleada,Árvores no início da onda,Bäume zu Wellenbeginn,Hücum Başında Ağaçlar,Alberi a inizio ondata
 BE_K_HP_START_WAVE,%敌袭开始时的生命值,% HP at Wave Start,% PV en début de vague,% ウェーブ開始時のHP,% 웨이브 시작 시 HP,%敵襲開始時的 HP,% ОЗ в начале волны,% PZ na początku fali,% PS al inicio de la oleada,% PV no início da onda,% HP zu Wellenbeginn,% Hücum Başında Sağlık,% PS a inizio ondata
 BE_K_HP_START_NEXT_WAVE,%下一波敌袭开始时的生命值,% HP at Next Wave Start,% PV au début de la vague suivante,% 次のウェーブ開始時のHP,% 다음 웨이브 시작 시 HP,%下一波敵襲開始時的 HP,% ОЗ в начале следующей волны,% PZ na początku następnej fali,% PS al inicio de la siguiente oleada,% PV no início da próxima onda,% HP zu Beginn der nächsten Welle,% Sonraki Hücum Başında Sağlık,% PS all'inizio dell'ondata successiva
@@ -218,7 +218,7 @@ BE_K_INSTANT_GOLD_ATTRACTING,立即吸取材料,Instant Material Pickup,Ramassag
 BE_K_HP_SHOP,用生命购买,Pay with HP,Payer en PV,HPで支払う,HP로 구매,用 HP 購買,Оплата здоровьем,Płatność PZ,Pagar con PS,Pagar com PV,Mit HP bezahlen,Sağlıkla Öde,Paga con i PS
 BE_K_NO_HEAL,无法恢复生命值,Cannot Heal,Aucun soin,回復不可,회복 불가,無法回復 HP,Без лечения,Brak leczenia,Sin curación,Sem cura,Keine Heilung,İyileşme Yok,Nessuna cura
 BE_K_PACIFIST,和平主义者,Pacifist,Pacifiste,平和主義,평화주의자,和平主義者,Пацифист,Pacyfista,Pacifista,Pacifista,Pazifist,Pasifist,Pacifista
-BE_K_TORTURE,折磨,Torture,Torture,拷問,고문,折磨,Пытка,Tortury,Tortura,Tortura,Folter,İşkence,Tortura
+BE_K_TORTURE,拷问,Torture,Torture,拷問器具,고문,拷問,Пытка,Tortura,Tortura,Tortura,Folter,İşkence,Tortura
 BE_K_CONSUMABLE,消耗品,Consumable,Consommable,消耗品,소모품,消耗品,Расходники,Przedmioty użytkowe,Consumible,Consumível,Verbrauchsgut,Sarf Malzemesi,Consumabile
 BE_K_ECONOMY,经济,Economy,Économie,経済,경제,經濟,Экономика,Ekonomia,Economía,Economia,Wirtschaft,Ekonomi,Economia
 BE_K_EXPLORATION,探索,Exploration,Exploration,探索,탐색,探索,Исследование,Eksploracja,Exploración,Exploração,Erkundung,Keşif,Esplorazione
@@ -227,17 +227,17 @@ BE_K_LESS_ENEMIES,更少敌人,Fewer Enemies,Moins d'ennemis,敵が少ない,적
 BE_K_LESS_ENEMY_SPEED,敌人更慢,Slower Enemies,Ennemis plus lents,敵が遅い,적 느려짐,敵人更慢,Медленные враги,Wolniejsi wrogowie,Enemigos más lentos,Inimigos mais lentos,Langsamere Gegner,Daha Yavaş Düşmanlar,Nemici più lenti
 BE_K_LOCK,锁定,Lock,Verrouillage,ロック,잠금,鎖定,Блокировка,Blokada,Bloqueo,Bloqueio,Sperren,Kilit,Blocco
 BE_K_MORE_ENEMIES,更多敌人,More Enemies,Plus d'ennemis,敵が多い,적 증가,更多敵人,Больше врагов,Więcej wrogów,Más enemigos,Mais inimigos,Mehr Gegner,Daha Fazla Düşman,Più nemici
-BE_K_PET,宠物,,,,,,,,,,,,
+BE_K_PET,宠物,Pet,Familier,ペット,펫,寵物,Питомец,Zwierzak,Mascota,Mascote,Haustier,Evcil Hayvan,Mascotte
 BE_K_PICKUP,拾取,Pickup,Ramassage,回収,줍기,拾取,Подбор,Zbieranie,Recogida,Coleta,Aufsammeln,Toplama,Raccolta
 BE_K_STAND_STILL,静止,Standing Still,Immobilité,静止,정지,靜止,На месте,Bezruch,Quieto,Parado,Stillstehen,Hareketsizlik,Fermo
-BE_K_STRUCTURE,构筑物,,,,,,,,,,,,
+BE_K_STRUCTURE,构筑物,Structure,Structure,建造物,구조,結構物,Постройка,Struktura,Estructura,Estrutura,Konstruktion,Yapı,Struttura
 BE_K_STRUCTURE_REAL,构筑物（实体）,Structure (Real),Structure (réelle),設置物（実体）,구조물 (실체),構築物（實體）,Строение (настоящее),Budowla (prawdziwa),Estructura (real),Estrutura (real),Struktur (echt),Yapı (gerçek),Struttura (reale)
 BE_TAB_BLUEPRINT,蓝图,Blueprint,Plan,設計図,설계도,藍圖,Схема,Schemat,Plano,Projeto,Bauplan,Şema,Progetto
 BE_ADD_TRIGGER,+ 扳机,+ Trigger,+ Déclencheur,+ トリガー,+ 트리거,+ 觸發,+ Триггер,+ Wyzwalacz,+ Activador,+ Gatilho,+ Auslöser,+ Tetikleyici,+ Innesco
 BE_ADD_COND,+ 条件,+ Condition,+ Condition,+ 条件,+ 조건,+ 條件,+ Условие,+ Warunek,+ Condición,+ Condição,+ Bedingung,+ Koşul,+ Condizione
 BE_ADD_EFFECT,+ 效果,+ Effect,+ Effet,+ 効果,+ 효과,+ 效果,+ Эффект,+ Efekt,+ Efecto,+ Efeito,+ Effekt,+ Efekt,+ Effetto
 BE_GRAPH_CLEAR,清空蓝图,Clear Blueprint,Vider le plan,設計図をクリア,설계도 비우기,清空藍圖,Очистить схему,Wyczyść schemat,Vaciar plano,Limpar projeto,Bauplan leeren,Şemayı Temizle,Svuota progetto
-BE_GRAPH_DESC,从扳机的右端口拖线到条件 / 效果的左端口连成路径；条件可以串联、分叉。点击节点右上角的 X 删除，Ctrl + 滚轮缩放。,"Drag from a trigger's right port to a condition / effect's left port to build a path; conditions can be chained and branched. Click the X at a node's top-right to delete it, Ctrl + mouse wheel to zoom.","Glissez du port droit d'un déclencheur vers le port gauche d'une condition / d'un effet pour tracer un chemin ; les conditions peuvent s'enchaîner et se ramifier. Cliquez sur le X d'un nœud pour le supprimer, Ctrl + molette pour zoomer.",トリガーの右端子から条件 / 効果の左端子へドラッグしてパスを作ります。条件は連結・分岐できます。ノード右上の X で削除、Ctrl + ホイールで拡大縮小。,"트리거의 오른쪽 단자에서 조건 / 효과의 왼쪽 단자로 끌어 경로를 만드세요. 조건은 이어 붙이거나 분기할 수 있습니다. 노드 오른쪽 위의 X로 삭제, Ctrl + 휠로 확대/축소.",從觸發的右端口拖線到條件 / 效果的左端口連成路徑；條件可以串聯、分岔。點擊節點右上角的 X 刪除，Ctrl + 滾輪縮放。,"Протяните связь от правого порта триггера к левому порту условия / эффекта, чтобы построить путь; условия можно соединять цепочкой и ветвить. X в правом верхнем углу узла удаляет его, Ctrl + колесо — масштаб.","Przeciągnij od prawego portu wyzwalacza do lewego portu warunku / efektu, aby utworzyć ścieżkę; warunki można łączyć w łańcuchy i rozgałęziać. X w prawym górnym rogu węzła usuwa go, Ctrl + kółko myszy przybliża.","Arrastra desde el puerto derecho de un activador hasta el puerto izquierdo de una condición / efecto para crear una ruta; las condiciones se pueden encadenar y ramificar. Haz clic en la X de un nodo para eliminarlo, Ctrl + rueda para hacer zoom.","Arraste da porta direita de um gatilho até a porta esquerda de uma condição / efeito para criar um caminho; condições podem ser encadeadas e ramificadas. Clique no X de um nó para excluí-lo, Ctrl + roda do mouse para zoom.","Ziehe vom rechten Anschluss eines Auslösers zum linken Anschluss einer Bedingung / eines Effekts, um einen Pfad zu bauen; Bedingungen lassen sich verketten und verzweigen. X oben rechts an einem Knoten löscht ihn, Strg + Mausrad zoomt.","Bir yol oluşturmak için tetikleyicinin sağ bağlantısından koşulun / efektin sol bağlantısına sürükle; koşullar zincirlenebilir ve dallanabilir. Silmek için düğümün sağ üstündeki X'e tıkla, yakınlaştırmak için Ctrl + fare tekerleği.","Trascina dalla porta destra di un innesco alla porta sinistra di una condizione / un effetto per creare un percorso; le condizioni si possono concatenare e ramificare. Clicca la X di un nodo per eliminarlo, Ctrl + rotellina per lo zoom."
+BE_GRAPH_DESC,从扳机的右端口拖线到条件 / 效果的左端口连成路径；多个条件可以串联，条件可以分叉连接多个扳机或效果。点击节点右上角的 X 删除，Ctrl + 滚轮缩放。,"Drag from a trigger's right port to a condition / effect's left port to build a path; several conditions can be chained, and a condition can branch to connect several triggers or effects. Click the X at a node's top-right to delete it, Ctrl + mouse wheel to zoom.","Glissez du port droit d'un déclencheur vers le port gauche d'une condition / d'un effet pour tracer un chemin ; plusieurs conditions peuvent s'enchaîner, et une condition peut se ramifier pour relier plusieurs déclencheurs ou effets. Cliquez sur le X d'un nœud pour le supprimer, Ctrl + molette pour zoomer.",トリガーの右端子から条件 / 効果の左端子へドラッグしてパスを作ります。複数の条件を連結でき、条件は分岐して複数のトリガーや効果につなげられます。ノード右上の X で削除、Ctrl + ホイールで拡大縮小。,"트리거의 오른쪽 단자에서 조건 / 효과의 왼쪽 단자로 끌어 경로를 만드세요. 여러 조건을 이어 붙일 수 있고, 조건은 분기해 여러 트리거나 효과에 연결할 수 있습니다. 노드 오른쪽 위의 X로 삭제, Ctrl + 휠로 확대/축소.",從觸發的右端口拖線到條件 / 效果的左端口連成路徑；多個條件可以串聯，條件可以分岔連接多個觸發或效果。點擊節點右上角的 X 刪除，Ctrl + 滾輪縮放。,"Протяните связь от правого порта триггера к левому порту условия / эффекта, чтобы построить путь; несколько условий можно соединить цепочкой, а условие может ветвиться и связывать несколько триггеров или эффектов. X в правом верхнем углу узла удаляет его, Ctrl + колесо — масштаб.","Przeciągnij od prawego portu wyzwalacza do lewego portu warunku / efektu, aby utworzyć ścieżkę; kilka warunków można połączyć w łańcuch, a warunek może się rozgałęziać i łączyć kilka wyzwalaczy lub efektów. X w prawym górnym rogu węzła usuwa go, Ctrl + kółko myszy przybliża.","Arrastra desde el puerto derecho de un activador hasta el puerto izquierdo de una condición / efecto para crear una ruta; puedes encadenar varias condiciones, y una condición puede ramificarse para conectar varios activadores o efectos. Haz clic en la X de un nodo para eliminarlo, Ctrl + rueda para hacer zoom.","Arraste da porta direita de um gatilho até a porta esquerda de uma condição / efeito para criar um caminho; várias condições podem ser encadeadas, e uma condição pode se ramificar para ligar vários gatilhos ou efeitos. Clique no X de um nó para excluí-lo, Ctrl + roda do mouse para zoom.","Ziehe vom rechten Anschluss eines Auslösers zum linken Anschluss einer Bedingung / eines Effekts, um einen Pfad zu bauen; mehrere Bedingungen lassen sich verketten, und eine Bedingung kann sich verzweigen und mehrere Auslöser oder Effekte verbinden. X oben rechts an einem Knoten löscht ihn, Strg + Mausrad zoomt.","Bir yol oluşturmak için tetikleyicinin sağ bağlantısından koşulun / efektin sol bağlantısına sürükle; birden çok koşul zincirlenebilir ve bir koşul dallanarak birden çok tetikleyiciye veya efekte bağlanabilir. Silmek için düğümün sağ üstündeki X'e tıkla, yakınlaştırmak için Ctrl + fare tekerleği.","Trascina dalla porta destra di un innesco alla porta sinistra di una condizione / un effetto per creare un percorso; più condizioni si possono concatenare e una condizione può ramificarsi per collegare più inneschi o effetti. Clicca la X di un nodo per eliminarlo, Ctrl + rotellina per lo zoom."
 BE_GRAPH_PATHS,路径预览,Path Preview,Aperçu des chemins,パスのプレビュー,경로 미리보기,路徑預覽,Предпросмотр путей,Podgląd ścieżek,Vista previa de rutas,Prévia dos caminhos,Pfadvorschau,Yol Önizlemesi,Anteprima percorsi
 BE_GRAPH_EMPTY,还没有完整的路径（扳机 → … → 效果）。,No complete path yet (trigger → … → effect).,Aucun chemin complet (déclencheur → … → effet).,完成したパス（トリガー → … → 効果）がまだありません。,아직 완성된 경로가 없습니다 (트리거 → … → 효과).,還沒有完整的路徑（觸發 → … → 效果）。,Пока нет полного пути (триггер → … → эффект).,Brak pełnej ścieżki (wyzwalacz → … → efekt).,Aún no hay rutas completas (activador → … → efecto).,Ainda não há caminhos completos (gatilho → … → efeito).,Noch kein vollständiger Pfad (Auslöser → … → Effekt).,Henüz tam bir yol yok (tetikleyici → … → efekt).,Ancora nessun percorso completo (innesco → … → effetto).
 BE_TYPE_TRIGGER,扳机,Trigger,Déclencheur,トリガー,트리거,觸發,Триггер,Wyzwalacz,Activador,Gatilho,Auslöser,Tetikleyici,Innesco
@@ -321,14 +321,14 @@ BE_START_DESC,开局箱子在第一波敌袭结束时打开。固定敌袭时长
 BE_GRP_GAIN,属性修改,Stat Modifications,Modifications de stats,ステータス修正,능력치 수정,屬性修改,Модификации характеристик,Modyfikacje statystyk,Modificaciones de estadísticas,Modificações de atributos,Wert-Modifikationen,İstatistik Değişiklikleri,Modifiche delle statistiche
 BE_GRP_CAPS,属性上限（设定值）,Stat Caps (set value),Plafonds de stats (valeur fixée),ステータス上限（設定値）,능력치 상한 (설정값),屬性上限（設定值）,Пределы характеристик (фиксированное значение),Limity statystyk (stała wartość),Límites de estadísticas (valor fijo),Limites de atributos (valor fixo),Wert-Obergrenzen (fester Wert),İstatistik Sınırları (sabit değer),Limiti delle statistiche (valore fisso)
 BE_GAIN_FMT,%{0}修改,% {0} Modifications,% Modifications de {0},% {0}の修正,% {0} 수정,%{0}修改,% модификаций: {0},% modyfikacji: {0},% Modificaciones de {0},% Modificações de {0},% {0}-Modifikationen,% {0} Değişiklikleri,% Modifiche di {0}
-BE_K_STAT_CURSE,诅咒,,,,,,,,,,,,
-BE_K_CHANCE_DOUBLE_GOLD,%几率获得双倍材料,,,,,,,,,,,,
-BE_K_ITEM_BOX_GOLD,箱子里的材料,,,,,,,,,,,,
+BE_K_STAT_CURSE,诅咒,Curse,Malédiction,呪い,저주,詛咒,Проклятие,Klątwa,Maldición,Maldição,Fluch,Lanet,Maledizione
+BE_K_CHANCE_DOUBLE_GOLD,%几率获得双倍材料,% Double Material Chance,% Chance de matériaux doubles,拾得マテリアル倍化確率(%),% 재료 두배 확률,%雙倍素材機率,% шанса удвоения материалов,% szans na podwójne materiały,% de prob. de materiales x2,% de chance de dobrar materiais,% auf doppelte Materialien,% İki Katı Malzeme Düşme Olasılığı,% di prob. raddoppio materiali
+BE_K_ITEM_BOX_GOLD,箱子里的材料,Materials in crates,Matériaux dans les caisses,宝箱からのマテリアル獲得量,상자 안의 재료,木箱裡的素材,Материалы в ящиках,Materiały w skrzyniach,Materiales en cajas,Materiais em caixas,Materialien in Kisten,Sandıktaki malzeme sayısı,Materiali nelle casse
 BE_K_HEAL_WHEN_PICKUP_GOLD,%拾取材料时恢复生命值几率,% Chance to Heal on Material Pickup,% Chance de soin en ramassant un matériau,% マテリアル回収時の回復確率,% 재료 획득 시 회복 확률,%拾取材料時回復 HP 機率,% шанс лечения при подборе материалов,% szansy na leczenie przy zbieraniu materiałów,% Prob. de curar al recoger material,% Chance de cura ao pegar material,% Heilchance beim Materialaufheben,% Malzeme Toplarken İyileşme Şansı,% Probabilità di cura raccogliendo materiali
 BE_K_BURNING_COOLDOWN_INCREASE,%燃烧速度降低,% Burning Speed Reduction,% Réduction de la vitesse de brûlure,% 燃焼速度の低下,% 화상 속도 감소,%燃燒速度降低,% замедления горения,% spowolnienia podpalenia,% Reducción de velocidad de quemadura,% Redução da velocidade de queimadura,% Verringerte Brenngeschwindigkeit,% Yanma Hızı Azalması,% Riduzione velocità di bruciatura
 BE_K_HIT_PROTECTION,免疫伤害次数,Hit Protection,Protection contre les coups,被弾無効,피격 보호,免疫傷害次數,Защита от ударов,Ochrona przed ciosami,Protección contra golpes,Proteção contra golpes,Trefferschutz,Vuruş Koruması,Protezione dai colpi
 BE_K_LOSE_HP_PER_SECOND,每秒失去生命值,HP Lost per Second,PV perdus par seconde,毎秒のHP減少,초당 HP 감소,每秒失去 HP,Потеря ОЗ в секунду,Utrata PZ na sekundę,PS perdidos por segundo,PV perdidos por segundo,HP-Verlust pro Sekunde,Saniyede Kaybedilen Sağlık,PS persi al secondo
-BE_K_NEXT_LEVEL_XP_NEEDED,%升级所需经验,% XP Needed per Level,% XP nécessaire par niveau,% レベルアップに必要な経験値,% 레벨 업 필요 XP,%升級所需經驗,% опыта для уровня,% PD potrzebnych na poziom,% XP necesaria por nivel,% EXP necessária por nível,% Benötigte XP pro Stufe,% Seviye Başına Gereken TP,% PE necessari per livello
+BE_K_NEXT_LEVEL_XP_NEEDED,%升级需要经验值,% XP Needed per Level,% XP nécessaire par niveau,% レベルアップに必要な経験値,% 레벨 업 필요 XP,%升級需要經驗值,% опыта для уровня,% PD potrzebnych na poziom,% XP necesaria por nivel,% EXP necessária por nível,% Benötigte XP pro Stufe,% Seviye Başına Gereken TP,% PE necessari per livello
 BE_K_GAIN_PCT_GOLD_START_WAVE,%每波敌袭开始时获得材料,% Materials Gained at Wave Start,% Matériaux gagnés en début de vague,% ウェーブ開始時のマテリアル獲得,% 웨이브 시작 시 재료 획득,%每波敵襲開始時獲得材料,% материалов в начале волны,% materiałów na początku fali,% Materiales al inicio de la oleada,% Materiais no início da onda,% Material zu Wellenbeginn,% Hücum Başında Malzeme,% Materiali a inizio ondata
 BE_K_INCREASE_MATERIAL_VALUE,%材料价值,% Material Value,% Valeur des matériaux,% マテリアルの価値,% 재료 가치,%材料價值,% ценности материалов,% wartości materiałów,% Valor de los materiales,% Valor dos materiais,% Materialwert,% Malzeme Değeri,% Valore dei materiali
 BE_K_MINIMUM_WEAPONS_IN_SHOP,商店最少武器数,Min Weapons in Shop,Armes min en boutique,ショップの最低武器数,상점 최소 무기 수,商店最少武器數,Мин. оружия в магазине,Min. broni w sklepie,Armas mínimas en la tienda,Mín. de armas na loja,Min. Waffen im Shop,Mağazada Min. Silah,Armi minime nel negozio
@@ -423,3 +423,8 @@ BE_CX_STAT_MIN,（{stat}不低于{n}时）, (while {stat} is at least {n}), (si 
 BE_CX_STAT_MAX,（{stat}不高于{n}时）, (while {stat} is at most {n}), (si {stat} est d'au plus {n}),（{stat}が{n}以下のとき）, ({stat} {n} 이하일 때),（{stat}不高於{n}時）, (пока {stat} не выше {n}), (gdy {stat} wynosi co najwyżej {n}), (si {stat} es como máximo {n}), (se {stat} for no máximo {n}), (solange {stat} höchstens {n} ist), ({stat} en fazla {n} iken), (se {stat} è al massimo {n})
 BE_CX_IF_MOVING,（移动时）, (while moving), (en mouvement),（移動中）, (이동 중),（移動時）, (в движении), (w ruchu), (en movimiento), (em movimento), (in Bewegung), (hareket ederken), (in movimento)
 BE_CX_IF_STILL,（站立不动时）, (while standing still), (en restant immobile),（静止中）, (정지 중),（站立不動時）, (стоя на месте), (stojąc w miejscu), (quieto), (parado), (beim Stillstehen), (hareketsizken), (stando fermo)
+BE_SRC_GROUP_STATS,初始属性,Starting Stats,Stats de départ,初期ステータス,시작 능력치,初始屬性,Начальные характеристики,Statystyki startowe,Estadísticas iniciales,Atributos iniciais,Startwerte,Başlangıç İstatistikleri,Statistiche iniziali
+BE_SRC_GROUP_START,初始装备,Starting Gear,Équipement de départ,初期装備,시작 장비,初始裝備,Начальное снаряжение,Wyposażenie startowe,Equipo inicial,Equipamento inicial,Startausrüstung,Başlangıç Ekipmanı,Equipaggiamento iniziale
+BE_SRC_GROUP_GRAPH,蓝图,Blueprint,Plan,設計図,설계도,藍圖,Схема,Schemat,Plano,Projeto,Bauplan,Şema,Progetto
+BE_YES,是,Yes,Oui,はい,예,是,Да,Tak,Sí,Sim,Ja,Evet,Sì
+BE_NO,否,No,Non,いいえ,아니요,否,Нет,Nie,No,Não,Nein,Hayır,No
