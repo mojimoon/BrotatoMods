@@ -456,9 +456,9 @@ static func _list_json(path: String) -> Array:
 	return out
 
 
-# custom/ 下的全部文件（相对路径）；根目录的是 0.8.0 的旧位置，下次保存时移入子文件夹
+# custom/ 下的全部文件（相对路径：<种类>/<id>.json）
 static func custom_files() -> Array:
-	var out = _list_json(CUSTOM_DIR)
+	var out = []
 	for kind in KINDS:
 		for name in _list_json(CUSTOM_DIR + kind):
 			out.push_back(kind + "/" + name)
@@ -1023,7 +1023,10 @@ func apply_all() -> void:
 		if p.name != "":
 			c.name = p.name
 		if p.weapons is Array:
-			c.starting_weapons = _weapons_by_ids(p.weapons)
+			# 档案里的武器全都不存在（来自已停用的 mod）时保留原版初始武器
+			var ws = _weapons_by_ids(p.weapons)
+			if not ws.empty() or p.weapons.empty():
+				c.starting_weapons = ws
 		if p.wanted_tags is Array:
 			c.wanted_tags = p.wanted_tags.duplicate()
 
@@ -1300,9 +1303,20 @@ func _register_customs() -> void:
 		_register_custom(id)
 
 
+# 基底不存在（来自已停用的 mod）：自定义对象不注册、不显示，档案保留，重新启用该 mod 后恢复
+func base_missing(kind: String, id: String) -> bool:
+	var p = profiles_of(kind).get(id)
+	if p == null or p.base == "":
+		return false
+	var bp = profiles_of(kind).get(p.base)
+	if bp != null and bp.custom:
+		return p.base != id and base_missing(kind, p.base)
+	return find_target(kind, p.base) == null
+
+
 func _register_custom(id: String) -> void:
 	var isvc = _isvc()
-	if isvc == null:
+	if isvc == null or base_missing("character", id):
 		return
 	var c = _customs.get(id)
 	if c == null:
@@ -1395,6 +1409,8 @@ func _register_custom_items() -> void:
 func _register_custom_item(id: String) -> void:
 	var isvc = _isvc()
 	var p = item_profiles[id]
+	if base_missing("item", id):
+		return
 	var it = _custom_items.get(id)
 	if it == null:
 		it = load("res://items/global/item_data.gd").new()

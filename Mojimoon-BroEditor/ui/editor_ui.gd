@@ -1855,9 +1855,10 @@ func _fill_effect_list() -> void:
 	for i in specs.size():
 		if _is_marker(specs[i]):
 			_effect_list.add_child(_group_row(i, specs[i]))
-		else:
+		elif _mod.make_effect(specs[i]) != null:
 			_effect_list.add_child(_effect_row(i, specs[i]))
-	if specs.empty():
+		# 模板不存在（来自已停用的 mod）的效果不显示，档案里保留
+	if _effect_list.get_child_count() == 0:
 		_effect_list.add_child(_desc(tr("BE_EFFECTS_EMPTY")))
 
 

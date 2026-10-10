@@ -4,7 +4,7 @@ extends SceneTree
 # 等 autoload 和 ModLoader 就绪后再加载测试组（BE_SUITE：core / ui / battle / compat，逗号分隔）。
 
 const DIR = "res://mods/tests/BroEditor/"
-const ALL = ["core", "ui", "battle", "compat"]
+const ALL = ["core", "ui", "battle", "compat", "compat_off"]
 
 
 func _initialize() -> void:

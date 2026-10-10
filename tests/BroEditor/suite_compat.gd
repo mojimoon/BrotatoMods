@@ -141,6 +141,68 @@ func test_12_brolab_character_in_editor() -> void:
 	m.profiles.erase(c.my_id)
 
 
+# ============================================================
+# 停用 mod：这里保存对 mod 内容的修改与基于 mod 内容新建的对象，suite_compat_off 在卸下 mod 后检查
+# （BroLab 只能加角色 / 道具；mod 武器家族按 mod 的做法直接加入 ItemService）
+# ============================================================
+const MOD_ITEM_ID = "item_brolab_compat"
+const MOD_WEAPON_ID = "weapon_modcompat"
+
+
+func test_90_save_mod_content() -> void:
+	var c = _brolab_character()
+	var it = _plain_item().duplicate()
+	it.my_id = MOD_ITEM_ID
+	it._generate_hashes()
+	_brolab().BrolabManager.add_items([it], "item", false, true)
+	var fam = _family_from(0, 0)
+	var prev = null
+	for w0 in fam:
+		var w = w0.duplicate()
+		w.weapon_id = MOD_WEAPON_ID
+		w.my_id = MOD_WEAPON_ID + "_" + str(w.tier + 1)
+		w._generate_hashes()
+		if prev != null:
+			prev.upgrades_into = w
+			w.previous_upgrade = prev
+		prev = w
+		isvc.weapons.push_back(w)
+	isvc._item_id_lookup = {}
+	isvc._weapon_id_lookup = {}
+	var mw = MOD_WEAPON_ID + "_1"
+	# 修改 mod 内容
+	var p = m.new_profile()
+	p.stats = {"stat_armor": 3}
+	m.profiles[c.my_id] = p
+	var ip = m.new_profile()
+	ip.price = 77
+	m.item_profiles[MOD_ITEM_ID] = ip
+	var wp = m.new_profile()
+	wp.wstats = {"damage": 66}
+	m.weapon_profiles[mw] = wp
+	m.set_disabled("item", MOD_ITEM_ID, true)
+	# 原版角色引用 mod 内容：BroLab 效果、mod 武器作初始武器、禁用 mod 道具
+	var rs = _entry_with_key("brolab_effect_receive_stat_at_wave")
+	var vp = m.new_profile()
+	vp.effects = m.effect_specs(CH, vp).duplicate()
+	vp.effects.push_back({"from": rs.from, "i": rs.i})
+	vp.weapons = [mw]
+	vp.start_items = [{"id": MOD_ITEM_ID}]
+	vp.ban_items = [MOD_ITEM_ID]
+	m.profiles[CH] = vp
+	# 基于 mod 内容新建
+	var cid = m.create_custom(c.my_id, "frommod")
+	var iid = m.create_custom_item(MOD_ITEM_ID, "frommod")
+	var wt = m.create_custom_weapon(MOD_WEAPON_ID, "frommod")
+	m.apply_all()
+	_check(cid != "" and iid != "" and wt != "", "created from mod content")
+	_check(m.find_character(cid) != null and m.find_target("item", iid) != null and m.find_target("weapon", wt) != null, "listed while the mod is loaded")
+	_eq(m.find_target("item", MOD_ITEM_ID).value, 77, "mod item edited")
+	_check(m.find_character(CH).starting_weapons[0].my_id == mw, "vanilla character starts with the mod weapon")
+	m.save_profiles()
+	_eq(m.custom_files().size(), 3, "custom files saved")
+
+
 func _tree_has_rich(n: Node) -> bool:
 	if n == null:
 		return false

@@ -2,6 +2,7 @@
 # BroEditor 无头测试
 # 用法（Git Bash）：bash mods/tests/BroEditor/run_tests.sh [core|ui|battle|compat|all|core,ui]
 #   默认 = core,ui,battle；compat = 与 QianMo-BroLab、cave-modtools 同时加载的兼容性测试；all = 全部
+#   compat 之后自动再运行 compat_off：卸下这两个 mod、沿用同一个 user://，检查停用 mod 后的表现
 #   BE_ONLY=<名字片段> 只跑名字含该片段的测试；BE_KEEP_LOG=<路径> 保留完整日志
 #
 # - 在反编译的游戏工程（本仓库的上一级目录）里运行，使用真实的 ItemService / RunData / ModLoader
@@ -38,14 +39,14 @@ cleanup_compat() {
 	for m in $COMPAT_MODS; do rm -rf "$PROJECT/mods-unpacked/$m"; done
 }
 
-# 运行一次 Godot；$1 = 组列表，$2 = 日志
+# 运行一次 Godot；$1 = 组列表，$2 = 日志，$3 = 沿用的 user 目录（可选，不删除）
 run_godot() {
-	local sandbox
-	sandbox=$(mktemp -d)
+	local sandbox=${3:-}
+	[ -z "$sandbox" ] && sandbox=$(mktemp -d)
 	(cd "$PROJECT" && APPDATA=$(cygpath -w "$sandbox") BE_TEST=1 BE_SUITE="$1" timeout 900 "$GODOT" --no-window --audio-driver Dummy --path . \
 		-s "res://mods/tests/BroEditor/run_be.gd" > "$2" 2>&1)
 	local st=$?
-	rm -rf "$sandbox"
+	[ -z "${3:-}" ] && rm -rf "$sandbox"
 	return $st
 }
 
@@ -110,8 +111,13 @@ if [ "$HAS_COMPAT" -gt 0 ]; then
 		cp -r "$PROJECT/other_mods/mods-unpacked/$m" "$PROJECT/mods-unpacked/$m"
 	done
 	[ -n "$NORMAL" ] && echo
-	run_godot compat "$LOGDIR/compat.log"
+	SHARED=$(mktemp -d)
+	run_godot compat "$LOGDIR/compat.log" "$SHARED"
 	report "$LOGDIR/compat.log" $? || STATUS=1
 	cleanup_compat
+	echo
+	run_godot compat_off "$LOGDIR/compat_off.log" "$SHARED"
+	report "$LOGDIR/compat_off.log" $? || STATUS=1
+	rm -rf "$SHARED"
 fi
 exit $STATUS

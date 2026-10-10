@@ -208,6 +208,15 @@ func _tree_has_text(n: Node, t: String) -> bool:
 	return false
 
 
+func _read(path: String) -> String:
+	var f = File.new()
+	if f.open(path, File.READ) != OK:
+		return ""
+	var t = f.get_as_text()
+	f.close()
+	return t
+
+
 func _plain_item():
 	for it in isvc.items:
 		if it.tier == 0 and it.max_nb == -1 and not it.effects.empty():
