@@ -4,11 +4,10 @@
 
 [English](#english) | [中文](#中文)
 
-![](../img/aa-icon.png)
-
-> modid: Mojimoon-AutoAnthony
-
+> modid: Mojimoon-AutoAnthony  
 > Design Docs / 设计文档：[DESIGN.md](DESIGN.md)
+
+![](../img/AutoAnthony/aa-icon.png)
 
 ## English
 
@@ -134,11 +133,11 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 <summary>Screenshot</summary>
 
-![](../img/aa-en-1.jpg)
+![](../img/AutoAnthony/aa-en-2.jpg)
 
-![](../img/aa-en-2.jpg)
+![](../img/AutoAnthony/aa-en-3.jpg)
 
-![](../img/aa-en-3.jpg)
+![](../img/AutoAnthony/aa-en-4.jpg)
 
 </details>
 
@@ -266,13 +265,13 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 
 <summary>截图</summary>
 
-![](../img/aa-0.png)
+![](../img/AutoAnthony/aa-zh-1.png)
 
-![](../img/aa-zh-1.jpg)
+![](../img/AutoAnthony/aa-zh-2.jpg)
 
-![](../img/aa-zh-2.jpg)
+![](../img/AutoAnthony/aa-zh-3.jpg)
 
-![](../img/aa-zh-3.jpg)
+![](../img/AutoAnthony/aa-zh-4.jpg)
 
 </details>
 

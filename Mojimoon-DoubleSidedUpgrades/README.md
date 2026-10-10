@@ -4,9 +4,9 @@
 
 [English](#english) | [中文](#中文)
 
-![](../img/dsu-icon-v2.png)
-
 > modid: Mojimoon-DoubleSidedUpgrades
+
+![](../img/DoubleSidedUpgrades/dsu-icon.png)
 
 ## English
 
@@ -137,12 +137,12 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 
 <summary>Screenshots / 截图</summary>
 
-![](../img/dsu-mod-1.png)
+![](../img/DoubleSidedUpgrades/dsu-en-1.png)
 
-![](../img/dsu-mod-2.png)
+![](../img/DoubleSidedUpgrades/dsu-en-2.png)
 
-![](../img/dsu-mod-3.png)
+![](../img/DoubleSidedUpgrades/dsu-en-3.png)
 
-![](../img/dsu-mod-4.png)
+![](../img/DoubleSidedUpgrades/dsu-en-4.png)
 
 </details>

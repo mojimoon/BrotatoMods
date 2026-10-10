@@ -4,9 +4,9 @@
 
 [English](#english) | [中文](#中文)
 
-![](../img/oitrta-v2-icon.png)
-
 > modid: Mojimoon-OneItemToRuleThemAllv2
+
+![](../img/OneItemToRuleThemAllv2/oitrta-v2-icon.png)
 
 ## English
 
@@ -163,9 +163,11 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 <summary>Screenshots</summary>
 
-![](../img/oitrta-v2-1.jpg)
+![](../img/OneItemToRuleThemAllv2/oitrta-v2-en-1.jpg)
 
-![](../img/oitrta-v2-3.jpg)
+![](../img/OneItemToRuleThemAllv2/oitrta-v2-en-2.jpg)
+
+![](../img/OneItemToRuleThemAllv2/oitrta-v2-en-3.jpg)
 
 </details>
 
@@ -327,9 +329,11 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 
 <summary>截图</summary>
 
-![](../img/oitrta-v2-2.jpg)
+![](../img/OneItemToRuleThemAllv2/oitrta-v2-zh-1.jpg)
 
-![](../img/oitrta-v2-4.jpg)
+![](../img/OneItemToRuleThemAllv2/oitrta-v2-zh-2.jpg)
+
+![](../img/OneItemToRuleThemAllv2/oitrta-v2-zh-3.jpg)
 
 </details>
 
