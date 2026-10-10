@@ -110,10 +110,10 @@ const WSTAT_LAYOUT = [
 	["nb_projectiles", "projectile_spread"], ["piercing", "piercing_dmg_reduction"],
 	["bounce", "bounce_dmg_reduction"], ["projectile_speed"],
 ]
-# 界面显示方式：pct = 内部 0–1 显示为百分比；neg = 取负（命中减速：原版用负数表示减速）
+# 界面显示方式：pct = 内部 0–1 显示为百分比
 const WSTAT_SHOW = {
 	"crit_chance": "pct", "accuracy": "pct", "lifesteal": "pct", "effect_scale": "pct",
-	"piercing_dmg_reduction": "pct", "bounce_dmg_reduction": "pct", "speed_percent_modifier": "neg",
+	"piercing_dmg_reduction": "pct", "bounce_dmg_reduction": "pct",
 }
 var _delete_btn: Button
 var _tab_buttons: Dictionary = {}
@@ -1274,7 +1274,7 @@ func _on_id_entered(text: String) -> void:
 	var tier = _character().tier if _kind == "weapon" else 0
 	var nid = _mod.rename_custom(_kind, _obj_key(), text)
 	if nid == "":
-		_set_status(tr("BE_ID_TAKEN"))
+		_set_status(tr("BE_CUSTOM_IN_USE" if _kind == "character" and _mod.is_in_saved_run(_obj_key()) else "BE_ID_TAKEN"))
 		return
 	_id = BEMain.tier_id(nid, tier, true) if _kind == "weapon" else nid
 	_refresh_char_list()
@@ -2853,6 +2853,8 @@ func _on_delete_custom() -> void:
 		_refresh_char_list()
 		_select(_first_listed())
 	else:
+		if _kind == "character":
+			_set_status(tr("BE_CUSTOM_IN_USE"))
 		_refresh_header()
 
 

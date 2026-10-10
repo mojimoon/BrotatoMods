@@ -1134,9 +1134,9 @@ func create_custom(base_id: String, suffix: String = "") -> String:
 	return id
 
 
-# 删除自定义角色（进行中的一局：角色数据随存档保存，读档时找不到的对象由原版跳过）
+# 删除自定义角色；存档中进行中的一局正在使用该角色时拒绝（读档时找不到角色，那一局无法继续）
 func delete_custom(id: String) -> bool:
-	if not is_custom(id):
+	if not is_custom(id) or is_in_saved_run(id):
 		return false
 	profiles.erase(id)
 	var c = _customs.get(id)
@@ -1145,6 +1145,25 @@ func delete_custom(id: String) -> bool:
 	if c != null and isvc != null:
 		isvc.characters.erase(c)
 	return true
+
+
+# 只看存档里各玩家的当前角色（不序列化整个存档：其中有循环引用）
+func is_in_saved_run(id: String) -> bool:
+	var pd = _autoload("ProgressData")
+	if pd == null or not pd.saved_run_state is Dictionary or not pd.saved_run_state.get("has_run_state", false):
+		return false
+	var players = pd.saved_run_state.get("players_data", [])
+	if not players is Array:
+		return false
+	for pl in players:
+		var ch = pl.get("current_character") if pl is Dictionary else (pl.current_character if pl is Object and "current_character" in pl else null)
+		if ch is Object and "my_id" in ch and ch.my_id == id:
+			return true
+		if ch is Dictionary and str(ch.get("my_id", "")) == id:
+			return true
+		if ch is String and ch == id:
+			return true
+	return false
 
 
 func _register_customs() -> void:
@@ -1353,7 +1372,7 @@ func rename_custom(kind: String, old_id: String, suffix: String) -> String:
 		return ""
 	match kind:
 		"character":
-			if not (profiles.has(old_id) and profiles[old_id].custom):
+			if not (profiles.has(old_id) and profiles[old_id].custom) or is_in_saved_run(old_id):
 				return ""
 			_move_key(profiles, old_id, new_id)
 			_rename_res(_customs, old_id, new_id)
