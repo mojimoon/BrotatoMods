@@ -1332,13 +1332,16 @@ func test_105_next_wave_xp_spread() -> void:
 
 
 # ============================================================
-# 本局玩家角色的初始道具不重组（驯兽师：战利品虫 + 开局可选的四只宠物）；鱼钩锚定；蝾螈效果不参与组合
+# 本局玩家角色的初始道具不重组（驯兽师：所有宠物）；鱼钩锚定；蝾螈效果不参与组合
 # ============================================================
 func test_106_starting_items_stay_native() -> void:
 	var bm = isvc.get_element_safe(isvc.characters, "character_beast_master")
-	var ids = m.starting_item_ids([bm])
+	var ids = m.starting_item_ids([bm], isvc.items)
 	_check("item_lootworm" in ids, "beast master: lootworm is a starting item")
-	_eq(ids.size(), 1 + bm.starting_items.size(), "beast master: lootworm + selectable pets")
+	for it in isvc.items:
+		if "pet" in it.tags:
+			_check(it.my_id in ids, "beast master: pet %s kept native" % it.my_id)
+	_eq(m.starting_item_ids([bm]).size(), 1 + bm.starting_items.size(), "beast master without item list: lootworm + selectable pets")
 	_setup_player("character_beast_master")
 	m.start_new_run()
 	for id in ids:

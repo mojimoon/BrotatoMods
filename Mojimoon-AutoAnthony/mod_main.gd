@@ -491,11 +491,11 @@ func _activate(state: Dictionary) -> void:
 			if native != null and not native in chars:
 				chars.push_back(native)
 	var gen = Generator.new(state.cfg, int(state.seed))
-	# 本局玩家角色的初始道具（角色效果里的初始 / 诅咒初始道具，以及开局可选的道具，例如驯兽师的四只宠物）
+	# 本局玩家角色的初始道具（角色效果里的初始 / 诅咒初始道具，开局可选的道具，以及驯兽师的所有宠物）
 	# 本局不重组：初始道具与商店里的同 ID 道具一致，背包合并显示、存档（原版按 ID 缓存序列化）、独特限制都保持正确
 	#（"重组初始道具"选项开启时照常重组：开局已持有的初始道具由 _materialize_owned 换成生成版本，同 ID 仍一致）
 	if not bool(state.cfg.get("starting_items", false)):
-		gen.run_excluded_ids = starting_item_ids(chars)
+		gen.run_excluded_ids = starting_item_ids(chars, native_only(isvc.items))
 	# 本局所有玩家角色的偏好词条：重组后 T1–T3 每个稀有度都保证有带这些词条的道具
 	for ch in chars:
 		for t in ch.wanted_tags:
@@ -799,9 +799,15 @@ func _materialize_owned(owned: Array) -> void:
 	triggers_dirty = true
 
 
-static func starting_item_ids(chars: Array) -> Array:
+# 驯兽师（角色效果 beast_master_effect）：所有宠物道具都不重组
+static func starting_item_ids(chars: Array, items: Array = []) -> Array:
 	var ids = []
 	for ch in chars:
+		for e in ch.effects:
+			if e.key == "beast_master_effect":
+				for it in items:
+					if "pet" in it.tags and not it.my_id in ids:
+						ids.push_back(it.my_id)
 		for e in ch.effects:
 			if e.custom_key in ["starting_item", "cursed_starting_item"] and not e.key in ids:
 				ids.push_back(e.key)
