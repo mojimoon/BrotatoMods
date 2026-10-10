@@ -759,7 +759,11 @@ func stat_text_key(key: String) -> String:
 
 # 属性显示名：原版 STAT_X；属性获取修改（gain_stat_x / gain_x）= "<属性> 获取 %"；其余用本 mod 的 BE_K_X
 # 原版标签含义不清（NUMBER_OF_ENEMIES = "敌人"）的 key：用本 mod 的标签
-const OWN_LABEL_KEYS = ["number_of_enemies"]
+# item_box_gold：原版标签"箱子里的材料"不如袋子的说法清楚，用本 mod 的标签
+const OWN_LABEL_KEYS = ["number_of_enemies", "item_box_gold"]
+# 原版效果文本不含数值（"同时仅能装备1种武器"）的 key：不借用该文本
+const NO_LIBRARY_TEXT = ["weapon_slot"]
+const TEXT_FORMAT_LIKE = {"effect_bounce_damage": "effect_piercing_damage"}
 
 
 func stat_name(key: String) -> String:
@@ -776,11 +780,24 @@ func stat_name(key: String) -> String:
 	return t if t != k else key
 
 
-# 原版没有描述文本的属性 key：注册 "+X 名称" 文本（原版 Text 按 key 决定是否加 +/- 号）
+# 属性页数值的效果文本：原版效果用过的 text_key > 原版 EFFECT_<KEY> > 原版 <KEY>（"+X 名称"）；
+# 都没有时注册本 mod 的 BE_FX_<KEY>（有翻译行用翻译行，否则 "+X 名称"）
 func _plain_text_key(key: String) -> String:
-	var tk = stat_text_key(key)
-	if tk != "" or tr(key.to_upper()) != key.to_upper():
+	var tk = "" if key in NO_LIBRARY_TEXT else stat_text_key(key)
+	if tk != "":
 		return tk
+	if tr("EFFECT_" + key.to_upper()) != "EFFECT_" + key.to_upper():
+		tk = "effect_" + key
+		# 原版没有用过、因而没登记 +/- 号与 % 的文本：照同类文本登记（反弹伤害同贯通伤害）
+		var like = TEXT_FORMAT_LIKE.get(tk, "")
+		var text = _autoload("Text")
+		if like != "" and text != null:
+			for table in [text.keys_needing_operator, text.keys_needing_percent]:
+				if table.has(like) and not table.has(tk):
+					table[tk] = table[like]
+		return tk
+	if tr(key.to_upper()) != key.to_upper():
+		return ""
 	tk = "BE_FX_" + key.to_upper()
 	if tr(tk) == tk:
 		if _desc_translation == null:
@@ -794,7 +811,20 @@ func _plain_text_key(key: String) -> String:
 	return tk
 
 
+const STAT_GAINS_SCRIPT = "res://effects/items/stat_gains_modification_effect.gd"
+
+
 func stat_effect(key: String, value: int):
+	# 属性获取修改：用原版的效果（"{0}的修改增加 / 减少{1}"），效果与 gain_<属性> += value 相同
+	if key.begins_with("gain_") and key != "gain_pct_gold_start_wave" and ResourceLoader.exists(STAT_GAINS_SCRIPT):
+		var g = load(STAT_GAINS_SCRIPT).new()
+		g.key = "effect_increase_stat_gains" if value >= 0 else "effect_reduce_stat_gains"
+		g.value = value
+		g.effect_sign = 3	# FROM_VALUE
+		g.stat_displayed = key.substr(5)
+		g.stats_modified = [key.substr(5)]
+		g._generate_hashes()
+		return g
 	var sets = {"key": key, "value": value, "text_key": _plain_text_key(key)}
 	if key in CAP_KEYS or key in SET_KEYS:
 		sets.storage_method = 2

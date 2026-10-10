@@ -340,11 +340,32 @@ func test_80_start_state() -> void:
 
 
 func test_81_gain_and_cap_stats() -> void:
-	var e = m.stat_effect("gain_stat_max_hp", 20)
-	var t = e.get_text(0, false)
-	_check(t.find("GAIN_STAT") < 0 and t.find("20") >= 0, "gain stat text: " + t)
-	_check(t.find("+20") >= 0, "signed: " + t)
 	_eq(m.stat_effect("hp_cap", 30).storage_method, 2, "cap replaces")
+	TranslationServer.set_locale("zh")
+	# 属性页的效果文本全部用原版字符串
+	var cases = [
+		["gain_stat_hp_regeneration", -100, "生命再生的修改减少100%"],
+		["gain_stat_max_hp", 20, "最大生命值的修改增加20%"],
+		["dodge_cap", 90, "闪避上限为90%"],
+		["hp_cap", 50, "最大生命值上限为50"],
+		["speed_cap", 30, "速度上限为30%"],
+		["item_box_gold", 5, "拾取箱子时+5材料"],
+		["bounce_damage", 20, "+20%反弹伤害，不会高于基础伤害"],
+		["neutral_gold_drops", 10, "+10%树木掉落的材料"],
+		["stat_armor", 3, "+3 护甲"],
+	]
+	for c in cases:
+		_eq(m.effect_text(m.stat_effect(c[0], c[1]), false), c[2], c[0])
+	_eq(m.stat_name("item_box_gold"), "拾取箱子时获得材料", "item box gold label")
+	# 属性获取修改与原版的效果相同：gain_<属性> += value
+	var e = m.stat_effect("gain_stat_max_hp", -30)
+	_setup_player(CH)
+	var h = Keys.generate_hash("gain_stat_max_hp")
+	var before = rd.get_player_effect(h, 0)
+	e.apply(0)
+	_eq(rd.get_player_effect(h, 0), before - 30, "gain modification applied")
+	e.unapply(0)
+	TranslationServer.set_locale("en")
 
 
 func test_100_icons() -> void:
