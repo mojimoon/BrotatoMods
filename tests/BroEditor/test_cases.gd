@@ -1,0 +1,449 @@
+extends Reference
+
+# BroEditor 的无头测试：在反编译的游戏工程里运行，使用真实的 ItemService / RunData / ModLoader。
+# 由 run_be.gd 在 autoload 就绪后加载；不要直接运行，使用同目录的 run_tests.sh（会同步 mod、隔离 user:// 目录）。
+
+const MOD_ID = "Mojimoon-BroEditor"
+const MOD_DIR = "res://mods-unpacked/" + MOD_ID + "/"
+const WAVE = 8
+
+var m
+var isvc
+var rd
+var tree: SceneTree
+var _current_test = ""
+var _failures: Array = []
+var _checks = 0
+# 测试用角色（第一个原版角色）
+var CH: String
+
+
+func run(p_tree: SceneTree):
+	tree = p_tree
+	if OS.get_environment("BE_TEST") != "1":
+		printerr("Refusing to run: use run_tests.sh (it isolates user:// from your real saves).")
+		return 2
+	m = tree.root.get_node_or_null("ModLoader/" + MOD_ID)
+	isvc = tree.root.get_node("ItemService")
+	rd = tree.root.get_node("RunData")
+	if m == null:
+		printerr("Mod node not found: is the mod in res://mods-unpacked?")
+		return 2
+	_unlock_everything()
+	CH = isvc.characters[0].my_id
+	print("user dir: ", OS.get_user_data_dir())
+	var tests: Array = []
+	for method in get_method_list():
+		if method.name.begins_with("test_"):
+			tests.push_back(method.name)
+	tests.sort()
+	for t in tests:
+		_current_test = t
+		_reset()
+		var state = call(t)
+		if state is GDScriptFunctionState:
+			yield(state, "completed")
+		print("  ran ", t)
+	print("")
+	print("%d checks, %d failures" % [_checks, _failures.size()])
+	for f in _failures:
+		printerr("FAIL ", f)
+	if _failures.empty():
+		print("ALL TESTS PASSED")
+	return 0 if _failures.empty() else 1
+
+
+func _check(cond: bool, msg: String) -> void:
+	_checks += 1
+	if not cond:
+		_failures.push_back(_current_test + ": " + msg)
+
+
+# Godot 3 的字典 == 比较引用：字典按 JSON 比较
+func _eq(actual, expected, msg: String) -> void:
+	if actual is Dictionary or expected is Dictionary:
+		_check(JSON.print(actual) == JSON.print(expected), "%s (expected %s, got %s)" % [msg, str(expected), str(actual)])
+		return
+	_check(actual == expected, "%s (expected %s, got %s)" % [msg, str(expected), str(actual)])
+
+
+func _reset() -> void:
+	for id in m.custom_ids():
+		m.delete_custom(id)
+	m.profiles = {}
+	m.apply_all()
+	_setup_player(CH if CH != "" else isvc.characters[0].my_id)
+	rd.current_wave = WAVE
+
+
+func _setup_player(id: String) -> void:
+	rd.set_player_count(1, true)
+	rd.enabled_dlcs = []
+	var c = m.find_character(id)
+	rd.players_data[0].current_character = c
+	rd.players_data[0].items = [c]
+
+
+func _unlock_everything() -> void:
+	var pd = tree.root.get_node("ProgressData")
+	pd.items_unlocked = []
+	for it in isvc.items:
+		pd.items_unlocked.push_back(it.my_id_hash)
+	pd.weapons_unlocked = []
+	for w in isvc.weapons:
+		if not pd.weapons_unlocked.has(w.weapon_id_hash):
+			pd.weapons_unlocked.push_back(w.weapon_id_hash)
+	isvc.init_unlocked_pool()
+
+
+func _find_effect(effects: Array, key: String, custom_key: String = ""):
+	for e in effects:
+		if e.key == key and e.custom_key == custom_key:
+			return e
+	return null
+
+
+func _open_ui(id: String):
+	var ui = load(MOD_DIR + "ui/editor_ui.tscn").instance()
+	ui.initial_id = id
+	tree.root.add_child(ui)
+	yield(tree, "idle_frame")
+	yield(tree, "idle_frame")
+	return ui
+
+
+# ============================================================
+# 效果库与蓝图
+# ============================================================
+func test_01_library_and_triggers() -> void:
+	var lib = m.library()
+	_check(lib.size() > 100, "library has many effects (%d)" % lib.size())
+	var cats = {}
+	for e in lib:
+		cats[e.cat] = true
+	for c in ["stat", "trigger", "scaling", "start"]:
+		_check(cats.has(c), "category %s present" % c)
+	for ck in ["stats_on_level_up", "stats_end_of_wave", "temp_stats_while_not_moving"]:
+		_check(m.trigger_template(ck) != null, "trigger template " + ck)
+	_eq(m.stat_text_key("knockback"), "effect_knockback", "non-stat key borrows a native text key")
+
+
+func test_02_make_effect_copies_template() -> void:
+	var t = m.trigger_template("stats_on_level_up")
+	var tmpl = m.template(t.from, t.i)
+	var orig_value = tmpl.value
+	var e = m.make_effect({"from": t.from, "i": t.i, "set": {"key": "stat_armor", "value": 7.0}})
+	_eq(e.key, "stat_armor", "key set")
+	_eq(e.value, 7, "value coerced to int")
+	_eq(typeof(e.value), TYPE_INT, "value type int")
+	_eq(e.custom_key, "stats_on_level_up", "trigger kept")
+	_eq(tmpl.value, orig_value, "template untouched")
+	_check(e.get_text(0) != "", "effect has text")
+	_eq(m.make_effect({"from": "nope", "i": 0}), null, "missing source -> null")
+
+
+# ============================================================
+# 原版角色档案
+# ============================================================
+func test_10_native_profile_applies_and_restores() -> void:
+	var c = m.find_character(CH)
+	var orig_effects = c.effects
+	var orig_name = c.name
+	var item = isvc.items[5].my_id
+	var p = m.new_profile()
+	p.name = "Test Potato"
+	p.stats = {"stat_armor": 5}
+	p.start_items = [{"id": item, "n": 2}]
+	p.desc = "hello {0}"
+	m.profiles[CH] = p
+	m.apply_all()
+	_eq(c.name, "Test Potato", "renamed")
+	_eq(c.effects.size(), orig_effects.size() + 3, "desc + original + stat + start item")
+	var st = _find_effect(c.effects, "stat_armor")
+	_check(st != null and st.value == 5, "stat effect added")
+	var si = _find_effect(c.effects, item, "starting_item")
+	_check(si != null and si.value == 2 and si.storage_method == 1, "starting item effect")
+	_eq(c.effects[0].key, "", "description first, inert")
+	_check(c.effects[0].get_text(0).find("hello") >= 0, "description text shown")
+	_check(c.effects[0].get_text(0).find("{") < 0, "braces sanitized")
+	# 停用 -> 原版
+	m.profiles[CH].enabled = false
+	m.apply_all()
+	_eq(c.effects, orig_effects, "disabled restores effects")
+	_eq(c.name, orig_name, "disabled restores name")
+	m.profiles[CH].enabled = true
+	m.apply_all()
+	m.reset_profile(CH)
+	m.apply_all()
+	_eq(c.effects, orig_effects, "reset restores effects")
+
+
+func test_11_run_gets_profile_stats_and_items() -> void:
+	var item = isvc.items[5]
+	var p = m.new_profile()
+	p.stats = {"stat_armor": 9}
+	p.start_items = [{"id": item.my_id, "n": 1}]
+	m.profiles[CH] = p
+	m.apply_all()
+	var c = m.find_character(CH)
+	var base_armor = 0
+	for e in m.orig_effects(CH):
+		if e.key == "stat_armor" and e.custom_key == "" and e.storage_method == 0:
+			base_armor += e.value
+	rd.set_player_count(1, true)
+	rd.add_character(c, 0)
+	rd.add_starting_items_and_weapons()
+	_eq(int(rd.get_player_effect(Keys.generate_hash("stat_armor"), 0)), base_armor + 9, "armor from profile")
+	var has_item = false
+	for it in rd.players_data[0].items:
+		if it.my_id == item.my_id:
+			has_item = true
+	_check(has_item, "starting item granted")
+
+
+func test_12_effects_edit_and_starting_weapons() -> void:
+	var c = m.find_character(CH)
+	var w = isvc.weapons[3]
+	var orig_sw = c.starting_weapons
+	var p = m.new_profile()
+	p.effects = [{"set": {"key": "stat_luck", "value": 30}}]
+	p.weapons = [w.my_id]
+	p.wanted_tags = ["stat_luck"]
+	m.profiles[CH] = p
+	m.apply_all()
+	_eq(c.effects.size(), 1, "effects replaced")
+	_eq(c.effects[0].key, "stat_luck", "plain stat effect")
+	_eq(c.starting_weapons, [w], "starting weapons replaced")
+	_eq(c.wanted_tags, ["stat_luck"], "wanted tags replaced")
+	m.reset_profile(CH)
+	m.apply_all()
+	_eq(c.starting_weapons, orig_sw, "starting weapons restored")
+
+
+# ============================================================
+# 自定义角色
+# ============================================================
+func test_20_custom_character_lifecycle() -> void:
+	var n = isvc.characters.size()
+	var id = m.create_custom(CH)
+	_check(id.begins_with(m.CUSTOM_PREFIX), "custom id prefix")
+	_eq(isvc.characters.size(), n + 1, "registered")
+	var c = m.find_character(id)
+	_eq(c.effects.size(), m.orig_effects(CH).size(), "copies base effects")
+	_eq(c.icon, m.find_character(CH).icon, "base icon")
+	_check(not c.starting_weapons.empty(), "has starting weapons")
+	_check(tree.root.get_node("ProgressData").characters_unlocked.has(c.my_id_hash), "unlocked")
+	# 改图标
+	m.profiles[id].icon = isvc.items[0].my_id
+	m.apply_all()
+	_eq(c.icon, isvc.items[0].icon, "icon from item")
+	# 存档往返
+	m.save_profiles()
+	m.load_profiles()
+	_check(m.is_custom(id), "custom survives save/load")
+	_check(m.delete_custom(id), "deleted")
+	_eq(isvc.characters.size(), n, "unregistered")
+	_eq(m.find_character(id), null, "gone")
+
+
+func test_21_custom_from_modified_base_copies_profile() -> void:
+	var p = m.new_profile()
+	p.stats = {"stat_dodge": 3}
+	p.ban_items = [isvc.items[0].my_id]
+	m.profiles[CH] = p
+	m.apply_all()
+	var id = m.create_custom(CH)
+	_eq(m.profiles[id].stats, {"stat_dodge": 3}, "stats copied")
+	_eq(m.profiles[id].ban_items, [isvc.items[0].my_id], "bans copied")
+	m.profiles[id].stats["stat_dodge"] = 4
+	_eq(m.profiles[CH].stats["stat_dodge"], 3, "deep copy")
+
+
+# ============================================================
+# 禁用
+# ============================================================
+func test_30_bans_filter_shop() -> void:
+	var banned_items = []
+	for it in isvc.items:
+		if it.tier == 0 and banned_items.size() < 40:
+			banned_items.push_back(it.my_id)
+	var families = []
+	for w in isvc.weapons:
+		if w.tier == 0 and not w.weapon_id in families and families.size() < 20:
+			families.push_back(w.weapon_id)
+	var p = m.new_profile()
+	p.ban_items = banned_items
+	p.ban_weapons = families
+	m.profiles[CH] = p
+	m.apply_all()
+	_setup_player(CH)
+	var before = rd.players_data[0].banned_items.size()
+	for i in 300:
+		seed(i)
+		var it = isvc.get_rand_item_for_wave(1, 0)
+		_check(not it.my_id in banned_items, "banned item rolled: " + it.my_id)
+		var args = isvc.GetRandItemForWaveArgs.new()
+		args.owned_and_shop_items = []
+		var w = isvc._get_rand_item_for_wave(1, 0, isvc.TierData.WEAPONS, args)
+		_check(not w.weapon_id in families, "banned weapon rolled: " + w.my_id)
+	_eq(rd.players_data[0].banned_items.size(), before, "player ban list restored")
+	# 停用档案 -> 不过滤
+	m.profiles[CH].enabled = false
+	m.apply_all()
+	_eq(m.ban_hashes(0), [], "no bans when disabled")
+
+
+# ============================================================
+# 分享码 / 存档
+# ============================================================
+func test_40_share_code() -> void:
+	var p = m.new_profile()
+	p.stats = {"stat_luck": 12}
+	m.profiles[CH] = p
+	var code = m.export_code(CH)
+	_check(code.begins_with(m.SHARE_PREFIX), "prefix")
+	m.profiles = {}
+	_eq(m.import_code(code, CH), CH, "imported into native")
+	_eq(m.profiles[CH].stats, {"stat_luck": 12}, "content")
+	for bad in ["", "x", "BE1:", "BE1:!!", "AA1:" + Marshalls.utf8_to_base64("{}")]:
+		_eq(m.import_code(bad, CH), "", "rejects " + bad)
+	# 自定义角色 -> 导入为新的自定义角色
+	var id = m.create_custom(CH)
+	var code2 = m.export_code(id)
+	var id2 = m.import_code(code2, CH)
+	_check(id2 != "" and id2 != id and m.is_custom(id2), "custom imported as new custom")
+
+
+func test_41_normalize_profile() -> void:
+	var p = m.normalize_profile({"stats": {"stat_armor": 2.0, "stat_luck": 0}, "effects": "bad", "ban_items": null, "desc": "{x}"})
+	_eq(p.stats, {"stat_armor": 2}, "zero stats dropped, ints")
+	_eq(p.effects, null, "bad effects -> null")
+	_eq(p.ban_items, [], "null list -> []")
+	_eq(p.desc, "｛x｝", "braces replaced")
+
+
+# ============================================================
+# 编辑器界面
+# ============================================================
+func test_50_ui_all_tabs_native_and_custom() -> void:
+	var id = m.create_custom(CH)
+	for target in [CH, id]:
+		var ui = yield(_open_ui(target), "completed")
+		_eq(ui._id, target, "opened on " + target)
+		for t in ui.TABS:
+			ui._on_tab_pressed(t[0])
+			yield(tree, "idle_frame")
+			_check(ui._page.get_child_count() > 0, "tab %s built for %s" % [t[0], target])
+		ui.queue_free()
+		yield(tree, "idle_frame")
+
+
+func test_51_ui_edits() -> void:
+	var ui = yield(_open_ui(CH), "completed")
+	# 初始属性
+	ui._on_tab_pressed("stats")
+	ui._on_stat_changed(4.0, "stat_armor", Label.new())
+	_eq(m.profiles[CH].stats, {"stat_armor": 4}, "stat edit")
+	# 蓝图：升级时 +3 幸运
+	ui._on_tab_pressed("effects")
+	var n = m.effect_specs(CH, m.profiles[CH]).size()
+	for i in ui._bp_trigger.get_item_count():
+		if ui._bp_trigger.get_item_metadata(i) == "stats_on_level_up":
+			ui._bp_trigger.select(i)
+	for i in ui._bp_stat.get_item_count():
+		if ui._bp_stat.get_item_metadata(i) == "stat_luck":
+			ui._bp_stat.select(i)
+	ui._bp_value.value = 3
+	ui._on_blueprint_add()
+	var specs = m.profiles[CH].effects
+	_eq(specs.size(), n + 1, "blueprint added")
+	var e = m.make_effect(specs[-1])
+	_eq([e.key, e.value, e.custom_key], ["stat_luck", 3, "stats_on_level_up"], "blueprint effect")
+	_eq(ui._expanded, specs.size() - 1, "new effect expanded")
+	# 编辑字段
+	ui._on_field_changed(6.0, specs.size() - 1, "value")
+	_eq(m.make_effect(specs[-1]).value, 6, "field edit")
+	# 换扳机：保留属性和数值
+	var opt = OptionButton.new()
+	opt.add_item("x")
+	opt.set_item_metadata(0, "")
+	ui._on_effect_trigger(0, specs.size() - 1, opt)
+	e = m.make_effect(m.profiles[CH].effects[-1])
+	_eq([e.key, e.value, e.custom_key], ["stat_luck", 6, ""], "trigger switched to permanent")
+	# 效果库
+	ui._on_lib_search("")
+	_check(ui._lib_list.get_child_count() > 0, "library rows")
+	var entry = m.library()[0]
+	ui._add_spec({"from": entry.from, "i": entry.i})
+	_eq(m.profiles[CH].effects.size(), n + 2, "library add")
+	ui._on_effect_move(m.profiles[CH].effects.size() - 1, -1)
+	ui._on_effect_delete(0)
+	_eq(m.profiles[CH].effects.size(), n + 1, "delete")
+	# 禁用
+	ui._on_tab_pressed("bans")
+	ui._on_ban_toggle("items", isvc.items[0].my_id)
+	ui._on_ban_toggle("weapons", isvc.weapons[0].weapon_id)
+	_eq(m.profiles[CH].ban_items, [isvc.items[0].my_id], "ban item")
+	_eq(m.profiles[CH].ban_weapons, [isvc.weapons[0].weapon_id], "ban weapon family")
+	# 初始装备：选择器
+	ui._on_tab_pressed("gear")
+	ui._open_picker("start_items")
+	ui._on_picker_toggle(isvc.items[1].my_id)
+	ui._on_picker_confirm()
+	_eq(m.profiles[CH].start_items.size(), 1, "start item added via picker")
+	ui._open_picker("start_weapons")
+	ui._on_picker_clear()
+	ui._on_picker_toggle(isvc.weapons[0].my_id)
+	ui._on_picker_confirm()
+	_eq(m.profiles[CH].weapons, [isvc.weapons[0].my_id], "starting weapons via picker")
+	# 概览
+	ui._on_tab_pressed("overview")
+	ui._on_name_changed("  Renamed  ")
+	_eq(m.profiles[CH].name, "Renamed", "name trimmed")
+	_check(ui._preview_text.bbcode_text != "", "preview filled")
+	# 导出 / 导入
+	ui.test_clipboard = ""
+	ui._on_export_pressed()
+	_check(ui.test_clipboard.begins_with(m.SHARE_PREFIX), "export to clipboard")
+	# 关闭：保存
+	ui._on_close_pressed()
+	yield(tree, "idle_frame")
+	m.load_profiles()
+	_eq(m.profiles[CH].name, "Renamed", "saved on close")
+
+
+func test_52_ui_custom_create_delete() -> void:
+	var ui = yield(_open_ui(CH), "completed")
+	var n = isvc.characters.size()
+	ui._on_new_custom()
+	_eq(isvc.characters.size(), n + 1, "created from UI")
+	var id = ui._id
+	_check(m.is_custom(id), "selected the new custom")
+	ui._open_picker("icon")
+	ui._on_picker_toggle(isvc.items[2].my_id)
+	_eq(m.profiles[id].icon, isvc.items[2].my_id, "single picker applies immediately")
+	_eq(ui._picker, null, "single picker closed")
+	ui._on_delete_custom()
+	_check(m.is_custom(id), "first click only arms")
+	ui._on_delete_custom()
+	_check(not m.is_custom(id), "second click deletes")
+	ui.queue_free()
+	yield(tree, "idle_frame")
+
+
+func test_60_entry_button() -> void:
+	var screen = Control.new()
+	var back = Button.new()
+	back.name = "BackButton"
+	back.unique_name_in_owner = true
+	screen.add_child(back)
+	back.owner = screen
+	tree.root.add_child(screen)
+	m.add_editor_button(screen)
+	m.add_editor_button(screen)
+	var n = 0
+	for c in back.get_children():
+		if c.name.begins_with("BroEditorBtn"):
+			n += 1
+	_eq(n, 1, "button added exactly once")
+	screen.queue_free()
