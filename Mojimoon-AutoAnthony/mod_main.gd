@@ -47,6 +47,7 @@ var cfg_triggers: int = 125			# 触发效果 50–250%（100% = 原版特殊行�
 var cfg_native_ratio: int = 0		# 保留原版道具 0–100%
 var cfg_fixed_seed: bool = false
 var cfg_seed: int = 0
+var cfg_font_scale: int = 100		# 设置界面字体大小 80–125%（界面偏好：不进分享码）
 
 # ------------------------------------------------------------
 # 运行时状态
@@ -178,6 +179,7 @@ func save_settings() -> void:
 	data["enabled"] = enabled
 	data["fixed_seed"] = cfg_fixed_seed
 	data["seed"] = cfg_seed
+	data["font_scale"] = cfg_font_scale
 	var dir = Directory.new()
 	var dir_path = SETTINGS_PATH.get_base_dir()
 	if not dir.dir_exists(dir_path):
@@ -201,6 +203,7 @@ func _load_settings() -> void:
 	if parsed.error != OK or not parsed.result is Dictionary:
 		return
 	apply_settings(parsed.result)
+	cfg_font_scale = int(clamp(int(parsed.result.get("font_scale", 100)), 80, 125))
 
 
 # 设置字典 -> 字段（读取本地设置与"导入设置"共用；缺少的字段取默认值）

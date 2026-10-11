@@ -3,17 +3,17 @@ extends Control
 # 东尼算法设置弹窗。布局（自上而下）：
 #   标题栏：标题 + 种子（固定开关、输入框、随机）+ 总开关 + 关闭
 #   页签：重组道具 / 重组武器 / 重组角色，每个页签右边是本页的总开关（武器、角色默认关闭）
-#   重组道具页：效果设置、更多选项（初始道具 / 保留原名 / 强制重组 / 究极混沌）、数值设置 + 道具预览
+#   重组道具页：效果设置、更多选项（初始道具 / 保留原名 / 强制重组 / 究极混沌）、数值设置（末行：本界面的字体大小）+ 道具预览
 #   重组武器页：重组方式（仅重组效果 / 深度重组）、更多选项、数值设置 + 武器预览
 #   重组角色页：说明
 # 每个选项下方用灰色小字说明实际效果。
 # 样式沿用 OneItemToRuleThemAll / cave-modtools（base_theme + 圆角卡片 + 强调色开关 + 灰色说明文字）。
 
 const AAMain = preload("res://mods-unpacked/Mojimoon-AutoAnthony/mod_main.gd")
-const FONT_TITLE = preload("res://resources/fonts/actual/base/font_32_outline.tres")
-const FONT_NORMAL = preload("res://resources/fonts/actual/base/font_26.tres")
-const FONT_SMALL = preload("res://resources/fonts/actual/base/font_22.tres")
-const FONT_DESC = preload("res://resources/fonts/actual/base/font_very_smallest_text.tres")
+const BASE_TITLE = preload("res://resources/fonts/actual/base/font_32_outline.tres")
+const BASE_NORMAL = preload("res://resources/fonts/actual/base/font_26.tres")
+const BASE_SMALL = preload("res://resources/fonts/actual/base/font_22.tres")
+const BASE_DESC = preload("res://resources/fonts/actual/base/font_very_smallest_text.tres")
 
 const PANEL_SIZE = Vector2(1680, 1040)
 const SECTION_WIDTH = 530
@@ -99,6 +99,14 @@ var _page_switches: Dictionary = {}
 var _pages: Dictionary = {}
 # 预览（道具 / 武器各一份，点击时只生成当前页）：页 id -> {tier, buttons, grid, scroll, hint, plan}
 var _pv: Dictionary = {}
+# 字体大小（cfg_font_scale）：复制一份原版字体再改大小，不影响游戏其它界面
+var _font_title: DynamicFont = BASE_TITLE.duplicate()
+var _font_normal: DynamicFont = BASE_NORMAL.duplicate()
+var _font_small: DynamicFont = BASE_SMALL.duplicate()
+var _font_desc: DynamicFont = BASE_DESC.duplicate()
+var _all_switches: Array = []
+var _switch_src: Dictionary = {}
+var _font_row: Control
 
 
 func _ready() -> void:
@@ -106,6 +114,7 @@ func _ready() -> void:
 	if _mod == null:
 		queue_free()
 		return
+	_scale_fonts()
 	_build_ui()
 	_refresh_all()
 	set_process_unhandled_input(true)
@@ -148,7 +157,9 @@ func _build_ui() -> void:
 	var cols = _columns(items)
 	_build_switch_section(cols, "AA_UI_SEC_EFFECTS", EFFECT_SWITCHES, C_ACCENT_3)
 	_build_switch_section(cols, "AA_UI_SEC_MORE", MORE_SWITCHES, C_ACCENT_2)
-	_build_slider_section(cols, SLIDERS)
+	var values = _build_slider_section(cols, SLIDERS)
+	# 字体大小：只影响本界面，不受"重组道具"开关影响
+	_font_row = _slider_row(values, ["cfg_font_scale", "MENU_FONT_SIZE", 80, 125, 5, ""])
 	_build_preview(items, "items", "AA_UI_SEC_PREVIEW", "AA_UI_PREVIEW", "AA_UI_PREVIEW_HINT")
 
 	var weapons = _new_page(root, "weapons")
@@ -168,10 +179,10 @@ func _build_header(root: Control) -> void:
 	var header = HBoxContainer.new()
 	header.add_constant_override("separation", 10)
 	root.add_child(header)
-	var title = _label(tr("AA_TITLE"), FONT_TITLE, C_TEXT)
+	var title = _label(tr("AA_TITLE"), _font_title, C_TEXT)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
-	var seed_lbl = _label(tr("AA_UI_SEED"), FONT_SMALL, C_TEXT)
+	var seed_lbl = _label(tr("AA_UI_SEED"), _font_small, C_TEXT)
 	seed_lbl.hint_tooltip = tr("AA_UI_SEED_DESC")
 	seed_lbl.mouse_filter = Control.MOUSE_FILTER_PASS
 	header.add_child(seed_lbl)
@@ -182,14 +193,14 @@ func _build_header(root: Control) -> void:
 	_seed_edit = LineEdit.new()
 	_seed_edit.rect_min_size = Vector2(190, 38)
 	_seed_edit.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_seed_edit.add_font_override("font", FONT_SMALL)
+	_seed_edit.add_font_override("font", _font_small)
 	_seed_edit.add_color_override("font_color", C_TEXT)
 	_seed_edit.add_stylebox_override("normal", _style(C_BG_CHIP, C_BORDER, 6, 1, 10, 4))
 	_seed_edit.add_stylebox_override("focus", _style(C_BG_CHIP, C_ACCENT, 6, 1, 10, 4))
 	_seed_edit.text = str(_mod.cfg_seed)
 	_seed_edit.connect("text_changed", self, "_on_seed_changed")
 	header.add_child(_seed_edit)
-	var rnd = _button(tr("AA_UI_RANDOM"), FONT_SMALL)
+	var rnd = _button(tr("AA_UI_RANDOM"), _font_small)
 	rnd.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_apply_action_style(rnd, C_ACCENT_2)
 	rnd.connect("pressed", self, "_on_random_seed_pressed")
@@ -200,7 +211,7 @@ func _build_header(root: Control) -> void:
 	_enable_switch = _switch(tr("AA_UI_ENABLE"), _mod.enabled)
 	_enable_switch.connect("toggled", self, "_on_enable_toggled")
 	header.add_child(_enable_switch)
-	var close_btn = _button("X", FONT_NORMAL)
+	var close_btn = _button("X", _font_normal)
 	close_btn.rect_min_size = Vector2(48, 44)
 	_apply_action_style(close_btn, C_DANGER)
 	close_btn.connect("pressed", self, "_on_close_pressed")
@@ -223,7 +234,7 @@ func _build_tabs(root: Control) -> void:
 		row.add_constant_override("separation", 8)
 		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		tab.add_child(row)
-		var lbl = _label(tr(d[1]), FONT_NORMAL, C_TEXT_DIM)
+		var lbl = _label(tr(d[1]), _font_normal, C_TEXT_DIM)
 		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		lbl.align = Label.ALIGN_CENTER
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -282,34 +293,41 @@ func _build_mode_section(parent: Control) -> void:
 		box.add_child(_desc(tr(d[2])))
 
 
-func _build_slider_section(parent: Control, defs: Array) -> void:
+func _build_slider_section(parent: Control, defs: Array) -> VBoxContainer:
 	var box = _section(parent, "AA_UI_SEC_VALUES", C_ACCENT)
 	for d in defs:
-		var row = HBoxContainer.new()
-		row.add_constant_override("separation", 10)
-		box.add_child(row)
-		var lbl = _label(tr(d[1]), FONT_SMALL, C_TEXT)
-		lbl.rect_min_size = Vector2(170, 0)
-		row.add_child(lbl)
-		var sl = HSlider.new()
-		sl.min_value = d[2]
-		sl.max_value = d[3]
-		sl.step = d[4]
-		sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		sl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		sl.rect_min_size = Vector2(0, 28)
-		sl.focus_mode = Control.FOCUS_NONE
-		_style_slider(sl)
-		sl.value = _mod.get(d[0])
-		sl.connect("value_changed", self, "_on_slider_changed", [d[0]])
-		row.add_child(sl)
-		var val = _label("", FONT_SMALL, C_ACCENT)
-		val.rect_min_size = Vector2(70, 0)
-		val.align = Label.ALIGN_RIGHT
-		row.add_child(val)
-		_sliders[d[0]] = sl
-		_slider_labels[d[0]] = val
+		_slider_row(box, d)
+	return box
+
+
+func _slider_row(box: Control, d: Array) -> HBoxContainer:
+	var row = HBoxContainer.new()
+	row.add_constant_override("separation", 10)
+	box.add_child(row)
+	var lbl = _label(tr(d[1]), _font_small, C_TEXT)
+	lbl.rect_min_size = Vector2(170, 0)
+	row.add_child(lbl)
+	var sl = HSlider.new()
+	sl.min_value = d[2]
+	sl.max_value = d[3]
+	sl.step = d[4]
+	sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	sl.rect_min_size = Vector2(0, 28)
+	sl.focus_mode = Control.FOCUS_NONE
+	_style_slider(sl)
+	sl.value = _mod.get(d[0])
+	sl.connect("value_changed", self, "_on_slider_changed", [d[0]])
+	row.add_child(sl)
+	var val = _label("", _font_small, C_ACCENT)
+	val.rect_min_size = Vector2(70, 0)
+	val.align = Label.ALIGN_RIGHT
+	row.add_child(val)
+	_sliders[d[0]] = sl
+	_slider_labels[d[0]] = val
+	if d[5] != "":
 		box.add_child(_desc(tr(d[5])))
+	return row
 
 
 func _build_preview(parent: Control, kind: String, title_key: String, button_key: String, hint_key: String) -> void:
@@ -324,10 +342,10 @@ func _build_preview(parent: Control, kind: String, title_key: String, button_key
 	var head = HBoxContainer.new()
 	head.add_constant_override("separation", 8)
 	vbox.add_child(head)
-	head.add_child(_label(tr(title_key), FONT_NORMAL, C_TEXT))
+	head.add_child(_label(tr(title_key), _font_normal, C_TEXT))
 	var group = ButtonGroup.new()
 	for t in 4:
-		var btn = _button("", FONT_SMALL)
+		var btn = _button("", _font_small)
 		btn.toggle_mode = true
 		btn.group = group
 		btn.pressed = t == 0
@@ -336,15 +354,15 @@ func _build_preview(parent: Control, kind: String, title_key: String, button_key
 		pv.buttons.push_back(btn)
 	head.add_child(_spacer())
 	# 导入 / 导出设置：分享码经由剪贴板
-	var import_btn = _button(tr("AA_UI_IMPORT"), FONT_SMALL)
+	var import_btn = _button(tr("AA_UI_IMPORT"), _font_small)
 	_apply_action_style(import_btn, C_ACCENT_2)
 	import_btn.connect("pressed", self, "_on_import_pressed")
 	head.add_child(import_btn)
-	var export_btn = _button(tr("AA_UI_EXPORT"), FONT_SMALL)
+	var export_btn = _button(tr("AA_UI_EXPORT"), _font_small)
 	_apply_action_style(export_btn, C_ACCENT_2)
 	export_btn.connect("pressed", self, "_on_export_pressed")
 	head.add_child(export_btn)
-	var prev_btn = _button(tr(button_key), FONT_SMALL)
+	var prev_btn = _button(tr(button_key), _font_small)
 	_apply_action_style(prev_btn, C_ACCENT)
 	prev_btn.connect("pressed", self, "_on_preview_pressed", [kind])
 	head.add_child(prev_btn)
@@ -394,6 +412,7 @@ func _refresh_all() -> void:
 		var on = d[0] == _page
 		tb[0].add_stylebox_override("panel", _style(tb[2].darkened(0.62) if on else C_BG_CHIP, tb[2] if on else C_BORDER, 8, 2 if on else 1, 14, 4))
 		tb[1].add_color_override("font_color", tb[2] if on else C_TEXT_DIM)
+	_font_row.modulate.a = 1.0 / _pages["items"].modulate.a
 
 
 func _refresh_tier_buttons(kind: String) -> void:
@@ -440,6 +459,25 @@ func _on_mode_toggled(pressed: bool, mode: String) -> void:
 func _on_slider_changed(value: float, key: String) -> void:
 	_mod.set(key, int(value))
 	_slider_labels[key].text = str(int(value)) + "%"
+	if key == "cfg_font_scale":
+		_scale_fonts()
+		_switch_icons.clear()
+		for sw in _all_switches:
+			_apply_switch_icons(sw)
+		for kind in _pv:
+			_fill_preview(kind)
+		# 原地改字体大小不会让控件重新计算最小尺寸
+		propagate_notification(NOTIFICATION_THEME_CHANGED)
+
+
+func _font_scale() -> float:
+	return _mod.cfg_font_scale / 100.0
+
+
+func _scale_fonts() -> void:
+	for pair in [[_font_title, BASE_TITLE], [_font_normal, BASE_NORMAL], [_font_small, BASE_SMALL], [_font_desc, BASE_DESC]]:
+		pair[0].size = int(round(pair[1].size * _font_scale()))
+		pair[0].outline_size = int(round(pair[1].outline_size * _font_scale()))
 
 
 func _on_fixed_seed_toggled(pressed: bool) -> void:
@@ -570,7 +608,7 @@ func _card_shell(icon_tex: Texture, color: Color, width: float) -> VBoxContainer
 	icon.texture = icon_tex
 	icon.expand = true
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon.rect_min_size = Vector2(64, 64)
+	icon.rect_min_size = Vector2(64, 64) * _font_scale()
 	icon.size_flags_vertical = 0
 	row.add_child(icon)
 	var col = VBoxContainer.new()
@@ -583,11 +621,11 @@ func _card_shell(icon_tex: Texture, color: Color, width: float) -> VBoxContainer
 func _card_head(col: Control, name_text: String, color: Color, right_text: String) -> void:
 	var head = HBoxContainer.new()
 	col.add_child(head)
-	var nm = _label(name_text, FONT_SMALL, color)
+	var nm = _label(name_text, _font_small, color)
 	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	nm.clip_text = true
 	head.add_child(nm)
-	head.add_child(_label(right_text, FONT_DESC, C_TEXT_DIM))
+	head.add_child(_label(right_text, _font_desc, C_TEXT_DIM))
 
 
 func _card_text(col: Control, bbcode: String) -> void:
@@ -596,7 +634,7 @@ func _card_text(col: Control, bbcode: String) -> void:
 	fx.fit_content_height = true
 	fx.scroll_active = false
 	fx.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	fx.add_font_override("normal_font", FONT_DESC)
+	fx.add_font_override("normal_font", _font_desc)
 	fx.add_color_override("default_color", C_TEXT)
 	fx.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	fx.bbcode_text = bbcode
@@ -717,13 +755,13 @@ func _section(parent: Control, title_key: String, accent: Color) -> VBoxContaine
 	var box = VBoxContainer.new()
 	box.add_constant_override("separation", 4)
 	card.add_child(box)
-	box.add_child(_label(tr(title_key), FONT_NORMAL, accent))
+	box.add_child(_label(tr(title_key), _font_normal, accent))
 	return box
 
 
 # 灰色说明文字（自动换行，不做悬浮提示）
 func _desc(text: String) -> Label:
-	var lbl = _label(text, FONT_DESC, C_TEXT_DIM)
+	var lbl = _label(text, _font_desc, C_TEXT_DIM)
 	lbl.autowrap = true
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return lbl
@@ -761,17 +799,24 @@ func _switch(text: String, on: bool) -> CheckButton:
 	sw.text = text
 	sw.pressed = on
 	sw.focus_mode = Control.FOCUS_NONE
-	sw.add_font_override("font", FONT_SMALL)
+	sw.add_font_override("font", _font_small)
 	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
 		sw.add_stylebox_override(state, StyleBoxEmpty.new())
-	for icon_name in ["on", "off", "on_disabled", "off_disabled"]:
-		var src_name = "on" if icon_name.begins_with("on") else "off"
-		var icon = _small_switch_icon(sw.get_icon(src_name))
-		if icon != null:
-			sw.add_icon_override(icon_name, icon)
+	if _switch_src.empty():
+		for n in ["on", "off"]:
+			_switch_src[n] = sw.get_icon(n)
+	_apply_switch_icons(sw)
+	_all_switches.push_back(sw)
 	for c in ["font_color", "font_color_hover", "font_color_pressed", "font_color_hover_pressed"]:
 		sw.add_color_override(c, C_TEXT)
 	return sw
+
+
+func _apply_switch_icons(sw: CheckButton) -> void:
+	for icon_name in ["on", "off", "on_disabled", "off_disabled"]:
+		var icon = _small_switch_icon(_switch_src["on" if icon_name.begins_with("on") else "off"])
+		if icon != null:
+			sw.add_icon_override(icon_name, icon)
 
 
 func _small_switch_icon(src: Texture) -> Texture:
@@ -786,7 +831,7 @@ func _small_switch_icon(src: Texture) -> Texture:
 	img = img.duplicate()
 	if img.is_compressed():
 		img.decompress()
-	img.resize(56, 28, Image.INTERPOLATE_BILINEAR)
+	img.resize(int(56 * _font_scale()), int(28 * _font_scale()), Image.INTERPOLATE_BILINEAR)
 	var tex = ImageTexture.new()
 	tex.create_from_image(img, Texture.FLAG_FILTER)
 	_switch_icons[key] = tex

@@ -2707,3 +2707,36 @@ func test_172_tier_pool_follows_restored_tiers() -> void:
 	m.cfg_items = true
 	m.cfg_chaos = false
 	m.on_menu_reset()
+
+
+# 字体大小：只缩放设置界面自己的字体副本（原版字体不变）；随本地设置保存，不进分享码；关闭重组道具时不变暗
+func test_173_ui_font_scale() -> void:
+	var base = load("res://resources/fonts/actual/base/font_22.tres")
+	var base_size = base.size
+	var ui = load(MOD_DIR + "ui/settings_ui.tscn").instance()
+	tree.root.add_child(ui)
+	ui._on_slider_changed(125.0, "cfg_font_scale")
+	_eq(ui._font_small.size, int(round(base_size * 1.25)), "UI font scaled")
+	_eq(base.size, base_size, "vanilla font untouched")
+	for page in ["items", "weapons", "characters"]:
+		ui._on_page_pressed(page)
+		for i in 4:
+			yield(tree, "idle_frame")
+		var panel = ui.get_child(1).get_child(0)
+		print("AUDIT settings panel at 125%% (%s) %s" % [page, str(panel.rect_size)])
+		_check(panel.rect_size.x <= 1920 and panel.rect_size.y <= 1080, page + " page fits the screen at 125%")
+	ui._on_page_pressed("items")
+	ui._on_switch_toggled(false, "cfg_items")
+	_check(is_equal_approx(ui._font_row.modulate.a * ui._pages["items"].modulate.a, 1.0), "font row not dimmed with items off")
+	ui._on_switch_toggled(true, "cfg_items")
+	m.save_settings()
+	m.cfg_font_scale = 100
+	m._load_settings()
+	_eq(m.cfg_font_scale, 125, "font scale saved")
+	_check(Marshalls.base64_to_utf8(m.export_settings_code().substr(4)).find("font_scale") == -1, "font scale not in share code")
+	m.import_settings_code(m.export_settings_code())
+	_eq(m.cfg_font_scale, 125, "import keeps font scale")
+	ui._on_slider_changed(100.0, "cfg_font_scale")
+	_eq(ui._font_small.size, base_size, "UI font restored")
+	ui.queue_free()
+	m.save_settings()
