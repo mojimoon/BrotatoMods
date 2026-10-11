@@ -1,6 +1,6 @@
 # BroEditor / 万能编辑器
 
-[CHANGELOG / 更新日志](CHANGELOG.md)
+[Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3817655214) | [Open in Steam Client](https://link.steam.watch/url/CommunityFilePage/3817655214) | [CHANGELOG / 更新日志](CHANGELOG.md)
 
 [English](#english) | [中文](#中文) | [Screenshots](#screenshots) | [截图](#截图)
 
