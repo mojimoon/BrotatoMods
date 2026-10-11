@@ -364,6 +364,7 @@ func _lower_stats(ty: int, t: int, st):
 		sc.push_back([x[0], c])
 	s.scaling_stats = sc
 	s.cooldown = int(round(float(st.cooldown) / _mean_growth(ty, t, "cooldown")))
+	cap_reload(s)
 	return s
 
 
@@ -1193,6 +1194,10 @@ func _deep_template(fam: Dictionary, tw, tier: int) -> Dictionary:
 	var bp = tw.stats.duplicate()
 	bp.cooldown = prof.cooldown
 	bp.recoil_duration = prof.recoil_duration
+	# 换弹跟随攻击节奏（不能沿用本家族原来的，否则电锯的换弹会套到新冷却上）
+	bp.additional_cooldown_every_x_shots = prof.additional_cooldown_every_x_shots
+	bp.additional_cooldown_multiplier = prof.additional_cooldown_multiplier
+	cap_reload(bp)
 	var b = _pick_base(ty).stats
 	bp.max_range = b.max_range
 	# 有最小攻击范围的武器（鱼叉枪）：最大范围再加上最小范围
@@ -1208,8 +1213,6 @@ func _deep_template(fam: Dictionary, tw, tier: int) -> Dictionary:
 	else:
 		bp.nb_projectiles = prof.nb_projectiles
 		bp.projectile_spread = prof.projectile_spread
-		bp.additional_cooldown_every_x_shots = prof.additional_cooldown_every_x_shots
-		bp.additional_cooldown_multiplier = prof.additional_cooldown_multiplier
 		b = _pick_base(ty).stats
 		# 火焰喷射器 / 歼灭者 / 粒子加速器的 99 贯穿属于它们的投射物，不单独抽取
 		if int(b.piercing) < 50:
@@ -1564,6 +1567,18 @@ static func _over_normal_cap(st) -> bool:
 		if float(x[1]) > cap + 0.001:
 			return true
 	return false
+
+
+# 换弹时长上限（秒）：原版最长为榴弹发射器 T4
+const MAX_RELOAD_SECS = 2.75
+
+
+# 换弹时长超过上限时缩短换弹倍率（换弹时长随倍率线性变化，斜率 = 冷却帧数 / FPS）；倍率不低于 1
+static func cap_reload(st) -> void:
+	var r = WeaponValue.reload_seconds(st)
+	if r > MAX_RELOAD_SECS:
+		var wcf = max(WeaponValue.MIN_CD_FRAMES, int(st.cooldown))
+		st.additional_cooldown_multiplier = max(1.0, float(st.additional_cooldown_multiplier) - (r - MAX_RELOAD_SECS) * WeaponValue.FPS / wcf)
 
 
 # 实际攻击间隔（含换弹等）不超过 secs 的最大冷却帧数

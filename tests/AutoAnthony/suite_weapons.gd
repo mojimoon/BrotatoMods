@@ -130,6 +130,8 @@ func test_141_weapon_deep_reassembly() -> void:
 			_eq(WV.is_melee(p.stats), w.type == 0, id + " keeps melee / ranged")
 			if p.stats.cooldown != w.stats.cooldown:
 				cd_changed += 1
+			# 换弹跟随攻击节奏，不超过上限（电锯原来的换弹不能套到新冷却上）
+			_check(WV.reload_seconds(p.stats) <= WG.MAX_RELOAD_SECS + 0.001,"%s reload %.2fs <= cap" % [id, WV.reload_seconds(p.stats)])
 			for e in p.effects:
 				if w.type == 0:
 					_check(not WG.ranged_only(e), id + " melee has no ranged-only effect")

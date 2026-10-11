@@ -121,6 +121,15 @@ static func cooldown_seconds(st) -> float:
 	return cd
 
 
+# 一次换弹的实际时长（秒），没有换弹为 0：每 1 发换弹时 cooldown_seconds 正好等于换弹间隔
+static func reload_seconds(st) -> float:
+	if int(st.additional_cooldown_every_x_shots) <= 0 or float(st.additional_cooldown_multiplier) <= 0:
+		return 0.0
+	var probe = st.duplicate()
+	probe.additional_cooldown_every_x_shots = 1
+	return cooldown_seconds(probe)
+
+
 static func stat_name(s) -> String:
 	if s is String:
 		return s
