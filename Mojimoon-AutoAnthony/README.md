@@ -1,11 +1,10 @@
 # Brotato: Auto-Anthonyology / 土豆兄弟：东尼算法
 
-[Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3671094202) | [Open in Steam Client](https://link.steam.watch/url/CommunityFilePage/3671094202)
+[Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3671094202) | [Open in Steam Client](https://link.steam.watch/url/CommunityFilePage/3671094202) | [DESIGN / 设计](DESIGN.md) | [CHANGELOG / 更新日志](CHANGELOG.md)
 
 [English](#english) | [中文](#中文) | [Screenshots](#screenshots) | [截图](#截图)
 
-> modid: Mojimoon-AutoAnthony  
-> Design Docs / 设计文档：[DESIGN.md](DESIGN.md)
+> modid: Mojimoon-AutoAnthony
 
 ![](../img/AutoAnthony/aa-icon.png)
 
