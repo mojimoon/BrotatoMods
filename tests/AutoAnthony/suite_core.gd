@@ -482,8 +482,8 @@ func test_51_ui_builds_and_previews() -> void:
 	# 每个开关都有灰色说明
 	for k in ["cfg_char_effects", "cfg_all_char_effects", "cfg_more_double", "cfg_starting_items", "cfg_rename", "cfg_force_items", "cfg_chaos", "cfg_w_item_effects", "cfg_w_low_tiers", "cfg_w_any_start"]:
 		_check(ui._switches.has(k), "switch exists: " + k)
-		var sw = ui._switches[k]
-		var desc = sw.get_parent().get_child(sw.get_index() + 1)
+		var row = ui._switches[k].get_parent()
+		var desc = row.get_parent().get_child(row.get_index() + 1)
 		_check(desc is Label and desc.text != "" and desc.text.find("AA_") == -1, "switch has a description: " + k)
 	# 导出 / 导入设置（经由剪贴板）
 	m.cfg_avg = 135
@@ -2709,7 +2709,7 @@ func test_172_tier_pool_follows_restored_tiers() -> void:
 	m.on_menu_reset()
 
 
-# 字体大小：只缩放设置界面自己的字体副本（原版字体不变）；随本地设置保存，不进分享码；关闭重组道具时不变暗
+# 字体大小：只缩放设置界面自己的字体副本（原版字体不变）；滑条在不缩放的标题栏；随本地设置保存，不进分享码
 func test_173_ui_font_scale() -> void:
 	var base = load("res://resources/fonts/actual/base/font_22.tres")
 	var base_size = base.size
@@ -2718,17 +2718,29 @@ func test_173_ui_font_scale() -> void:
 	ui._on_slider_changed(125.0, "cfg_font_scale")
 	_eq(ui._font_small.size, int(round(base_size * 1.25)), "UI font scaled")
 	_eq(base.size, base_size, "vanilla font untouched")
-	for page in ["items", "weapons", "characters"]:
-		ui._on_page_pressed(page)
-		for i in 4:
-			yield(tree, "idle_frame")
-		var panel = ui.get_child(1).get_child(0)
-		print("AUDIT settings panel at 125%% (%s) %s" % [page, str(panel.rect_size)])
-		_check(panel.rect_size.x <= 1920 and panel.rect_size.y <= 1080, page + " page fits the screen at 125%")
-	ui._on_page_pressed("items")
-	ui._on_switch_toggled(false, "cfg_items")
-	_check(is_equal_approx(ui._font_row.modulate.a * ui._pages["items"].modulate.a, 1.0), "font row not dimmed with items off")
-	ui._on_switch_toggled(true, "cfg_items")
+	# 任何语言、任何字体大小下面板都不被撑大（被撑大时面板重新居中，标题栏的滑条也会跟着移动）
+	var prev_locale = TranslationServer.get_locale()
+	for loc in ["zh", "en", "fr", "ja", "ko", "zh_TW", "ru", "pl", "es", "pt", "de", "tr", "it"]:
+		TranslationServer.set_locale(loc)
+		var lui = load(MOD_DIR + "ui/settings_ui.tscn").instance()
+		tree.root.add_child(lui)
+		for scale in [80.0, 125.0]:
+			lui._on_slider_changed(scale, "cfg_font_scale")
+			for page in ["items", "weapons", "characters"]:
+				lui._on_page_pressed(page)
+				yield(tree, "idle_frame")
+				var size = lui.get_child(1).get_child(0).get_combined_minimum_size()
+				_check(size.x <= lui.PANEL_SIZE.x and size.y <= lui.PANEL_SIZE.y, "%s %s at %d%% fits the panel %s" % [loc, page, scale, str(size)])
+		lui.free()
+	TranslationServer.set_locale(prev_locale)
+	ui._on_slider_changed(125.0, "cfg_font_scale")
+	# 滑条在标题栏，标题栏不缩放：拖动时滑条不移动
+	var pos = ui._sliders["cfg_font_scale"].get_global_rect()
+	ui._on_slider_changed(80.0, "cfg_font_scale")
+	for i in 4:
+		yield(tree, "idle_frame")
+	_check(ui._sliders["cfg_font_scale"].get_global_rect() == pos, "font slider stays in place")
+	ui._on_slider_changed(125.0, "cfg_font_scale")
 	m.save_settings()
 	m.cfg_font_scale = 100
 	m._load_settings()

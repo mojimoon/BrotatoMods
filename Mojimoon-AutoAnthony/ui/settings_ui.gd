@@ -1,9 +1,10 @@
 extends Control
 
 # 东尼算法设置弹窗。布局（自上而下）：
-#   标题栏：标题 + 种子（固定开关、输入框、随机）+ 总开关 + 关闭
+#   标题栏：标题 + 种子（固定开关、输入框、随机）+ 字体大小 + 总开关 + 关闭
+#     标题栏与页签不随字体大小缩放：拖动滑条时滑条本身不移动
 #   页签：重组道具 / 重组武器 / 重组角色，每个页签右边是本页的总开关（武器、角色默认关闭）
-#   重组道具页：效果设置、更多选项（初始道具 / 保留原名 / 强制重组 / 究极混沌）、数值设置（末行：本界面的字体大小）+ 道具预览
+#   重组道具页：效果设置、更多选项（初始道具 / 保留原名 / 强制重组 / 究极混沌）、数值设置 + 道具预览
 #   重组武器页：重组方式（仅重组效果 / 深度重组）、更多选项、数值设置 + 武器预览
 #   重组角色页：说明
 # 每个选项下方用灰色小字说明实际效果。
@@ -106,7 +107,7 @@ var _font_small: DynamicFont = BASE_SMALL.duplicate()
 var _font_desc: DynamicFont = BASE_DESC.duplicate()
 var _all_switches: Array = []
 var _switch_src: Dictionary = {}
-var _font_row: Control
+var _slider_names: Array = []
 
 
 func _ready() -> void:
@@ -157,9 +158,7 @@ func _build_ui() -> void:
 	var cols = _columns(items)
 	_build_switch_section(cols, "AA_UI_SEC_EFFECTS", EFFECT_SWITCHES, C_ACCENT_3)
 	_build_switch_section(cols, "AA_UI_SEC_MORE", MORE_SWITCHES, C_ACCENT_2)
-	var values = _build_slider_section(cols, SLIDERS)
-	# 字体大小：只影响本界面，不受"重组道具"开关影响
-	_font_row = _slider_row(values, ["cfg_font_scale", "MENU_FONT_SIZE", 80, 125, 5, ""])
+	_build_slider_section(cols, SLIDERS)
 	_build_preview(items, "items", "AA_UI_SEC_PREVIEW", "AA_UI_PREVIEW", "AA_UI_PREVIEW_HINT")
 
 	var weapons = _new_page(root, "weapons")
@@ -174,51 +173,56 @@ func _build_ui() -> void:
 	box.add_child(_desc(tr("AA_UI_CHARACTERS_DESC")))
 
 
-# 标题 种子 [固定] [输入框] [随机]  启用 [开关] [X]
+# 标题 种子 [固定] [输入框] [随机]  字体大小 [滑条]  启用 [开关] [X]（用原版字体，不随字体大小缩放）
 func _build_header(root: Control) -> void:
 	var header = HBoxContainer.new()
 	header.add_constant_override("separation", 10)
 	root.add_child(header)
-	var title = _label(tr("AA_TITLE"), _font_title, C_TEXT)
+	var title = _label(tr("AA_TITLE"), BASE_TITLE, C_TEXT)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
-	var seed_lbl = _label(tr("AA_UI_SEED"), _font_small, C_TEXT)
+	var seed_lbl = _label(tr("AA_UI_SEED"), BASE_SMALL, C_TEXT)
 	seed_lbl.hint_tooltip = tr("AA_UI_SEED_DESC")
 	seed_lbl.mouse_filter = Control.MOUSE_FILTER_PASS
 	header.add_child(seed_lbl)
-	_seed_switch = _switch("", _mod.cfg_fixed_seed)
+	_seed_switch = _switch("", _mod.cfg_fixed_seed, true)
 	_seed_switch.hint_tooltip = tr("AA_UI_SEED_DESC")
 	_seed_switch.connect("toggled", self, "_on_fixed_seed_toggled")
 	header.add_child(_seed_switch)
 	_seed_edit = LineEdit.new()
 	_seed_edit.rect_min_size = Vector2(190, 38)
 	_seed_edit.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_seed_edit.add_font_override("font", _font_small)
+	_seed_edit.add_font_override("font", BASE_SMALL)
 	_seed_edit.add_color_override("font_color", C_TEXT)
 	_seed_edit.add_stylebox_override("normal", _style(C_BG_CHIP, C_BORDER, 6, 1, 10, 4))
 	_seed_edit.add_stylebox_override("focus", _style(C_BG_CHIP, C_ACCENT, 6, 1, 10, 4))
 	_seed_edit.text = str(_mod.cfg_seed)
 	_seed_edit.connect("text_changed", self, "_on_seed_changed")
 	header.add_child(_seed_edit)
-	var rnd = _button(tr("AA_UI_RANDOM"), _font_small)
+	var rnd = _button(tr("AA_UI_RANDOM"), BASE_SMALL)
 	rnd.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_apply_action_style(rnd, C_ACCENT_2)
 	rnd.connect("pressed", self, "_on_random_seed_pressed")
 	header.add_child(rnd)
-	var gap = Control.new()
-	gap.rect_min_size = Vector2(40, 0)
-	header.add_child(gap)
-	_enable_switch = _switch(tr("AA_UI_ENABLE"), _mod.enabled)
+	header.add_child(_gap(30))
+	header.add_child(_label(tr("MENU_FONT_SIZE"), BASE_SMALL, C_TEXT))
+	var font_sl = _slider(["cfg_font_scale", "MENU_FONT_SIZE", 80, 125, 5])
+	font_sl.size_flags_horizontal = 0
+	font_sl.rect_min_size.x = 140
+	header.add_child(font_sl)
+	header.add_child(_slider_value(["cfg_font_scale"], BASE_SMALL))
+	header.add_child(_gap(30))
+	_enable_switch = _switch(tr("AA_UI_ENABLE"), _mod.enabled, true)
 	_enable_switch.connect("toggled", self, "_on_enable_toggled")
 	header.add_child(_enable_switch)
-	var close_btn = _button("X", _font_normal)
+	var close_btn = _button("X", BASE_NORMAL)
 	close_btn.rect_min_size = Vector2(48, 44)
 	_apply_action_style(close_btn, C_DANGER)
 	close_btn.connect("pressed", self, "_on_close_pressed")
 	header.add_child(close_btn)
 
 
-# | 重组道具 [开关] | 重组武器 [开关] | 重组角色 [开关] |：整个页签可点击，选中时用本页颜色
+# | 重组道具 [开关] | 重组武器 [开关] | 重组角色 [开关] |：整个页签可点击，选中时用本页颜色；与标题栏一样不随字体大小缩放
 func _build_tabs(root: Control) -> void:
 	var tabs = HBoxContainer.new()
 	tabs.add_constant_override("separation", 10)
@@ -234,13 +238,13 @@ func _build_tabs(root: Control) -> void:
 		row.add_constant_override("separation", 8)
 		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		tab.add_child(row)
-		var lbl = _label(tr(d[1]), _font_normal, C_TEXT_DIM)
+		var lbl = _label(tr(d[1]), BASE_NORMAL, C_TEXT_DIM)
 		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		lbl.align = Label.ALIGN_CENTER
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(lbl)
 		_tab_buttons[d[0]] = [tab, lbl, d[3]]
-		var sw = _switch("", _mod.get(d[2]))
+		var sw = _switch("", _mod.get(d[2]), true)
 		sw.connect("toggled", self, "_on_switch_toggled", [d[2]])
 		row.add_child(sw)
 		_page_switches[d[0]] = sw
@@ -267,9 +271,8 @@ func _build_switch_section(parent: Control, title_key: String, defs: Array, acce
 	var box = _section(parent, title_key, accent)
 	for d in defs:
 		var inverted = d.size() > 3 and d[3]
-		var sw = _switch(tr(d[1]), _mod.get(d[0]) != inverted)
+		var sw = _switch_row(box, tr(d[1]), _mod.get(d[0]) != inverted)
 		sw.connect("toggled", self, "_on_switch_toggled", [d[0]])
-		box.add_child(sw)
 		_switches[d[0]] = sw
 		if inverted:
 			_inverted[d[0]] = true
@@ -280,15 +283,13 @@ func _build_switch_section(parent: Control, title_key: String, defs: Array, acce
 func _build_mode_section(parent: Control) -> void:
 	var box = _section(parent, "AA_UI_SEC_EFFECTS", C_ACCENT_3)
 	for d in WEAPON_MODES:
-		var sw = _switch(tr(d[1]), _mod.cfg_weapon_mode == d[0])
+		var sw = _switch_row(box, tr(d[1]), _mod.cfg_weapon_mode == d[0])
 		sw.connect("toggled", self, "_on_mode_toggled", [d[0]])
-		box.add_child(sw)
 		_mode_switches[d[0]] = sw
 		box.add_child(_desc(tr(d[2])))
 	for d in WEAPON_EFFECT_SWITCHES:
-		var sw = _switch(tr(d[1]), _mod.get(d[0]))
+		var sw = _switch_row(box, tr(d[1]), _mod.get(d[0]))
 		sw.connect("toggled", self, "_on_switch_toggled", [d[0]])
-		box.add_child(sw)
 		_switches[d[0]] = sw
 		box.add_child(_desc(tr(d[2])))
 
@@ -305,8 +306,26 @@ func _slider_row(box: Control, d: Array) -> HBoxContainer:
 	row.add_constant_override("separation", 10)
 	box.add_child(row)
 	var lbl = _label(tr(d[1]), _font_small, C_TEXT)
-	lbl.rect_min_size = Vector2(170, 0)
+	lbl.autowrap = true
+	_fit_longest_word(lbl)
+	_slider_names.push_back(lbl)
 	row.add_child(lbl)
+	row.add_child(_slider(d))
+	row.add_child(_slider_value(d, _font_small))
+	if d[5] != "":
+		box.add_child(_desc(tr(d[5])))
+	return row
+
+
+# 滑条名称可换行，但至少容下最长的单词（换行时不从单词中间断开）
+func _fit_longest_word(lbl: Label) -> void:
+	var w = 170.0
+	for word in lbl.text.split(" "):
+		w = max(w, _font_small.get_string_size(word).x + 2)
+	lbl.rect_min_size.x = w
+
+
+func _slider(d: Array) -> HSlider:
 	var sl = HSlider.new()
 	sl.min_value = d[2]
 	sl.max_value = d[3]
@@ -318,16 +337,16 @@ func _slider_row(box: Control, d: Array) -> HBoxContainer:
 	_style_slider(sl)
 	sl.value = _mod.get(d[0])
 	sl.connect("value_changed", self, "_on_slider_changed", [d[0]])
-	row.add_child(sl)
-	var val = _label("", _font_small, C_ACCENT)
+	_sliders[d[0]] = sl
+	return sl
+
+
+func _slider_value(d: Array, font: Font) -> Label:
+	var val = _label("", font, C_ACCENT)
 	val.rect_min_size = Vector2(70, 0)
 	val.align = Label.ALIGN_RIGHT
-	row.add_child(val)
-	_sliders[d[0]] = sl
 	_slider_labels[d[0]] = val
-	if d[5] != "":
-		box.add_child(_desc(tr(d[5])))
-	return row
+	return val
 
 
 func _build_preview(parent: Control, kind: String, title_key: String, button_key: String, hint_key: String) -> void:
@@ -352,7 +371,12 @@ func _build_preview(parent: Control, kind: String, title_key: String, button_key
 		btn.connect("pressed", self, "_on_tier_pressed", [t, kind])
 		head.add_child(btn)
 		pv.buttons.push_back(btn)
-	head.add_child(_spacer())
+	pv.hint = _desc(tr(hint_key))
+	# 导入 / 导出 / 预览按钮放在说明行右侧：标题行太长时（字体放大、长语言）面板会被撑宽
+	head = HBoxContainer.new()
+	head.add_constant_override("separation", 8)
+	vbox.add_child(head)
+	head.add_child(pv.hint)
 	# 导入 / 导出设置：分享码经由剪贴板
 	var import_btn = _button(tr("AA_UI_IMPORT"), _font_small)
 	_apply_action_style(import_btn, C_ACCENT_2)
@@ -366,9 +390,6 @@ func _build_preview(parent: Control, kind: String, title_key: String, button_key
 	_apply_action_style(prev_btn, C_ACCENT)
 	prev_btn.connect("pressed", self, "_on_preview_pressed", [kind])
 	head.add_child(prev_btn)
-
-	pv.hint = _desc(tr(hint_key))
-	vbox.add_child(pv.hint)
 
 	pv.scroll = ScrollContainer.new()
 	pv.scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -412,7 +433,6 @@ func _refresh_all() -> void:
 		var on = d[0] == _page
 		tb[0].add_stylebox_override("panel", _style(tb[2].darkened(0.62) if on else C_BG_CHIP, tb[2] if on else C_BORDER, 8, 2 if on else 1, 14, 4))
 		tb[1].add_color_override("font_color", tb[2] if on else C_TEXT_DIM)
-	_font_row.modulate.a = 1.0 / _pages["items"].modulate.a
 
 
 func _refresh_tier_buttons(kind: String) -> void:
@@ -461,9 +481,10 @@ func _on_slider_changed(value: float, key: String) -> void:
 	_slider_labels[key].text = str(int(value)) + "%"
 	if key == "cfg_font_scale":
 		_scale_fonts()
-		_switch_icons.clear()
 		for sw in _all_switches:
-			_apply_switch_icons(sw)
+			_apply_switch_icons(sw, _font_scale())
+		for lbl in _slider_names:
+			_fit_longest_word(lbl)
 		for kind in _pv:
 			_fill_preview(kind)
 		# 原地改字体大小不会让控件重新计算最小尺寸
@@ -794,35 +815,59 @@ func _apply_action_style(btn: Button, accent: Color) -> void:
 	btn.add_color_override("font_color_pressed", C_TEXT)
 
 
-func _switch(text: String, on: bool) -> CheckButton:
+# fixed：标题栏的开关，不随字体大小缩放
+func _switch(text: String, on: bool, fixed: bool = false) -> CheckButton:
 	var sw = CheckButton.new()
 	sw.text = text
 	sw.pressed = on
 	sw.focus_mode = Control.FOCUS_NONE
-	sw.add_font_override("font", _font_small)
+	sw.add_font_override("font", BASE_SMALL if fixed else _font_small)
 	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
 		sw.add_stylebox_override(state, StyleBoxEmpty.new())
 	if _switch_src.empty():
 		for n in ["on", "off"]:
 			_switch_src[n] = sw.get_icon(n)
-	_apply_switch_icons(sw)
-	_all_switches.push_back(sw)
+	_apply_switch_icons(sw, 1.0 if fixed else _font_scale())
+	if not fixed:
+		_all_switches.push_back(sw)
 	for c in ["font_color", "font_color_hover", "font_color_pressed", "font_color_hover_pressed"]:
 		sw.add_color_override(c, C_TEXT)
 	return sw
 
 
-func _apply_switch_icons(sw: CheckButton) -> void:
+# 设置卡片里的开关：名称用可换行的标签（开关自身的文字不能换行，长语言 / 大字体会撑宽卡片），点名称也能切换
+func _switch_row(box: Control, text: String, on: bool) -> CheckButton:
+	var row = HBoxContainer.new()
+	row.add_constant_override("separation", 8)
+	box.add_child(row)
+	var lbl = _label(text, _font_small, C_TEXT)
+	lbl.autowrap = true
+	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lbl.mouse_filter = Control.MOUSE_FILTER_STOP
+	row.add_child(lbl)
+	var sw = _switch("", on)
+	sw.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(sw)
+	lbl.connect("gui_input", self, "_on_switch_label_input", [sw])
+	return sw
+
+
+func _on_switch_label_input(event: InputEvent, sw: CheckButton) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == BUTTON_LEFT:
+		sw.pressed = not sw.pressed
+
+
+func _apply_switch_icons(sw: CheckButton, scale: float) -> void:
 	for icon_name in ["on", "off", "on_disabled", "off_disabled"]:
-		var icon = _small_switch_icon(_switch_src["on" if icon_name.begins_with("on") else "off"])
+		var icon = _small_switch_icon(_switch_src["on" if icon_name.begins_with("on") else "off"], scale)
 		if icon != null:
 			sw.add_icon_override(icon_name, icon)
 
 
-func _small_switch_icon(src: Texture) -> Texture:
+func _small_switch_icon(src: Texture, scale: float) -> Texture:
 	if src == null:
 		return null
-	var key = src.get_rid().get_id()
+	var key = str(src.get_rid().get_id()) + ":" + str(scale)
 	if _switch_icons.has(key):
 		return _switch_icons[key]
 	var img: Image = src.get_data()
@@ -831,7 +876,7 @@ func _small_switch_icon(src: Texture) -> Texture:
 	img = img.duplicate()
 	if img.is_compressed():
 		img.decompress()
-	img.resize(int(56 * _font_scale()), int(28 * _font_scale()), Image.INTERPOLATE_BILINEAR)
+	img.resize(int(56 * scale), int(28 * scale), Image.INTERPOLATE_BILINEAR)
 	var tex = ImageTexture.new()
 	tex.create_from_image(img, Texture.FLAG_FILTER)
 	_switch_icons[key] = tex
@@ -852,6 +897,12 @@ func _label(text: String, font: Font, color: Color) -> Label:
 	lbl.add_font_override("font", font)
 	lbl.add_color_override("font_color", color)
 	return lbl
+
+
+func _gap(width: float) -> Control:
+	var c = Control.new()
+	c.rect_min_size = Vector2(width, 0)
+	return c
 
 
 func _spacer() -> Control:
