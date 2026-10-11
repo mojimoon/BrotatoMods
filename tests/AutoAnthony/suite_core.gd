@@ -301,12 +301,14 @@ func test_25_curse_compatible() -> void:
 		return
 	var c = {"trigger": "hit", "chance": 100, "payload": "temp_stat", "stat": "stat_armor", "value": 2}
 	var item = _item("item_potato").duplicate()
-	item.effects = [TriggerEffect.make(c)]
+	var te = TriggerEffect.make(c)
+	te.probe()
+	item.effects = [te]
 	item.is_cursed = false
 	var cursed = dlc.curse_item(item, 0, true)
 	_check(cursed.is_cursed, "cursed")
 	_check(cursed.effects[0] is TriggerEffect, "trigger kept its type")
-	_check(cursed.effects[0].value >= 2, "positive trigger value boosted or kept (%d)" % cursed.effects[0].value)
+	_check(cursed.effects[0].live().value >= 2, "positive trigger value boosted or kept (%d)" % cursed.effects[0].live().value)
 
 
 # ============================================================
@@ -1051,6 +1053,7 @@ func test_95_curse_whole_pool() -> void:
 				continue
 			var holder = _item(id).duplicate()
 			holder.effects = plan.items[id].effects
+			TriggerEffect.probe_all(holder.effects)
 			holder.is_cursed = false
 			var cursed = dlc.curse_item(holder, 0)
 			n_items += 1
@@ -1073,7 +1076,18 @@ func test_95_curse_whole_pool() -> void:
 				_check(txt.find("AA_") == -1, "%s cursed text: %s" % [id, txt])
 				if (a.custom_key if a.custom_key != "" else a.key) in special_keys:
 					continue
-				if a.value != 0 and "value" in b:
+				if a is TriggerEffect:
+					# 触发条款：每 N 次的扳机诅咒 N，否则诅咒载荷；方向按条款好坏 E
+					var la = a.live()
+					var lb = b.live()
+					var e_sign = TriggerEffect.goodness(la)
+					if e_sign == 0:
+						_eq([lb.value, lb.param], [la.value, la.param], "%s: neutral clause unchanged" % id)
+					elif Catalog.TRIGGERS[la.trigger].gate == "every":
+						_check(lb.value == la.value and (lb.param == la.param or (lb.param < la.param) == (e_sign > 0)), "%s: every-N clause curses N (%d -> %d, E %d)" % [id, la.param, lb.param, e_sign])
+					elif la.payload != "grant" and la.stat != "dodge_cap":
+						_check(lb.param == la.param and (lb.value == la.value or (abs(lb.value) > abs(la.value)) == (e_sign > 0)), "%s: clause payload by E (%d -> %d, E %d)" % [id, la.value, lb.value, e_sign])
+				elif a.value != 0 and "value" in b:
 					if _is_good(a):
 						_check(abs(b.value) >= abs(a.value), "%s: good line not weakened (%s: %d -> %d)" % [id, a.key, a.value, b.value])
 					else:
@@ -1090,17 +1104,18 @@ func test_95_curse_whole_pool() -> void:
 	TempStats.reset()
 	var base = _item("item_potato").duplicate()
 	base.effects = [
-		TriggerEffect.make({"trigger": "kill", "payload": "temp_stat", "stat": "stat_armor", "value": 2}),
-		TriggerEffect.make({"trigger": "kill", "payload": "temp_stat", "stat": "enemy_damage", "value": 4}),
+		TriggerEffect.make({"trigger": "level_up", "payload": "temp_stat", "stat": "stat_armor", "value": 2}),
+		TriggerEffect.make({"trigger": "level_up", "payload": "temp_stat", "stat": "enemy_damage", "value": 4}),
 	]
+	TriggerEffect.probe_all(base.effects)
 	var cursed2 = dlc.curse_item(base, 0, true)
-	_check(cursed2.effects[1].value < 4, "native curse weakens the enemy-stat clause (%d)" % cursed2.effects[1].value)
+	_check(cursed2.effects[1].live().value < 4, "native curse weakens the enemy-stat clause (%d)" % cursed2.effects[1].live().value)
 	rd.add_item(cursed2, 0)
 	var rt = Runtime.new()
 	tree.root.add_child(rt)
 	rt.mod = m
 	rt.rebuild_all()
-	rt.fire("kill", 0)
+	rt.fire("level_up", 0)
 	_check(int(TempStats.get_stat(Keys.stat_armor_hash, 0) / rd.get_stat_gain(Keys.stat_armor_hash, 0)) >= 3, "cursed trigger stronger at runtime")
 	_check(int(TempStats.get_stat(Keys.generate_hash("enemy_damage"), 0)) <= 3, "cursed paired downside weaker at runtime")
 	rt.queue_free()
@@ -2698,3 +2713,103 @@ func test_172_tier_pool_follows_restored_tiers() -> void:
 	m.cfg_items = true
 	m.cfg_chaos = false
 	m.on_menu_reset()
+
+
+# 触发条款的诅咒（系数 0.5、关闭随机）：方向按载荷好坏 E；每 N 次的扳机诅咒 N（方向 -E）；中立不变；
+# 方向与按 key 的特判交给原版；运行时 / 存档按诅咒后的条款
+func _curse_clause(dlc, c: Dictionary):
+	var it = _item("item_potato").duplicate()
+	var te = TriggerEffect.make(c)
+	te.probe()
+	it.effects = [te]
+	it.is_cursed = false
+	var cu = dlc.curse_item(it, 0, true, 0.5)
+	for e in cu.effects:
+		if e is TriggerEffect:
+			return e
+	return null
+
+
+func test_173_trigger_curse_rules() -> void:
+	var pd = tree.root.get_node("ProgressData")
+	var dlc = pd.get_dlc_data("abyssal_terrors")
+	if dlc == null:
+		print("  (DLC data unavailable, skipped)")
+		return
+	var base_mod = dlc.cursed_item_base_percent_modifier
+	var cases = [
+		# [条款, 诅咒后 value, param, value2, 说明]
+		[{"trigger": "wave_start", "payload": "temp_stat", "stat": "stat_armor", "value": 3}, 5, 1, 0, "+3 armor"],
+		[{"trigger": "wave_start", "payload": "temp_stat", "stat": "stat_armor", "value": -4}, -2, 1, 0, "-4 armor"],
+		[{"trigger": "wave_start", "payload": "temp_stat", "stat": "items_price", "value": -5}, -8, 1, 0, "-5% price"],
+		[{"trigger": "wave_start", "payload": "temp_stat", "stat": "items_price", "value": 5}, 3, 1, 0, "+5% price"],
+		[{"trigger": "wave_start", "payload": "temp_stat", "stat": "number_of_enemies", "value": 10}, 10, 1, 0, "+10% enemies (neutral)"],
+		[{"trigger": "kill", "param": 6, "payload": "gold", "value": 2}, 2, 4, 0, "every 6 kills +2 gold"],
+		[{"trigger": "kill", "param": 6, "payload": "temp_stat", "stat": "stat_armor", "value": -2}, -2, 9, 0, "every 6 kills -2 armor"],
+		[{"trigger": "kill", "param": 1, "payload": "gold", "value": 2}, 2, 1, 0, "every kill +2 gold"],
+		[{"trigger": "level_up", "payload": "timed_stat", "stat": "stat_attack_speed", "value": 20, "value2": 3}, 30, 1, 5, "timed +20 attack speed 3s"],
+		[{"trigger": "level_up", "payload": "timed_stat", "stat": "stat_armor", "value": -6, "value2": 4}, -4, 1, 2, "timed -6 armor 4s"],
+	]
+	for cs in cases:
+		var ce = _curse_clause(dlc, cs[0])
+		_check(ce != null and ce.probed and abs(ce.curse_modifier() - 0.5) < 0.0011, cs[4] + ": probe gives the modifier")
+		if ce == null:
+			continue
+		var v = ce.live()
+		_eq(v.value, cs[1], cs[4] + ": value")
+		_eq(v.param, cs[2], cs[4] + ": param")
+		_eq(v.value2, cs[3], cs[4] + ": value2")
+		var txt = ce.get_text(0, false)
+		_check(txt.find(str(abs(cs[1]))) != -1, cs[4] + ": text shows the cursed value: " + txt)
+	_eq(dlc.cursed_item_base_percent_modifier, base_mod, "base modifier restored")
+	# 闪避上限：原版按 key 的特判
+	var dc = _curse_clause(dlc, {"trigger": "wave_start", "payload": "temp_stat", "stat": "dodge_cap", "value": 3}).live()
+	_check(dc.value >= 72 and dc.value <= 76, "dodge cap -> 72~76 (%d)" % dc.value)
+	# 几率 / 每波上限 / 间隔：只改载荷
+	var ch = _curse_clause(dlc, {"trigger": "heal", "chance": 50, "cap": 3, "payload": "gold", "value": 2}).live()
+	_check(ch.value == 3 and ch.chance == 50 and ch.cap == 3, "chance / cap clause: payload only (%d, %d%%, cap %d)" % [ch.value, ch.chance, ch.cap])
+	var iv = _curse_clause(dlc, {"trigger": "interval", "param": 5, "payload": "heal", "value": 2}).live()
+	_check(iv.value == 3 and iv.param == 5, "interval kept, payload cursed (%d every %ds)" % [iv.value, iv.param])
+	# grant 燃烧：按原版放大伤害与持续时间
+	var burn = null
+	for it in isvc.items + isvc.weapons:
+		for e in it.effects:
+			if e is BurningEffect and burn == null:
+				burn = e
+	_check(burn != null, "native burning effect found")
+	if burn != null:
+		var g = _curse_clause(dlc, {"trigger": "level_up", "payload": "grant", "grant": burn, "grant_mode": "temp", "grant_unit": 1.0, "value": 1}).live()
+		_check(g.grant != null and g.grant.burning_data.damage == int(ceil(burn.burning_data.damage * 1.5)), "granted burning damage cursed")
+		_check(g.grant != null and g.grant.burning_data.duration == int(ceil(burn.burning_data.duration * 1.5)), "granted burning duration cursed")
+	# 诅咒后的道具加入一局：按新数值触发
+	TempStats.reset()
+	var it2 = _item("item_potato").duplicate()
+	var te = TriggerEffect.make({"trigger": "kill", "param": 6, "payload": "temp_stat", "stat": "stat_armor", "value": 3})
+	te.probe()
+	it2.effects = [te]
+	it2.is_cursed = false
+	var cursed = dlc.curse_item(it2, 0, true, 0.5)
+	rd.add_item(cursed, 0)
+	var rt = Runtime.new()
+	tree.root.add_child(rt)
+	rt.mod = m
+	rt.rebuild_all()
+	for _i in 3:
+		rt.fire("kill", 0)
+	_eq(int(TempStats.get_stat(Keys.stat_armor_hash, 0)), 0, "cursed every-4 clause: not yet after 3 kills")
+	rt.fire("kill", 0)
+	_eq(int(round(TempStats.get_stat(Keys.stat_armor_hash, 0) / rd.get_stat_gain(Keys.stat_armor_hash, 0))), 3, "cursed clause fires every 4 kills (was 6)")
+	rt.queue_free()
+	TempStats.reset()
+	rd.remove_item(cursed, 0)
+	# 存档往返：保留系数与诅咒后的条款（含原版特判的随机结果）
+	for src in [_curse_clause(dlc, {"trigger": "wave_start", "payload": "temp_stat", "stat": "dodge_cap", "value": 3}), _curse_clause(dlc, cases[8][0])]:
+		var back = TriggerEffect.new()
+		back.deserialize_and_merge(JSON.parse(JSON.print(src.serialize())).result)
+		_check(back.probed and abs(back.curse_modifier() - src.curse_modifier()) < 0.0001, "roundtrip keeps the modifier")
+		_eq(back.get_text(0, false), src.get_text(0, false), "roundtrip keeps the cursed text")
+		_eq([back.live().value, back.live().param, back.live().value2], [src.live().value, src.live().param, src.live().value2], "roundtrip keeps the cursed clause")
+	# 旧存档（无探针字段）：数值原样
+	var back3 = TriggerEffect.new()
+	back3.deserialize_and_merge(JSON.parse(JSON.print(TriggerEffect.make({"trigger": "kill", "payload": "gold", "value": 4}).serialize())).result)
+	_check(not back3.probed and back3.live().value == 4, "old save clause read as is")

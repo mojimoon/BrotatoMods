@@ -58,12 +58,14 @@ func rebuild(player_index: int) -> void:
 	for src in sources:
 		for e in src.effects:
 			if e is TriggerEffect:
-				var id = e.get_instance_id()
+				# 诅咒后的实际条款（未诅咒为原条款）
+				var le = e.live()
+				var id = le.get_instance_id()
 				if old.has(id):
 					list.push_back(old[id])
 				else:
-					var show = Valuation.raw_rate(e.trigger, e.param, e.chance) <= FEEDBACK_MAX_RATE and not e.trigger in ["still", "moving"] and Catalog.STATS.has(e.stat)
-					list.push_back({"effect": e, "count": 0, "fired": 0, "active": false, "show": show, "stack": 0, "granted": []})
+					var show = Valuation.raw_rate(le.trigger, le.param, le.chance) <= FEEDBACK_MAX_RATE and not le.trigger in ["still", "moving"] and Catalog.STATS.has(le.stat)
+					list.push_back({"effect": le, "count": 0, "fired": 0, "active": false, "show": show, "stack": 0, "granted": []})
 	# 被移除的状态加成要撤销
 	var reverted = false
 	for id in old:

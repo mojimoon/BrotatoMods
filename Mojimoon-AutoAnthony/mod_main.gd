@@ -518,6 +518,7 @@ func _activate(state: Dictionary) -> void:
 			var p = plan.items[id]
 			_backup(res)
 			res.effects = p.effects
+			TriggerEffect.probe_all(res.effects)
 			res.tags = p.tags
 			res.tracking_text = "[EMPTY]"
 			# 原版的"限制 (N)"/"独特"属于原道具，不继承到重组后的道具上；带设定值型角色效果的道具为独特
@@ -550,6 +551,7 @@ func _activate(state: Dictionary) -> void:
 			_backup(res)
 			var pw = plan.weapons[id]
 			res.effects = pw.effects
+			TriggerEffect.probe_all(res.effects)
 			if w_rename and pw.has("adj"):
 				res.name = _compose_name(pw.adj, _backups[res.get_instance_id()].name)
 			if pw.has("stats"):
@@ -870,7 +872,9 @@ func _repair_item(it) -> void:
 	for e in tmpl.effects:
 		if e is TriggerEffect:
 			var ne = e.duplicate()
-			if it.is_cursed and dlc != null and dlc.has_method("_boost_effect_value_positively"):
+			if it.is_cursed and ne.probed:
+				ne.value = int(ceil(TriggerEffect.CURSE_PROBE * (1.0 + it.curse_factor)))
+			elif it.is_cursed and dlc != null and dlc.has_method("_boost_effect_value_positively"):
 				ne.value = dlc._boost_effect_value_positively(ne, it.curse_factor)
 			new_effects.push_back(ne)
 	it.effects = new_effects
@@ -889,8 +893,11 @@ func fire_shop(event: String, player_index: int, item = null) -> void:
 	sources += rd.get_player_items_ref(player_index)
 	sources += rd.get_player_weapons_ref(player_index)
 	for src in sources:
-		for e in src.effects:
-			if not e is TriggerEffect or e.trigger != event:
+		for te in src.effects:
+			if not te is TriggerEffect:
+				continue
+			var e = te.live()
+			if e.trigger != event:
 				continue
 			if event == "buy_stat" and not _item_raises(item, e.stat):
 				continue
@@ -918,6 +925,29 @@ func fire_shop(event: String, player_index: int, item = null) -> void:
 					for _i in max(0, e.value):
 						rd.add_stat(rd.get_random_primary_stats(), 1, player_index)
 					LinkedStats.reset_player(player_index)
+
+
+# 属性在原版效果里的好方向（触发条款诅咒用）：+1 = 越大越好，-1 = 越小越好（如价格），0 = 中立（如敌人数量）。
+# 取原版角色 / 道具 / 武器里第一个同 key、custom_key 为空的效果的符号；重组中的资源读备份的原版效果
+var _good_dirs = null
+
+
+func good_dir(key: String) -> int:
+	if _good_dirs == null:
+		var isvc = _autoload("ItemService")
+		if isvc == null:
+			return 1
+		_good_dirs = {}
+		for arr in [isvc.characters, isvc.items, isvc.weapons]:
+			for r in native_only(arr):
+				var b = _backups.get(r.get_instance_id())
+				for e in (b.effects if b != null else r.effects):
+					if e.custom_key != "" or e.key == "" or e.value == 0 or _good_dirs.has(e.key) or e is TriggerEffect:
+						continue
+					var s = e.get_sign(e.effect_sign, e.value)
+					var sv = 1 if e.value > 0 else -1
+					_good_dirs[e.key] = sv if s in [Effect.Sign.POSITIVE, Effect.Sign.OVERRIDE] else (-sv if s == Effect.Sign.NEGATIVE else 0)
+	return _good_dirs.get(key, 1)
 
 
 static func _item_raises(item, stat: String) -> bool:
