@@ -81,11 +81,14 @@ func finish() -> int:
 
 
 # 每次测试都输出：默认设置（固定种子 42）下全部重组道具的 markdown 表格 -> mods/tests/AutoAnthony/ITEMS.md
+const WRITE_ITEMS_TABLE = false
 const ITEMS_TABLE_SEED = 42
 const ITEMS_TABLE_PATH = "res://mods/tests/AutoAnthony/ITEMS.md"
 
 
 func _write_items_table() -> void:
+	if not WRITE_ITEMS_TABLE:
+		return
 	var prev = TranslationServer.get_locale()
 	# 默认输出简体中文；AA_ITEMS_LOCALE / AA_ITEMS_OUT 可输出其他语言到指定路径（核对文本用）
 	var loc = OS.get_environment("AA_ITEMS_LOCALE")
