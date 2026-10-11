@@ -79,12 +79,12 @@ About the buttons and options in the top-right corner:
 
 [h1]Files[/h1]
 
-Files are saved in [code]%APPDATA%\Brotato\Mojimoon-BroEditor\[/code] (Windows), [code]~/Library/Application Support/Brotato/Mojimoon-BroEditor/[/code] (Mac) or [code]~/.local/share/Brotato/Mojimoon-BroEditor/[/code] (Linux):
+Files are saved in [i]%APPDATA%\Brotato\Mojimoon-BroEditor\[/i] (Windows), [i]~/Library/Application Support/Brotato/Mojimoon-BroEditor/[/i] (Mac) or [i]~/.local/share/Brotato/Mojimoon-BroEditor/[/i] (Linux):
 
 [list]
-[*][code]profiles.json[/code]: changes to vanilla characters, items and weapons, and the editor settings.
-[*][code]custom\character\[/code], [code]custom\item\[/code], [code]custom\weapon\[/code]: one [code]<id>.json[/code] file per character, item or weapon you created. To share, send the files (or a whole folder); the receiver puts them in the same folder and restarts the game.
-[*][code]icons\[/code]: imported icon images. Send them along with the file if your object uses one.
+[*][i]profiles.json[/i]: changes to vanilla characters, items and weapons, and the editor settings.
+[*][i]custom\character\[/i], [i]custom\item\[/i], [i]custom\weapon\[/i]: one [i]<id>.json[/i] file per character, item or weapon you created. To share, send the files (or a whole folder); the receiver puts them in the same folder and restarts the game.
+[*][i]icons\[/i]: imported icon images. Send them along with the file if your object uses one.
 [/list]
 
 [pullquote]If you like this mod, please consider liking, favoriting and sharing it, thank you! Comments and suggestions are also very welcome![/pullquote]
@@ -179,12 +179,12 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 [h1]文件[/h1]
 
-文件保存在 [code]%APPDATA%\Brotato\Mojimoon-BroEditor\[/code] (Windows)、[code]~/Library/Application Support/Brotato/Mojimoon-BroEditor/[/code] (Mac) 或 [code]~/.local/share/Brotato/Mojimoon-BroEditor/[/code] (Linux)：
+文件保存在 [i]%APPDATA%\Brotato\Mojimoon-BroEditor\[/i] (Windows)、[i]~/Library/Application Support/Brotato/Mojimoon-BroEditor/[/i] (Mac) 或 [i]~/.local/share/Brotato/Mojimoon-BroEditor/[/i] (Linux)：
 
 [list]
-[*][code]profiles.json[/code]：对原版角色、道具、武器的修改，以及编辑器设置。
-[*][code]custom\character\[/code]、[code]custom\item\[/code]、[code]custom\weapon\[/code]：每个新建的角色、道具、武器各一个 [code]<id>.json[/code] 文件。分享时发送文件（或整个文件夹），对方放进相同的文件夹后重启游戏即可。
-[*][code]icons\[/code]：导入的图标图片。如果对象用了导入的图标，一并发送。
+[*][i]profiles.json[/i]：对原版角色、道具、武器的修改，以及编辑器设置。
+[*][i]custom\character\[/i]、[i]custom\item\[/i]、[i]custom\weapon\[/i]：每个新建的角色、道具、武器各一个 [i]<id>.json[/i] 文件。分享时发送文件（或整个文件夹），对方放进相同的文件夹后重启游戏即可。
+[*][i]icons\[/i]：导入的图标图片。如果对象用了导入的图标，一并发送。
 [/list]
 
 [pullquote]如果你喜欢这个 mod，欢迎点赞、收藏、转发，多谢啦！有问题或建议欢迎在评论区留言！[/pullquote]
