@@ -22,11 +22,13 @@ func test_31_weapons_swap_within_type() -> void:
 	var wg = WG.new(m.get_cfg(), 11)
 	wg.generate(weapons)
 	_check(out.size() > 200, "weapons mapped (%d)" % out.size())
-	var lifted = 0
-	var over = 0
 	var changed = 0
 	var cross = 0
 	var off = 0
+	var gained = 0
+	var own = 0
+	var fs = []
+	var fallback = 0
 	for id in out:
 		var w = isvc.get_element_safe(isvc.weapons, id)
 		var p = out[id]
@@ -35,7 +37,8 @@ func test_31_weapons_swap_within_type() -> void:
 			changed += 1
 		if donor.type != w.type:
 			cross += 1
-		_check(p.stats.damage >= 1, id + " damage >= 1")
+		# 属性不变（标枪效果绑定的暴击除外）
+		_eq([p.stats.damage, str(p.stats.scaling_stats), p.stats.cooldown], [w.stats.damage, str(w.stats.scaling_stats), w.stats.cooldown], id + " stats unchanged")
 		for e in p.effects:
 			if e is WeaponStackEffect:
 				_eq(e.weapon_stacked_id, w.weapon_id, "stack effect retargeted on " + id)
@@ -43,31 +46,61 @@ func test_31_weapons_swap_within_type() -> void:
 				_check(not WG.ranged_only(e), "%s (melee) has no ranged-only effect %s" % [id, WV.effect_key(e)])
 			if WG.bound_key(e):
 				_check(WV.effect_key(e) in _keys_of(w.effects), "%s keeps only its own family-bound effect %s" % [id, WV.effect_key(e)])
-		# 绑定效果按 key 比较（参数按家族随机）
 		for e in w.effects:
 			if WG.bound_key(e):
 				_check(WV.effect_key(e) in _keys_of(p.effects), "%s keeps its family-bound effect" % id)
-		# 价值守恒：新武器价值 = 原价值 × 家族浮动（伤害取整误差内）
-		var want = wg._want(w) * wg._family_mult(WG.family_of(w))
+		var v0 = wg.wv.value(w.stats, w.effects, w.tier)
 		var got = wg.wv.value(p.stats, p.effects, w.tier)
-		# 为不倒挂而抬高伤害的武器会超出目标，单独计数
-		# 负面效果抵扣封顶的武器价值低于目标，不计
-		if p.get("capped", false):
-			continue
-		if p.get("lifted", false):
-			lifted += 1
-			if got > want * 1.3:
-				over += 1
-				print("AUDIT lifted over target %s: want %.1f got %.1f" % [id, want, got])
-		elif abs(got - want) > max(3.0, want * 0.15):
-			off += 1
-			print("AUDIT weapon value off %s: want %.1f got %.1f (scale %.2f)" % [id, want, got, p.scale])
-	_check(changed > out.size() / 2, "most weapons got another family's effects (%d)" % changed)
+		var price = int(p.get("price", w.value))
+		if p.has("price"):
+			# 获得效果：涨价至多 30%，价格与价值同比例
+			gained += 1
+			_check(price > int(w.value) and price <= int(round(w.value * 1.3)) + 1, "%s price %d -> %d within +30%%" % [id, int(w.value), price])
+			_check(abs(got / v0 - float(price) / w.value) < 0.12 + 1.0 / w.value, "%s price follows value (%.2f vs %.2f)" % [id, got / v0, float(price) / w.value])
+		elif WG.family_of(donor) == WG.family_of(w):
+			own += 1
+		# 有效果的武器：效果价值 = 原效果价值 × 浮动（取整与逐级强化的误差内）
+		var bound = []
+		for e in w.effects:
+			if WG.bound_key(e):
+				bound.push_back(e)
+		var fx0 = v0 - wg.wv.value(w.stats, bound, w.tier)
+		if fx0 > 0 and not p.has("price"):
+			var want = fx0 * wg._family_mult(WG.family_of(w))
+			var fx = got - wg.wv.value(p.stats, bound, w.tier)
+			if abs(fx - want) > max(2.0, want * 0.3):
+				off += 1
+				print("AUDIT effect value off %s: want %.1f got %.1f (f %.2f, donor %s)" % [id, want, fx, float(p.fx_scale), p.donor])
+			if p.donor != id:
+				fs.push_back(float(p.fx_scale))
+			else:
+				fallback += 1
+	fs.sort()
+	print("AUDIT weapons: %d, other family %d, cross-type %d, kept own %d (with effects %d), gained effects %d; effect scale p10 %.2f median %.2f p90 %.2f" % [out.size(), changed, cross, own, fallback, gained, fs[fs.size() / 10], fs[fs.size() / 2], fs[fs.size() * 9 / 10]])
+	_check(changed > out.size() / 3, "many weapons got another family's effects (%d)" % changed)
 	_check(cross > 0, "effects cross melee / ranged (%d)" % cross)
-	_check(off <= out.size() / 20, "weapon values match the target (%d off)" % off)
-	print("AUDIT lifted %d, of which > 1.3x target %d" % [lifted, over])
-	_check(over <= out.size() / 10, "few lifted weapons far above target (%d)" % over)
-	print("AUDIT weapons: %d, other family %d, cross-type %d" % [out.size(), changed, cross])
+	_check(gained > 0, "some weapons without effects gained effects (%d)" % gained)
+	_check(off <= out.size() / 20, "effect values match the target (%d off)" % off)
+	_check(fs[0] >= WG.FX_RANGE[0] - 0.001 and fs[-1] <= WG.FX_RANGE[1] + 0.001, "effect scale within range (%.2f - %.2f)" % [fs[0], fs[-1]])
+	# 补出的低级武器：属性从高一级倒推（不高于高一级），压低时加成不低于下限，不出现"伤害 1、加成 5%"
+	var all = weapons + WG.make_low_tiers(weapons)
+	var wg2 = WG.new(m.get_cfg(), 11)
+	var out2 = wg2.generate(all)
+	var n_low = 0
+	for w in all:
+		if not w.has_meta("aa_low_of"):
+			continue
+		n_low += 1
+		var p = out2[w.my_id]
+		var up = out2[w.upgrades_into.my_id]
+		_check(p.stats.damage <= up.stats.damage, "%s damage %d <= next tier %d" % [w.my_id, p.stats.damage, up.stats.damage])
+		for i in p.stats.scaling_stats.size():
+			var c = float(p.stats.scaling_stats[i][1])
+			var cu = float(up.stats.scaling_stats[i][1])
+			var floor_c = WG.SCALING_FLOOR.get(WV.stat_name(p.stats.scaling_stats[i][0]), 0.05)
+			if cu > 0:
+				_check(c <= cu + 0.001 and c >= min(cu, floor_c) - 0.001, "%s coef %.2f within [floor %.2f, next tier %.2f]" % [w.my_id, c, floor_c, cu])
+	_check(n_low > 20, "low tiers generated (%d)" % n_low)
 
 
 # 深度重组：属性从原版分布抽取、价值按模型守恒；主加成大多是本类型的伤害；类别按词条（必定 / 可能）选取
@@ -208,9 +241,9 @@ func test_142_weapon_item_effects() -> void:
 			if fam_lines[f] != null:
 				with_line += 1
 		print("AUDIT %s item lines: %d / %d families, related %d, clauses %d" % [mode, with_line, fam_lines.size(), related, clauses])
-		# 仅重组效果：约六成家族有道具效果；深度重组：道具效果是"额外效果"中的一部分
-		var lo_share = 0.4 if mode == "effects" else 0.1
-		var hi_share = 0.8 if mode == "effects" else 0.5
+		# 仅重组效果：有效果的家族约六成带道具效果，获得效果的家族一部分是道具效果；深度重组：道具效果是"额外效果"中的一部分
+		var lo_share = 0.2 if mode == "effects" else 0.1
+		var hi_share = 0.6 if mode == "effects" else 0.5
 		_check(with_line > fam_lines.size() * lo_share and with_line < fam_lines.size() * hi_share, mode + ": share of families with an item line (%d)" % with_line)
 		_check(related > 0 and clauses > 0, mode + ": related stat lines and clauses both appear")
 

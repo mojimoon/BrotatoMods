@@ -1,8 +1,8 @@
 extends Reference
 
 # 武器重组。以武器家族（同 weapon_id 的各稀有度）为单位：
-#   仅重组效果（effects）：每个家族换用另一个随机家族的效果（可跨近战 / 远程），
-#     再按价值模型（weapon_value.gd）缩放伤害与属性加成，使新武器的价值 = 原武器价值 × 平均数值 × 浮动
+#   仅重组效果（effects）：属性不变，有效果的家族换用另一个随机有效果家族的效果（可跨近战 / 远程），
+#     按价值模型（weapon_value.gd）缩放效果数值，使效果价值 = 原效果价值 × 浮动；无效果的家族可能获得效果并涨价
 #   深度重组（deep）：冷却、暴击、射程、击退、吸血、投射物 / 贯穿 / 弹跳 / 换弹、属性加成、效果、武器类别全部重新生成
 #     （各属性从同类型原版武器的分布中抽取）；最低一级随机多组、取价值不超过价格对应目标的最好一组，
 #     由它估出最高一级、中间各级按原版逐级比例插值，按实际价值重新定价；近战 / 远程、武器场景不变
@@ -21,10 +21,6 @@ const FAMILY_BOUND_KEYS = ["weapon_slow_in_zone", "effect_no_hit_boost", "break_
 const RANGED_ONLY_KEYS = ["pierce_on_crit", "bounce_on_crit", "modify_every_x_projectile", "reload_when_pickup_gold"]
 # 浮动范围 100% 时家族强度倍率的对数标准差（原版"价值 / 价格"的离散度约 0.36，但大部分是模型误差，不照搬）
 const NATIVE_SIGMA = 0.1
-# 伤害缩放的可接受范围：超出则换下一个候选家族
-const MIN_SCALE = 0.3
-const MAX_SCALE = 3.5
-const DONOR_TRIES = 12
 
 var cfg: Dictionary
 var seed_value: int
@@ -209,66 +205,298 @@ func _family_mult(f: String) -> float:
 # ============================================================
 # 仅重组效果
 # ============================================================
+# 武器属性不变（平均数值 ≠ 100% 时伤害与加成整体乘它），只换效果，不再用伤害补平价值：
+#   有效果的武器：换用另一个有效果家族的效果，缩放效果数值，使效果价值 = 原效果价值 × 浮动；
+#     缩放倍率须在 FX_RANGE 内、价值偏差在 FX_TOL 内，否则换下一个来源家族；都不合适时保留自己的效果（同样缩放）
+#   无效果的武器：按"额外效果"滑条（100% = 原版有效果的武器比例）可能获得效果（来源家族的效果或一条道具效果），
+#     价值增加至多 PRICE_CAP，价格按价值比例上涨；滑条低于 100% 时有效果的武器可能失去效果，价格按比例下降（至多 PRICE_CAP）
+#   补出的低级武器没有原版属性：伤害、加成、攻速按原版逐级成长从高一级倒推（强于同价格的武器时一起压低，
+#     至多一半、加成不低于 SCALING_FLOOR），效果占比同最低的原版一级
+const FX_RANGE = [0.5, 2.0]
+const FX_TOL = 0.2
+const PRICE_CAP = 0.3
+
+
 func generate_effects_only() -> Dictionary:
+	_collect_deep_priors()
+	_collect_upgrade_priors()
 	rng.seed = hash(str(seed_value) + "/weapons")
-	var order = fam_names.duplicate()
 	var pool = fam_names.duplicate()
 	_shuffle(pool)
 	var out = {}
-	for f in order:
-		var target = families[f]
-		var mult = _family_mult(f)
-		# 候选来源家族：打乱后的顺序，从与自身位置对应的那个开始轮换
-		var start = pool.find(f)
-		var done = false
-		for k in DONOR_TRIES:
-			var donor_f = pool[(start + 1 + k) % pool.size()]
-			var res = _apply_donor(f, target, families[donor_f], mult)
-			if not res.empty():
-				for id in res:
-					out[id] = res[id]
-				done = true
-				break
-		if not done:
-			var res = _apply_donor(f, target, target, mult, true)
-			for id in res:
-				out[id] = res[id]
+	for f in fam_names:
+		var res = _effects_family(f, pool)
+		for id in res:
+			out[id] = res[id]
 	return out
 
 
-# 把来源家族的效果放到目标家族各稀有度上，缩放伤害使价值达标；任一稀有度无法达标返回 {}
-func _apply_donor(f: String, target: Dictionary, donor: Dictionary, mult: float, force := false) -> Dictionary:
-	var out = {}
-	var spec = _item_spec(f, _closest_tier(target.tiers, 0).stats.scaling_stats)
-	for tier in target.tiers:
-		var tw = target.tiers[tier]
-		var dw = _closest_tier(donor.tiers, tier)
-		var effects = []
-		# 目标家族自身绑定的效果保留
+func _effects_family(f: String, pool: Array) -> Dictionary:
+	var fam = families[f]
+	var ty: int = fam.type
+	var avg = float(cfg.get("w_avg", 100)) / 100.0
+	var m = _family_mult(f) / avg
+	var natives = []
+	var lows = []
+	for t in fam.tiers:
+		if fam.tiers[t].has_meta("aa_low_of"):
+			lows.push_back(t)
+		else:
+			natives.push_back(t)
+	if natives.empty():
+		return {}
+	natives.sort()
+	# 各原版稀有度：属性、绑定效果、原价值（属性按平均数值缩放后）、效果价值
+	var rows = {}
+	var has_fx = false
+	for t in natives:
+		var tw = fam.tiers[t]
+		var st = tw.stats if avg == 1.0 else scaled_stats(tw.stats, avg)
+		var bound = []
+		var own = []
 		for e in tw.effects:
 			if bound_key(e):
-				effects.push_back(_vary_fixed(e, f))
-		for e in dw.effects:
+				bound.push_back(_vary_fixed(e, f))
+			else:
+				own.push_back(e)
+		var b = wv.value(st, bound, t)
+		var v = wv.value(st, bound + own, t)
+		rows[t] = {"tw": tw, "st": st, "bound": bound, "own": own, "orig": v, "fx": v - b}
+		if not own.empty() and v > b:
+			has_fx = true
+	rng.seed = hash(str(seed_value) + "/weffects/" + f)
+	var s1 = float(_fx_share[ty][1])
+	var goal = min(0.95, s1 * float(cfg.get("w_effects", 125)) / 100.0)
+	var u = rng.randf()
+	var res = {}
+	var priced = false
+	if has_fx and goal < s1 and u < 1.0 - goal / s1:
+		# 失去效果
+		for t in natives:
+			res[t] = {"effects": rows[t].bound, "stats": rows[t].st, "donor": rows[t].tw.my_id, "fx_scale": 0.0, "line": 0.0, "src": ""}
+		priced = true
+	elif has_fx:
+		var spec = _item_spec(f, rows[natives[0]].tw.stats.scaling_stats)
+		var totals = {}
+		var lines = {}
+		for t in natives:
+			var r = rows[t]
+			totals[t] = r.orig + r.fx * (m - 1.0)
+			lines[t] = 0.0 if spec.empty() else min(ITEM_LINE_SHARE * r.orig, 0.5 * r.fx * m)
+		res = _effects_donors(f, pool, natives, rows, totals, spec, lines)
+		if res.empty():
+			res = _effects_tiers(f, natives, rows, fam, totals, spec, lines, false)
+	elif goal > s1 and u < (goal - s1) / max(0.01, 1.0 - s1):
+		# 获得效果：价值增加原价值的 g（同类型原版有效果武器的效果占比 s 折算成 s / (1 - s)，至多 PRICE_CAP）
+		var targets: Array = _fx_targets[ty]
+		var s = float(targets[rng.randi() % targets.size()]) if not targets.empty() else 0.3
+		var g = min(PRICE_CAP, s / max(0.05, 1.0 - s) * m)
+		var totals = {}
+		var lines = {}
+		var item = gen != null and cfg.get("w_item_effects", false) and rng.randf() < ITEM_SLOT_SHARE
+		for t in natives:
+			totals[t] = rows[t].orig * (1.0 + g)
+			lines[t] = rows[t].orig * g if item else 0.0
+		if item:
+			res = _effects_tiers(f, natives, rows, null, totals, _item_spec(f, rows[natives[0]].tw.stats.scaling_stats, true), lines, false)
+		else:
+			res = _effects_donors(f, pool, natives, rows, totals, {}, lines)
+		priced = not res.empty()
+	if res.empty():
+		for t in natives:
+			res[t] = {"effects": rows[t].bound + rows[t].own, "stats": rows[t].st, "donor": rows[t].tw.my_id, "fx_scale": 1.0, "line": 0.0, "src": ""}
+	# 价格：获得 / 失去效果时按价值比例（至多 ±PRICE_CAP）
+	var out = {}
+	var t0: int = natives[0]
+	var k0 = 1.0
+	for t in natives:
+		var p = res[t]
+		var k = 1.0
+		if priced:
+			k = clamp(wv.value(p.stats, p.effects, t) / max(0.01, rows[t].orig), 1.0 - PRICE_CAP, 1.0 + PRICE_CAP)
+			p["price"] = int(max(1, round(float(rows[t].tw.value) * k)))
+		if t == t0:
+			k0 = k
+		out[rows[t].tw.my_id] = p
+	# 补出的低级武器：属性从高一级按原版逐级成长倒推（_lower_stats），远强于同价格武器时再压低，价格沿用补出时的阶梯；
+	# 效果（来源家族最接近的一级）与道具效果的价值占比同最低的原版一级
+	var p0 = res[t0]
+	var v_new = wv.value(p0.stats, p0.effects, t0)
+	var fx_share = clamp((v_new - wv.value(p0.stats, rows[t0].bound, t0)) / max(0.01, v_new), 0.0, 0.9)
+	var line_share = float(p0.line) / max(0.01, v_new)
+	var donor_fam = families.get(p0.get("src", ""))
+	var spec0 = p0.get("spec", {})
+	lows.sort()
+	lows.invert()
+	var upper = p0.stats
+	for t in lows:
+		var tw = fam.tiers[t]
+		var bound = []
+		for e in tw.effects:
 			if bound_key(e):
-				continue
-			if ranged_only(e) and target.type == 0:
-				if force:
-					continue
-				return {}
-			effects.push_back(_vary_fixed(_adapt(_convert_explosion(e.duplicate(), target.type), tw), f))
-		var base_st = _bind_javelin(tw.stats, effects, float(dw.stats.crit_damage))
-		var want = _want(tw) * mult
-		var line = _item_effect(spec, tier, want)
-		if line != null:
-			effects.push_back(line)
-		var excess = _downside_excess(want, effects)
-		want -= excess
-		var r = _solve_scale(base_st, effects, tier, want)
-		if not force and (r < MIN_SCALE or r > MAX_SCALE):
-			return {}
-		var st = scaled_stats(base_st, r)
-		out[tw.my_id] = {"effects": effects, "stats": st, "donor": dw.my_id, "scale": r, "want": want, "capped": excess > 0}
+				bound.push_back(_vary_fixed(e, f))
+		var st = _lower_stats(ty, t, upper)
+		# 强于同价格的武器（原版传奇武器按价格算很强）：伤害与加成一起压低（至多一半），加成不低于 SCALING_FLOOR
+		var want = _want(tw) * (LEGENDARY_PREMIUM if _is_legendary(tw.get_meta("aa_low_of")) else 1.0) * (1.0 - fx_share)
+		if wv.value(st, bound, t) > want:
+			st = _floored_to(st, bound, t, want)
+		var total = wv.value(st, bound, t) / (1.0 - fx_share)
+		var p = _effects_tier(f, {"tw": tw, "st": st, "bound": bound}, donor_fam, total, spec0, line_share * total, false)
+		if k0 != 1.0:
+			p["price"] = int(max(1, round(float(tw.value) * k0)))
+		out[tw.my_id] = p
+		upper = p.stats
 	return out
+
+
+# 低一级的属性：基础伤害、加成系数、攻击间隔按原版同类型从 t 到 t + 1 的平均成长（几何平均，含不变的样本）倒推；
+# 加成不低于 SCALING_FLOOR（高一级已低于下限的不变）
+func _lower_stats(ty: int, t: int, st):
+	var s = st.duplicate()
+	s.damage = int(max(1, round(float(st.damage) / _mean_growth(ty, t, "damage"))))
+	var sc = []
+	for i in st.scaling_stats.size():
+		var x = st.scaling_stats[i]
+		var c = float(x[1])
+		if c > 0:
+			c = max(min(c, SCALING_FLOOR.get(WeaponValue.stat_name(x[0]), 0.05)), stepify(c / _mean_growth(ty, t, "main" if i == 0 else "secondary"), 0.05))
+		sc.push_back([x[0], c])
+	s.scaling_stats = sc
+	s.cooldown = int(round(float(st.cooldown) / _mean_growth(ty, t, "cooldown")))
+	return s
+
+
+# 伤害 × r、正加成系数 × r（不低于 SCALING_FLOOR，不高于原值），r 使价值不超过 want 且尽量接近；
+# r 至少 LOW_SHRINK_MIN（原版传奇武器按价格算本来就强，不压成 1 点伤害）
+const LOW_SHRINK_MIN = 0.5
+
+
+func _floored_to(st, bound: Array, tier: int, want: float):
+	var lo = LOW_SHRINK_MIN
+	if wv.value(_floored(st, lo), bound, tier) > want:
+		return _floored(st, lo)
+	var hi = 1.0
+	for _i in 16:
+		var mid = sqrt(lo * hi)
+		if wv.value(_floored(st, mid), bound, tier) > want:
+			hi = mid
+		else:
+			lo = mid
+	return _floored(st, lo)
+
+
+static func _floored(st, r: float):
+	var s = st.duplicate()
+	s.damage = int(max(1, round(float(st.damage) * r)))
+	var sc = []
+	for x in st.scaling_stats:
+		var c = float(x[1])
+		if c > 0:
+			c = min(c, max(SCALING_FLOOR.get(WeaponValue.stat_name(x[0]), 0.05), stepify(c * r, 0.05)))
+		sc.push_back([x[0], c])
+	s.scaling_stats = sc
+	return s
+
+
+func _mean_growth(ty: int, t: int, field: String) -> float:
+	var arr = _prior(ty, t, field)
+	if arr.empty():
+		return 1.0
+	var acc = 0.0
+	for x in arr:
+		acc += log(float(x))
+	return exp(acc / arr.size())
+
+
+# 依次尝试有效果的来源家族（打乱后的顺序，从自身位置之后开始），取第一个各稀有度都合适的；都不合适时返回 {}
+func _effects_donors(f: String, pool: Array, natives: Array, rows: Dictionary, totals: Dictionary, spec: Dictionary, lines: Dictionary) -> Dictionary:
+	var start = pool.find(f)
+	for k in range(1, pool.size()):
+		var d = pool[(start + k) % pool.size()]
+		if not d in _effectful:
+			continue
+		var res = _effects_tiers(f, natives, rows, families[d], totals, spec, lines, true)
+		if not res.empty():
+			return res
+	return {}
+
+
+func _effects_tiers(f: String, natives: Array, rows: Dictionary, donor, totals: Dictionary, spec: Dictionary, lines: Dictionary, strict: bool) -> Dictionary:
+	var res = {}
+	var prev = null
+	for t in natives:
+		var p = _effects_tier(f, rows[t], donor, totals[t], spec, lines[t], strict)
+		if p.empty():
+			return {}
+		# 逐级强化（同 _no_inversion）后再检查价值：各级分别缩放可能低于低一级，强化后会超出目标
+		if prev != null:
+			p.effects = _strengthen_effects(p.effects, prev.effects)
+			if strict and wv.value(p.stats, p.effects, t) - totals[t] > FX_TOL * max(0.01, totals[t] - rows[t].orig + rows[t].fx):
+				return {}
+		res[t] = p
+		prev = p
+	return res
+
+
+# 一个稀有度：绑定效果 + 道具效果（价值 line）+ 来源家族最接近稀有度的效果，来源效果按价值缩放使整把武器价值 = total。
+# strict 时缩放倍率超出 FX_RANGE、价值偏差超出 FX_TOL 或没有可用效果返回 {}
+func _effects_tier(f: String, r: Dictionary, donor, total: float, spec: Dictionary, line: float, strict: bool) -> Dictionary:
+	var tw = r.tw
+	var t: int = tw.tier
+	var st = r.st
+	var base = r.bound.duplicate()
+	var le = _item_effect(spec, t, line / ITEM_LINE_SHARE) if line > 0 else null
+	if le != null:
+		base.push_back(le)
+	var fx = []
+	var dw = null
+	if donor != null:
+		dw = _closest_tier(donor.tiers, t)
+		for e in dw.effects:
+			if bound_key(e) or (ranged_only(e) and tw.type == 0):
+				continue
+			fx.push_back(_vary_fixed(_adapt(_convert_explosion(e.duplicate(), tw.type), tw), f))
+		if fx.empty() and strict:
+			return {}
+		st = _bind_javelin(st, fx, float(dw.stats.crit_damage))
+	var fit = {"effects": [], "f": 1.0}
+	if not fx.empty():
+		var want = total - wv.value(st, base, t)
+		if want <= 0 and strict:
+			return {}
+		fit = _fit_fx(st, base, fx, t, want)
+		if strict and (fit.f < FX_RANGE[0] or fit.f > FX_RANGE[1] or abs(fit.gain - want) > FX_TOL * want):
+			return {}
+	var line_v = wv.value(st, base, t) - wv.value(st, r.bound, t) if le != null else 0.0
+	return {"effects": base + fit.effects, "stats": st, "donor": dw.my_id if dw != null else tw.my_id, "fx_scale": fit.f,
+		"line": line_v, "src": family_of(dw) if dw != null else "", "spec": spec if le != null else {}}
+
+
+# 效果数值的缩放倍率 f（_scale_effects），使加上它们后价值增加 want（价值随 f 单调、取整成台阶：取更接近的一侧）。
+# 数值不能缩放的（开关型）f 记为 1
+func _fit_fx(st, base: Array, fx: Array, tier: int, want: float) -> Dictionary:
+	var b = wv.value(st, base, tier)
+	var lo = 0.1
+	var hi = 10.0
+	var g_lo = wv.value(st, base + _scale_effects(fx, lo), tier) - b
+	var g_hi = wv.value(st, base + _scale_effects(fx, hi), tier) - b
+	if abs(g_hi - g_lo) < 0.001:
+		return {"effects": fx, "f": 1.0, "gain": g_lo}
+	if g_lo >= want:
+		return {"effects": _scale_effects(fx, lo), "f": lo, "gain": g_lo}
+	if g_hi <= want:
+		return {"effects": _scale_effects(fx, hi), "f": hi, "gain": g_hi}
+	for _i in 14:
+		var mid = sqrt(lo * hi)
+		var g = wv.value(st, base + _scale_effects(fx, mid), tier) - b
+		if g < want:
+			lo = mid
+			g_lo = g
+		else:
+			hi = mid
+			g_hi = g
+	var f = lo if want - g_lo < g_hi - want else hi
+	return {"effects": _scale_effects(fx, f), "f": f, "gain": g_lo if f == lo else g_hi}
 
 
 # 效果搬到新武器上的改写：棍子的"每有 1 把同名武器"指向新武器
@@ -462,31 +690,6 @@ func _downside_excess(want: float, effects: Array) -> float:
 	return max(0.0, neg - DOWNSIDE_CAP * want)
 
 
-static func _adapt(e, tw):
-	if e is WeaponStackEffect:
-		e.weapon_stacked_id = tw.weapon_id
-		e.weapon_stacked_id_hash = Keys.generate_hash(tw.weapon_id)
-		e.weapon_stacked_name = tw.name
-	return e
-
-
-# 伤害与属性加成的缩放倍率 r，使 value(缩放后属性, effects) = want（二分；价值随 r 单调）
-func _solve_scale(st, effects: Array, tier: int, want: float, coef_exp := 1.0) -> float:
-	var lo = 0.05
-	var hi = 20.0
-	if wv.value(scaled_stats(st, hi, coef_exp), effects, tier) < want:
-		return hi
-	if wv.value(scaled_stats(st, lo, coef_exp), effects, tier) > want:
-		return lo
-	for _i in 30:
-		var mid = sqrt(lo * hi)
-		if wv.value(scaled_stats(st, mid, coef_exp), effects, tier) < want:
-			lo = mid
-		else:
-			hi = mid
-	return sqrt(lo * hi)
-
-
 # 伤害 × r（至少 1），每条属性加成 × r^coef_exp（按 5% 取整，正系数至少 5%）
 static func scaled_stats(st, r: float, coef_exp := 1.0):
 	var s = st.duplicate()
@@ -501,6 +704,15 @@ static func scaled_stats(st, r: float, coef_exp := 1.0):
 		sc.push_back([x[0], nc])
 	s.scaling_stats = sc
 	return s
+
+
+static func _adapt(e, tw):
+	if e is WeaponStackEffect:
+		e.weapon_stacked_id = tw.weapon_id
+		e.weapon_stacked_id_hash = Keys.generate_hash(tw.weapon_id)
+		e.weapon_stacked_name = tw.name
+	return e
+
 
 
 func _shuffle(arr: Array) -> void:
@@ -1567,26 +1779,6 @@ static func _convert_explosion(e, ty: int):
 		e.text_key = ""
 	return e
 
-
-# 只缩放伤害（加成系数不变）
-func _solve_damage(st, effects: Array, tier: int, want: float) -> float:
-	var lo = 0.02
-	var hi = 50.0
-	var probe = st.duplicate()
-	probe.damage = int(max(1, round(st.damage * hi)))
-	if wv.value(probe, effects, tier) < want:
-		return hi
-	probe.damage = int(max(1, round(st.damage * lo)))
-	if wv.value(probe, effects, tier) > want:
-		return lo
-	for _i in 30:
-		var mid = sqrt(lo * hi)
-		probe.damage = int(max(1, round(st.damage * mid)))
-		if wv.value(probe, effects, tier) < want:
-			lo = mid
-		else:
-			hi = mid
-	return sqrt(lo * hi)
 
 
 # 效果里的暴击 / 元素属性不给词条（不决定精准 / 元素类别）；暴击词条只看武器面板，元素只看加成属性与燃烧
