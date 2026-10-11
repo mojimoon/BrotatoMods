@@ -1,7 +1,7 @@
 extends Control
 
 # 东尼算法设置弹窗。布局（自上而下）：
-#   标题栏：标题 + 种子（固定开关、输入框、随机）+ 字体大小 + 总开关 + 关闭
+#   标题栏：标题 + 字体大小 + 种子（固定开关、输入框、随机）+ 总开关 + 关闭
 #     标题栏与页签不随字体大小缩放：拖动滑条时滑条本身不移动
 #   页签：重组道具 / 重组武器 / 重组角色，每个页签右边是本页的总开关（武器、角色默认关闭）
 #   重组道具页：效果设置、更多选项（初始道具 / 保留原名 / 强制重组 / 究极混沌）、数值设置 + 道具预览
@@ -173,7 +173,7 @@ func _build_ui() -> void:
 	box.add_child(_desc(tr("AA_UI_CHARACTERS_DESC")))
 
 
-# 标题 种子 [固定] [输入框] [随机]  字体大小 [滑条]  启用 [开关] [X]（用原版字体，不随字体大小缩放）
+# 标题 字体大小 [滑条]  种子 [固定] [输入框] [随机]  启用 [开关] [X]（用原版字体，不随字体大小缩放）
 func _build_header(root: Control) -> void:
 	var header = HBoxContainer.new()
 	header.add_constant_override("separation", 10)
@@ -181,6 +181,13 @@ func _build_header(root: Control) -> void:
 	var title = _label(tr("AA_TITLE"), BASE_TITLE, C_TEXT)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
+	header.add_child(_label(tr("MENU_FONT_SIZE"), BASE_SMALL, C_TEXT))
+	var font_sl = _slider(["cfg_font_scale", "MENU_FONT_SIZE", 80, 125, 5])
+	font_sl.size_flags_horizontal = 0
+	font_sl.rect_min_size.x = 140
+	header.add_child(font_sl)
+	header.add_child(_slider_value(["cfg_font_scale"], BASE_SMALL))
+	header.add_child(_gap(30))
 	var seed_lbl = _label(tr("AA_UI_SEED"), BASE_SMALL, C_TEXT)
 	seed_lbl.hint_tooltip = tr("AA_UI_SEED_DESC")
 	seed_lbl.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -204,13 +211,6 @@ func _build_header(root: Control) -> void:
 	_apply_action_style(rnd, C_ACCENT_2)
 	rnd.connect("pressed", self, "_on_random_seed_pressed")
 	header.add_child(rnd)
-	header.add_child(_gap(30))
-	header.add_child(_label(tr("MENU_FONT_SIZE"), BASE_SMALL, C_TEXT))
-	var font_sl = _slider(["cfg_font_scale", "MENU_FONT_SIZE", 80, 125, 5])
-	font_sl.size_flags_horizontal = 0
-	font_sl.rect_min_size.x = 140
-	header.add_child(font_sl)
-	header.add_child(_slider_value(["cfg_font_scale"], BASE_SMALL))
 	header.add_child(_gap(30))
 	_enable_switch = _switch(tr("AA_UI_ENABLE"), _mod.enabled, true)
 	_enable_switch.connect("toggled", self, "_on_enable_toggled")
