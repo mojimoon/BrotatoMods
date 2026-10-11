@@ -97,8 +97,8 @@ func test_14_sliders() -> void:
 		high += _value_of(g1, p1.items[id].effects, _item(id).tier)
 	_check(high > base * 1.3, "avg 150%% gives more total value (%.0f vs %.0f)" % [high, base])
 	cfg.avg = 100
-	# 浮动范围：预算离散度随滑条变化
-	for pair in [[50, 0.10, 0.25], [200, 0.40, 0.95]]:
+	# 浮动范围：净价值离散度随滑条变化（净价值按 √倍率，离散度为倍率的一半）
+	for pair in [[50, 0.05, 0.13], [200, 0.20, 0.48]]:
 		cfg.variance = pair[0]
 		var g = Generator.new(cfg, 9)
 		var pl = g.generate(isvc.items, isvc.characters, [], [])
@@ -2277,7 +2277,16 @@ func test_130_trigger_templates() -> void:
 	# 商店扳机（刷新 / 购买）出现得少：至少一个用上计次
 	for t in ["dodge", "consumable", "hit"]:
 		_check(counted.has(t), "count gate now used on " + t)
-	_check(counted.has("reroll") or counted.has("buy"), "count gate used on a shop trigger")
+	# 商店扳机计次只在条款预算很小时出现（整池里很少）：直接用小预算生成
+	var shop_counted = false
+	for sd in range(1, 4):
+		var g = Generator.new(_cfg(), sd)
+		g.generate(isvc.items, isvc.characters, [], [])
+		for t in ["reroll", "buy"]:
+			var c = g.gen_clause(0.6, Catalog.PERM_MULT[0], false, t, "")
+			if not c.empty() and int(c.get("param", 1)) > 1:
+				shop_counted = true
+	_check(shop_counted, "count gate used on a shop trigger")
 	_check(typed.get("stat_engineering", 0) > 0 and typed.get("stat_engineering", 0) < typed.get("stat_melee_damage", 0), "engineering rarer than melee")
 	for tbl in [Catalog.LEGAL, Catalog.FREE_LEGAL]:
 		_check(not "fruit" in tbl.wave_end and not "fruit" in tbl.wave_start, "no fruit at wave start / end")

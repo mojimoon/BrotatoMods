@@ -68,6 +68,20 @@ func test_12_value_audit() -> void:
 	_check(p90 < 1.7, "p90 value/budget not too high (%.2f)" % p90)
 	_check(trig_count.size() >= 12, "most triggers occur (%d)" % trig_count.size())
 	# 点燃 / 减速 / 按生命值伤害只挂在少数有目标敌人的扳机上，单个种子里可能不出现：由 test_127 / 128 在多个种子上检查
+	# 少见的载荷（易伤、水果，约每个种子 0.5 次）：上面几个种子都没出现时再补几个种子
+	for sd in range(100, 110):
+		var missing = false
+		for p in Catalog.PAYLOADS:
+			if not pay_count.has(p) and not p in ["ignite", "slow", "hp_dmg"]:
+				missing = true
+		if not missing:
+			break
+		var gx = Generator.new(_cfg(), sd)
+		var px = gx.generate(isvc.items, isvc.characters, [], [])
+		for id in px.items:
+			for e in px.items[id].effects:
+				if e is TriggerEffect:
+					pay_count[e.payload] = pay_count.get(e.payload, 0) + 1
 	for p in Catalog.PAYLOADS:
 		_check(pay_count.has(p) or p in ["ignite", "slow", "hp_dmg"], "payload occurs: " + p)
 	# 实验性扳机出现但保持少数（原 test_107）
@@ -621,3 +635,156 @@ func _dist(a: Array) -> String:
 	var s = a.duplicate()
 	s.sort()
 	return "%d [%d-%d] (%d)" % [s[s.size() / 2], s[0], s.back(), s.size()]
+
+
+# ============================================================
+# 实验（临时）：浮动方案对比。AA_VAR_EVAL=1 时运行，输出到 tests/AutoAnthony/variance_eval/
+# ============================================================
+const VAR_MODES = ["net", "gross", "split", "mean"]
+const VAR_MODE_NAMES = {"net": "旧（倍率全给净价值）", "gross": "方案1 正负同涨、净价值不浮动", "split": "方案2 √V 净价值 + 正面按 V", "mean": "方案3 旧 ÷ 倍率均值"}
+const VAR_DIR = "res://mods/tests/AutoAnthony/variance_eval/"
+
+
+func _var_item_stats(gen, plan) -> Array:
+	var out = []
+	for id in plan.items:
+		var p = plan.items[id]
+		var item = _item(id)
+		var base = gen._base_budget(item)
+		var pos = 0.0
+		var neg = 0.0
+		for e in p.effects:
+			var v = _value_of(gen, [e], item.tier)
+			if v >= 0:
+				pos += v
+			else:
+				neg -= v
+		out.push_back({"id": id, "tier": item.tier, "vm": float(p.get("vmult", 1.0)), "pos": pos / base, "neg": neg / base, "net": (pos - neg) / base, "down": neg > 0.0, "item": item, "p": p})
+	return out
+
+
+func _q(arr: Array, q: float) -> float:
+	var a = arr.duplicate()
+	a.sort()
+	return a[int(clamp(round(q * (a.size() - 1)), 0, a.size() - 1))]
+
+
+func _mean(arr: Array) -> float:
+	var t = 0.0
+	for x in arr:
+		t += x
+	return t / max(1, arr.size())
+
+
+func test_998_variance_eval() -> void:
+	if OS.get_environment("AA_VAR_EVAL") == "":
+		return
+	var md = "# 浮动方案对比（临时实验）\n\n"
+	md += "种子 %s，每种设置 × 每个种子生成整池重组道具（默认设置，触发效果 100%%）。数值均为「实测效果价值 / 基准预算」（基准 = 档位预算 × 隐藏乘数 × 平均数值，即浮动前的预算，近似对应价格）。负面价值已按负面除数 2.5 折算（负面实际强度约为该值 × 2.5）。V = 该道具抽到的浮动倍率。\n\n" % str(SEEDS)
+	md += "方案：\n\n"
+	for mode in VAR_MODES:
+		md += "- **%s**：%s\n" % [mode, VAR_MODE_NAMES[mode]]
+	for var_pct in [50, 100, 250]:
+		md += "\n## 浮动范围 %d%%\n\n" % var_pct
+		md += "| 方案 | 净 均值 | 净 p10 | 净 中位 | 净 p90 | 净 最大 | 净>1.5 | 净>2 | 净<0.6 | 正 均值 | 负 均值 | 带负面 | T1 净 | T2 净 | T3 净 | T4 净 |\n"
+		md += "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+		var buckets_md = ""
+		for mode in VAR_MODES:
+			var cfg = _cfg()
+			cfg.variance = var_pct
+			cfg.variance_mode = mode
+			var all = []
+			for sd in SEEDS:
+				var g = Generator.new(cfg, sd)
+				var pl = g.generate(isvc.items, isvc.characters, [], [])
+				all += _var_item_stats(g, pl)
+			var nets = []
+			var poss = []
+			var negs = []
+			var down = 0
+			var by_tier = [[], [], [], []]
+			var over15 = 0
+			var over2 = 0
+			var under06 = 0
+			for r in all:
+				nets.push_back(r.net)
+				poss.push_back(r.pos)
+				negs.push_back(r.neg)
+				by_tier[r.tier].push_back(r.net)
+				if r.down:
+					down += 1
+				if r.net > 1.5:
+					over15 += 1
+				if r.net > 2.0:
+					over2 += 1
+				if r.net < 0.6:
+					under06 += 1
+			var n = float(all.size())
+			md += "| %s | %.2f | %.2f | %.2f | %.2f | %.2f | %.1f%% | %.1f%% | %.1f%% | %.2f | %.2f | %.0f%% | %.2f | %.2f | %.2f | %.2f |\n" % [
+				mode, _mean(nets), _q(nets, 0.1), _q(nets, 0.5), _q(nets, 0.9), _q(nets, 1.0),
+				100.0 * over15 / n, 100.0 * over2 / n, 100.0 * under06 / n, _mean(poss), _mean(negs), 100.0 * down / n,
+				_mean(by_tier[0]), _mean(by_tier[1]), _mean(by_tier[2]), _mean(by_tier[3])]
+			# 按倍率分组
+			buckets_md += "\n**%s**\n\n| V 区间 | 件数 | 平均 V | 正 | 负 | 净 | 带负面 |\n| --- | --- | --- | --- | --- | --- | --- |\n" % mode
+			for b in [[0.0, 0.6], [0.6, 0.9], [0.9, 1.15], [1.15, 1.6], [1.6, 2.5], [2.5, 99.0]]:
+				var sel = []
+				var dn = 0
+				for r in all:
+					if r.vm >= b[0] and r.vm < b[1]:
+						sel.push_back(r)
+						if r.down:
+							dn += 1
+				if sel.empty():
+					continue
+				var vms = []
+				var bp = []
+				var bn = []
+				var bt = []
+				for r in sel:
+					vms.push_back(r.vm)
+					bp.push_back(r.pos)
+					bn.push_back(r.neg)
+					bt.push_back(r.net)
+				buckets_md += "| %.2f–%s | %d | %.2f | %.2f | %.2f | %.2f | %.0f%% |\n" % [b[0], ("∞" if b[1] > 50 else "%.2f" % b[1]), sel.size(), _mean(vms), _mean(bp), _mean(bn), _mean(bt), 100.0 * dn / sel.size()]
+			# 250%：输出种子 42 的道具池
+			if var_pct == 250:
+				_var_write_pool(cfg, mode)
+		md += "\n按浮动倍率 V 分组：\n" + buckets_md
+	var f = File.new()
+	if f.open(VAR_DIR + "SUMMARY.md", File.WRITE) == OK:
+		f.store_string(md)
+		f.close()
+		print("variance eval: ", ProjectSettings.globalize_path(VAR_DIR + "SUMMARY.md"))
+
+
+func _var_write_pool(cfg: Dictionary, mode: String) -> void:
+	var prev = TranslationServer.get_locale()
+	TranslationServer.set_locale("zh")
+	var g = Generator.new(cfg, 42)
+	var pl = g.generate(isvc.items, isvc.characters, [], [])
+	var rows = _var_item_stats(g, pl)
+	rows.sort_custom(self, "_var_sort")
+	var strip = RegEx.new()
+	strip.compile("\\[img[^\\]]*\\][^\\[]*\\[/img\\]|\\[/?color\\]|\\[color=[^\\]]*\\]")
+	var out = "# 浮动 250%%、方案 %s（%s）、种子 42 的道具池\n\n" % [mode, VAR_MODE_NAMES[mode]]
+	out += "按稀有度、净价值从高到低排序。正 / 负 / 净 = 实测效果价值 / 基准预算（负面已按除数 2.5 折算）。\n\n"
+	out += "| 稀有度 | 道具 | 价格 | V | 净 | 正 | 负 | 效果 |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n"
+	for r in rows:
+		var fx = []
+		for e in r.p.effects:
+			var t = strip.sub(e.get_text(0, false), "", true).strip_edges()
+			if t != "":
+				fx.push_back(t.replace("|", "/").replace("\n", " "))
+		var nm = tr("AA_NAME_FMT").replace("{0}", tr(r.p.adj)).replace("{1}", tr(r.item.name))
+		out += "| T%d | %s | %d | %.2f | %.2f | %.2f | %.2f | %s |\n" % [r.tier + 1, nm, int(r.p.get("price", 0)), r.vm, r.net, r.pos, r.neg, PoolStringArray(fx).join("<br>")]
+	var f = File.new()
+	if f.open(VAR_DIR + "POOL_250_%s.md" % mode, File.WRITE) == OK:
+		f.store_string(out)
+		f.close()
+	TranslationServer.set_locale(prev)
+
+
+func _var_sort(a, b) -> bool:
+	if a.tier != b.tier:
+		return a.tier < b.tier
+	return a.net > b.net

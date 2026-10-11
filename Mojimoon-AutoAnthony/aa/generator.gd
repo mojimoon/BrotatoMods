@@ -13,7 +13,8 @@ extends Reference
 #
 # cfg（百分比都是整数）：
 #   avg          平均数值：预算倍率（100 = 原版价格）
-#   variance     浮动范围：预算的对数正态离散度，100 = 原版"价值 / 价格"的离散度（σ = 0.35，四分位约 0.8–1.27）
+#   variance     浮动范围：对数正态倍率 V 的离散度，100 = 原版"价值 / 价格"的离散度（σ = 0.35，四分位约 0.8–1.27）；
+#                净价值按 √V、正面幅度按 V，差额由代价补足（_variance_comp）
 #   triggers     触发效果：100 = 原版同稀有度道具带特殊行（触发 / 机制）的比例
 #   native_ratio 保留原版道具的比例
 #   char_effects 角色效果可出现在道具上
@@ -125,8 +126,10 @@ func generate(items: Array, all_characters: Array, selected: Array, weapons: Arr
 		assign_prices(gen_items, orig_tiers)
 		var core = pick_core_items(gen_items)
 		for item in gen_items:
+			last_vm = 1.0
 			var r = generate_item(item, core.get(item.my_id, ""))
 			if not r.empty():
+				r["vmult"] = last_vm
 				plan.items[item.my_id] = r
 		cur_stat_bans = []
 		_ensure_player_wanted_tags(plan, items, gen_items, core)
@@ -411,7 +414,7 @@ func _generate_clause_tag_item(item, tag: String) -> Dictionary:
 	rng.seed = hash(str(seed_value) + "/tagclause/" + item.my_id + "/" + tag)
 	cur_tier = item.tier
 	var perm_mult: float = Catalog.PERM_MULT[item.tier]
-	var budget: float = item_budget(item) * Catalog.HIDDEN_TIER_MULT[item.tier] * _avg_mult() * _variance_mult()
+	var budget: float = _base_budget(item) * _net_mult(_variance_mult())
 	var budget_total = budget
 	var c = {}
 	for attempt in 8:
@@ -458,7 +461,7 @@ func _generate_mechanic_tag_item(item, tag: String) -> Dictionary:
 		return {}
 	rng.seed = hash(str(seed_value) + "/tagmech/" + item.my_id + "/" + tag)
 	cur_tier = item.tier
-	var budget: float = item_budget(item) * Catalog.HIDDEN_TIER_MULT[item.tier] * _avg_mult() * _variance_mult()
+	var budget: float = _base_budget(item) * _net_mult(_variance_mult())
 	var budget_total = budget
 	var m = cands[rng.randi() % cands.size()]
 	var me = _mechanic_copy(m, budget * 0.5 if not m.down else -1.0, item.my_id)
@@ -1005,12 +1008,69 @@ func _avg_mult() -> float:
 	return clamp(float(cfg.get("avg", 100)), 10.0, 500.0) / 100.0
 
 
+# 道具的基准预算（未浮动）
+func _base_budget(item) -> float:
+	return item_budget(item) * Catalog.HIDDEN_TIER_MULT[item.tier] * _avg_mult()
+
+
+# 浮动倍率 V 一半作用于净价值、一半作用于正负幅度：净价值 = 基准 × √V，正面 = (基准 + 原代价) × V，
+# 差额由代价补足（V 大时正负一起变大）。V 小时代价至少按原比例缩小（原代价 × V），保持带代价道具的比例。
+# r = 原代价占基准的比例；不带代价的道具只有净价值浮动
+# 实验：variance_mode = net（旧：倍率全部作用于净价值）/ gross（净价值不浮动，正面按 V、代价补足）/
+# split（净价值 √V、正面按 V）/ mean（同 net，但除以倍率均值使平均净价值为 1）
+func _variance_mode() -> String:
+	return str(cfg.get("variance_mode", "split"))
+
+
+func _net_mult(vm: float) -> float:
+	match _variance_mode():
+		"net":
+			return vm
+		"gross":
+			return 1.0
+		"mean":
+			return vm / _variance_mean(1.0)
+	# 对数正态的 √V 均值 > 1（E[√V] = e^(σ²/8)，再计入截断）：除以均值，使平均净价值为基准
+	return sqrt(vm) / _variance_mean(0.5)
+
+
+func _variance_comp(item, vm: float, r: float) -> float:
+	var base = _base_budget(item)
+	var n = _net_mult(vm)
+	if _variance_mode() in ["net", "mean"]:
+		return base * r * n
+	return base * max((1.0 + r) * vm - n, r * vm)
+
+
+# 截断（±2σ）对数正态倍率的 power 次方的均值 E[V^power]（数值积分，按 σ 缓存）
+var _vmean_cache := {}
+
+
+func _variance_mean(power: float) -> float:
+	var sigma = NATIVE_VALUE_SIGMA * clamp(float(cfg.get("variance", 100)), 0.0, 400.0) / 100.0 * power
+	if _vmean_cache.has(sigma):
+		return _vmean_cache[sigma]
+	var tot = 0.0
+	var wsum = 0.0
+	for i in range(-600, 601):
+		var z = i / 100.0
+		var w = exp(-z * z / 2.0)
+		tot += w * exp(sigma * clamp(z, -2.0, 2.0))
+		wsum += w
+	_vmean_cache[sigma] = tot / wsum
+	return tot / wsum
+
+
 # 对数正态浮动，中位数为 1
+var last_vm := 1.0
+
+
 func _variance_mult() -> float:
 	var sigma = NATIVE_VALUE_SIGMA * clamp(float(cfg.get("variance", 100)), 0.0, 400.0) / 100.0
 	if sigma <= 0.0:
 		return 1.0
-	return exp(sigma * clamp(rng.randfn(0.0, 1.0), -2.0, 2.0))
+	last_vm = exp(sigma * clamp(rng.randfn(0.0, 1.0), -2.0, 2.0))
+	return last_vm
 
 
 func _trigger_rate() -> float:
@@ -1038,7 +1098,8 @@ func generate_item(item, core_stat: String = "") -> Dictionary:
 func _generate_growth_item(item) -> Dictionary:
 	cur_tier = item.tier
 	var perm_mult: float = Catalog.PERM_MULT[item.tier]
-	var budget: float = item_budget(item) * Catalog.HIDDEN_TIER_MULT[item.tier] * _avg_mult() * _variance_mult()
+	var vm = _variance_mult()
+	var budget: float = _base_budget(item) * _net_mult(vm)
 	var budget_total = budget
 	pos_cat = ""
 	neg_cat = "*"
@@ -1059,7 +1120,7 @@ func _generate_growth_item(item) -> Dictionary:
 	var used = [a_stat, b_stat]
 	var downsides = []
 	if rng.randf() < Catalog.GROWTH_DOWNSIDE_CHANCE:
-		var dres = _gen_downsides(item, budget_total * rng.randf_range(0.1, 0.3), perm_mult, used, budget_total)
+		var dres = _gen_downsides(item, _variance_comp(item, vm, rng.randf_range(0.1, 0.3)), perm_mult, used, budget_total)
 		downsides = dres.effects
 		budget += dres.got
 	var lines = []
@@ -1120,7 +1181,8 @@ func _generate_item_once(item, force_special: bool) -> Dictionary:
 	cur_tier = item.tier
 	var tier: int = item.tier
 	var perm_mult: float = Catalog.PERM_MULT[tier]
-	var budget: float = item_budget(item) * Catalog.HIDDEN_TIER_MULT[item.tier] * _avg_mult() * _variance_mult()
+	var vm = _variance_mult()
+	var budget: float = _base_budget(item) * _net_mult(vm)
 	var budget_total = budget
 	var effects = []
 	var used_stats = []
@@ -1141,7 +1203,7 @@ func _generate_item_once(item, force_special: bool) -> Dictionary:
 	# 1) 代价：负面效果的实际强度 = 换来的预算 × 负面除数
 	var downsides = []
 	if neg_cat != "-":
-		var dres = _gen_downsides(item, budget_total * rng.randf_range(0.1, 0.35), perm_mult, used_stats, budget_total)
+		var dres = _gen_downsides(item, _variance_comp(item, vm, rng.randf_range(0.1, 0.35)), perm_mult, used_stats, budget_total)
 		downsides = dres.effects
 		budget += dres.got
 		# 代价是"无法回血"：同一道具不再出现回血相关的条款 / 机制
@@ -1317,7 +1379,8 @@ func _preserved_lines(item) -> Array:
 func _generate_core_item(item, stat: String) -> Dictionary:
 	cur_tier = item.tier
 	var perm_mult: float = Catalog.PERM_MULT[item.tier]
-	var budget: float = item_budget(item) * Catalog.HIDDEN_TIER_MULT[item.tier] * _avg_mult() * _variance_mult()
+	var vm = _variance_mult()
+	var budget: float = _base_budget(item) * _net_mult(vm)
 	var budget_total = budget
 	pos_cat = ""
 	neg_cat = "*"
@@ -1325,7 +1388,7 @@ func _generate_core_item(item, stat: String) -> Dictionary:
 	var used_stats = [stat]
 	var downsides = []
 	if item.tier in Catalog.CORE_TIERS:
-		var dres = _gen_downsides(item, budget_total * rng.randf_range(0.15, 0.4), perm_mult, used_stats, budget_total)
+		var dres = _gen_downsides(item, _variance_comp(item, vm, rng.randf_range(0.15, 0.4)), perm_mult, used_stats, budget_total)
 		downsides = dres.effects
 		budget += dres.got
 	var cap = int(ceil(_line_cap(stat, false) * Catalog.CORE_LINE_CAP_MULT))
