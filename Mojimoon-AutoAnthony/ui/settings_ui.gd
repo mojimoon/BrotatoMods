@@ -371,25 +371,23 @@ func _build_preview(parent: Control, kind: String, title_key: String, button_key
 		btn.connect("pressed", self, "_on_tier_pressed", [t, kind])
 		head.add_child(btn)
 		pv.buttons.push_back(btn)
-	pv.hint = _desc(tr(hint_key))
-	# 导入 / 导出 / 预览按钮放在说明行右侧：标题行太长时（字体放大、长语言）面板会被撑宽
-	head = HBoxContainer.new()
-	head.add_constant_override("separation", 8)
-	vbox.add_child(head)
-	head.add_child(pv.hint)
-	# 导入 / 导出设置：分享码经由剪贴板
-	var import_btn = _button(tr("AA_UI_IMPORT"), _font_small)
+	head.add_child(_spacer())
+	# 导入 / 导出设置（分享码经由剪贴板）/ 预览：与标题栏一样不随字体大小缩放，标题行放大后也不会撑宽面板
+	var import_btn = _button(tr("AA_UI_IMPORT"), BASE_SMALL)
 	_apply_action_style(import_btn, C_ACCENT_2)
 	import_btn.connect("pressed", self, "_on_import_pressed")
 	head.add_child(import_btn)
-	var export_btn = _button(tr("AA_UI_EXPORT"), _font_small)
+	var export_btn = _button(tr("AA_UI_EXPORT"), BASE_SMALL)
 	_apply_action_style(export_btn, C_ACCENT_2)
 	export_btn.connect("pressed", self, "_on_export_pressed")
 	head.add_child(export_btn)
-	var prev_btn = _button(tr(button_key), _font_small)
+	var prev_btn = _button(tr(button_key), BASE_SMALL)
 	_apply_action_style(prev_btn, C_ACCENT)
 	prev_btn.connect("pressed", self, "_on_preview_pressed", [kind])
 	head.add_child(prev_btn)
+
+	pv.hint = _desc(tr(hint_key))
+	vbox.add_child(pv.hint)
 
 	pv.scroll = ScrollContainer.new()
 	pv.scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
