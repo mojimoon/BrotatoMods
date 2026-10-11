@@ -18,6 +18,7 @@ static func raw_rate(trigger: String, param: int, chance: int) -> float:
 
 # 每波有效触发次数（计入上限）
 static func fires_per_wave(trigger: String, param: int, chance: int, cap: int) -> float:
+	cap = Catalog.effective_cap(trigger, param, cap)
 	var f = raw_rate(trigger, param, chance)
 	if cap > 0:
 		f = min(f, float(cap))
@@ -26,6 +27,7 @@ static func fires_per_wave(trigger: String, param: int, chance: int, cap: int) -
 
 # 本波临时属性的平均叠层（线性累积；有上限时在达到上限后保持）
 static func avg_stack(trigger: String, param: int, chance: int, cap: int, reset: bool = false) -> float:
+	cap = Catalog.effective_cap(trigger, param, cap)
 	var t = Catalog.TRIGGERS[trigger]
 	if reset and t.kind == "event" and t.timing > 0.0 and t.timing < 1.0:
 		# 受击清空：受击间隔近似指数分布（实际约每波 7 次），平均叠层 = 触发频率 × 平均受击间隔

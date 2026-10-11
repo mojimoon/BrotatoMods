@@ -14,6 +14,9 @@ func test_01_mod_loaded_and_effect_registered() -> void:
 
 
 func test_02_catalog_consistency() -> void:
+	# "每 N 秒"的上限按 90 秒截断后仍不低于 60 秒一波的触发次数：截断不改变估值
+	for n in range(1, 31):
+		_check(Catalog.effective_cap("interval", n, 999) >= Catalog.WAVE_SECONDS / n, "interval %ds: truncated cap keeps the valued fires" % n)
 	for t in Catalog.TRIGGERS:
 		_check(Catalog.LEGAL.has(t), "LEGAL has trigger " + t)
 		for p in Catalog.LEGAL[t]:
@@ -69,6 +72,8 @@ func test_11_generated_items_are_well_formed() -> void:
 						_check(not e.stat in Catalog.TEMP_STAT_BANNED, "%s temp stat allowed" % id)
 					if e.trigger == "interval":
 						_check(e.param <= 30, "%s interval sane" % id)
+						# 每波上限不超过最长一波（90 秒）能触发的次数
+						_check(e.cap <= int(90 / e.param), "%s interval cap %d reachable within 90s (every %ds)" % [id, e.cap, e.param])
 				elif gen.is_plain_stat(e):
 					_check(e.value % Catalog.stat_unit(e.key) == 0, "%s value multiple of unit" % id)
 			_check(has_pos or _has_up_mechanic(p.effects), "%s has a positive line: %s" % [id, _texts(p.effects)])

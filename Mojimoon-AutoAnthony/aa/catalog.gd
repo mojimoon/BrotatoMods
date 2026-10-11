@@ -20,6 +20,8 @@ extends Reference
 # 击杀 / 拾取材料 / 受击 / 回血的次数现已不再高估。
 
 const WAVE_SECONDS = 60.0
+# 最长一波（最终波）的秒数："每 N 秒"的每波上限不超过这一波能触发的次数
+const MAX_WAVE_SECONDS = 90.0
 
 # 稀有度截距（Tier 0..3）：原版价格中与效果无关的部分（只用于可选的 intercept 预算模型）
 const TIER_INTERCEPT = [11.9, 31.5, 44.6, 42.5]
@@ -563,6 +565,13 @@ static func is_pct_stat(stat: String) -> bool:
 
 static func payload_needs_stat(payload: String) -> bool:
 	return payload in ["temp_stat", "perm_stat", "timed_stat", "damage", "explode"]
+
+
+# 每波上限按最长一波截断（"每 N 秒"至多触发 90 / N 次）。N ≤ 30 时截断后的上限仍 ≥ 60 秒一波的触发次数，估值不变
+static func effective_cap(trigger: String, param: int, cap: int) -> int:
+	if trigger == "interval" and cap > 0:
+		return int(min(cap, floor(MAX_WAVE_SECONDS / max(1, param))))
+	return cap
 
 
 static func events_per_wave(trigger: String, param: int) -> float:

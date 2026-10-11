@@ -2805,6 +2805,7 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 	# 每隔 N 秒获得持续 M 秒的效果：M < N（否则等同于一直生效）
 	if trigger == "interval" and payload == "timed_stat":
 		c.value2 = int(clamp(c.value2, 1, max(1, c.param - 1)))
+	c.cap = Catalog.effective_cap(trigger, c.param, c.cap)
 	# 单次触发的属性数值同样受原版单行上限约束
 	if c.payload in ["temp_stat", "perm_stat", "timed_stat"]:
 		c.value = int(min(c.value, _line_cap(c.stat, negative)))
