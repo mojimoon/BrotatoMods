@@ -1856,3 +1856,32 @@ func _count_below(a: Array, x: float) -> int:
 	for v in a:
 		n += 1 if v < x else 0
 	return n
+
+
+
+# 百分比几率的效果（暴击击杀得材料、一击必杀）至多 100%；砖头碎裂掉落的材料在两种重组方式下都随稀有度增长
+func test_174_chance_cap_and_brick_growth() -> void:
+	var WV = load(MOD_DIR + "aa/weapon_value.gd")
+	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
+	m.cfg_weapons = true
+	var weapons = m.native_only(isvc.weapons)
+	var capped = 0
+	for mode in ["effects", "deep"]:
+		m.cfg_weapon_mode = mode
+		for sd in [1, 2, 3, 4, 5, 6]:
+			var out = WG.new(m.get_cfg(), sd).generate(weapons)
+			var mats = {}
+			for id in out:
+				for e in out[id].effects:
+					var k = WV.effect_key(e)
+					if k in WG.PERCENT_CHANCE_KEYS:
+						_check(int(e.value) <= 100, "%s s%d %s %s <= 100%% (%d)" % [mode, sd, id, k, int(e.value)])
+						if int(e.value) == 100:
+							capped += 1
+					if k == "break_on_hit":
+						mats[int(isvc.get_element_safe(isvc.weapons, id).tier)] = int(e.value2)
+			for t in [1, 2, 3]:
+				if mats.has(t) and mats.has(t - 1):
+					_check(mats[t] > mats[t - 1], "%s s%d brick T%d drops more than T%d %s" % [mode, sd, t + 1, t, str(mats)])
+	print("AUDIT chance effects capped at 100%%: %d" % capped)
+	m.cfg_weapon_mode = "deep"

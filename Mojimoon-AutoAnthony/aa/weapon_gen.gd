@@ -91,6 +91,7 @@ func generate(weapons: Array) -> Dictionary:
 	for id in out:
 		for e in out[id].effects:
 			sync_value2(e)
+			_cap_chance(e)
 	return out
 
 
@@ -526,6 +527,14 @@ func _vary_fixed(e, f: String):
 #   3. 因此超出目标价值时，先放慢攻速（不慢于低一级）、再降暴击（不低于低一级）；仍超出则不管
 const TIER_FIT_TOL = 1.05
 const NO_STRENGTHEN_KEYS = ["break_on_hit", "lose_hp_per_second", "effect_slow_in_zone"]
+# value 是百分比几率的效果：至多 100%（暴击击杀得材料、一击必杀）。缩放时封顶，价值按封顶后的数值算；
+# 原版诅咒对暴击击杀得材料也封顶 100，交给游戏处理
+const PERCENT_CHANCE_KEYS = ["gold_on_crit_kill", "weapon_one_shot_on_hit"]
+
+
+static func _cap_chance(e) -> void:
+	if WeaponValue.effect_key(e) in PERCENT_CHANCE_KEYS and int(e.value) > 100:
+		e.value = 100
 
 
 func _no_inversion(out: Dictionary) -> void:
@@ -1364,7 +1373,7 @@ func _deep_interp(fam: Dictionary, base: Dictionary, tiers: Array, mult: float) 
 	for i in range(1, tiers.size()):
 		var t: int = tiers[i]
 		var st = best[t].stats
-		var effects: Array = best[t].effects
+		var effects: Array = _tier_bound(best[t].effects, fam.tiers[t])
 		var got = wv.value(st, effects, t)
 		var excess = _downside_excess(_want(fam.tiers[t], true) * mult, effects)
 		var price = _price_of(fam.tiers[t])
@@ -1375,6 +1384,21 @@ func _deep_interp(fam: Dictionary, base: Dictionary, tiers: Array, mult: float) 
 		prev = {"effects": effects, "stats": st, "donor": base.donor, "scale": best_k, "want": got, "capped": excess > 0, "price": int(round(price))}
 		res.push_back(prev)
 	return res
+
+
+# 不随稀有度强化的家族固定效果（砖头碎裂掉落的材料等）：高稀有度换成本稀有度原版的数值（同样按家族随机），
+# 否则逐级推出的高稀有度都沿用最低一级的数值
+func _tier_bound(effects: Array, tw) -> Array:
+	var out = []
+	for e in effects:
+		var key = WeaponValue.effect_key(e)
+		if bound_key(e) and key in NO_STRENGTHEN_KEYS:
+			for q in tw.effects:
+				if WeaponValue.effect_key(q) == key:
+					e = _vary_fixed(q, family_of(tw))
+					break
+		out.push_back(e)
+	return out
 
 
 func _collect_upgrade_priors() -> void:
@@ -1758,6 +1782,7 @@ static func _scale_effects(effects: Array, f: float) -> Array:
 			ne.value = int(max(1, round(ne.value / max(0.05, f))))
 		elif abs(int(ne.value)) >= 2 or (f > 1.0 and int(ne.value) != 0):
 			ne.value = int(sign(ne.value) * max(1, round(abs(ne.value) * f)))
+		_cap_chance(ne)
 		if e.has_meta("aa_value") and int(e.value) != 0:
 			ne.set_meta("aa_value", float(e.get_meta("aa_value")) * float(ne.value) / float(e.value))
 		out.push_back(ne)

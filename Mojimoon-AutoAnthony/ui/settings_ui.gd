@@ -44,9 +44,9 @@ const EFFECT_SWITCHES = [
 	["cfg_char_effects", "AA_UI_CHAR_EFFECTS", "AA_UI_CHAR_EFFECTS_DESC"],
 	["cfg_all_char_effects", "AA_UI_ALL_CHAR_EFFECTS", "AA_UI_ALL_CHAR_EFFECTS_DESC"],
 	["cfg_more_double", "AA_UI_MORE_DOUBLE", "AA_UI_MORE_DOUBLE_DESC"],
-	["cfg_starting_items", "AA_UI_STARTING_ITEMS", "AA_UI_STARTING_ITEMS_DESC"],
 ]
 const MORE_SWITCHES = [
+	["cfg_starting_items", "AA_UI_STARTING_ITEMS", "AA_UI_STARTING_ITEMS_DESC"],
 	["cfg_rename", "AA_UI_KEEP_NAMES", "AA_UI_KEEP_NAMES_DESC", true],
 	["cfg_force_items", "AA_UI_FORCE", "AA_UI_FORCE_DESC"],
 	["cfg_tier_chaos", "AA_UI_TIER_CHAOS", "AA_UI_TIER_CHAOS_DESC"],
