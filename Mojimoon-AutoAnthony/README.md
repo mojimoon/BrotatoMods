@@ -40,9 +40,9 @@ The settings have three tabs. The switch on each tab turns that part on or off.
 | More character effects | Off | Items can get more character mechanics (XP required, charm chance, map size, "when you hit an enemy with a damage type"...). |
 | All character effects (BETA) | Off | Also extreme character mechanics (shop stealing, weapon slots on level up...) and drawbacks (dying in one hit, no healing...). |
 | More double-sided effects | Off | Pure upsides / drawbacks get an opposite side (-materials dropped, -enemy health, losing materials on a trigger...). |
-| Reassemble starting items (Not recommended) | Off | Your character's starting items are reassembled too. |
+| Reassemble starting items | Off | Your character's starting items are reassembled too. |
 | Keep original names | Off | Off: "adjective + original name". |
-| Force reassembly (Not recommended) | Off | Spyglass, Bait, Pocket Factory, Axolotl, Goldfish and Fish Hook are reassembled too. |
+| Force reassembly | Off | Spyglass, Bait, Pocket Factory, Axolotl, Goldfish and Fish Hook are reassembled too. |
 | Chaos / Ultimate chaos | Off | Shuffle item rarities / rarities and icons (pick one). |
 | Average value / Variance / Triggers | 100% / 100% / 125% | Overall strength, strength spread, and how often items have triggered or mechanic effects (100% = original). |
 | Keep original items | 0% | Keeps a share of the original items. |
@@ -98,9 +98,9 @@ The settings have three tabs. The switch on each tab turns that part on or off.
 [tr][td]More character effects[/td][td]Off[/td][td]Items can get more character mechanics (XP required, charm chance, map size, "when you hit an enemy with a damage type"...).[/td][/tr]
 [tr][td]All character effects (BETA)[/td][td]Off[/td][td]Also extreme character mechanics (shop stealing, weapon slots on level up...) and drawbacks (dying in one hit, no healing...).[/td][/tr]
 [tr][td]More double-sided effects[/td][td]Off[/td][td]Pure upsides / drawbacks get an opposite side (-materials dropped, -enemy health, losing materials on a trigger...).[/td][/tr]
-[tr][td]Reassemble starting items (Not recommended)[/td][td]Off[/td][td]Your character's starting items are reassembled too.[/td][/tr]
+[tr][td]Reassemble starting items[/td][td]Off[/td][td]Your character's starting items are reassembled too.[/td][/tr]
 [tr][td]Keep original names[/td][td]Off[/td][td]Off: "adjective + original name".[/td][/tr]
-[tr][td]Force reassembly (Not recommended)[/td][td]Off[/td][td]Spyglass, Bait, Pocket Factory, Axolotl, Goldfish and Fish Hook are reassembled too.[/td][/tr]
+[tr][td]Force reassembly[/td][td]Off[/td][td]Spyglass, Bait, Pocket Factory, Axolotl, Goldfish and Fish Hook are reassembled too.[/td][/tr]
 [tr][td]Chaos / Ultimate chaos[/td][td]Off[/td][td]Shuffle item rarities / rarities and icons (pick one).[/td][/tr]
 [tr][td]Average value / Variance / Triggers[/td][td]100% / 100% / 125%[/td][td]Overall strength, strength spread, and how often items have triggered or mechanic effects (100% = original).[/td][/tr]
 [tr][td]Keep original items[/td][td]0%[/td][td]Keeps a share of the original items.[/td][/tr]
@@ -168,9 +168,9 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 | 更多角色效果 | 关 | 道具可以获得更多角色机制（经验需求、魅惑几率、地图大小、"用某类伤害命中敌人时"……）。 |
 | 全部角色效果 (BETA) | 关 | 进一步加入极端的角色机制（窃取商品、升级得武器栏……）与代价（一击必死、无法回血……）。 |
 | 更多双面效果 | 关 | 为纯增益 / 纯代价效果加上对立面（-材料掉落、-敌人血量、触发时失去材料……）。 |
-| 重组初始道具 (不推荐) | 关 | 角色的初始道具也参与重组。 |
+| 重组初始道具 | 关 | 角色的初始道具也参与重组。 |
 | 保留原名 | 关 | 关闭时命名为"形容词+原名称"。 |
-| 强制重组 (不推荐) | 关 | 望远镜、诱饵、口袋工厂、蝾螈、金鱼、鱼钩也参与重组。 |
+| 强制重组 | 关 | 望远镜、诱饵、口袋工厂、蝾螈、金鱼、鱼钩也参与重组。 |
 | 混沌 / 究极混沌 | 关 | 随机交换道具的稀有度 / 稀有度和图标（二选一）。 |
 | 平均数值 / 浮动范围 / 触发效果 | 100% / 100% / 125% | 整体强度、强弱差异、带触发或机制效果的概率（100% = 原版）。 |
 | 保留原版道具 | 0% | 保留一定比例的原版道具。 |
@@ -224,9 +224,9 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 [tr][td]更多角色效果[/td][td]关[/td][td]道具可以获得更多角色机制（经验需求、魅惑几率、地图大小、"用某类伤害命中敌人时"……）。[/td][/tr]
 [tr][td]全部角色效果 (BETA)[/td][td]关[/td][td]进一步加入极端的角色机制（窃取商品、升级得武器栏……）与代价（一击必死、无法回血……）。[/td][/tr]
 [tr][td]更多双面效果[/td][td]关[/td][td]为纯增益 / 纯代价效果加上对立面（-材料掉落、-敌人血量、触发时失去材料……）。[/td][/tr]
-[tr][td]重组初始道具 (不推荐)[/td][td]关[/td][td]角色的初始道具也参与重组。[/td][/tr]
+[tr][td]重组初始道具[/td][td]关[/td][td]角色的初始道具也参与重组。[/td][/tr]
 [tr][td]保留原名[/td][td]关[/td][td]关闭时命名为"形容词+原名称"。[/td][/tr]
-[tr][td]强制重组 (不推荐)[/td][td]关[/td][td]望远镜、诱饵、口袋工厂、蝾螈、金鱼、鱼钩也参与重组。[/td][/tr]
+[tr][td]强制重组[/td][td]关[/td][td]望远镜、诱饵、口袋工厂、蝾螈、金鱼、鱼钩也参与重组。[/td][/tr]
 [tr][td]混沌 / 究极混沌[/td][td]关[/td][td]随机交换道具的稀有度 / 稀有度和图标（二选一）。[/td][/tr]
 [tr][td]平均数值 / 浮动范围 / 触发效果[/td][td]100% / 100% / 125%[/td][td]整体强度、强弱差异、带触发或机制效果的概率（100% = 原版）。[/td][/tr]
 [tr][td]保留原版道具[/td][td]0%[/td][td]保留一定比例的原版道具。[/td][/tr]
