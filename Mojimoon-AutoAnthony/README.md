@@ -134,8 +134,6 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 ![](../img/AutoAnthony/aa-en-3.jpg)
 
-![](../img/AutoAnthony/aa-en-4.jpg)
-
 ---
 
 ## 中文
@@ -263,8 +261,6 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 ![](../img/AutoAnthony/aa-zh-2.jpg)
 
 ![](../img/AutoAnthony/aa-zh-3.jpg)
-
-![](../img/AutoAnthony/aa-zh-4.jpg)
 
 <!--
 
