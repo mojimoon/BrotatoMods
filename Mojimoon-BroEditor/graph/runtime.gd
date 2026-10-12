@@ -187,6 +187,9 @@ func _pass(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> bool:
 			return hp != null and hp < float(_param(n, "pct", 50))
 		"dmg_type":
 			return str(_param(n, "stat", "")) in ctx.info.get("stats", [])
+		"once":
+			var tokens = GraphEffect.once_list(p)
+			return tokens != null and GraphEffect.take_once(tokens, en.effect.once_token(int(n.id)))
 	return true
 
 

@@ -360,6 +360,43 @@ func test_75_graph_more_nodes() -> void:
 	_check(not "no_melee_weapons" in m.Catalog.graph_stat_keys() and "enemy_damage" in m.Catalog.graph_stat_keys(), "blueprint stats exclude rules")
 
 
+# 条件"仅一次"：每获得一次持有者只通过一次（同原版"下一波"）；令牌随存档保存；拆解原版"下一波"效果
+func test_76_graph_once() -> void:
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	var once = GE.add_node(g, "once", Vector2.ZERO)
+	GE.add_link(g, GE.add_node(g, "wave_start", Vector2.ZERO), once)
+	GE.add_link(g, once, GE.add_node(g, "perm_stat", Vector2.ZERO, {"stat": "stat_armor", "value": 2}))
+	_graph_char(g)
+	var h = Keys.generate_hash(GE.ONCE_KEY)
+	_eq(rd.get_player_effects(0).get(h, []).size(), 1, "one token when the character is added")
+	# 存档往返：令牌保留
+	var pd = rd.players_data[0]
+	var saved = JSON.parse(JSON.print(pd._serialize_effects(pd.effects))).result
+	var loaded = Utils.convert_dictionary_to_hash(pd._deserialize_effects(saved, {}), true)
+	_eq(loaded.get(h, []).size(), 1, "token survives save / load")
+	_check(int(loaded[h][0]) == int(pd.effects[h][0]), "same token after load")
+	var a0 = _armor()
+	m.runtime.fire("wave_start", 0)
+	m.runtime.fire("wave_start", 0)
+	_eq(_armor(), a0 + 2, "fires once")
+	m.runtime.end_wave()
+	m.runtime.start_wave(null)
+	m.runtime.fire("wave_start", 0)
+	_eq(_armor(), a0 + 2, "not again next wave")
+	m.runtime.end_wave()
+	_check(GE.graph_text(g, false).find(tr("BE_CX_ONCE").strip_edges()) >= 0, "once text")
+	# 拆解原版"下一波"效果：波次开始 → 仅一次 → 本波属性
+	var nw = m.trigger_template("stats_next_wave")
+	if nw != null:
+		var g2 = GE.new_graph()
+		_check(GE.split_native(g2, m.make_effect({"from": nw.from, "i": nw.i}), Vector2.ZERO), "next-wave effect splits")
+		var kinds = []
+		for n in g2.nodes:
+			kinds.push_back(n.kind)
+		_eq(kinds, ["wave_start", "once", "temp_stat"], "split path")
+
+
 func test_80_start_state() -> void:
 	var p = m.new_profile()
 	p.start = {"materials": 50, "levels": 3, "crates": 2}

@@ -7,6 +7,9 @@ extends Effect
 const ID = "broeditor_graph"
 const Catalog = preload("res://mods-unpacked/Mojimoon-BroEditor/catalog.gd")
 const MAX_PATHS = 40
+# 条件"仅一次"（同原版"下一波"效果）：每获得一次持有者（道具 / 角色），每个"仅一次"节点在玩家效果表里记一枚令牌，
+# 条件通过时消耗一枚。令牌随一局存档保存；同内容的蓝图共用令牌（数量一致，不影响结果）
+const ONCE_KEY = "broeditor_once"
 # 诅咒探针：value 固定为 CURSE_PROBE、效果符号为"正面"。原版诅咒把它当作普通正面效果放大为
 # ceil(CURSE_PROBE × (1 + 诅咒系数))，据此还原诅咒系数，再按系数诅咒图里的数值（mod_main.curse_graph）
 const CURSE_PROBE = 1000
@@ -54,12 +57,70 @@ static func _mod():
 	return tree.root.get_node_or_null("/root/ModLoader/Mojimoon-BroEditor")
 
 
-func apply(_player_index: int) -> void:
+func apply(player_index: int) -> void:
+	var tokens = once_list(player_index)
+	if tokens != null:
+		for t in once_tokens():
+			tokens.push_back(t)
 	_mark_dirty()
 
 
-func unapply(_player_index: int) -> void:
+func unapply(player_index: int) -> void:
+	var tokens = once_list(player_index)
+	if tokens != null:
+		for t in once_tokens():
+			take_once(tokens, t)
 	_mark_dirty()
+
+
+# 玩家效果表里的令牌列表（没有时创建）
+static func once_list(player_index: int):
+	if player_index < 0 or player_index >= RunData.players_data.size():
+		return null
+	var effects = RunData.get_player_effects(player_index)
+	var h = Keys.generate_hash(ONCE_KEY)
+	if not effects.get(h) is Array:
+		effects[h] = []
+	return effects[h]
+
+
+static func take_once(tokens: Array, t: int) -> bool:
+	for i in tokens.size():
+		if int(tokens[i]) == t:
+			tokens.remove(i)
+			return true
+	return false
+
+
+func once_tokens() -> Array:
+	var out = []
+	for n in graph.get("nodes", []):
+		if n.kind == "once":
+			out.push_back(once_token(int(n.id)))
+	return out
+
+
+# 令牌 = 蓝图内容 + 节点 id 的哈希（读档后数值变成浮点也一样）
+func once_token(node_id: int) -> int:
+	return hash(_canon(graph.get("nodes", [])) + _canon(graph.get("links", [])) + "#" + str(node_id))
+
+
+static func _canon(v) -> String:
+	if v is Dictionary:
+		var keys = v.keys()
+		keys.sort()
+		var parts = []
+		for k in keys:
+			parts.push_back(str(k) + ":" + _canon(v[k]))
+		return "{" + PoolStringArray(parts).join(",") + "}"
+	if v is Array:
+		var parts = []
+		for x in v:
+			parts.push_back(_canon(x))
+		return "[" + PoolStringArray(parts).join(",") + "]"
+	if typeof(v) == TYPE_REAL and v == floor(v):
+		return str(int(v))
+	return str(v)
 
 
 func _mark_dirty() -> void:
