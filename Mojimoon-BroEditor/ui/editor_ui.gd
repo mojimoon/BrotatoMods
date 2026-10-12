@@ -1954,6 +1954,17 @@ func _key_label(text: String) -> Label:
 	return l
 
 
+# 效果文本：显示键名时下方另起一行灰色键名（key · custom_key · text_key）
+func _with_key(ctrl: Control, e) -> Control:
+	if not _mod.debug or e == null:
+		return ctrl
+	var col = VBoxContainer.new()
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.add_child(ctrl)
+	col.add_child(_key_label(_key_info(e)))
+	return col
+
+
 # 属性名称格：白字；显示键名时下方另起一行灰色键名
 func _name_cell(text: String, key: String = "") -> Control:
 	var lbl = _label(text, FONT_DESC, C_TEXT)
@@ -2334,7 +2345,7 @@ func _lib_entry_text(entry: Dictionary, cat: String, search: String) -> String:
 		return ""
 	var text = _mod.effect_text(entry.effect)
 	if text != "" and search != "":
-		var plain = _strip(text).to_lower() + " " + tr(entry.src).to_lower() + " " + str(entry.effect.key) + " " + str(entry.effect.custom_key)
+		var plain = _strip(text).to_lower() + " " + tr(entry.src).to_lower() + " " + _key_info(entry.effect).to_lower()
 		if plain.find(search) < 0:
 			return ""
 	return text
@@ -2371,14 +2382,7 @@ func _fill_library() -> void:
 		_apply_action_style(add, C_ACCENT_3)
 		add.connect("pressed", self, "_add_spec", [{"from": entry.from, "i": entry.i}])
 		row.add_child(add)
-		if _mod.debug:
-			var tcol = VBoxContainer.new()
-			tcol.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			tcol.add_child(_rich(text))
-			tcol.add_child(_key_label(_key_info(entry.effect)))
-			row.add_child(tcol)
-		else:
-			row.add_child(_rich(text))
+		row.add_child(_with_key(_rich(text), entry.effect))
 		var src = _label(tr(entry.src), FONT_DESC, C_TEXT_DIM)
 		src.rect_min_size = Vector2(110, 0)
 		src.clip_text = true

@@ -196,7 +196,6 @@ func _param_control(n: Dictionary, p: Array) -> Control:
 	var b = ui._button("", ui.FONT_DESC)
 	b.text = ui._strip(GraphEffect._grant_text({"kind": "grant", "params": {"ref": cur, "n": 1}}, false)) if cur is Dictionary else ui.tr("BE_GRANT_PICK")
 	b.clip_text = true
-	b.hint_tooltip = b.text	# 按钮宽度有限：悬停显示完整效果
 	b.rect_min_size = Vector2(200, 0)
 	ui._apply_action_style(b, TYPE_COLORS.effect)
 	b.connect("pressed", self, "_open_effect_picker", [int(n.id)])
@@ -392,7 +391,7 @@ func _fill_picker() -> void:
 		else:
 			pick.connect("pressed", self, "_on_picked", [ref])
 		row.add_child(pick)
-		row.add_child(ui._rich(text))
+		row.add_child(ui._with_key(ui._rich(text), entry.effect))
 		var src = ui._label(ui.tr(entry.src), ui.FONT_DESC, ui.C_TEXT_DIM)
 		src.rect_min_size = Vector2(120, 0)
 		src.clip_text = true

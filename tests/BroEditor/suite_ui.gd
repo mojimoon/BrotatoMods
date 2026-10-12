@@ -823,6 +823,29 @@ func test_161_effect_details_and_popup_buttons() -> void:
 	bp._on_picker_enter("")
 	_eq(JSON.print(GE.nodes_by_id(m.profiles[CH].graph)[gn].params.ref), JSON.print(ref), "enter on the current effect keeps it")
 	_check(bp._picker == null, "picker closed")
+	# 显示键名：选择窗口与详细信息里都显示键名
+	m.debug = true
+	bp._picker_cat = "all"
+	bp._picker_filter = "burn"
+	bp._open_effect_picker(gn)
+	yield(tree, "idle_frame")
+	var texts = []
+	for n in _all_nodes(bp._picker_list):
+		if n is Label:
+			texts.push_back(n.text)
+	_check(PoolStringArray(texts).join("|").find("burn") >= 0, "picker shows key names")
+	bp.close_picker()
+	bp._picker_filter = ""
+	GE.nodes_by_id(m.profiles[CH].graph)[gn].params.ref = {"from": burn.from, "i": burn.i}
+	bp._on_ref_details(gn)
+	texts = []
+	for n in _all_nodes(ui._modals[-1]):
+		if n is Label:
+			texts.push_back(n.text)
+	var joined = PoolStringArray(texts).join("|")
+	_check(joined.find("burning_data") >= 0 and joined.find("|damage|") >= 0, "details show key names")
+	ui._modals[-1].close()
+	m.debug = false
 	# 从角色导入：头像按钮不拉伸
 	ui._on_tab_pressed("gear")
 	ui._open_char_weapons()

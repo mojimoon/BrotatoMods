@@ -41,7 +41,7 @@ func _build() -> void:
 	back.connect("pressed", modal, "close")
 	modal.head.add_child(back)
 	_preview = ui._rich("")
-	modal.body.add_child(_preview)
+	modal.body.add_child(ui._with_key(_preview, ui._mod.make_effect(spec)))
 	var scroll = ui._scroll()
 	modal.body.add_child(scroll)
 	var col = VBoxContainer.new()
@@ -59,6 +59,8 @@ func _build() -> void:
 	for f in Catalog.sub_fields(e):
 		var r = e.get(f)
 		var box = ui._section(col, _field_name(f), ui.C_ACCENT_3)
+		if ui._mod.debug:
+			box.add_child(ui._key_label(f + "  ·  " + (r.get_script().resource_path.get_file() if r.get_script() != null else r.get_class())))
 		var grid = _grid(box)
 		for cf in Catalog.sub_child_fields(r):
 			_field(grid, cf, r.get(cf.name), f, "sub")
@@ -85,7 +87,16 @@ func _field_name(name: String) -> String:
 
 func _field(grid: Control, f: Dictionary, cur, sub: String, where: String) -> void:
 	var lbl = ui._label(_field_name(f.name), ui.FONT_DESC, ui.C_TEXT_DIM)
-	grid.add_child(lbl)
+	if ui._mod.debug:
+		var c = VBoxContainer.new()
+		c.add_constant_override("separation", 0)
+		c.add_child(lbl)
+		var k = ui._key_label(f.name)
+		k.clip_text = false
+		c.add_child(k)
+		grid.add_child(c)
+	else:
+		grid.add_child(lbl)
 	match f.type:
 		TYPE_INT, TYPE_REAL:
 			var sb = ui._spin(-99999, 99999, 1 if f.type == TYPE_INT else 0.01)
