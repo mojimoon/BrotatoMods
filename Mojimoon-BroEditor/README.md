@@ -30,12 +30,16 @@ Heartfelt thanks to [BroLab](https://steamcommunity.com/sharedfiles/filedetails/
 
 Click **BroEditor** in the top-left corner of the character, weapon or difficulty selection screen.
 
-About the buttons and options in the top-right corner:
+About the buttons in the top-right corner:
 
 - **Import**: Import a code from the clipboard to load a project, character, item, weapon or everything.
 - **Export**: Export a code for the current object (BE0:), all characters (BEC:), all items (BEI:), all weapons (BEW:) or everything (BEA:). Different types have different formats, and the mod will automatically detect the type when importing from clipboard.
-- **Show Keys**: show the key names of all stats, effects, item tags and weapon types for easy searching.
-- **Hide Numbers**: by default, custom objects using vanilla icons will show a number in the bottom-right corner to distinguish them. Enable this option to hide the number.
+- **Settings**:
+  - **Font Size**: 80–125%, scales the editor's text.
+  - **Effect Library Dedup**: effects with the same keys but different values count as one in the Effect Library.
+  - **Hide Numbers**: by default, custom objects using vanilla icons show a number in the bottom-right corner to tell them apart. Enable this option to hide it.
+  - **Show Keys**: show the key names of all stats, effects, item tags and weapon types for easy searching. Effects show only their main key.
+  - **Detailed Keys**: requires Show Keys. Effects show all their keys (`key (text_key) / custom_key`), and field names are shown when editing effects.
 
 ### Files
 
@@ -69,12 +73,18 @@ Heartfelt thanks to [url=https://steamcommunity.com/sharedfiles/filedetails/?id=
 
 Click [b]BroEditor[/b] in the top-left corner of the character, weapon or difficulty selection screen.
 
-About the buttons and options in the top-right corner:
+About the buttons in the top-right corner:
 
 [list]
 [*][b]Import / Export[/b]: export a code for the current object (BE0:), all characters (BEC:), all items (BEI:), all weapons (BEW:) or everything (BEA:). Different types have different formats, and the mod will automatically detect the type when importing from clipboard.
-[*][b]Show Keys[/b]: show the key names of all stats, effects, item tags and weapon types for easy searching.
-[*][b]Hide Numbers[/b]: by default, custom objects using vanilla icons will show a number in the bottom-right corner to distinguish them. Enable this option to hide the number.
+[*][b]Settings[/b]:
+[list]
+[*][b]Font Size[/b]: 80–125%, scales the editor's text.
+[*][b]Effect Library Dedup[/b]: effects with the same keys but different values count as one in the Effect Library.
+[*][b]Hide Numbers[/b]: by default, custom objects using vanilla icons show a number in the bottom-right corner to tell them apart. Enable this option to hide it.
+[*][b]Show Keys[/b]: show the key names of all stats, effects, item tags and weapon types for easy searching. Effects show only their main key.
+[*][b]Detailed Keys[/b]: requires Show Keys. Effects show all their keys ([i]key (text_key) / custom_key[/i]), and field names are shown when editing effects.
+[/list]
 [/list]
 
 [h1]Files[/h1]
@@ -131,11 +141,15 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 在角色、武器或难度选择界面左上角点击 **BroEditor**。
 
-关于右上角的按钮和选项：
+关于右上角的按钮：
 
 - **导入 / 导出**：导出当前项目 (BE0:)、角色 (BEC:)、道具 (BEI:)、武器 (BEW:) 或全部 (BEA:) 的分享码。不同类型的格式不同，从剪贴版导入时会自动识别。
-- **显示键名**：显示所有属性、效果、道具标签、武器类型的键名 (key)，方便查找。
-- **隐藏编号**：默认情况下，使用原版图标自定义的内容右下角会显示一个编号，方便区分。启用时隐藏编号。
+- **设置**：
+  - **字体大小**：80–125%，缩放编辑器的文字。
+  - **效果库去重**：效果库中同键名不同数值的效果视为同一条。
+  - **隐藏编号**：默认情况下，使用原版图标自定义的内容右下角会显示一个编号，方便区分。启用时隐藏编号。
+  - **显示键名**：显示所有属性、效果、道具标签、武器类型的键名 (key)，方便查找。效果只显示主键名。
+  - **更详细键名**：需要先开启显示键名。效果显示全部键名（`key (text_key) / custom_key`），编辑效果时额外显示字段名。
 
 ### 文件
 
@@ -169,12 +183,18 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 在角色、武器或难度选择界面左上角点击 [b]BroEditor[/b]。
 
-关于右上角的按钮和选项：
+关于右上角的按钮：
 
 [list]
 [*][b]导入 / 导出[/b]：导出当前项目 (BE0:)、角色 (BEC:)、道具 (BEI:)、武器 (BEW:) 或全部 (BEA:) 的分享码。不同类型的格式不同，从剪贴版导入时会自动识别。
-[*][b]显示键名[/b]：显示所有属性、效果、道具标签、武器类型的键名 (key)，方便查找。
+[*][b]设置[/b]：
+[list]
+[*][b]字体大小[/b]：80–125%，缩放编辑器的文字。
+[*][b]效果库去重[/b]：效果库中同键名不同数值的效果视为同一条。
 [*][b]隐藏编号[/b]：默认情况下，使用原版图标自定义的内容右下角会显示一个编号，方便区分。启用时隐藏编号。
+[*][b]显示键名[/b]：显示所有属性、效果、道具标签、武器类型的键名 (key)，方便查找。效果只显示主键名。
+[*][b]更详细键名[/b]：需要先开启显示键名。效果显示全部键名（[i]key (text_key) / custom_key[/i]），编辑效果时额外显示字段名。
+[/list]
 [/list]
 
 [h1]文件[/h1]
