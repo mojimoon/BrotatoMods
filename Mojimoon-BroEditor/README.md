@@ -1,4 +1,4 @@
-# BroEditor / 万能编辑器
+# BroEditor - Universal Visual Editor / 万能可视化编辑器
 
 [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3817655214) | [Open in Steam Client](https://link.steam.watch/url/CommunityFilePage/3817655214) | [CHANGELOG / 更新日志](CHANGELOG.md)
 
@@ -28,7 +28,7 @@ Heartfelt thanks to [BroLab](https://steamcommunity.com/sharedfiles/filedetails/
 
 ### How to use
 
-Click **BroEditor** in the top-left corner of the character, weapon or difficulty selection screen.
+Click **BroEditor** in the top-left corner of the character, weapon or difficulty selection screen. The interface should be self-explanatory, but if you need help, click **Help** in the top-right corner.
 
 About the buttons in the top-right corner:
 
@@ -39,7 +39,7 @@ About the buttons in the top-right corner:
   - **Font Size**: 80–125%, scales the editor's text.
   - **Effect Library Dedup**: effects with the same keys but different values count as one in the Effect Library.
   - **Hide Numbers**: by default, custom objects using vanilla icons show a number in the bottom-right corner to tell them apart. Enable this option to hide it.
-  - **Show Keys**: show the key names of all stats, effects, item tags and weapon types for easy searching. Effects show only their main key.
+  - **Show Keys**: show the key names of all stats, effects, item tags and weapon types for easy searching.
   - **Detailed Keys**: requires Show Keys. Effects show all their keys (`key (text_key) / custom_key`), and field names are shown when editing effects.
 
 ### Files
@@ -47,7 +47,7 @@ About the buttons in the top-right corner:
 Files are saved in `%APPDATA%\Brotato\Mojimoon-BroEditor\` (Windows), `~/Library/Application Support/Brotato/Mojimoon-BroEditor/` (Mac) or `~/.local/share/Brotato/Mojimoon-BroEditor/` (Linux):
 
 - `profiles.json`: changes to vanilla characters, items and weapons, and the editor settings.
-- `custom\character\`, `custom\item\`, `custom\weapon\`: one `<id>.json` file per character, item or weapon you created. To share, send the files (or a whole folder); the receiver puts them in the same folder and restarts the game.
+- `custom\character\`, `custom\item\`, `custom\weapon\`: one `<id>.json` file per character, item or weapon you created. To share, send the files or a whole folder; the receiver puts them in the same folder and restarts the game.
 - `icons\`: imported icon images. Send them along with the file if your object uses one.
 
 <!-- BBCode
@@ -72,7 +72,7 @@ Heartfelt thanks to [url=https://steamcommunity.com/sharedfiles/filedetails/?id=
 
 [h1]How to use[/h1]
 
-Click [b]BroEditor[/b] in the top-left corner of the character, weapon or difficulty selection screen.
+Click [b]BroEditor[/b] in the top-left corner of the character, weapon or difficulty selection screen. The interface should be self-explanatory, but if you need help, click [b]Help[/b] in the top-right corner.
 
 About the buttons in the top-right corner:
 
@@ -84,7 +84,7 @@ About the buttons in the top-right corner:
 [*][b]Font Size[/b]: 80–125%, scales the editor's text.
 [*][b]Effect Library Dedup[/b]: effects with the same keys but different values count as one in the Effect Library.
 [*][b]Hide Numbers[/b]: by default, custom objects using vanilla icons show a number in the bottom-right corner to tell them apart. Enable this option to hide it.
-[*][b]Show Keys[/b]: show the key names of all stats, effects, item tags and weapon types for easy searching. Effects show only their main key.
+[*][b]Show Keys[/b]: show the key names of all stats, effects, item tags and weapon types for easy searching.
 [*][b]Detailed Keys[/b]: requires Show Keys. Effects show all their keys ([i]key (text_key) / custom_key[/i]), and field names are shown when editing effects.
 [/list]
 [/list]
@@ -95,7 +95,7 @@ Files are saved in [i]%APPDATA%\Brotato\Mojimoon-BroEditor\[/i] (Windows), [i]~/
 
 [list]
 [*][i]profiles.json[/i]: changes to vanilla characters, items and weapons, and the editor settings.
-[*][i]custom\character\[/i], [i]custom\item\[/i], [i]custom\weapon\[/i]: one [i]<id>.json[/i] file per character, item or weapon you created. To share, send the files (or a whole folder); the receiver puts them in the same folder and restarts the game.
+[*][i]custom\character\[/i], [i]custom\item\[/i], [i]custom\weapon\[/i]: one [i]<id>.json[/i] file per character, item or weapon you created. To share, send the files or a whole folder; the receiver puts them in the same folder and restarts the game.
 [*][i]icons\[/i]: imported icon images. Send them along with the file if your object uses one.
 [/list]
 
@@ -119,6 +119,8 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 ![](../img/BroEditor/be-en-6.jpg)
 
+![](../img/BroEditor/be-en-7.jpg)
+
 ---
 
 ## 中文
@@ -141,17 +143,17 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 ### 使用
 
-在角色、武器或难度选择界面左上角点击 **BroEditor**。
+在角色、武器或难度选择界面左上角点击 **BroEditor**。界面简单明了，如果有不懂的，可以点击右上角 **帮助**。
 
 关于右上角的按钮：
 
 - **导入 / 导出**：导出当前项目 (BE0:)、角色 (BEC:)、道具 (BEI:)、武器 (BEW:) 或全部 (BEA:) 的分享码。不同类型的格式不同，从剪贴版导入时会自动识别。
 - **帮助**：显示当前栏（角色、道具或武器）的操作指南。
 - **设置**：
-  - **字体大小**：80–125%，缩放编辑器的文字。
+  - **字体大小**：80–125%，控制 BroEditor 的文字大小。
   - **效果库去重**：效果库中同键名不同数值的效果视为同一条。
   - **隐藏编号**：默认情况下，使用原版图标自定义的内容右下角会显示一个编号，方便区分。启用时隐藏编号。
-  - **显示键名**：显示所有属性、效果、道具标签、武器类型的键名 (key)，方便查找。效果只显示主键名。
+  - **显示键名**：显示所有属性、效果、道具标签、武器类型的内部键名 (key)，方便查找。
   - **更详细键名**：需要先开启显示键名。效果显示全部键名（`key (text_key) / custom_key`），编辑效果时额外显示字段名。
 
 ### 文件
@@ -159,7 +161,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 文件保存在 `%APPDATA%\Brotato\Mojimoon-BroEditor\` (Windows)、`~/Library/Application Support/Brotato/Mojimoon-BroEditor/` (Mac) 或 `~/.local/share/Brotato/Mojimoon-BroEditor/` (Linux)：
 
 - `profiles.json`：对原版角色、道具、武器的修改，以及编辑器设置。
-- `custom\character\`、`custom\item\`、`custom\weapon\`：每个新建的角色、道具、武器各一个 `<id>.json` 文件。分享时发送文件（或整个文件夹），对方放进相同的文件夹后重启游戏即可。
+- `custom\character\`、`custom\item\`、`custom\weapon\`：每个新建的角色、道具、武器各一个 `<id>.json` 文件。分享时发送文件或整个文件夹，对方放进相同的文件夹后重启游戏即可。
 - `icons\`：导入的图标图片。如果对象用了导入的图标，一并发送。
 
 <!-- BBCode
@@ -184,19 +186,17 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 [h1]使用[/h1]
 
-在角色、武器或难度选择界面左上角点击 [b]BroEditor[/b]。
-
-关于右上角的按钮：
+在角色、武器或难度选择界面左上角点击 [b]BroEditor[/b]。界面简单明了，如果有不懂的，可以点击右上角 [b]帮助[/b]。关于右上角的按钮：
 
 [list]
 [*][b]导入 / 导出[/b]：导出当前项目 (BE0:)、角色 (BEC:)、道具 (BEI:)、武器 (BEW:) 或全部 (BEA:) 的分享码。不同类型的格式不同，从剪贴版导入时会自动识别。
 [*][b]帮助[/b]：显示当前栏（角色、道具或武器）的操作指南。
 [*][b]设置[/b]：
 [list]
-[*][b]字体大小[/b]：80–125%，缩放编辑器的文字。
+[*][b]字体大小[/b]：80–125%，控制 BroEditor 的文字大小。
 [*][b]效果库去重[/b]：效果库中同键名不同数值的效果视为同一条。
 [*][b]隐藏编号[/b]：默认情况下，使用原版图标自定义的内容右下角会显示一个编号，方便区分。启用时隐藏编号。
-[*][b]显示键名[/b]：显示所有属性、效果、道具标签、武器类型的键名 (key)，方便查找。效果只显示主键名。
+[*][b]显示键名[/b]：显示所有属性、效果、道具标签、武器类型的内部键名 (key)，方便查找。
 [*][b]更详细键名[/b]：需要先开启显示键名。效果显示全部键名（[i]key (text_key) / custom_key[/i]），编辑效果时额外显示字段名。
 [/list]
 [/list]
@@ -207,7 +207,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 [list]
 [*][i]profiles.json[/i]：对原版角色、道具、武器的修改，以及编辑器设置。
-[*][i]custom\character\[/i]、[i]custom\item\[/i]、[i]custom\weapon\[/i]：每个新建的角色、道具、武器各一个 [i]<id>.json[/i] 文件。分享时发送文件（或整个文件夹），对方放进相同的文件夹后重启游戏即可。
+[*][i]custom\character\[/i]、[i]custom\item\[/i]、[i]custom\weapon\[/i]：每个新建的角色、道具、武器各一个 [i]<id>.json[/i] 文件。分享时发送文件或整个文件夹，对方放进相同的文件夹后重启游戏即可。
 [*][i]icons\[/i]：导入的图标图片。如果对象用了导入的图标，一并发送。
 [/list]
 
