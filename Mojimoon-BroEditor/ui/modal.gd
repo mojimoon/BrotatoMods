@@ -16,10 +16,12 @@ var _steps: Array = []
 var _target: Object = null
 var _method := ""
 var _args: Array = []
+var fixed := false	# 用原版字体（设置弹窗：大小不随字体设置变化）
 
 
-static func open(p_ui, title: String, accent: Color, size: Vector2):
+static func open(p_ui, title: String, accent: Color, size: Vector2, p_fixed: bool = false):
 	var m = load("res://mods-unpacked/Mojimoon-BroEditor/ui/modal.gd").new()
+	m.fixed = p_fixed
 	m._build(p_ui, title, accent, size)
 	return m
 
@@ -55,7 +57,7 @@ func _build(p_ui, title: String, accent: Color, size: Vector2) -> void:
 	head = HBoxContainer.new()
 	head.add_constant_override("separation", 10)
 	box.add_child(head)
-	var t = ui._label(title, ui.FONT_NORMAL, accent)
+	var t = ui._label(title, ui.BASE_NORMAL if fixed else ui.FONT_NORMAL, accent)
 	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(t)
 	body = VBoxContainer.new()
@@ -72,7 +74,7 @@ func _build(p_ui, title: String, accent: Color, size: Vector2) -> void:
 
 # 底部按钮
 func add_button(text: String, accent: Color, target: Object, method: String, args: Array = []) -> Button:
-	var b = ui._button(text, ui.FONT_SMALL)
+	var b = ui._button(text, ui.BASE_SMALL if fixed else ui.FONT_SMALL)
 	ui._apply_action_style(b, accent)
 	b.connect("pressed", target, method, args)
 	foot.add_child(b)

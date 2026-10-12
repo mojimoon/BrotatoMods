@@ -15,10 +15,19 @@ const SearchSelect = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/search_s
 const DragRow = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/drag_row.gd")
 const Modal = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/modal.gd")
 const EffectDetail = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/effect_detail.gd")
-const FONT_TITLE = preload("res://resources/fonts/actual/base/font_32_outline.tres")
-const FONT_NORMAL = preload("res://resources/fonts/actual/base/font_26.tres")
-const FONT_SMALL = preload("res://resources/fonts/actual/base/font_22.tres")
-const FONT_DESC = preload("res://resources/fonts/actual/base/font_very_smallest_text.tres")
+const BASE_TITLE = preload("res://resources/fonts/actual/base/font_32_outline.tres")
+const BASE_NORMAL = preload("res://resources/fonts/actual/base/font_26.tres")
+const BASE_SMALL = preload("res://resources/fonts/actual/base/font_22.tres")
+const BASE_DESC = preload("res://resources/fonts/actual/base/font_very_smallest_text.tres")
+# 字体大小（设置里的 80–125%）：复制一份原版字体再改大小，不影响游戏其它界面；标题行与设置弹窗用原版字体（BASE_*），拖动滑条时不移动
+var FONT_TITLE: DynamicFont = BASE_TITLE.duplicate()
+var FONT_NORMAL: DynamicFont = BASE_NORMAL.duplicate()
+var FONT_SMALL: DynamicFont = BASE_SMALL.duplicate()
+var FONT_DESC: DynamicFont = BASE_DESC.duplicate()
+var _scaled_switches: Array = []
+var _settings_modal = null
+var _detail_switch: CheckButton
+var _font_value: Label
 
 const PANEL_SIZE = Vector2(1760, 1010)
 const LEFT_WIDTH = 380
@@ -162,6 +171,7 @@ func _ready() -> void:
 		queue_free()
 		return
 	_regex_bb.compile("\\[[^\\]]*\\]")
+	_scale_fonts()
 	_start_sig = _sig()
 	_id = initial_id
 	if _mod.find_character(_id) == null:
@@ -251,22 +261,17 @@ func _build_header(root: Control) -> void:
 	var header = HBoxContainer.new()
 	header.add_constant_override("separation", 10)
 	root.add_child(header)
-	header.add_child(_label(tr("BE_TITLE"), FONT_TITLE, C_TEXT))
-	_status = _label("", FONT_SMALL, C_TEXT_DIM)
+	header.add_child(_label(tr("BE_TITLE"), BASE_TITLE, C_TEXT))
+	_status = _label("", BASE_SMALL, C_TEXT_DIM)
 	_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_status.align = Label.ALIGN_RIGHT
 	_status.clip_text = true
 	header.add_child(_status)
-	var dedup = _switch(tr("BE_LIBRARY_DEDUP"), _mod.library_dedup)
-	dedup.connect("toggled", self, "_on_library_dedup_toggled")
-	header.add_child(dedup)
-	var nums = _switch(tr("BE_HIDE_NUMBERS"), _mod.hide_numbers)
-	nums.connect("toggled", self, "_on_hide_numbers_toggled")
-	header.add_child(nums)
-	var dbg = _switch(tr("BE_DEBUG"), _mod.debug)
-	dbg.connect("toggled", self, "_on_debug_toggled")
-	header.add_child(dbg)
-	var import_btn = _button(tr("BE_IMPORT"), FONT_SMALL)
+	var settings_btn = _button(tr("BE_SETTINGS"), BASE_SMALL)
+	_apply_action_style(settings_btn, C_ACCENT)
+	settings_btn.connect("pressed", self, "open_settings")
+	header.add_child(settings_btn)
+	var import_btn = _button(tr("BE_IMPORT"), BASE_SMALL)
 	_apply_action_style(import_btn, C_ACCENT_2)
 	import_btn.connect("pressed", self, "_on_import_pressed")
 	header.add_child(import_btn)
@@ -280,16 +285,93 @@ func _build_header(root: Control) -> void:
 		[tr("BE_EXPORT_KIND_weapon"), BEMain.BUNDLE_PREFIX.weapon],
 		[tr("BE_EXPORT_ALL"), BEMain.ALL_PREFIX],
 	])
-	export_btn.add_font_override("font", FONT_SMALL)
+	export_btn.add_font_override("font", BASE_SMALL)
 	export_btn.align = Button.ALIGN_CENTER
 	export_btn.clip_text = false
 	export_btn.connect("selected", self, "_on_export_selected")
 	header.add_child(export_btn)
-	var close_btn = _button("X", FONT_NORMAL)
+	var close_btn = _button("X", BASE_NORMAL)
 	close_btn.rect_min_size = Vector2(48, 44)
 	_apply_action_style(close_btn, C_DANGER)
 	close_btn.connect("pressed", self, "_on_close_pressed")
 	header.add_child(close_btn)
+
+
+# 设置弹窗：字体大小、效果库去重、隐藏编号、显示键名、更详细键名（各带简要说明）；用原版字体，大小不随字体设置变化
+const SETTINGS = [
+	["library_dedup", "BE_LIBRARY_DEDUP", "_on_library_dedup_toggled"],
+	["hide_numbers", "BE_HIDE_NUMBERS", "_on_hide_numbers_toggled"],
+	["debug", "BE_DEBUG", "_on_debug_toggled"],
+	["debug_detail", "BE_DEBUG_DETAIL", "_on_debug_detail_toggled"],
+]
+
+
+func open_settings() -> void:
+	_settings_modal = Modal.open(self, tr("BE_SETTINGS"), C_ACCENT, Vector2(820, 0), true)
+	_settings_modal.connect("closed", self, "_on_settings_closed")
+	_settings_modal.add_button(tr("MENU_BACK"), C_TEXT_DIM, _settings_modal, "close")
+	var box = _settings_modal.body
+	box.add_constant_override("separation", 14)
+	var frow = HBoxContainer.new()
+	frow.add_constant_override("separation", 12)
+	box.add_child(frow)
+	var fl = _label(tr("MENU_FONT_SIZE"), BASE_SMALL, C_TEXT)
+	fl.rect_min_size = Vector2(260, 0)
+	frow.add_child(fl)
+	var sl = HSlider.new()
+	sl.min_value = 80
+	sl.max_value = 125
+	sl.step = 5
+	sl.value = _mod.font_scale
+	sl.rect_min_size = Vector2(300, 0)
+	sl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	sl.focus_mode = Control.FOCUS_NONE
+	sl.connect("value_changed", self, "_on_font_scale")
+	frow.add_child(sl)
+	_font_value = _label(str(_mod.font_scale) + "%", BASE_SMALL, C_TEXT)
+	_font_value.rect_min_size = Vector2(80, 0)
+	frow.add_child(_font_value)
+	for d in SETTINGS:
+		var sw = _switch(tr(d[1]), bool(_mod.get(d[0])), true)
+		sw.connect("toggled", self, d[2])
+		box.add_child(sw)
+		if d[0] == "debug_detail":
+			_detail_switch = sw
+			sw.disabled = not _mod.debug
+		var desc = _label(tr(d[1] + "_DESC"), BASE_DESC, C_TEXT_DIM)
+		desc.autowrap = true
+		desc.rect_min_size = Vector2(780, 0)
+		box.add_child(desc)
+
+
+func _on_settings_closed() -> void:
+	_settings_modal = null
+	_detail_switch = null
+	_font_value = null
+
+
+func _on_font_scale(value: float) -> void:
+	_mod.font_scale = int(value)
+	if _font_value != null and is_instance_valid(_font_value):
+		_font_value.text = str(int(value)) + "%"
+	_scale_fonts()
+	for sw in _scaled_switches:
+		if is_instance_valid(sw):
+			_apply_switch_icons(sw, _mod.font_scale / 100.0)
+	# 原地改字体大小不会让控件重新计算最小尺寸
+	propagate_notification(NOTIFICATION_THEME_CHANGED)
+
+
+func _scale_fonts() -> void:
+	var s = (_mod.font_scale if _mod != null else 100) / 100.0
+	for pair in [[FONT_TITLE, BASE_TITLE], [FONT_NORMAL, BASE_NORMAL], [FONT_SMALL, BASE_SMALL], [FONT_DESC, BASE_DESC]]:
+		pair[0].size = int(round(pair[1].size * s))
+		pair[0].outline_size = int(round(pair[1].outline_size * s))
+
+
+func _on_debug_detail_toggled(pressed: bool) -> void:
+	_mod.debug_detail = pressed
+	_build_page()
 
 
 # | 角色 [开关] | 道具 [开关] | 武器 [开关] |：总开关关闭时该栏的全部修改都不生效
@@ -1972,11 +2054,22 @@ func _key_rich(e) -> Control:
 	return r
 
 
-# 字段名称格：显示键名时下方另起一行灰色字段名（效果页展开编辑、详细信息弹窗共用）
+# 效果的键名行：显示键名时只显示主键名（灰字）；更详细键名时显示全部键名并高亮主键名
+func _key_line(e) -> Control:
+	if e != null and not _mod.debug_detail:
+		return _key_label(_key_parts(e)[0])
+	return _key_rich(e)
+
+
+func _detail_keys() -> bool:
+	return _mod.debug and _mod.debug_detail
+
+
+# 字段名称格：更详细键名时下方另起一行灰色字段名（效果页展开编辑、详细信息弹窗共用）
 func _field_label(text: String, field: String) -> Control:
 	var lbl = _label(text, FONT_DESC, C_TEXT_DIM)
 	lbl.mouse_filter = Control.MOUSE_FILTER_PASS
-	if not _mod.debug:
+	if not _detail_keys():
 		return lbl
 	var c = VBoxContainer.new()
 	c.add_constant_override("separation", 0)
@@ -2003,7 +2096,7 @@ func _with_key(ctrl: Control, e) -> Control:
 	var col = VBoxContainer.new()
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.add_child(ctrl)
-	col.add_child(_key_rich(e))
+	col.add_child(_key_line(e))
 	return col
 
 
@@ -2082,7 +2175,7 @@ func _group_row(i: int, spec: Dictionary) -> Control:
 	var e = _marker_effect(spec)
 	col.add_child(_rich(_mod.effect_text(e) if e != null else ""))
 	if _mod.debug:
-		col.add_child(_key_rich(e))
+		col.add_child(_key_line(e))
 	var src = _label(tr("BE_SRC_GROUP_" + str(spec.group).to_upper()), FONT_DESC, C_ACCENT)
 	src.rect_min_size = Vector2(120, 0)
 	src.align = Label.ALIGN_RIGHT
@@ -2155,7 +2248,7 @@ func _effect_row(i: int, spec) -> Control:
 	var txt = _rich(_effect_text(spec))
 	tcol.add_child(txt)
 	if _mod.debug:
-		tcol.add_child(_key_rich(e))
+		tcol.add_child(_key_line(e))
 	var src = _label(_source_name(spec), FONT_DESC, C_TEXT_DIM)
 	src.rect_min_size = Vector2(120, 0)
 	src.clip_text = true
@@ -3018,6 +3111,8 @@ func _on_library_dedup_toggled(pressed: bool) -> void:
 
 func _on_debug_toggled(pressed: bool) -> void:
 	_mod.debug = pressed
+	if _detail_switch != null and is_instance_valid(_detail_switch):
+		_detail_switch.disabled = not pressed
 	_build_page()
 
 
@@ -3316,28 +3411,42 @@ func _apply_action_style(btn: Button, accent: Color) -> void:
 	btn.add_color_override("font_color_pressed", C_TEXT)
 
 
-func _switch(text: String, on: bool) -> CheckButton:
+# fixed：设置弹窗里的开关，不随字体大小缩放
+func _switch(text: String, on: bool, fixed: bool = false) -> CheckButton:
 	var sw = CheckButton.new()
 	sw.text = text
 	sw.pressed = on
 	sw.focus_mode = Control.FOCUS_NONE
-	sw.add_font_override("font", FONT_SMALL)
+	sw.add_font_override("font", BASE_SMALL if fixed else FONT_SMALL)
 	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
 		sw.add_stylebox_override(state, StyleBoxEmpty.new())
-	for icon_name in ["on", "off", "on_disabled", "off_disabled"]:
-		var src_name = "on" if icon_name.begins_with("on") else "off"
-		var icon = _small_switch_icon(sw.get_icon(src_name))
-		if icon != null:
-			sw.add_icon_override(icon_name, icon)
+	_apply_switch_icons(sw, 1.0 if fixed else _mod.font_scale / 100.0)
+	if not fixed:
+		_scaled_switches.push_back(sw)
 	for c in ["font_color", "font_color_hover", "font_color_pressed", "font_color_hover_pressed"]:
 		sw.add_color_override(c, C_TEXT)
+	sw.add_color_override("font_color_disabled", C_TEXT_DIM)
 	return sw
 
 
-func _small_switch_icon(src: Texture) -> Texture:
+# 开关图标按比例缩小（基准 56×28）；来源是第一个开关上的原版图标（之后的开关已被覆盖）
+var _switch_src: Dictionary = {}
+
+
+func _apply_switch_icons(sw: CheckButton, scale: float) -> void:
+	for n in ["on", "off"]:
+		if not _switch_src.has(n):
+			_switch_src[n] = sw.get_icon(n)
+	for icon_name in ["on", "off", "on_disabled", "off_disabled"]:
+		var icon = _small_switch_icon(_switch_src["on" if icon_name.begins_with("on") else "off"], scale)
+		if icon != null:
+			sw.add_icon_override(icon_name, icon)
+
+
+func _small_switch_icon(src: Texture, scale: float = 1.0) -> Texture:
 	if src == null:
 		return null
-	var key = src.get_rid().get_id()
+	var key = str(src.get_rid().get_id()) + "@" + str(scale)
 	if _switch_icons.has(key):
 		return _switch_icons[key]
 	var img: Image = src.get_data()
@@ -3346,7 +3455,7 @@ func _small_switch_icon(src: Texture) -> Texture:
 	img = img.duplicate()
 	if img.is_compressed():
 		img.decompress()
-	img.resize(56, 28, Image.INTERPOLATE_BILINEAR)
+	img.resize(int(round(56 * scale)), int(round(28 * scale)), Image.INTERPOLATE_BILINEAR)
 	var tex = ImageTexture.new()
 	tex.create_from_image(img, Texture.FLAG_FILTER)
 	_switch_icons[key] = tex

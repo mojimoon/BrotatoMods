@@ -425,6 +425,32 @@ func _find_label(n: Node, t: String):
 	return null
 
 
+# 设置弹窗：字体大小只缩放编辑器正文，标题行与设置弹窗不变；更详细键名依赖显示键名
+func test_155_settings_and_font_scale() -> void:
+	var ui = yield(_open_ui(CH), "completed")
+	ui.open_settings()
+	yield(tree, "idle_frame")
+	var md = ui._modals[-1]
+	_check(md.fixed, "settings modal uses fixed fonts")
+	_check(ui._detail_switch != null and ui._detail_switch.disabled == (not m.debug), "detailed keys needs show keys")
+	ui._on_debug_toggled(true)
+	_check(not ui._detail_switch.disabled, "detailed keys enabled with show keys")
+	ui._on_debug_toggled(false)
+	var size0 = md.get_child(1).get_child(0).rect_size
+	ui._on_font_scale(125)
+	yield(tree, "idle_frame")
+	_eq(ui.FONT_SMALL.size, int(round(ui.BASE_SMALL.size * 1.25)), "editor fonts scaled")
+	_eq(ui.BASE_SMALL.size, 22, "base fonts untouched")
+	_eq(m.font_scale, 125, "font scale stored")
+	_eq(md.get_child(1).get_child(0).rect_size, size0, "settings panel keeps its size")
+	ui._on_font_scale(80)
+	_eq(ui.FONT_DESC.size, int(round(ui.BASE_DESC.size * 0.8)), "smaller fonts")
+	ui._on_font_scale(100)
+	md.close()
+	ui.queue_free()
+	yield(tree, "idle_frame")
+
+
 func test_154_key_names() -> void:
 	m.debug = true
 	var ui = yield(_open_ui("character_brawler"), "completed")
@@ -432,12 +458,19 @@ func test_154_key_names() -> void:
 	var l = null
 	for e in m.find_character("character_brawler").effects:
 		if e.key == "EFFECT_WEAPON_CLASS_BONUS":
-			l = _find_label(ui._effect_list, ui._key_info(e))
-	_check(l != null and not l.can_translate_messages(), "upper-case key label is not auto-translated")
+			l = _find_label(ui._effect_list, ui._key_parts(e)[0])
+	_check(l != null and l is Label and not l.can_translate_messages(), "only the main key, grey and not auto-translated")
 	ui._on_effect_edit(0)
-	_check(_find_label(ui._effect_list, ui._key_info(m.make_effect(ui._specs()[0]))) != null, "key shown on the expanded row in key mode")
-	var ef = m.Catalog.editable_fields(m.make_effect(ui._specs()[0]))
-	_check(not ef.empty() and _find_label(ui._effect_list, ef[0].name) != null, "field names shown when editing an effect in key mode")
+	var e0 = m.make_effect(ui._specs()[0])
+	_check(_find_label(ui._effect_list, ui._key_parts(e0)[0]) != null, "main key shown on the expanded row in key mode")
+	var ef = m.Catalog.editable_fields(e0)
+	_check(not ef.empty() and _find_label(ui._effect_list, ef[0].name) == null, "no field names without detailed keys")
+	# 更详细键名：全部键名与字段名
+	m.debug_detail = true
+	ui._build_page()
+	_check(_find_label(ui._effect_list, ui._key_info(e0)) != null, "all keys with detailed keys")
+	_check(_find_label(ui._effect_list, ef[0].name) != null, "field names shown when editing with detailed keys")
+	m.debug_detail = false
 	ui._on_tab_pressed("overview")
 	_check(_tree_has_text(ui._page, "stat_max_hp") or _tree_has_text(ui._page, m.find_character("character_brawler").wanted_tags[0] if not m.find_character("character_brawler").wanted_tags.empty() else "stat_"), "tag keys shown in key mode")
 	ui._on_tab_pressed("stats")
@@ -825,8 +858,9 @@ func test_161_effect_details_and_popup_buttons() -> void:
 	bp._on_picker_enter("")
 	_eq(JSON.print(GE.nodes_by_id(m.profiles[CH].graph)[gn].params.ref), JSON.print(ref), "enter on the current effect keeps it")
 	_check(bp._picker == null, "picker closed")
-	# 显示键名：选择窗口与详细信息里都显示键名
+	# 显示键名：选择窗口与详细信息里都显示键名（字段名需要更详细键名）
 	m.debug = true
+	m.debug_detail = true
 	bp._picker_cat = "all"
 	bp._picker_filter = "burn"
 	bp._open_effect_picker(gn)
@@ -848,6 +882,7 @@ func test_161_effect_details_and_popup_buttons() -> void:
 	_check(joined.find("burning_data") >= 0 and joined.find("|damage|") >= 0, "details show key names")
 	ui._modals[-1].close()
 	m.debug = false
+	m.debug_detail = false
 	# 从角色导入：头像按钮不拉伸
 	ui._on_tab_pressed("gear")
 	ui._open_char_weapons()

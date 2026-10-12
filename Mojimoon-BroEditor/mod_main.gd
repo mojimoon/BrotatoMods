@@ -76,6 +76,10 @@ var debug := false
 var hide_numbers := false
 # 效果库去重（同脚本、同 key 的效果只保留一条）；默认关：保留全部，包括同一武器各等级的效果
 var library_dedup := false
+# 更详细的键名（只在显示键名时生效）：效果显示全部键名、编辑时显示字段名
+var debug_detail := false
+# 编辑器字体大小 80–125%（标题行与设置弹窗不缩放）
+var font_scale: int = 100
 
 # 原版角色 id -> 原始字段（还原用）
 var _backups: Dictionary = {}
@@ -410,6 +414,8 @@ func _load_main_file() -> void:
 	debug = bool(settings.get("debug", false)) if settings is Dictionary else false
 	hide_numbers = bool(settings.get("hide_numbers", false)) if settings is Dictionary else false
 	library_dedup = bool(settings.get("library_dedup", false)) if settings is Dictionary else false
+	debug_detail = bool(settings.get("debug_detail", false)) if settings is Dictionary else false
+	font_scale = int(clamp(int(settings.get("font_scale", 100)), 80, 125)) if settings is Dictionary else 100
 	var kinds = settings.get("kinds", {}) if settings is Dictionary else {}
 	for k in KINDS:
 		kind_enabled[k] = bool(kinds.get(k, true)) if kinds is Dictionary else true
@@ -490,7 +496,7 @@ func save_profiles() -> void:
 			main.families[wid] = weapon_families[wid]
 	main["version"] = 1
 	main["next_id"] = next_id
-	main["settings"] = {"debug": debug, "hide_numbers": hide_numbers, "library_dedup": library_dedup, "kinds": kind_enabled}
+	main["settings"] = {"debug": debug, "debug_detail": debug_detail, "font_scale": font_scale, "hide_numbers": hide_numbers, "library_dedup": library_dedup, "kinds": kind_enabled}
 	main["disabled"] = disabled
 	var file = File.new()
 	if file.open(SAVE_PATH, File.WRITE) != OK:

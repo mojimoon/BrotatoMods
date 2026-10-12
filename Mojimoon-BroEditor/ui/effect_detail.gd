@@ -59,7 +59,7 @@ func _build() -> void:
 	for f in Catalog.sub_fields(e):
 		var r = e.get(f)
 		var box = ui._section(col, _field_name(f), ui.C_ACCENT_3)
-		if ui._mod.debug:
+		if ui._detail_keys():
 			box.add_child(ui._key_label(f + "  ·  " + (r.get_script().resource_path.get_file() if r.get_script() != null else r.get_class())))
 		var grid = _grid(box)
 		for cf in Catalog.sub_child_fields(r):
