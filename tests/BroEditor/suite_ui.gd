@@ -447,6 +447,20 @@ func test_155_settings_and_font_scale() -> void:
 	_eq(ui.FONT_DESC.size, int(round(ui.BASE_DESC.size * 0.8)), "smaller fonts")
 	ui._on_font_scale(100)
 	md.close()
+	# 帮助：三栏各自的指南，占位符都已替换，各页按本栏页签
+	for kind in ["character", "item", "weapon"]:
+		ui.set_kind(kind)
+		yield(tree, "idle_frame")
+		var text = ui.help_text()
+		_check(text.find("{") < 0 and text.find("BE_HELP") < 0, kind + " help has no raw keys / placeholders")
+		_check(text.find(ui.tr("BE_NEW_CUSTOM" if kind == "character" else "BE_NEW_CUSTOM_" + kind.to_upper())) >= 0, kind + " help names its new button")
+		_eq(text.find(ui.tr("BE_TAB_BANS")) >= 0, kind == "character", kind + " help lists only its own pages")
+		_eq(text.find("+Tn") >= 0, kind == "weapon", kind + " help mentions tiers only for weapons")
+		var n0 = ui._modals.size()
+		ui.open_help()
+		_eq(ui._modals.size(), n0 + 1, kind + " help opens")
+		ui._modals[-1].close()
+	_check(ui.help_bbcode("### A\n- **b:** `c`").find("[color=") >= 0, "help markdown rendered")
 	ui.queue_free()
 	yield(tree, "idle_frame")
 

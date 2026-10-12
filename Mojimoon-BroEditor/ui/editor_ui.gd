@@ -267,6 +267,10 @@ func _build_header(root: Control) -> void:
 	_status.align = Label.ALIGN_RIGHT
 	_status.clip_text = true
 	header.add_child(_status)
+	var help_btn = _button(tr("BE_HELP"), BASE_SMALL)
+	_apply_action_style(help_btn, C_ACCENT)
+	help_btn.connect("pressed", self, "open_help")
+	header.add_child(help_btn)
 	var settings_btn = _button(tr("BE_SETTINGS"), BASE_SMALL)
 	_apply_action_style(settings_btn, C_ACCENT)
 	settings_btn.connect("pressed", self, "open_settings")
@@ -342,6 +346,58 @@ func open_settings() -> void:
 		desc.autowrap = true
 		desc.rect_min_size = Vector2(780, 0)
 		box.add_child(desc)
+
+
+# 帮助：本栏的操作指南。文本分块、三栏共用（BE_HELP_*），各页按本栏的页签顺序；
+# 某栏专用的页说明为 BE_HELP_P_<页>_<栏>。占位符：{kind} 本栏名称、{new} 新建按钮、{tags} 词条 / 标签 / 类别、{dir} 文件夹
+func open_help() -> void:
+	var m = Modal.open(self, tr("BE_HELP_TITLE").replace("{kind}", tr("BE_KIND_" + _kind.to_upper())), C_ACCENT, Vector2(1100, 820))
+	m.add_button(tr("MENU_BACK"), C_TEXT_DIM, m, "close")
+	var scroll = _scroll()
+	m.body.add_child(scroll)
+	var r = _rich(help_bbcode(help_text()))
+	r.add_font_override("normal_font", FONT_SMALL)
+	r.add_font_override("bold_font", FONT_SMALL)
+	scroll.add_child(r)
+
+
+func help_text() -> String:
+	var parts = [tr("BE_HELP_BASIC")]
+	if _kind == "weapon":
+		parts.push_back(tr("BE_HELP_TIERS"))
+	parts += [tr("BE_HELP_CURRENT"), tr("BE_HELP_PAGES")]
+	for t in _tab_defs():
+		var k = "BE_HELP_P_" + t[0].to_upper()
+		var own = k + "_" + _kind.to_upper()
+		parts.push_back(tr(own) if tr(own) != own else tr(k))
+	parts.push_back(tr("BE_HELP_SHARE"))
+	var tags = {"character": "BE_SEC_TAGS", "item": "BE_SEC_ITEM_TAGS", "weapon": "BE_SEC_WEAPON_SETS"}[_kind]
+	var new_key = "BE_NEW_CUSTOM" if _kind == "character" else "BE_NEW_CUSTOM_" + _kind.to_upper()
+	return PoolStringArray(parts).join("\n").replace("{kind}", tr("BE_KIND_" + _kind.to_upper())).replace("{new}", tr(new_key)).replace("{tags}", tr(tags)).replace("{dir}", _kind)
+
+
+# 简单的 Markdown -> BBCode：### 标题、- 列表、两格缩进的子列表、**粗体**、`代码`
+func help_bbcode(md: String) -> String:
+	var out = []
+	var bold = RegEx.new()
+	bold.compile("\\*\\*(.+?)\\*\\*")
+	var code = RegEx.new()
+	code.compile("`([^`]+)`")
+	for line in md.split("\n"):
+		var s: String = line
+		if s.begins_with("### "):
+			if not out.empty():
+				out.push_back("")
+			out.push_back("[color=#" + C_ACCENT.to_html(false) + "]" + s.substr(4) + "[/color]")
+			continue
+		if s.begins_with("  - "):
+			s = "        - " + s.substr(4)
+		elif s.begins_with("- "):
+			s = "  · " + s.substr(2)
+		s = bold.sub(s, "[color=#" + C_TEXT.to_html(false) + "]$1[/color]", true)
+		s = code.sub(s, "[color=#" + C_ACCENT_2.to_html(false) + "]$1[/color]", true)
+		out.push_back(s)
+	return PoolStringArray(out).join("\n")
 
 
 func _on_settings_closed() -> void:

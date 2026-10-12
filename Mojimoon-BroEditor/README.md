@@ -34,6 +34,7 @@ About the buttons in the top-right corner:
 
 - **Import**: Import a code from the clipboard to load a project, character, item, weapon or everything.
 - **Export**: Export a code for the current object (BE0:), all characters (BEC:), all items (BEI:), all weapons (BEW:) or everything (BEA:). Different types have different formats, and the mod will automatically detect the type when importing from clipboard.
+- **Help**: a how-to guide for the current tab (characters, items or weapons).
 - **Settings**:
   - **Font Size**: 80–125%, scales the editor's text.
   - **Effect Library Dedup**: effects with the same keys but different values count as one in the Effect Library.
@@ -77,6 +78,7 @@ About the buttons in the top-right corner:
 
 [list]
 [*][b]Import / Export[/b]: export a code for the current object (BE0:), all characters (BEC:), all items (BEI:), all weapons (BEW:) or everything (BEA:). Different types have different formats, and the mod will automatically detect the type when importing from clipboard.
+[*][b]Help[/b]: a how-to guide for the current tab (characters, items or weapons).
 [*][b]Settings[/b]:
 [list]
 [*][b]Font Size[/b]: 80–125%, scales the editor's text.
@@ -144,6 +146,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 关于右上角的按钮：
 
 - **导入 / 导出**：导出当前项目 (BE0:)、角色 (BEC:)、道具 (BEI:)、武器 (BEW:) 或全部 (BEA:) 的分享码。不同类型的格式不同，从剪贴版导入时会自动识别。
+- **帮助**：显示当前栏（角色、道具或武器）的操作指南。
 - **设置**：
   - **字体大小**：80–125%，缩放编辑器的文字。
   - **效果库去重**：效果库中同键名不同数值的效果视为同一条。
@@ -187,6 +190,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 [list]
 [*][b]导入 / 导出[/b]：导出当前项目 (BE0:)、角色 (BEC:)、道具 (BEI:)、武器 (BEW:) 或全部 (BEA:) 的分享码。不同类型的格式不同，从剪贴版导入时会自动识别。
+[*][b]帮助[/b]：显示当前栏（角色、道具或武器）的操作指南。
 [*][b]设置[/b]：
 [list]
 [*][b]字体大小[/b]：80–125%，缩放编辑器的文字。
