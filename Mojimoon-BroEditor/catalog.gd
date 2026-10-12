@@ -113,6 +113,15 @@ static func stat_keys() -> Array:
 	return out
 
 
+# 蓝图可用的属性：不含规则（开关 / 设定值型，如"无法使用近战武器"、最低武器等级）
+static func graph_stat_keys() -> Array:
+	var out = []
+	for g in STAT_GROUPS:
+		if g[0] != "BE_GRP_RULES":
+			out += g[1]
+	return out
+
+
 static func is_stat_key(key: String) -> bool:
 	return key in stat_keys()
 
@@ -237,6 +246,7 @@ const CURSE_EFFECT_PARAMS = {
 	"temp_stat": ["value"], "perm_stat": ["value"], "timed_stat": ["value", "secs"],
 	"heal_hp": ["value"], "add_gold": ["value"], "xp": ["value"], "damage": ["pct"], "explode": ["pct"],
 	"hp_dmg": ["pct"], "ignite": ["value"], "slow": ["pct"], "rand_stats": ["value"], "fruit": ["value"],
+	"vuln": ["pct", "secs"],
 }
 # 百分比参数的上限
 const CURSE_MAX = {"chance": {"pct": 100}, "hp_below": {"pct": 100}}
@@ -307,7 +317,9 @@ class FieldSorter:
 
 # ============================================================
 # 蓝图节点（扳机 → 条件 → 效果，用路径连接；参考 AutoAnthony 的扳机 / 载荷拆分，不做合法性检查）
-#   [id, 类型, 参数[[名称, 类型, 默认值]...]]；参数类型：int / stat / mode:<a>|<b> / effect（效果库引用）
+#   [id, 类型, 参数[[名称, 类型, 默认值]...]]；参数类型：int / stat / dmg（伤害类型）/ mode:<a>|<b> / effect（效果库引用）
+#   部分扳机非原版（同 AutoAnthony）：命中敌人 / 首次命中 / 点燃由敌人身上的效果行为（graph/enemy_behavior.gd）转发，
+#   引发爆炸由 WeaponService.explode 的扩展转发
 #   名称 key = BE_N_<ID>；路径文本见 graph_effect.gd（扳机句式 BE_TX_*、效果句式 BE_PX_*、条件后缀 BE_CX_*）
 #   状态扳机（still / moving / low_hp / full_hp）：进入状态时执行，离开时撤销"本波属性"与"本波获得"
 # ============================================================
@@ -320,6 +332,10 @@ const NODES = [
 	["kill", "trigger", []],
 	["crit", "trigger", []],
 	["crit_kill", "trigger", []],
+	["enemy_hit", "trigger", []],
+	["first_hit", "trigger", []],
+	["on_ignite", "trigger", []],
+	["on_explode", "trigger", []],
 	["burning_kill", "trigger", []],
 	["cursed_kill", "trigger", []],
 	["tree_kill", "trigger", []],
@@ -348,6 +364,9 @@ const NODES = [
 	["stat_max", "cond", [["stat", "stat", "stat_armor"], ["n", "int", 10]]],
 	["if_moving", "cond", []],
 	["if_still", "cond", []],
+	["enemy_hp_above", "cond", [["pct", "int", 50]]],
+	["enemy_hp_below", "cond", [["pct", "int", 50]]],
+	["dmg_type", "cond", [["stat", "dmg", "stat_melee_damage"]]],
 	["temp_stat", "effect", [["stat", "stat", "stat_percent_damage"], ["value", "int", 5]]],
 	["perm_stat", "effect", [["stat", "stat", "stat_max_hp"], ["value", "int", 1]]],
 	["timed_stat", "effect", [["stat", "stat", "stat_attack_speed"], ["value", "int", 20], ["secs", "int", 3]]],
@@ -359,10 +378,15 @@ const NODES = [
 	["hp_dmg", "effect", [["pct", "int", 5]]],
 	["ignite", "effect", [["value", "int", 5]]],
 	["slow", "effect", [["pct", "int", 10]]],
+	["vuln", "effect", [["pct", "int", 10], ["secs", "int", 3]]],
 	["rand_stats", "effect", [["value", "int", 1]]],
 	["fruit", "effect", [["value", "int", 1]]],
-	["grant", "effect", [["ref", "effect", null], ["n", "int", 1], ["mode", "mode:temp|perm", "temp"]]],
+	["grant", "effect", [["ref", "effect", null], ["n", "int", 1], ["mode", "mode:temp|timed|perm", "temp"], ["secs", "int", 5]]],
 ]
+# 只在某个参数取某值时显示的参数：[节点, 参数] -> [条件参数, 值]
+const PARAM_SHOW_IF = {"grant:secs": ["mode", "timed"]}
+# 伤害类型（条件"伤害类型"：命中 / 击杀的缩放属性）
+const DMG_TYPES = ["stat_melee_damage", "stat_ranged_damage", "stat_elemental_damage", "stat_engineering"]
 const STATE_TRIGGERS = ["still", "moving", "low_hp", "full_hp"]
 const SHOP_TRIGGERS = ["reroll", "buy"]
 

@@ -3385,10 +3385,10 @@ func _search_select(items: Array, current = null) -> Button:
 
 
 # 属性下拉框（current 不在列表中时追加）
-func _stat_option(current: String) -> Button:
+func _stat_option(current: String, keys = null) -> Button:
 	var items = []
 	var found = false
-	for k in Catalog.stat_keys():
+	for k in (keys if keys != null else Catalog.stat_keys()):
 		if _is_valid_stat(k):
 			items.push_back([stat_name(k), k])
 			found = found or k == current

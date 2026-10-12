@@ -154,6 +154,9 @@ func _make_node(n: Dictionary) -> GraphNode:
 	gn.set_slot(0, t != "trigger", PORT_TYPE, color, t != "effect", PORT_TYPE, color)
 	var d = Catalog.node_def(n.kind)
 	for p in d[2]:
+		var show_if = Catalog.PARAM_SHOW_IF.get(n.kind + ":" + p[0])
+		if show_if != null and str(n.params.get(show_if[0], "")) != show_if[1]:
+			continue
 		var row = HBoxContainer.new()
 		row.add_constant_override("separation", 6)
 		gn.add_child(row)
@@ -173,8 +176,8 @@ func _param_control(n: Dictionary, p: Array) -> Control:
 		sb.rect_min_size = Vector2(130, 0)
 		sb.connect("value_changed", self, "_on_param", [int(n.id), p[0]])
 		return sb
-	if ptype == "stat":
-		var opt = ui._stat_option(str(cur))
+	if ptype == "stat" or ptype == "dmg":
+		var opt = ui._stat_option(str(cur), Catalog.DMG_TYPES if ptype == "dmg" else Catalog.graph_stat_keys())
 		opt.rect_min_size = Vector2(170, 0)
 		opt.connect("selected", self, "_on_param_option", [int(n.id), p[0]])
 		return opt
@@ -278,6 +281,11 @@ func _on_param_option(value, id: int, key: String) -> void:
 	if n != null:
 		n.params[key] = value
 		_changed()
+		# 参数的显示依赖于它（获得效果的"持续 N 秒"）：重建节点
+		for k in Catalog.PARAM_SHOW_IF:
+			if k.begins_with(n.kind + ":") and Catalog.PARAM_SHOW_IF[k][0] == key:
+				call_deferred("rebuild")
+				break
 
 
 func _on_clear() -> void:

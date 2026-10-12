@@ -8,6 +8,7 @@ extends Node
 
 const Catalog = preload("res://mods-unpacked/Mojimoon-BroEditor/catalog.gd")
 const GraphEffect = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/graph_effect.gd")
+const EnemyBehavior = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/enemy_behavior.gd")
 const EXPLOSION_EFFECT_PATH = "res://items/all/rip_and_tear/rip_and_tear_effect_1.tres"
 const MAX_DEPTH = 24
 
@@ -21,6 +22,7 @@ var _poll := 0.0
 var _steps: Array = [0.0, 0.0, 0.0, 0.0]
 var _wave_serial := 0
 var _explosion_effect = null
+var _timed_list: Array = []	# 持续 N 秒的效果：[{p, u: 撤销列表}]
 
 
 func _ready() -> void:
@@ -51,6 +53,10 @@ func end_wave() -> void:
 				st.acc = 0.0
 			_revert(p, en.granted)
 			en.granted = []
+	for rec in _timed_list:
+		_revert(rec.p, rec.u)
+		rec.u = []
+	_timed_list = []
 	main = null
 
 
@@ -99,7 +105,8 @@ func has_any(player_index: int) -> bool:
 # ============================================================
 # 事件
 # ============================================================
-func fire(event: String, player_index: int, pos = null, target = null) -> void:
+# target：有目标敌人的事件（命中、暴击、点燃）；info：{hp_pct：目标的生命百分比, stats：伤害类型（缩放属性 key）}
+func fire(event: String, player_index: int, pos = null, target = null, info = null) -> void:
 	if player_index < 0 or player_index >= RunData.get_player_count():
 		return
 	if wave_over and not event in Catalog.SHOP_TRIGGERS:
@@ -107,7 +114,7 @@ func fire(event: String, player_index: int, pos = null, target = null) -> void:
 	_check_dirty()
 	if entries[player_index].empty():
 		return
-	var ctx = {"pos": pos, "target": target, "hold": null}
+	var ctx = {"pos": pos, "target": target, "hold": null, "info": info if info is Dictionary else {}}
 	for en in entries[player_index]:
 		for n in en.g.get("nodes", []):
 			if n.kind == event:
@@ -123,7 +130,7 @@ func _walk(en: Dictionary, from_id: int, p: int, ctx: Dictionary, depth: int) ->
 			continue
 		match Catalog.node_type(n.kind):
 			"cond":
-				if _pass(en, n, p):
+				if _pass(en, n, p, ctx):
 					_walk(en, to, p, ctx, depth + 1)
 			"effect":
 				_execute(en, n, p, ctx)
@@ -133,7 +140,7 @@ func _param(n: Dictionary, k: String, default = 0):
 	return n.get("params", {}).get(k, default)
 
 
-func _pass(en: Dictionary, n: Dictionary, p: int) -> bool:
+func _pass(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> bool:
 	var st = _state(en, int(n.id))
 	match n.kind:
 		"chance":
@@ -172,7 +179,25 @@ func _pass(en: Dictionary, n: Dictionary, p: int) -> bool:
 		"if_still":
 			var pl = _player(p)
 			return pl != null and pl._current_movement == Vector2.ZERO
+		"enemy_hp_above":
+			var hp = _target_hp(ctx)
+			return hp != null and hp >= float(_param(n, "pct", 50))
+		"enemy_hp_below":
+			var hp = _target_hp(ctx)
+			return hp != null and hp < float(_param(n, "pct", 50))
+		"dmg_type":
+			return str(_param(n, "stat", "")) in ctx.info.get("stats", [])
 	return true
+
+
+# 目标敌人的生命百分比：命中事件为命中前，其余为当前；没有目标敌人为 null
+func _target_hp(ctx: Dictionary):
+	if ctx.info.has("hp_pct"):
+		return float(ctx.info.hp_pct)
+	var t = ctx.target
+	if t != null and is_instance_valid(t) and "current_stats" in t:
+		return 100.0 * t.current_stats.health / max(1.0, float(t.max_stats.health))
+	return null
 
 
 func _hp_pct(p: int) -> float:
@@ -192,16 +217,21 @@ func _execute(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> void:
 	var v = int(_param(n, "value", 0))
 	match n.kind:
 		"temp_stat":
-			TempStats.add_stat(h, v, p)
+			var u = _add_temp(h, v, p)
 			if ctx.hold != null:
-				ctx.hold.push_back(["temp", h, v])
+				ctx.hold.push_back(u)
+			elif u[0] == "eff":
+				en.granted.push_back(u)
 		"perm_stat":
-			RunData.add_stat(h, v, p)
-			LinkedStats.reset_player(p)
+			if Utils.is_stat_key(h):
+				RunData.add_stat(h, v, p)
+			else:
+				_add_effect(h, v, p)
+			_refresh(p)
 		"timed_stat":
-			TempStats.add_stat(h, v, p)
-			var timer = get_tree().create_timer(max(0.1, float(_param(n, "secs", 1))), false)
-			timer.connect("timeout", self, "_on_timed_out", [_wave_serial, h, v, p])
+			_timed(p, [_add_temp(h, v, p)], _param(n, "secs", 1))
+		"vuln":
+			_vuln(n, ctx.target)
 		"heal_hp":
 			RunData.emit_signal("healing_effect", v, p, Keys.empty_hash)
 		"add_gold":
@@ -241,33 +271,62 @@ func _grant(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> void:
 		return
 	g.value = g.value * int(_param(n, "n", 1))
 	g.apply(p)
-	if str(_param(n, "mode", "temp")) != "perm":
-		if ctx.hold != null:
-			ctx.hold.push_back(["grant", g])
-		else:
-			en.granted.push_back(["grant", g])
+	match str(_param(n, "mode", "temp")):
+		"perm":
+			pass
+		"timed":
+			_timed(p, [["grant", g]], _param(n, "secs", 5))
+		_:
+			if ctx.hold != null:
+				ctx.hold.push_back(["grant", g])
+			else:
+				en.granted.push_back(["grant", g])
 	_refresh(p)
 
 
-# 撤销：["temp", hash, 数值] / ["grant", 效果]
+# 本波属性：原版临时属性表里有的 key 走 TempStats（原版波末清空）；其余（敌人数量、价格…）直接改玩家效果表，由本运行时撤销
+func _add_temp(h: int, v: int, p: int) -> Array:
+	if TempStats.player_stats[p].has(h):
+		TempStats.add_stat(h, v, p)
+		return ["temp", h, v]
+	_add_effect(h, v, p)
+	return ["eff", h, v]
+
+
+func _add_effect(h: int, v: int, p: int) -> void:
+	var effects = RunData.get_player_effects(p)
+	if typeof(effects.get(h)) in [TYPE_INT, TYPE_REAL]:
+		effects[h] += v
+	_refresh(p)
+
+
+# 持续 N 秒：到时撤销；波次提前结束时由 end_wave 撤销
+func _timed(p: int, undo: Array, secs) -> void:
+	var rec = {"p": p, "u": undo}
+	_timed_list.push_back(rec)
+	var timer = get_tree().create_timer(max(0.1, float(secs)), false)
+	timer.connect("timeout", self, "_on_timed_out", [rec])
+
+
+func _on_timed_out(rec: Dictionary) -> void:
+	_revert(rec.p, rec.u)
+	rec.u = []
+
+
+# 撤销：["temp", hash, 数值] / ["eff", hash, 数值] / ["grant", 效果]
 func _revert(p: int, undo: Array) -> void:
 	if undo.empty() or p >= RunData.get_player_count():
 		return
 	var hp_before = RunData.get_player_max_health(p)
 	for u in undo:
-		if u[0] == "temp":
-			TempStats.remove_stat(u[1], u[2], p)
-		else:
-			u[1].unapply(p)
+		match u[0]:
+			"temp":
+				TempStats.remove_stat(u[1], u[2], p)
+			"eff":
+				_add_effect(u[1], -u[2], p)
+			_:
+				u[1].unapply(p)
 	_refresh(p)
-	_sync_lost_max_hp(p, hp_before)
-
-
-func _on_timed_out(serial: int, h: int, v: int, p: int) -> void:
-	if serial != _wave_serial or not is_inside_tree():
-		return
-	var hp_before = RunData.get_player_max_health(p)
-	TempStats.remove_stat(h, v, p)
 	_sync_lost_max_hp(p, hp_before)
 
 
@@ -275,6 +334,7 @@ func _refresh(p: int) -> void:
 	Utils.reset_stat_cache(p)
 	RunData._are_player_stats_dirty[p] = true
 	LinkedStats.reset_player(p)
+	EntityService.reset_cache()
 
 
 # 最大生命被临时降低时，当前生命不超过新上限（同 AutoAnthony）
@@ -328,7 +388,17 @@ func _explode(n: Dictionary, p: int, pos) -> void:
 	args.scaling_stats = []
 	args.from_player_index = p
 	args.damage_tracking_key_hash = Keys.empty_hash
+	args.set_meta("be_bp", true)
 	WeaponService.call_deferred("explode", _explosion_effect, args)
+
+
+# 使目标敌人受到的伤害提高 X%，持续 N 秒（敌人身上的效果行为；同一节点不叠层，取较大值并刷新时间）
+func _vuln(n: Dictionary, target) -> void:
+	if target == null or not is_instance_valid(target) or target.dead:
+		return
+	var b = EnemyBehavior.find_on(target)
+	if b != null:
+		b.add_vuln(int(_param(n, "pct", 10)), max(0.1, float(_param(n, "secs", 3))), str(n.id) + JSON.print(n.params))
 
 
 func _hp_damage(n: Dictionary, p: int, target) -> void:

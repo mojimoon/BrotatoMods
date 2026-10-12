@@ -13,6 +13,8 @@ func test_85_battle_graph() -> void:
 		["level_up", {}, "perm_stat", {"stat": "stat_armor", "value": 7}],
 		["kill", {}, "add_gold", {"value": 1000}],
 		["wave_start", {}, "perm_stat", {"stat": "stat_engineering", "value": 3}],
+		["enemy_hit", {}, "vuln", {"pct": 25, "secs": 30}],
+		["on_explode", {}, "add_gold", {"value": 500}],
 	]
 	for pr in pairs:
 		GE.add_link(g, GE.add_node(g, pr[0], Vector2.ZERO, pr[1]), GE.add_node(g, pr[2], Vector2.ZERO, pr[3]))
@@ -68,6 +70,25 @@ func test_85_battle_graph() -> void:
 		yield(tree, "idle_frame")
 	_check(enemy != null, "enemy spawned")
 	if enemy != null:
+		var beb = load("res://mods-unpacked/Mojimoon-BroEditor/graph/enemy_behavior.gd").find_on(enemy)
+		_check(beb != null, "enemy behavior attached")
+		if beb != null:
+			m.runtime.fire("enemy_hit", 0, enemy.global_position, enemy, {"hp_pct": 100.0, "stats": []})
+			_eq(beb.get_bonus_damage(null, 0), 25, "vuln on the hit enemy")
+		var ex = load("res://items/all/rip_and_tear/rip_and_tear_effect_1.tres")
+		var args = WeaponServiceExplodeArgs.new()
+		args.pos = player.global_position
+		args.damage = 1
+		args.from_player_index = 0
+		args.ignored_objects = [enemy]
+		gold0 = rd.players_data[0].gold
+		WeaponService.explode(ex, args)
+		_eq(rd.players_data[0].gold - gold0, 500, "explosion trigger")
+		args.set_meta("be_bp", true)
+		gold0 = rd.players_data[0].gold
+		WeaponService.explode(ex, args)
+		_eq(rd.players_data[0].gold - gold0, 0, "blueprint explosions do not re-trigger")
+		yield(_frames(2), "completed")
 		gold0 = rd.players_data[0].gold
 		var _k = enemy.take_damage(999999, TakeDamageArgs.new(0))
 		yield(_frames(3), "completed")

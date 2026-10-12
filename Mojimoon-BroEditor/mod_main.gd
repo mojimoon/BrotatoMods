@@ -106,6 +106,7 @@ func _init() -> void:
 	var dir: String = ModLoaderMod.get_unpacked_dir() + MOD_ID + "/extensions/"
 	ModLoaderMod.install_script_extension(dir + "singletons/item_service.gd")
 	ModLoaderMod.install_script_extension(dir + "singletons/run_data.gd")
+	ModLoaderMod.install_script_extension(dir + "singletons/weapon_service.gd")
 	ModLoaderMod.install_script_extension(dir + "main.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/shop/shop.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/shop/coop_shop.gd")
@@ -124,10 +125,26 @@ func _ready() -> void:
 	var isvc = _isvc()
 	if isvc != null and not GraphEffect in isvc.effects:
 		isvc.effects.push_back(GraphEffect)
+	_register_enemy_behavior()
 	# 自定义角色必须在 ProgressData 读档之前注册（存档里的本局可能就是自定义角色）
 	_register_customs()
 	# DLC 角色在 ProgressData 就绪后才加入：本帧结束后再应用档案
 	call_deferred("apply_all")
+
+
+# 挂在敌人身上的效果行为（蓝图的命中 / 首次命中 / 点燃扳机与"受到伤害提高"效果）：注册到原版 EffectBehaviorService
+var _behavior_data = null
+
+
+func _register_enemy_behavior() -> void:
+	var svc = _autoload("EffectBehaviorService")
+	if svc == null:
+		return
+	if _behavior_data == null:
+		_behavior_data = load("res://items/global/effect_behavior_data.gd").new()
+		_behavior_data.scene = load("res://mods-unpacked/Mojimoon-BroEditor/graph/enemy_behavior.tscn")
+	if not _behavior_data in svc.enemy_effect_behaviors:
+		svc.enemy_effect_behaviors.push_back(_behavior_data)
 
 
 static func get_mod() -> Node:

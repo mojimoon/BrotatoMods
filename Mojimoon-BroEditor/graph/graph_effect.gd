@@ -218,6 +218,8 @@ static func _payload_text(n: Dictionary, trigger_kind: String, colored: bool) ->
 			return _tr("BE_PX_HP_DMG").replace("{0}", _col(str(pct) + "%", true, colored)).replace("{1}", str(stepify(pct / 10.0, 0.1)).trim_suffix(".0") + "%")
 		"ignite":
 			return _tr("BE_PX_IGNITE").replace("{0}", _col(str(v), true, colored)).replace("{1}", "3")
+		"vuln":
+			return _tr("BE_PX_VULN").replace("{0}", _col(str(int(_p(n, "pct", 10))) + "%", true, colored)).replace("{1}", str(int(_p(n, "secs", 3))))
 		"slow":
 			var pct = int(_p(n, "pct", 10))
 			return _tr("BE_PX_SLOW").replace("{0}", _col(str(pct) + "%", true, colored)).replace("{1}", str(int(min(90, pct * 4))) + "%")
@@ -227,8 +229,9 @@ static func _payload_text(n: Dictionary, trigger_kind: String, colored: bool) ->
 			return _tr("BE_PX_RAND_STATS_1" if v == 1 else "BE_PX_RAND_STATS").replace("{0}", _col(str(v), good, colored))
 		"grant":
 			var inner = _grant_text(n, colored)
-			var k = "BE_PX_GRANT_PERM" if str(_p(n, "mode", "temp")) == "perm" else ("BE_PX_GRANT_STATE" if state else "BE_PX_GRANT_TEMP")
-			return _tr(k).replace("{0}", inner)
+			var mode = str(_p(n, "mode", "temp"))
+			var k = {"perm": "BE_PX_GRANT_PERM", "timed": "BE_PX_GRANT_TIMED"}.get(mode, "BE_PX_GRANT_STATE" if state else "BE_PX_GRANT_TEMP")
+			return _tr(k).replace("{0}", inner).replace("{1}", str(int(_p(n, "secs", 5))))
 	return ""
 
 

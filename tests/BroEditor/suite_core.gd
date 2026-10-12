@@ -318,6 +318,48 @@ func test_74_split_native() -> void:
 	yield(tree, "idle_frame")
 
 
+# 新节点：目标敌人条件、伤害类型、非临时属性表的属性、持续 N 秒获得效果、文本
+func test_75_graph_more_nodes() -> void:
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	var hit = GE.add_node(g, "enemy_hit", Vector2.ZERO)
+	var above = GE.add_node(g, "enemy_hp_above", Vector2.ZERO, {"pct": 50})
+	var below = GE.add_node(g, "enemy_hp_below", Vector2.ZERO, {"pct": 50})
+	var melee = GE.add_node(g, "dmg_type", Vector2.ZERO, {"stat": "stat_melee_damage"})
+	GE.add_link(g, hit, above)
+	GE.add_link(g, above, GE.add_node(g, "add_gold", Vector2.ZERO, {"value": 1}))
+	GE.add_link(g, hit, below)
+	GE.add_link(g, below, GE.add_node(g, "add_gold", Vector2.ZERO, {"value": 10}))
+	GE.add_link(g, hit, melee)
+	GE.add_link(g, melee, GE.add_node(g, "add_gold", Vector2.ZERO, {"value": 100}))
+	GE.add_link(g, hit, GE.add_node(g, "vuln", Vector2.ZERO, {"pct": 20, "secs": 3}))
+	# 不在原版临时属性表里的属性（箱子几率）：本波 / 永久都直接改效果表
+	GE.add_link(g, GE.add_node(g, "wave_start", Vector2.ZERO), GE.add_node(g, "temp_stat", Vector2.ZERO, {"stat": "crate_chance", "value": 5}))
+	GE.add_link(g, GE.add_node(g, "level_up", Vector2.ZERO), GE.add_node(g, "perm_stat", Vector2.ZERO, {"stat": "crate_chance", "value": 3}))
+	GE.add_link(g, GE.add_node(g, "kill", Vector2.ZERO), GE.add_node(g, "grant", Vector2.ZERO, {"ref": {"set": {"key": "stat_armor", "value": 2}}, "n": 1, "mode": "timed", "secs": 60}))
+	_graph_char(g)
+	var gold0 = rd.players_data[0].gold
+	m.runtime.fire("enemy_hit", 0, null, null, {"hp_pct": 80.0, "stats": ["stat_ranged_damage"]})
+	_eq(rd.players_data[0].gold - gold0, 1, "enemy HP above passes, below / melee blocked")
+	gold0 = rd.players_data[0].gold
+	m.runtime.fire("enemy_hit", 0, null, null, {"hp_pct": 30.0, "stats": ["stat_melee_damage"]})
+	_eq(rd.players_data[0].gold - gold0, 110, "enemy HP below + melee damage type pass")
+	var hc = Keys.generate_hash("crate_chance")
+	var c0 = rd.get_player_effect(hc, 0)
+	m.runtime.fire("wave_start", 0)
+	m.runtime.fire("level_up", 0)
+	_eq(rd.get_player_effect(hc, 0), c0 + 8, "non-temp stat: wave + permanent")
+	var a0 = _armor()
+	m.runtime.fire("kill", 0)
+	_eq(_armor(), a0 + 2, "timed grant applied")
+	m.runtime.end_wave()
+	_eq(rd.get_player_effect(hc, 0), c0 + 3, "wave stat reverted at wave end, permanent kept")
+	_eq(_armor(), a0, "timed grant reverted at wave end")
+	var text = GE.graph_text(g, false)
+	_check(text.find("60") >= 0 and text.find("20%") >= 0, "timed grant / vuln text: " + text)
+	_check(not "no_melee_weapons" in m.Catalog.graph_stat_keys() and "enemy_damage" in m.Catalog.graph_stat_keys(), "blueprint stats exclude rules")
+
+
 func test_80_start_state() -> void:
 	var p = m.new_profile()
 	p.start = {"materials": 50, "levels": 3, "crates": 2}

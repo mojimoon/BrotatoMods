@@ -3,6 +3,7 @@ extends "res://main.gd"
 # 战斗场景：把原版事件转发给蓝图运行时（graph/runtime.gd），并处理开局状态（结算升级、开局箱子、波次时长）。
 
 const BEMain = preload("res://mods-unpacked/Mojimoon-BroEditor/mod_main.gd")
+const BEBehavior = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/enemy_behavior.gd")
 
 
 # 波次时长在 main._ready 里读取：在进入场景树时（_ready 之前）设置。
@@ -54,6 +55,11 @@ func _on_enemy_died(enemy: Enemy, args: Entity.DieArgs) -> void:
 	var pos = enemy.global_position
 	var burning = args.is_burning or (is_instance_valid(enemy) and enemy._is_burning)
 	var cursed = _be_is_cursed(enemy)
+	# 致命一击的伤害类型（条件"伤害类型"）：燃烧致死算元素，否则取最后一次命中的缩放属性
+	var info = {"stats": ["stat_elemental_damage"] if args.is_burning else []}
+	var b = BEBehavior.find_on(enemy)
+	if b != null and not args.is_burning:
+		info.stats = b.last_stats
 	._on_enemy_died(enemy, args)
 	var rt = _be_rt()
 	if rt == null or not counts:
@@ -63,11 +69,11 @@ func _on_enemy_died(enemy: Enemy, args: Entity.DieArgs) -> void:
 		for player in _get_live_players():
 			killers.push_back(player.player_index)
 	for p in killers:
-		rt.fire("kill", p, pos)
+		rt.fire("kill", p, pos, null, info)
 		if burning:
-			rt.fire("burning_kill", p, pos)
+			rt.fire("burning_kill", p, pos, null, info)
 		if cursed:
-			rt.fire("cursed_kill", p, pos)
+			rt.fire("cursed_kill", p, pos, null, info)
 
 
 static func _be_is_cursed(enemy) -> bool:
@@ -102,9 +108,11 @@ func _on_enemy_took_damage(enemy: Enemy, value: int, knockback_direction: Vector
 		return
 	# 原版的死亡是延迟调用：按"本次伤害后生命为 0"判断暴击击杀
 	var killed = enemy.dead or enemy.current_stats.health <= 0
-	rt.fire("crit", args.from_player_index, enemy.global_position, enemy if not killed else null)
+	var b = BEBehavior.find_on(enemy)
+	var info = {"stats": b.last_stats if b != null else []}
+	rt.fire("crit", args.from_player_index, enemy.global_position, enemy if not killed else null, info)
 	if killed:
-		rt.fire("crit_kill", args.from_player_index, enemy.global_position)
+		rt.fire("crit_kill", args.from_player_index, enemy.global_position, null, info)
 
 
 func _on_HalfWaveTimer_timeout() -> void:
