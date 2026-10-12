@@ -312,7 +312,7 @@ func test_133_ui_items_and_weapons() -> void:
 	ui.set_kind("character")
 	_eq(ui._kind, "character", "back to characters")
 	var e = m.make_effect({"set": {"key": "stat_luck", "custom_key": "ck", "text_key": "tk"}})
-	_eq(ui._key_info(e), "stat_luck  ·  ck  ·  tk", "all keys, no file")
+	_eq(ui._key_info(e), "stat_luck (tk) / ck", "main key (text_key) / other keys")
 	ui.queue_free()
 	yield(tree, "idle_frame")
 
@@ -416,7 +416,7 @@ func test_153_weapon_attack_type() -> void:
 
 
 func _find_label(n: Node, t: String):
-	if n is Label and n.text == t:
+	if (n is Label or n is RichTextLabel) and n.text == t:
 		return n
 	for c in n.get_children():
 		var f = _find_label(c, t)
@@ -436,6 +436,8 @@ func test_154_key_names() -> void:
 	_check(l != null and not l.can_translate_messages(), "upper-case key label is not auto-translated")
 	ui._on_effect_edit(0)
 	_check(_find_label(ui._effect_list, ui._key_info(m.make_effect(ui._specs()[0]))) != null, "key shown on the expanded row in key mode")
+	var ef = m.Catalog.editable_fields(m.make_effect(ui._specs()[0]))
+	_check(not ef.empty() and _find_label(ui._effect_list, ef[0].name) != null, "field names shown when editing an effect in key mode")
 	ui._on_tab_pressed("overview")
 	_check(_tree_has_text(ui._page, "stat_max_hp") or _tree_has_text(ui._page, m.find_character("character_brawler").wanted_tags[0] if not m.find_character("character_brawler").wanted_tags.empty() else "stat_"), "tag keys shown in key mode")
 	ui._on_tab_pressed("stats")
@@ -831,7 +833,7 @@ func test_161_effect_details_and_popup_buttons() -> void:
 	yield(tree, "idle_frame")
 	var texts = []
 	for n in _all_nodes(bp._picker_list):
-		if n is Label:
+		if n is Label or n is RichTextLabel:
 			texts.push_back(n.text)
 	_check(PoolStringArray(texts).join("|").find("burn") >= 0, "picker shows key names")
 	bp.close_picker()
@@ -840,7 +842,7 @@ func test_161_effect_details_and_popup_buttons() -> void:
 	bp._on_ref_details(gn)
 	texts = []
 	for n in _all_nodes(ui._modals[-1]):
-		if n is Label:
+		if n is Label or n is RichTextLabel:
 			texts.push_back(n.text)
 	var joined = PoolStringArray(texts).join("|")
 	_check(joined.find("burning_data") >= 0 and joined.find("|damage|") >= 0, "details show key names")

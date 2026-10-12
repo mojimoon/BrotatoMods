@@ -1934,15 +1934,57 @@ func _drag_handle() -> Label:
 	return h
 
 
-# 键名（灰色小字，只在"显示键名"下显示）：key · custom_key · text_key
+# 键名（只在"显示键名"下显示）：主键名 (text_key) / 其他键名 / ...
+# 主键名为 key（为空时用 custom_key）；其他键名为 custom_key、tracking_key
+func _key_parts(e) -> Array:
+	var main = str(e.key)
+	var others = []
+	for f in ["custom_key", "tracking_key"]:
+		if f in e and str(e.get(f)) != "" and str(e.get(f)) != main:
+			others.push_back(str(e.get(f)))
+	if main == "" and not others.empty():
+		main = others.pop_front()
+	var tk = str(e.text_key) if str(e.text_key) != main else ""
+	return [main, tk, others]
+
+
 func _key_info(e) -> String:
 	if e == null:
 		return ""
-	var parts = []
-	for v in [e.key, e.custom_key, e.text_key]:
-		if str(v) != "":
-			parts.push_back(str(v))
-	return PoolStringArray(parts).join("  ·  ")
+	var kp = _key_parts(e)
+	var s = kp[0] + (" (" + kp[1] + ")" if kp[1] != "" else "")
+	for o in kp[2]:
+		s += " / " + o
+	return s.strip_edges()
+
+
+# 键名行：主键名高亮，其余灰色
+func _key_rich(e) -> Control:
+	if e == null:
+		return _key_label("")
+	var kp = _key_parts(e)
+	var rest = (" (" + kp[1] + ")" if kp[1] != "" else "")
+	for o in kp[2]:
+		rest += " / " + o
+	var r = _rich("[color=#" + C_TEXT.to_html(false) + "]" + kp[0] + "[/color][color=#" + C_TEXT_DIM.to_html(false) + "]" + rest + "[/color]")
+	r.modulate.a = 0.85
+	r.set_message_translation(false)
+	return r
+
+
+# 字段名称格：显示键名时下方另起一行灰色字段名（效果页展开编辑、详细信息弹窗共用）
+func _field_label(text: String, field: String) -> Control:
+	var lbl = _label(text, FONT_DESC, C_TEXT_DIM)
+	lbl.mouse_filter = Control.MOUSE_FILTER_PASS
+	if not _mod.debug:
+		return lbl
+	var c = VBoxContainer.new()
+	c.add_constant_override("separation", 0)
+	c.add_child(lbl)
+	var k = _key_label(field)
+	k.clip_text = false
+	c.add_child(k)
+	return c
 
 
 func _key_label(text: String) -> Label:
@@ -1961,7 +2003,7 @@ func _with_key(ctrl: Control, e) -> Control:
 	var col = VBoxContainer.new()
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.add_child(ctrl)
-	col.add_child(_key_label(_key_info(e)))
+	col.add_child(_key_rich(e))
 	return col
 
 
@@ -2040,7 +2082,7 @@ func _group_row(i: int, spec: Dictionary) -> Control:
 	var e = _marker_effect(spec)
 	col.add_child(_rich(_mod.effect_text(e) if e != null else ""))
 	if _mod.debug:
-		col.add_child(_key_label(_key_info(e)))
+		col.add_child(_key_rich(e))
 	var src = _label(tr("BE_SRC_GROUP_" + str(spec.group).to_upper()), FONT_DESC, C_ACCENT)
 	src.rect_min_size = Vector2(120, 0)
 	src.align = Label.ALIGN_RIGHT
@@ -2113,7 +2155,7 @@ func _effect_row(i: int, spec) -> Control:
 	var txt = _rich(_effect_text(spec))
 	tcol.add_child(txt)
 	if _mod.debug:
-		tcol.add_child(_key_label(_key_info(e)))
+		tcol.add_child(_key_rich(e))
 	var src = _label(_source_name(spec), FONT_DESC, C_TEXT_DIM)
 	src.rect_min_size = Vector2(120, 0)
 	src.clip_text = true
@@ -2168,9 +2210,7 @@ func _build_effect_fields(col: Control, i: int, spec: Dictionary) -> void:
 		var lbl_text = tr(name_key)
 		if lbl_text == name_key:
 			lbl_text = f.name
-		var lbl = _label(lbl_text, FONT_DESC, C_TEXT_DIM)
-		lbl.mouse_filter = Control.MOUSE_FILTER_PASS
-		grid.add_child(lbl)
+		grid.add_child(_field_label(lbl_text, f.name))
 		var cur = e.get(f.name)
 		match f.type:
 			TYPE_INT, TYPE_REAL:

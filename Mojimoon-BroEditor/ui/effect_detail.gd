@@ -86,17 +86,7 @@ func _field_name(name: String) -> String:
 
 
 func _field(grid: Control, f: Dictionary, cur, sub: String, where: String) -> void:
-	var lbl = ui._label(_field_name(f.name), ui.FONT_DESC, ui.C_TEXT_DIM)
-	if ui._mod.debug:
-		var c = VBoxContainer.new()
-		c.add_constant_override("separation", 0)
-		c.add_child(lbl)
-		var k = ui._key_label(f.name)
-		k.clip_text = false
-		c.add_child(k)
-		grid.add_child(c)
-	else:
-		grid.add_child(lbl)
+	grid.add_child(ui._field_label(_field_name(f.name), f.name))
 	match f.type:
 		TYPE_INT, TYPE_REAL:
 			var sb = ui._spin(-99999, 99999, 1 if f.type == TYPE_INT else 0.01)

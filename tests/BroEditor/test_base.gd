@@ -200,7 +200,7 @@ func _real(specs: Array) -> Array:
 
 
 func _tree_has_text(n: Node, t: String) -> bool:
-	if n is Label and n.text.find(t) >= 0:
+	if (n is Label or n is RichTextLabel) and n.text.find(t) >= 0:
 		return true
 	for c in n.get_children():
 		if _tree_has_text(c, t):
