@@ -254,6 +254,7 @@ BE_MODE_PERM,永久,Permanent,Permanent,永続,영구,永久,Навсегда,Na
 BE_GRANT_PICK,选择效果…,Choose effect…,Choisir un effet…,効果を選択…,효과 선택…,選擇效果…,Выбрать эффект…,Wybierz efekt…,Elegir efecto…,Escolher efeito…,Effekt wählen…,Efekt seç…,Scegli effetto…
 BE_GRANT_NONE,（未选择效果）,(no effect chosen),(aucun effet choisi),（効果未選択）,(선택한 효과 없음),（未選擇效果）,(эффект не выбран),(nie wybrano efektu),(ningún efecto elegido),(nenhum efeito escolhido),(kein Effekt gewählt),(efekt seçilmedi),(nessun effetto scelto)
 BE_PICK,选择,Choose,Choisir,選択,선택,選擇,Выбрать,Wybierz,Elegir,Escolher,Wählen,Seç,Scegli
+BE_PICK_CURRENT,当前,Current,Actuel,現在,현재,目前,Текущий,Obecny,Actual,Atual,Aktuell,Mevcut,Attuale
 BE_SPLIT,拆解,Split,Décomposer,分解,분해,拆解,Разобрать,Rozłóż,Descomponer,Decompor,Zerlegen,Ayrıştır,Scomponi
 BE_SPLIT_DONE,已拆解为蓝图路径（见“蓝图”页）,"Split into a blueprint path (see the ""Blueprint"" tab)",Décomposé en chemin de plan (voir l'onglet « Plan »),設計図のパスに分解しました（「設計図」タブを参照）,"설계도 경로로 분해했습니다 (""설계도"" 탭 참고)",已拆解為藍圖路徑（見「藍圖」頁）,Разобрано в путь схемы (см. вкладку «Схема»),Rozłożono na ścieżkę schematu (zob. kartę „Schemat”),Descompuesto en una ruta del plano (ver la pestaña «Plano»),"Decomposto em um caminho do projeto (veja a aba ""Projeto"")",In einen Bauplan-Pfad zerlegt (siehe Reiter „Bauplan“),"Bir şema yoluna ayrıştırıldı (""Şema"" sekmesine bak)","Scomposto in un percorso del progetto (vedi la scheda ""Progetto"")"
 BE_N_WAVE_START,敌袭开始时,At wave start,Début de vague,ウェーブ開始時,웨이브 시작 시,敵襲開始時,Начало волны,Początek fali,Inicio de oleada,Início da onda,Wellenbeginn,Hücum başı,Inizio ondata

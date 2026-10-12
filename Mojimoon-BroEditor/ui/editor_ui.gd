@@ -1878,19 +1878,7 @@ func _build_effects() -> void:
 	rcard.add_child(rbox)
 	rbox.add_child(_label(tr("BE_SEC_LIBRARY"), FONT_NORMAL, C_ACCENT))
 	rbox.add_child(_desc(tr("BE_LIBRARY_DESC_WEAPON" if _kind == "weapon" else "BE_LIBRARY_DESC")))
-	var cats = GridContainer.new()
-	cats.columns = 4
-	cats.add_constant_override("hseparation", 6)
-	cats.add_constant_override("vseparation", 6)
-	rbox.add_child(cats)
-	for c in Catalog.CATEGORIES:
-		var b = _button(tr(c[1]), FONT_DESC)
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.clip_text = true
-		b.rect_min_size = Vector2(60, 0)
-		_apply_chip_style(b, c[0] == _lib_cat, C_ACCENT)
-		b.connect("pressed", self, "_on_lib_cat", [c[0]])
-		cats.add_child(b)
+	_category_chips(rbox, _lib_cat, self, "_on_lib_cat", 4)
 	var srow = HBoxContainer.new()
 	srow.add_constant_override("separation", 8)
 	rbox.add_child(srow)
@@ -2320,6 +2308,38 @@ func _add_spec(spec: Dictionary) -> void:
 	_set_status(tr("BE_EFFECT_ADDED"))
 
 
+# 效果库的分类按钮（效果库与"获得效果"的选择窗口共用）；返回 {分类: 按钮}
+func _category_chips(parent: Control, current: String, target: Object, method: String, columns: int) -> Dictionary:
+	var cats = GridContainer.new()
+	cats.columns = columns
+	cats.add_constant_override("hseparation", 6)
+	cats.add_constant_override("vseparation", 6)
+	parent.add_child(cats)
+	var out = {}
+	for c in Catalog.CATEGORIES:
+		var b = _button(tr(c[1]), FONT_DESC)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.clip_text = true
+		b.rect_min_size = Vector2(60, 0)
+		_apply_chip_style(b, c[0] == current, C_ACCENT)
+		b.connect("pressed", target, method, [c[0]])
+		cats.add_child(b)
+		out[c[0]] = b
+	return out
+
+
+# 效果库条目的显示文本；不属于该分类、不匹配搜索或没有文本时返回 ""
+func _lib_entry_text(entry: Dictionary, cat: String, search: String) -> String:
+	if cat != "all" and entry.cat != cat:
+		return ""
+	var text = _mod.effect_text(entry.effect)
+	if text != "" and search != "":
+		var plain = _strip(text).to_lower() + " " + tr(entry.src).to_lower() + " " + str(entry.effect.key) + " " + str(entry.effect.custom_key)
+		if plain.find(search) < 0:
+			return ""
+	return text
+
+
 func _on_lib_cat(cat: String) -> void:
 	_lib_cat = cat
 	_build_page()
@@ -2337,15 +2357,9 @@ func _fill_library() -> void:
 	var shown = 0
 	var total = 0
 	for entry in _mod.library(_kind == "weapon"):
-		if _lib_cat != "all" and entry.cat != _lib_cat:
-			continue
-		var text = _mod.effect_text(entry.effect)
+		var text = _lib_entry_text(entry, _lib_cat, _lib_search)
 		if text == "":
 			continue
-		if _lib_search != "":
-			var plain = _strip(text).to_lower() + " " + tr(entry.src).to_lower() + " " + str(entry.effect.key) + " " + str(entry.effect.custom_key)
-			if plain.find(_lib_search) < 0:
-				continue
 		total += 1
 		if shown >= LIBRARY_LIMIT:
 			continue

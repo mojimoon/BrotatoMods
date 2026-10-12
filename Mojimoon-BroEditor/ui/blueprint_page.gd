@@ -16,7 +16,11 @@ var preview: RichTextLabel
 var _picker: Control = null
 var _picker_node := -1
 var _picker_list: VBoxContainer
-var _picker_filter := ""
+var _picker_filter := ""	# 搜索与分类在本次游戏中保留（连续给多个节点选效果时不用重复筛选）
+var _picker_cat := "all"
+var _picker_chips: Dictionary = {}
+var _picker_count: Label
+var _picker_first = null	# 当前筛选结果的第一条（搜索框回车直接选择）
 
 
 func build(p_ui, parent: Control) -> void:
@@ -192,6 +196,7 @@ func _param_control(n: Dictionary, p: Array) -> Control:
 	var b = ui._button("", ui.FONT_DESC)
 	b.text = ui._strip(GraphEffect._grant_text({"kind": "grant", "params": {"ref": cur, "n": 1}}, false)) if cur is Dictionary else ui.tr("BE_GRANT_PICK")
 	b.clip_text = true
+	b.hint_tooltip = b.text	# 按钮宽度有限：悬停显示完整效果
 	b.rect_min_size = Vector2(200, 0)
 	ui._apply_action_style(b, TYPE_COLORS.effect)
 	b.connect("pressed", self, "_open_effect_picker", [int(n.id)])
@@ -324,14 +329,22 @@ func _on_import() -> void:
 # ============================================================
 func _open_effect_picker(id: int) -> void:
 	_picker_node = id
-	_picker_filter = ""
 	_picker = ui.Modal.open(ui, ui.tr("BE_GRANT_PICK"), TYPE_COLORS.effect, Vector2(1000, 800))
 	_picker.connect("closed", self, "_on_picker_closed")
 	_picker.add_button(ui.tr("BE_CANCEL"), ui.C_TEXT_DIM, self, "close_picker")
 	var box = _picker.body
+	_picker_chips = ui._category_chips(box, _picker_cat, self, "_on_picker_cat", 6)
+	var srow = HBoxContainer.new()
+	srow.add_constant_override("separation", 8)
+	box.add_child(srow)
 	var search = ui._line_edit(ui.tr("BE_LIBRARY_SEARCH"))
+	search.text = _picker_filter
+	search.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	search.connect("text_changed", self, "_on_picker_search")
-	box.add_child(search)
+	search.connect("text_entered", self, "_on_picker_enter")
+	srow.add_child(search)
+	_picker_count = ui._label("", ui.FONT_DESC, ui.C_TEXT_DIM)
+	srow.add_child(_picker_count)
 	var scroll = ui._scroll()
 	box.add_child(scroll)
 	_picker_list = VBoxContainer.new()
@@ -346,27 +359,60 @@ func _fill_picker() -> void:
 		_picker_list.remove_child(c)
 		c.queue_free()
 	var shown = 0
+	var total = 0
+	_picker_first = null
+	# 当前选中的效果：标出并排在最前
+	var n = _find(_graph(), _picker_node)
+	var cur = n.params.get("ref") if n != null else null
 	for entry in ui._mod.library(ui._kind == "weapon"):
-		var text = ui._mod.effect_text(entry.effect)
+		var text = ui._lib_entry_text(entry, _picker_cat, _picker_filter)
 		if text == "":
 			continue
-		if _picker_filter != "" and (ui._strip(text) + " " + ui.tr(entry.src) + " " + str(entry.effect.key)).to_lower().find(_picker_filter) < 0:
+		total += 1
+		var is_cur = cur is Dictionary and str(cur.get("from")) == str(entry.from) and int(cur.get("i", -1)) == int(entry.i)
+		if shown >= ui.LIBRARY_LIMIT and not is_cur:
 			continue
 		shown += 1
-		if shown > ui.LIBRARY_LIMIT:
-			break
+		var ref = {"from": entry.from, "i": entry.i}
+		# 回车选最上面一行：当前效果排在最前（只关闭窗口，用空字典表示）
+		if is_cur:
+			_picker_first = {}
+		elif _picker_first == null:
+			_picker_first = ref
 		var row = HBoxContainer.new()
 		row.add_constant_override("separation", 6)
 		_picker_list.add_child(row)
-		var pick = ui._button(ui.tr("BE_PICK"), ui.FONT_DESC)
-		ui._apply_action_style(pick, TYPE_COLORS.effect)
-		pick.connect("pressed", self, "_on_picked", [{"from": entry.from, "i": entry.i}])
+		if is_cur:
+			_picker_list.move_child(row, 0)
+		var pick = ui._button(ui.tr("BE_PICK_CURRENT" if is_cur else "BE_PICK"), ui.FONT_DESC)
+		ui._apply_action_style(pick, ui.C_ACCENT if is_cur else TYPE_COLORS.effect)
+		# 重新选中当前效果会清掉"详细信息"里的修改：当前项只关闭窗口
+		if is_cur:
+			pick.connect("pressed", self, "close_picker")
+		else:
+			pick.connect("pressed", self, "_on_picked", [ref])
 		row.add_child(pick)
 		row.add_child(ui._rich(text))
 		var src = ui._label(ui.tr(entry.src), ui.FONT_DESC, ui.C_TEXT_DIM)
 		src.rect_min_size = Vector2(120, 0)
 		src.clip_text = true
+		src.align = Label.ALIGN_RIGHT
 		row.add_child(src)
+	_picker_count.text = ui.tr("BE_LIBRARY_COUNT").replace("{0}", str(shown)).replace("{1}", str(total))
+
+
+func _on_picker_cat(cat: String) -> void:
+	_picker_cat = cat
+	for c in _picker_chips:
+		ui._apply_chip_style(_picker_chips[c], c == cat, ui.C_ACCENT)
+	_fill_picker()
+
+
+func _on_picker_enter(_text: String) -> void:
+	if _picker_first is Dictionary and _picker_first.empty():
+		close_picker()
+	elif _picker_first != null:
+		_on_picked(_picker_first)
 
 
 func _on_picker_search(text: String) -> void:

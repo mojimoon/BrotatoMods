@@ -804,6 +804,25 @@ func test_161_effect_details_and_popup_buttons() -> void:
 	var ref = GE.nodes_by_id(m.profiles[CH].graph)[gn].params.ref
 	_eq(m.make_effect(ref).burning_data.damage, 66, "blueprint grant uses the detail")
 	ui._modals[-1].close()
+	# 选择获得的效果：12 类筛选、当前效果在最前、回车选第一条（当前效果只关闭，不丢失详细信息）
+	var bp = ui.blueprint
+	bp._open_effect_picker(gn)
+	yield(tree, "idle_frame")
+	_eq(bp._picker_chips.size(), m.Catalog.CATEGORIES.size(), "picker has the library categories")
+	var first_btn = bp._picker_list.get_child(0).get_child(0)
+	_eq(first_btn.text, ui.tr("BE_PICK_CURRENT"), "current effect listed first")
+	var all_n = bp._picker_list.get_child_count()
+	bp._on_picker_cat("economy")
+	_check(bp._picker_list.get_child_count() > 0 and bp._picker_list.get_child_count() < all_n, "category narrows the list")
+	bp._on_picker_enter("")
+	ref = GE.nodes_by_id(m.profiles[CH].graph)[gn].params.ref
+	_check(str(ref.get("from")) != str(burn.from) or int(ref.get("i")) != int(burn.i), "enter picks the first economy effect")
+	bp._open_effect_picker(gn)
+	yield(tree, "idle_frame")
+	_eq(bp._picker_cat, "economy", "category remembered")
+	bp._on_picker_enter("")
+	_eq(JSON.print(GE.nodes_by_id(m.profiles[CH].graph)[gn].params.ref), JSON.print(ref), "enter on the current effect keeps it")
+	_check(bp._picker == null, "picker closed")
 	# 从角色导入：头像按钮不拉伸
 	ui._on_tab_pressed("gear")
 	ui._open_char_weapons()
