@@ -49,21 +49,17 @@ func _on_enemy_died(enemy: Enemy, args: Entity.DieArgs) -> void:
 	if killers.empty():
 		for player in _get_live_players():
 			killers.push_back(player.player_index)
-	var cursed = _aa_is_cursed(enemy)
-	# 致命一击的伤害类型：燃烧致死算元素，否则取最后一次命中的伤害缩放属性
-	var kill_info = {"stats": ["stat_elemental_damage"] if args.is_burning else []}
+	# 致命一击的伤害类型：燃烧致死算元素，否则取最后一次命中的伤害缩放属性；暴击击杀见 _on_enemy_took_damage
+	var kill_info = {"stats": ["stat_elemental_damage"] if args.is_burning else [], "burning": burning, "cursed": _aa_is_cursed(enemy),
+		"crit": is_instance_valid(enemy) and enemy.has_meta("aa_crit_kill") and enemy.get_meta("aa_crit_kill")}
+	if is_instance_valid(enemy):
+		enemy.set_meta("aa_crit_kill", false)
 	if not args.is_burning:
 		var b = AABehavior.find_on(enemy)
 		if b != null:
 			kill_info.stats = b.last_stats
 	for p in killers:
-		rt.fire("kill", p, pos)
-		if not kill_info.stats.empty():
-			rt.fire("kill_typed", p, pos, -1, null, kill_info)
-		if burning:
-			rt.fire("burning_kill", p, pos)
-		if cursed:
-			rt.fire("cursed_kill", p, pos)
+		rt.fire("kill", p, pos, -1, null, kill_info)
 
 
 # 砍倒树木（口袋工厂同一入口）
@@ -91,19 +87,19 @@ static func _aa_is_cursed(enemy) -> bool:
 	return false
 
 
-# 暴击 / 暴击击杀：原版在敌人受伤信号里带有是否暴击（致死时死亡尚未执行，见下）
+# 暴击 / 暴击击杀：原版在敌人受伤信号里带有是否暴击（致死时死亡尚未执行，见下）；暴击击杀记在敌人上，由击杀事件读取
 func _on_enemy_took_damage(enemy: Enemy, value: int, knockback_direction: Vector2, is_crit: bool, is_dodge: bool, is_protected: bool, armor_did_something: bool, args: TakeDamageArgs, hit_type: int, is_one_shot: bool) -> void:
 	._on_enemy_took_damage(enemy, value, knockback_direction, is_crit, is_dodge, is_protected, armor_did_something, args, hit_type, is_one_shot)
+	# 原版的死亡是延迟调用（unit.take_damage 里 call_deferred("die")），发出受伤信号时 enemy.dead 仍为假：
+	# 按"本次伤害后生命为 0"判断致死
+	var killed = enemy.dead or enemy.current_stats.health <= 0
+	if killed and not enemy.dead:
+		enemy.set_meta("aa_crit_kill", is_crit)
 	if not is_crit or _cleaning_up or args.from_player_index < 0:
 		return
 	var rt = _aa_rt()
 	if rt != null:
-		# 原版的死亡是延迟调用（unit.take_damage 里 call_deferred("die")），发出受伤信号时 enemy.dead 仍为假：
-		# 按"本次伤害后生命为 0"判断暴击击杀
-		var killed = enemy.dead or enemy.current_stats.health <= 0
 		rt.fire("crit", args.from_player_index, enemy.global_position, -1, enemy if not killed else null)
-		if killed:
-			rt.fire("crit_kill", args.from_player_index, enemy.global_position)
 
 
 func _on_HalfWaveTimer_timeout() -> void:

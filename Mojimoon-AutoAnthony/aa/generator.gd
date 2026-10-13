@@ -47,6 +47,7 @@ var lines_by_tier: Array = [[], [], [], []]		# 每个原版道具的正面属性
 var neg_prob_by_tier: Array = [0.0, 0.0, 0.0, 0.0]
 var special_share_by_tier: Array = [0.0, 0.0, 0.0, 0.0]	# 原版带特殊行（触发 / 机制）的道具比例
 var trigger_prior: Dictionary = {}
+var cond_prior: Dictionary = {}
 var payload_prior: Dictionary = {}
 var trigger_stat_prior: Dictionary = {}
 var mechanics_by_tier: Array = [[], [], [], []]	# {effect, value, down, source}
@@ -83,6 +84,7 @@ var gain_mod_prior := 0.0
 # 重复惩罚：本次生成中已出现的扳机 / 载荷 / 组合计数
 var used_combo: Dictionary = {}
 var used_trigger: Dictionary = {}
+var used_cond: Dictionary = {}
 var used_payload: Dictionary = {}
 var scaling_script: Script
 var gain_mod_script: Script
@@ -401,10 +403,14 @@ func _generate_tag_item(item, tag: String, items: Array) -> Dictionary:
 
 # 围绕一条带该词条的触发条款生成道具（扳机 / 载荷绑定了该词条，例如 静止 -> stand_still、爆炸 -> explosive）：条款 + 一行属性补足预算
 func _generate_clause_tag_item(item, tag: String) -> Dictionary:
+	# [扳机, 机制条件]
 	var trig = []
 	for t in Catalog.TRIGGERS:
 		if Catalog.TRIGGER_TAGS.get(t, "") == tag or tag in Catalog.tags_for_binding("trigger:" + t):
-			trig.push_back(t)
+			trig.push_back([t, ""])
+	for k in Catalog.CONDS:
+		if tag in Catalog.tags_for_binding("cond:" + k):
+			trig.push_back(["", k])
 	var pay = []
 	for p in Catalog.PAYLOADS:
 		if Catalog.PAYLOAD_TAGS.get(p, "") == tag or tag in Catalog.tags_for_binding("payload:" + p):
@@ -418,9 +424,9 @@ func _generate_clause_tag_item(item, tag: String) -> Dictionary:
 	var budget_total = budget
 	var c = {}
 	for attempt in 8:
-		var ft = trig[rng.randi() % trig.size()] if not trig.empty() else ""
+		var ft = trig[rng.randi() % trig.size()] if not trig.empty() else ["", ""]
 		var fp = pay[rng.randi() % pay.size()] if trig.empty() else ""
-		c = gen_clause(budget * 0.6, perm_mult, false, ft, fp)
+		c = gen_clause(budget * 0.6, perm_mult, false, ft[0], fp, ft[1])
 		if not c.empty():
 			break
 	if c.empty():
@@ -438,7 +444,7 @@ func _generate_clause_tag_item(item, tag: String) -> Dictionary:
 	cur_tier = -1
 	return {
 		"effects": effects,
-		"adj": _adj(Catalog.ADJ_BY_TRIGGER.get(c.trigger, Catalog.ADJ_MECHANIC)),
+		"adj": _adj(Catalog.adj_options(c)),
 		"tags": _tags_for(effects),
 		"main_stats": main_stats(effects),
 		"budget": budget_total,
@@ -530,6 +536,12 @@ func native_trigger_of(e):
 	return null
 
 
+# 原版触发行拆成的条款（估值用）
+static func _native_clause(nt: Array, stat: String, value: int) -> Dictionary:
+	return {"trigger": nt[0], "payload": nt[1], "cond": nt[2] if nt.size() > 2 else "", "cond_arg": nt[3] if nt.size() > 3 else 0,
+		"stat": stat, "value": value, "param": 5 if nt[0] == "interval" else 1}
+
+
 func is_scaling(e) -> bool:
 	return e.get_script() == scaling_script
 
@@ -613,6 +625,8 @@ func _collect_priors(items: Array, characters: Array, weapons: Array) -> void:
 			if nt != null:
 				trigger_prior[nt[0]] += 1.0
 				payload_prior[nt[1]] += 1.0
+				if nt.size() > 2:
+					cond_prior[nt[2]] = cond_prior.get(nt[2], 0.0) + 1.0
 				var sk = e.key if Catalog.STATS.has(e.key) else ""
 				if sk == "" and "stat" in e and Catalog.STATS.has(e.stat):
 					sk = e.stat
@@ -1283,7 +1297,7 @@ func _generate_item_once(item, force_special: bool) -> Dictionary:
 						effects.push_back(TriggerEffect.make(c2))
 						budget += neg_value(abs(Valuation.clause_value(c2, perm_mult)))
 				if cv > main_line.value:
-					main_line = {"value": cv, "adj": _adj(Catalog.ADJ_GRANT) if c.payload == "grant" and rng.randf() < 0.5 else _adj(Catalog.ADJ_BY_TRIGGER[c.trigger])}
+					main_line = {"value": cv, "adj": _adj(Catalog.ADJ_GRANT) if c.payload == "grant" and rng.randf() < 0.5 else _adj(Catalog.adj_options(c))}
 				if c.get("stat", "") != "":
 					used_stats.push_back(c.stat)
 
@@ -1357,7 +1371,7 @@ func _generate_item_once(item, force_special: bool) -> Dictionary:
 func _add_cursed_kill_curse(effects: Array) -> void:
 	var has_trigger = false
 	for e in effects:
-		if e is TriggerEffect and e.trigger == "cursed_kill" and e.value > 0:
+		if e is TriggerEffect and e.cond == "cursed" and e.value > 0:
 			has_trigger = true
 		elif e.key == "stat_curse" and e.custom_key == "" and not e is TriggerEffect:
 			return
@@ -1588,6 +1602,7 @@ func _tags_for(effects: Array) -> Array:
 				add.push_back(Catalog.TRIGGER_TAGS.get(e.trigger, ""))
 				add.push_back(Catalog.PAYLOAD_TAGS.get(e.payload, ""))
 				add += Catalog.tags_for_binding("trigger:" + e.trigger)
+				add += Catalog.tags_for_binding("cond:" + e.cond)
 				add.push_back(e.dmg_type)
 				add += Catalog.tags_for_binding("payload:" + e.payload)
 				if e.grant != null and is_scaling(e.grant):
@@ -1741,6 +1756,8 @@ func _note_clause(c: Dictionary) -> void:
 	var k = c.trigger + "/" + c.payload
 	used_combo[k] = used_combo.get(k, 0) + 1
 	used_trigger[c.trigger] = used_trigger.get(c.trigger, 0) + 1
+	if c.get("cond", "") != "":
+		used_cond[c.cond] = used_cond.get(c.cond, 0) + 1
 	used_payload[c.payload] = used_payload.get(c.payload, 0) + 1
 
 
@@ -2481,7 +2498,7 @@ func _make_pair(c: Dictionary, perm_mult: float) -> Dictionary:
 		return {}
 	var comp = cv * rng.randf_range(0.3, 0.6)
 	var cap = 10 if enemy else _line_cap(stat, true)
-	if Valuation.raw_rate(c.trigger, c.param, c.chance) <= 1.5 or Catalog.TRIGGERS[c.trigger].kind == "state":
+	if Valuation.raw_rate(c) <= 1.5 or Catalog.TRIGGERS[c.trigger].kind == "state":
 		cap *= 4
 	var mag = int(clamp(round(comp * divisor / per_unit), 1, cap))
 	c2.value = mag if enemy else -mag
@@ -2590,10 +2607,10 @@ func gen_gain_mod(target: float, negative: bool) -> Dictionary:
 # 触发条款
 # ============================================================
 # target：目标价值（负数表示代价条款）。返回 clause 字典，失败返回 {}。
-# fixed_trigger / fixed_payload：固定条款的一半，只重组另一半
-func gen_clause(target: float, perm_mult: float, negative: bool, fixed_trigger: String = "", fixed_payload: String = "") -> Dictionary:
+# fixed_trigger / fixed_payload / fixed_cond：固定条款的一部分，只重组其余部分
+func gen_clause(target: float, perm_mult: float, negative: bool, fixed_trigger: String = "", fixed_payload: String = "", fixed_cond: String = "") -> Dictionary:
 	for _attempt in 8:
-		var c = _try_clause(abs(target), perm_mult, negative, fixed_trigger, fixed_payload)
+		var c = _try_clause(abs(target), perm_mult, negative, fixed_trigger, fixed_payload, fixed_cond)
 		if c.empty():
 			continue
 		var v = abs(Valuation.clause_value(c, perm_mult))
@@ -2621,21 +2638,21 @@ func _legal_payloads(trigger: String, negative: bool) -> Array:
 	return out
 
 
-func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger: String = "", fixed_payload: String = "") -> Dictionary:
+func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger: String = "", fixed_payload: String = "", fixed_cond: String = "") -> Dictionary:
 	var trigger = fixed_trigger if fixed_trigger != "" else null
 	if trigger == null:
 		var tw = {}
 		for t in Catalog.TRIGGERS:
 			if t in banned_triggers:
 				continue
-			if t == "hit_typed" and not cfg.get("char_effects", false):
+			if fixed_cond != "" and not fixed_cond in Catalog.conds_for(t):
 				continue
 			var legal_t = _legal_payloads(t, negative)
 			if legal_t.empty() or (fixed_payload != "" and not fixed_payload in legal_t):
 				continue
 			tw[t] = (Catalog.TRIGGERS[t].w + Catalog.NATIVE_PRIOR_STRENGTH * log(1.0 + trigger_prior[t]) / 2.0) \
 				/ (1.0 + Catalog.REPEAT_PENALTY_TRIGGER * used_trigger.get(t, 0))
-			if not negative and (_binding_wanted("trigger:" + t, Catalog.TRIGGER_TAGS.get(t, "")) 					or (t in Catalog.TYPED_TRIGGERS and _wanted_dmg_type())):
+			if not negative and (_binding_wanted("trigger:" + t, Catalog.TRIGGER_TAGS.get(t, "")) or _trigger_cond_wanted(t)):
 				tw[t] *= Catalog.WANTED_BIAS
 		trigger = _pick_weighted(tw)
 	if trigger == null:
@@ -2655,12 +2672,16 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 	if payload == null:
 		return {}
 
-	var c = {"trigger": trigger, "payload": payload, "param": 1, "chance": 100, "cap": 0, "stat": "", "value": 1, "value2": 0}
+	var c = {"trigger": trigger, "cond": "", "cond_arg": 0, "payload": payload, "param": 1, "chance": 100, "cap": 0, "cooldown": 0,
+		"stat": "", "value": 1, "value2": 0}
 	var t = Catalog.TRIGGERS[trigger]
 	if trigger == "interval":
 		c.param = Catalog.INTERVAL_CHOICES[rng.randi() % Catalog.INTERVAL_CHOICES.size()]
-	if trigger in Catalog.TYPED_TRIGGERS:
-		c.dmg_type = _pick_dmg_type()
+	# 代价条款不带机制条件
+	if not negative:
+		_pick_cond(c, fixed_cond)
+	# 扳机次数 × 机制条件满足率
+	var base = Valuation.base_rate(c)
 
 	match payload:
 		"temp_stat", "timed_stat":
@@ -2673,16 +2694,20 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 				c.value = Catalog.stat_unit(c.stat)
 			if payload == "timed_stat":
 				c.value2 = [3, 4, 5, 6, 8][rng.randi() % 5]
-			if payload == "temp_stat" and t.kind == "event" and Valuation.raw_rate(trigger, 1, 100) > 6.0 and rng.randf() < 0.5:
-				c.cap = [10, 15, 20, 30][rng.randi() % 4]
+			# 本波属性的每波上限（低于触发次数才有意义）
+			if payload == "temp_stat" and t.kind == "event" and base > 6.0 and rng.randf() < 0.5:
+				var caps = []
+				for n in [10, 15, 20, 30]:
+					if n < base:
+						caps.push_back(n)
+				if not caps.empty():
+					c.cap = caps[rng.randi() % caps.size()]
 			if payload == "temp_stat" and not negative and t.kind == "event" and t.timing > 0.0 and t.timing < 1.0 \
 					and trigger != "hit" and rng.randf() < Catalog.RESET_ON_HIT_CHANCE:
 				c.reset = true
 		"perm_stat":
 			c.stat = _pick_stat(false)
 			c.value = Catalog.stat_unit(c.stat)
-			if Valuation.raw_rate(trigger, 1, 100) > 1.5:
-				c.cap = 1 + rng.randi() % 3
 		"heal", "gold":
 			c.value = 1
 		"xp":
@@ -2702,8 +2727,6 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 			c.grant_max = gr.max_units
 			c.grant_mode = mode
 			c.value = 1
-			if mode == "perm" and Valuation.raw_rate(trigger, 1, 100) > 1.5:
-				c.cap = 1 + rng.randi() % 3
 		"damage":
 			c.stat = _pick_dmg_type(_pick_stat(false, [], Catalog.DAMAGE_SCALING_STATS))
 			# 单次伤害可以较小：高频扳机更应该频繁触发，而不是攒很多次打一下
@@ -2724,39 +2747,27 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 			c.value = 1
 		"rand_stats":
 			c.value = 1
-			if Valuation.raw_rate(trigger, 1, 100) > 1.5:
-				c.cap = 1 + rng.randi() % 3
 
-	# 高频扳机上的永久效果：先按预算定每波上限（2..10），再把频率调到上限的约两倍（多数波次能触发满）
+	# 高频扳机上的永久效果：按预算定每波上限（2..PERM_CAP_MAX，低于触发次数），多数波次能触发满
 	var is_perm = payload in ["perm_stat", "rand_stats"] or (payload == "grant" and c.get("grant_mode", "") == "perm")
-	if is_perm and not negative and Valuation.raw_rate(trigger, 1, 100) > 1.5:
+	if is_perm and not negative and base > 1.5 and "cap" in Catalog.numeric_conds(trigger):
 		c.cap = 1
 		var per_fire = abs(Valuation.clause_value(c, perm_mult))
+		c.cap = 0
 		if per_fire > 0.0 and per_fire * 2.0 <= budget:
 			var cap = int(clamp(floor(budget / per_fire), 2, Catalog.PERM_CAP_MAX))
-			c.cap = cap
-			var rate = Valuation.raw_rate(trigger, 1, 100)
-			# 触发频率调到上限的约两倍，且高频扳机至少 MIN_FIRES_HIGH_FREQ 次
-			var want = cap * 2.0
-			if t.kind == "event" and t.e >= 20.0:
-				want = max(want, Catalog.MIN_FIRES_HIGH_FREQ)
-			if rate > want:
-				if t.gate == "every":
-					c.param = int(max(1, floor(rate / want)))
-				elif t.gate == "chance" or t.kind == "shop":
-					c.chance = int(clamp(round(want / rate * 20.0) * 5, 5, 100))
-				elif trigger == "interval":
-					c.param = int(clamp(ceil(Catalog.WAVE_SECONDS / want), c.param, 30))
-			if c.payload == "perm_stat":
-				c.value = int(min(c.value, _line_cap(c.stat, false)))
-			return c
+			if cap < base:
+				c.cap = cap
+				if c.payload == "perm_stat":
+					c.value = int(min(c.value, _line_cap(c.stat, false)))
+				return c
 
 	var unit_v = abs(Valuation.clause_value(c, perm_mult))
 	if unit_v <= 0.0:
 		return {}
 
 	if unit_v <= budget:
-		# 预算有余：先提高数值（有合理上限），再用"每 N 次"之外的门控不变
+		# 预算有余：提高数值（有合理上限），不加数值条件
 		var k = floor(budget / unit_v)
 		var k_max = _amount_cap(c, trigger)
 		k = clamp(k, 1, k_max)
@@ -2768,39 +2779,19 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 			c.value = int(min(c.value * k, Catalog.HP_DMG_MAX))
 		elif payload == "slow":
 			c.value = int(min(c.value * k, Catalog.SLOW_MAX))
-		elif payload == "xp":
-			c.value = int(c.value * k)
 		else:
 			c.value = int(c.value * k)
 	else:
-		# 预算不足：按扳机的门控方式降低频率
-		var ratio = budget / unit_v
-		# 作用于目标敌人的效果只用单次 / 几率（"每 N 个敌人"中只有第 N 个被作用，不直观）
-		var chance_only = payload in Catalog.TARGET_PAYLOADS
-		if t.gate == "every" and (chance_only or (ratio >= 0.1 and rng.randf() < Catalog.CHANCE_GATE_ON_EVERY)):
-			if ratio < 0.05:
-				return {}
-			c.chance = int(clamp(round(ratio * 20.0) * 5, 5, 100))
-		elif t.gate == "every":
-			c.param = int(max(1, ceil(1.0 / ratio)))
-		elif t.gate == "chance" or t.kind == "shop":
-			c.chance = int(clamp(round(ratio * 20.0) * 5, 5, 100))
-			if c.chance == 5 and ratio < 0.05:
-				return {}
-		elif trigger == "interval":
-			var fitted = int(ceil(c.param / ratio))
-			if fitted > 30:
-				return {}
-			c.param = fitted
-		else:
+		# 预算不足：用一个数值条件降低频率；已有的本波上限先去掉（每条至多一个数值条件）
+		if c.cap > 0:
+			c.cap = 0
+			unit_v = abs(Valuation.clause_value(c, perm_mult))
+		if not _gate(c, budget, unit_v, perm_mult):
 			return {}
-		# 永久属性 / 永久获得在高频扳机上再用每波上限收口
-		if (payload in ["perm_stat", "rand_stats"] or (payload == "grant" and c.grant_mode == "perm")) and c.cap > 1:
-			var per_fire = abs(Valuation.clause_value(c, perm_mult)) / max(0.01, Valuation.fires_per_wave(trigger, c.param, c.chance, c.cap))
-			c.cap = int(clamp(floor(budget / max(0.01, per_fire)), 1, c.cap))
 
-	# 高频扳机门槛过高（每波实际只触发几次）：换别的组合
-	if t.kind == "event" and Catalog.TRIGGERS[trigger].e >= 20.0 and not negative 			and Valuation.raw_rate(trigger, c.param, c.chance) < Catalog.MIN_FIRES_HIGH_FREQ:
+	# 高频扳机门槛过高（每 N 次 / 几率之后每波实际只触发几次）：换别的组合；冷却本身就是"每 N 秒至多一次"，不受此限
+	if t.kind == "event" and t.e >= 20.0 and not negative and c.cooldown == 0 \
+			and Valuation.raw_rate(c) < Catalog.MIN_FIRES_HIGH_FREQ:
 		return {}
 	# 每隔 N 秒获得持续 M 秒的效果：M < N（否则等同于一直生效）
 	if trigger == "interval" and payload == "timed_stat":
@@ -2815,8 +2806,101 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 	return c
 
 
+# 机制条件：按扳机的概率（cond_p，默认 COND_CHANCE）抽一个可接的条件；fixed_cond 固定条件
+func _pick_cond(c: Dictionary, fixed_cond: String) -> void:
+	var options = []
+	for k in Catalog.conds_for(c.trigger):
+		if not c.payload in Catalog.COND_PAYLOAD_EXCLUDED.get(k, []):
+			options.push_back(k)
+	# 用某类伤害命中敌人（潜水员）：只在"更多角色效果"开启时出现
+	if c.trigger == "hit_enemy" and not cfg.get("char_effects", false):
+		options.erase("dmg_type")
+	if fixed_cond != "":
+		if not fixed_cond in options:
+			return
+		options = [fixed_cond]
+	else:
+		var sw = 0.0
+		for k in options:
+			sw += Catalog.CONDS[k].w
+		var p = float(Catalog.TRIGGERS[c.trigger].get("cond_p", Catalog.COND_CHANCE * min(1.0, sw)))
+		if options.empty() or rng.randf() >= p:
+			return
+	var w = {}
+	for k in options:
+		w[k] = Catalog.CONDS[k].w * (1.0 + Catalog.NATIVE_PRIOR_STRENGTH * log(1.0 + cond_prior.get(k, 0.0))) \
+			/ (1.0 + Catalog.REPEAT_PENALTY_TRIGGER * used_cond.get(k, 0))
+		if _binding_wanted("cond:" + k) or (k == "dmg_type" and _wanted_dmg_type()):
+			w[k] *= Catalog.WANTED_BIAS
+	var k = _pick_weighted(w)
+	c.cond = k
+	if Catalog.CONDS[k].has("args"):
+		var args = Catalog.CONDS[k].args.keys()
+		c.cond_arg = args[rng.randi() % args.size()]
+	if k == "dmg_type":
+		c.dmg_type = _pick_dmg_type()
+
+
+# 扳机的专属机制条件（暴击 / 燃烧 / 诅咒 / 伤害类型 / 敌人生命，不含到处可接的自身状态）绑定了偏好词条
+func _trigger_cond_wanted(t: String) -> bool:
+	for k in Catalog.conds_for(t):
+		if Catalog.CONDS[k].on.size() <= 3 and (_binding_wanted("cond:" + k) or (k == "dmg_type" and _wanted_dmg_type())):
+			return true
+	return false
+
+
+# 预算不足（价值 unit_v > budget）：选一个数值条件把价值降到 budget 附近
+#   几率：比例 ≥ 10%（作用于目标敌人的效果 ≥ 5%）；每 N 次 / 每波上限：不用于作用于目标敌人的效果（只有第 N 个敌人被作用，不直观）；
+#   冷却：每波至少 COOLDOWN_MIN_RATE 次的事件扳机；每 N 秒的扳机优先拉长间隔
+func _gate(c: Dictionary, budget: float, unit_v: float, perm_mult: float) -> bool:
+	var ratio = budget / unit_v
+	var base = Valuation.base_rate(c)
+	if c.trigger == "interval":
+		var fitted = int(ceil(c.param / ratio))
+		if fitted <= 30:
+			c.param = fitted
+			return true
+	var target_only = c.payload in Catalog.TARGET_PAYLOADS
+	var w = {}
+	for k in Catalog.numeric_conds(c.trigger):
+		match k:
+			"chance":
+				if ratio >= 0.1 or (target_only and ratio >= 0.05):
+					w[k] = 1.0
+			"every":
+				if not target_only:
+					w[k] = 1.0
+			"cap":
+				if not target_only and base * ratio >= 1.0:
+					w[k] = 0.5
+			"cooldown":
+				if base >= Catalog.COOLDOWN_MIN_RATE and base * ratio >= 0.5:
+					w[k] = 0.5
+	var k = _pick_weighted(w)
+	if k == null:
+		return false
+	match k:
+		"chance":
+			c.chance = int(clamp(round(ratio * 20.0) * 5, 5, 100))
+		"every":
+			c.param = int(max(1, ceil(1.0 / ratio)))
+		"cap", "cooldown":
+			# 价值随上限 / 冷却单调：取价值最接近预算的一档
+			var choices = Catalog.COOLDOWN_CHOICES if k == "cooldown" else range(1, Catalog.PERM_CAP_MAX + 1)
+			var best = choices[0]
+			var best_d = INF
+			for v in choices:
+				c[k] = v
+				var d = abs(log(max(0.001, abs(Valuation.clause_value(c, perm_mult))) / budget))
+				if d < best_d:
+					best_d = d
+					best = v
+			c[k] = best
+	return true
+
+
 func _amount_cap(c: Dictionary, trigger: String) -> int:
-	var rate = Valuation.raw_rate(trigger, c.param, c.chance)
+	var rate = Valuation.raw_rate(c)
 	var kind = Catalog.TRIGGERS[trigger].kind
 	match c.payload:
 		"temp_stat":
@@ -2928,11 +3012,11 @@ func generate_character(ch) -> Dictionary:
 			continue
 		var nt = native_trigger_of(e)
 		if nt != null and Catalog.STATS.has(e.key) and e.value != 0 and not is_disabling(e):
-			var native = {"trigger": nt[0], "payload": nt[1], "stat": e.key, "value": e.value, "param": 5 if nt[0] == "interval" else 1}
+			var native = _native_clause(nt, e.key, e.value)
 			var nv = Valuation.clause_value(native, perm_mult)
 			var c = {}
 			if rng.randf() < 0.5:
-				c = gen_clause(nv, perm_mult, nv < 0, nt[0], "")
+				c = gen_clause(nv, perm_mult, nv < 0, nt[0], "", native.cond)
 			else:
 				c = gen_clause(nv, perm_mult, nv < 0, "", nt[1])
 			if c.empty():
@@ -2941,7 +3025,7 @@ func generate_character(ch) -> Dictionary:
 				out.push_back(TriggerEffect.make(c))
 				if abs(nv) > main_v and nv > 0:
 					main_v = abs(nv)
-					main_adj = _adj(Catalog.ADJ_BY_TRIGGER[c.trigger])
+					main_adj = _adj(Catalog.adj_options(c))
 				continue
 		out.push_back(e)
 	if main_adj == "":
@@ -2959,7 +3043,7 @@ func _char_reassemble_positive(val: float, perm_mult: float, used: Array) -> Dic
 		var c = gen_clause(val, perm_mult, false)
 		if not c.empty():
 			_note_clause(c)
-			return {"effect": TriggerEffect.make(c), "value": Valuation.clause_value(c, perm_mult), "adj": _adj(Catalog.ADJ_BY_TRIGGER[c.trigger])}
+			return {"effect": TriggerEffect.make(c), "value": Valuation.clause_value(c, perm_mult), "adj": _adj(Catalog.adj_options(c))}
 	elif kind == "scaling":
 		var sc = gen_scaling(val, false)
 		if not sc.empty():
@@ -3002,7 +3086,7 @@ func char_line_value(e) -> float:
 		var v = e.value
 		if v < 0:
 			v = -int(min(abs(v), Catalog.counter_ref(e.key)))
-		var cv = Valuation.clause_value({"trigger": nt[0], "payload": nt[1], "stat": e.key, "value": v, "param": 5 if nt[0] == "interval" else 1}, Catalog.PERM_MULT_CHARACTER)
+		var cv = Valuation.clause_value(_native_clause(nt, e.key, v), Catalog.PERM_MULT_CHARACTER)
 		return cv if cv >= 0 else neg_value(cv)
 	return 0.0
 

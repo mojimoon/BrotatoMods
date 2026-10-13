@@ -1,23 +1,28 @@
 extends Effect
 
-# 通用触发条款：任意触发扳机 × 任意合法载荷。
+# 通用触发条款：触发扳机 + 至多一个机制条件 + 至多一个数值条件 + 载荷。
 # 本效果不写入玩家 effects 字典（原版每种触发器都有自己的专用 key 和数据格式，互不通用）；
 # 运行时由 aa/runtime.gd 扫描玩家持有的道具 / 角色 / 武器上的本效果并统一派发。
 #
 #   trigger  触发扳机 id（见 catalog.TRIGGERS）
-#   param    每 N 次（gate = every 的扳机）或间隔秒数（interval）
-#   dmg_type 限定伤害类型的扳机（TYPED_TRIGGERS）的伤害缩放属性
-#   chance   每次触发的几率（%）
+#   cond     机制条件 id（见 catalog.CONDS；空 = 无）；cond_arg 条件参数（敌人生命百分比）
+#   dmg_type 机制条件"伤害类型"的伤害缩放属性
+#   param    每 N 次（数值条件，gate = every 的扳机）或间隔秒数（interval 的扳机参数）
+#   chance   每次触发的几率（%，数值条件）
+#   cooldown 冷却秒数（数值条件："每 N 秒最多触发一次"）
 #   payload  载荷 id（见 catalog.PAYLOADS）
 #   stat     属性 key（属性类载荷）或伤害缩放属性（damage / explode）
 #   value    属性数值 / 回复量 / 材料 / 经验 / 伤害百分比
 #   value2   限时属性的持续秒数
-#   cap      每波最多触发次数（0 = 不限）
+#   cap      每波最多触发次数（数值条件，0 = 不限）
 
 const ID = "aa_trigger"
 const Catalog = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/catalog.gd")
 
 export(String) var trigger := ""
+export(String) var cond := ""
+export(int) var cond_arg := 0
+export(int) var cooldown := 0
 export(int) var param := 1
 export(int) var chance := 100
 export(String) var payload := ""
@@ -46,6 +51,9 @@ static func make(c: Dictionary) -> Effect:
 	e.custom_key_hash = Keys.empty_hash
 	e.text_key = ""
 	e.trigger = c.trigger
+	e.cond = str(c.get("cond", ""))
+	e.cond_arg = int(c.get("cond_arg", 0))
+	e.cooldown = int(c.get("cooldown", 0))
 	e.param = int(c.get("param", 1))
 	e.chance = int(c.get("chance", 100))
 	e.payload = c.payload
@@ -67,7 +75,7 @@ static func make(c: Dictionary) -> Effect:
 
 func to_clause() -> Dictionary:
 	return {
-		"trigger": trigger, "param": param, "chance": chance, "payload": payload,
+		"trigger": trigger, "cond": cond, "cond_arg": cond_arg, "cooldown": cooldown, "param": param, "chance": chance, "payload": payload,
 		"stat": stat, "dmg_type": dmg_type, "value": value, "value2": value2, "cap": cap, "reset": reset,
 		"grant_mode": grant_mode, "grant_unit": grant_unit,
 	}
@@ -129,20 +137,20 @@ func get_text(_player_index: int, colored: bool = true) -> String:
 	if tc.length() > 0:
 		tc = tc.substr(0, 1).to_upper() + tc.substr(1)
 	var s = tr(k).replace("{T}", tc).replace("{t}", t).replace("{p}", _payload_text(colored)) 		.replace("{c}", _col(str(chance) + "%", true, colored))
-	return s + _cap_text()
+	return s + _cond_text() + _cap_text()
 
 
 # 通用模板：单次 AA_T_X、计次 AA_T_X_EVERY（{0} = 次数），几率由 AA_FMT_CHANCE 包裹；{1} = 伤害类型 / 生命百分比 / 属性
+# 针对目标敌人的机制条件（暴击、燃烧、诅咒、伤害类型、敌人生命）与扳机合写成一句（catalog.COND_TEXT），其余写成后缀
 func _trigger_text(_colored: bool) -> String:
 	if trigger == "interval":
 		return tr("AA_T_INTERVAL").replace("{0}", str(param))
-	var base = "AA_T_" + trigger.to_upper()
+	var base = Catalog.COND_TEXT.get(trigger + "/" + cond, "AA_T_" + trigger.to_upper())
 	var arg = ""
-	if trigger in Catalog.TYPED_TRIGGERS:
+	if cond == "dmg_type":
 		arg = tr(dmg_type.to_upper())
-	elif trigger.begins_with("hit_above_") or trigger.begins_with("hit_below_"):
-		base = "AA_T_HIT_ABOVE" if trigger.begins_with("hit_above_") else "AA_T_HIT_BELOW"
-		arg = trigger.get_slice("_", 2)
+	elif cond.begins_with("enemy_hp_"):
+		arg = str(cond_arg)
 	elif trigger == "buy_stat":
 		# 条件属性 = 效果属性（同原版雪球）
 		arg = tr(stat.to_upper())
@@ -202,8 +210,17 @@ func scaled_grant():
 	return d
 
 
+# 自身状态条件的后缀（"（移动时）"）
+func _cond_text() -> String:
+	if cond == "" or Catalog.COND_TEXT.has(trigger + "/" + cond):
+		return ""
+	return tr("AA_C_" + cond.to_upper())
+
+
 func _cap_text() -> String:
 	var t = ""
+	if cooldown > 0:
+		t += tr("AA_COOLDOWN").replace("{0}", str(cooldown))
 	if cap > 0:
 		# 属性类效果写每波可获得的总量（原版"每波最大值：+8"），其余写次数
 		if payload in ["temp_stat", "perm_stat"]:
@@ -218,6 +235,9 @@ func _cap_text() -> String:
 func serialize() -> Dictionary:
 	var s = .serialize()
 	s.trigger = trigger
+	s.cond = cond
+	s.cond_arg = cond_arg
+	s.cooldown = cooldown
 	s.param = param
 	s.chance = chance
 	s.payload = payload
@@ -235,6 +255,9 @@ func serialize() -> Dictionary:
 func deserialize_and_merge(s: Dictionary) -> void:
 	.deserialize_and_merge(s)
 	trigger = str(s.get("trigger", ""))
+	cond = str(s.get("cond", ""))
+	cond_arg = int(s.get("cond_arg", 0))
+	cooldown = int(s.get("cooldown", 0))
 	param = int(s.get("param", 1))
 	chance = int(s.get("chance", 100))
 	payload = str(s.get("payload", ""))

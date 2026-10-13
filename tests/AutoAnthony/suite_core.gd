@@ -416,20 +416,24 @@ func test_50_all_translation_keys_exist() -> void:
 		var k = line.split(",")[0].replace("\"", "")
 		keys[k] = true
 	f.close()
-	for k in ["AA_T_FIRST_HIT_TYPED", "AA_T_FIRST_HIT_TYPED_EVERY", "AA_T_HIT_ABOVE", "AA_T_HIT_ABOVE_EVERY", "AA_T_HIT_BELOW", "AA_T_HIT_BELOW_EVERY", "AA_T_HIT_TYPED", "AA_T_HIT_TYPED_EVERY", "AA_P_VULN"]:
+	for k in ["AA_P_VULN", "AA_COOLDOWN"]:
 		_check(keys.has(k), "text key " + k)
 	for t in Catalog.TRIGGERS:
-		# 带参数的扳机（限定伤害类型的首次命中、命中高 / 低血敌人）共用一条带占位符的文本
-		if not t in ["kill", "gold", "interval"] and not t.begins_with("hit_above_") and not t.begins_with("hit_below_"):
-			_check(keys.has("AA_T_" + t.to_upper()), "trigger text for " + t)
-		for param in [1, 3]:
-			var txt = TriggerEffect.make({"trigger": t, "param": param, "payload": "gold", "value": 1, "dmg_type": "stat_melee_damage", "stat": "stat_armor"}).get_text(0, false)
-			_check(txt.find("AA_") == -1 and txt.find("{") == -1, "rendered trigger text for %s: %s" % [t, txt])
+		_check(keys.has("AA_T_" + t.to_upper()), "trigger text for " + t)
+		# 每种扳机 × 每个可接的机制条件 × 单次 / 每 3 次 / 冷却
+		for cond in [""] + Catalog.conds_for(t):
+			for param in [1, 3]:
+				var c = {"trigger": t, "cond": cond, "cond_arg": 50, "param": param, "payload": "gold", "value": 1, "dmg_type": "stat_melee_damage",
+					"stat": "stat_armor", "cooldown": 0 if param == 1 else 4}
+				var txt = TriggerEffect.make(c).get_text(0, false)
+				_check(txt.find("AA_") == -1 and txt.find("{") == -1, "rendered trigger text for %s/%s: %s" % [t, cond, txt])
 	var adjs = Catalog.ADJ_MECHANIC + Catalog.ADJ_SCALING + Catalog.ADJ_GAIN_MOD + Catalog.ADJ_GRANT
 	for s in Catalog.ADJ_BY_STAT:
 		adjs += Catalog.ADJ_BY_STAT[s]
 	for t in Catalog.ADJ_BY_TRIGGER:
 		adjs += Catalog.ADJ_BY_TRIGGER[t]
+	for k in Catalog.ADJ_BY_COND:
+		adjs += Catalog.ADJ_BY_COND[k]
 	for a in adjs:
 		_check(keys.has(a), "adjective " + a)
 	print("AUDIT distinct name adjectives: %d" % adjs.size())
@@ -909,18 +913,21 @@ func test_92_next_wave_and_pairs() -> void:
 func test_93_new_triggers_tags_and_char_components() -> void:
 	TempStats.reset()
 	var rt = _make_runtime([
-		{"trigger": "crit_kill", "param": 2, "payload": "gold", "value": 5},
-		{"trigger": "burning_kill", "payload": "temp_stat", "stat": "stat_armor", "value": 1},
+		{"trigger": "kill", "cond": "crit", "param": 2, "payload": "gold", "value": 5},
+		{"trigger": "kill", "cond": "burning", "payload": "temp_stat", "stat": "stat_armor", "value": 1},
 		{"trigger": "steps", "param": 10, "payload": "xp", "value": 3},
 		{"trigger": "half_wave", "payload": "temp_stat", "stat": "stat_dodge", "value": 7},
 	])
 	var g0 = rd.get_player_gold(0)
-	rt.fire("crit_kill", 0)
-	rt.fire("crit_kill", 0)
+	var crit = {"stats": [], "crit": true, "burning": false, "cursed": false}
+	var plain = {"stats": [], "crit": false, "burning": false, "cursed": false}
+	rt.fire("kill", 0, null, -1, null, crit)
+	rt.fire("kill", 0, null, -1, null, crit)
 	_eq(rd.get_player_gold(0), g0 + 5, "every 2 crit kills")
+	rt.fire("kill", 0, null, -1, null, plain)
 	rt.fire("kill", 0)
 	_eq(rd.get_player_gold(0), g0 + 5, "plain kill does not count as crit kill")
-	rt.fire("burning_kill", 0)
+	rt.fire("kill", 0, null, -1, null, {"stats": [], "crit": false, "burning": true, "cursed": false})
 	_eq(int(TempStats.get_stat(Keys.stat_armor_hash, 0) / rd.get_stat_gain(Keys.stat_armor_hash, 0)), 1, "burning kill")
 	var xp0 = rd.get_player_xp(0)
 	for i in 10:
@@ -943,9 +950,10 @@ func test_93_new_triggers_tags_and_char_components() -> void:
 			for e in p.effects:
 				if e is TriggerEffect:
 					seen_trig[e.trigger] = true
-					if e.value > 0 and e.trigger == "crit_kill":
+					seen_trig[e.trigger + "/" + e.cond] = true
+					if e.value > 0 and e.cond == "crit":
 						_check("stat_crit_chance" in p.tags, id + " crit-kill item has crit tag")
-					if e.value > 0 and e.trigger == "burning_kill":
+					if e.value > 0 and e.cond == "burning":
 						_check("stat_elemental_damage" in p.tags, id + " burning-kill item has elemental tag")
 				if gen.is_scaling(e) and e.value > 0:
 					if e.stat_scaled == "burning_enemy":
@@ -971,7 +979,7 @@ func test_93_new_triggers_tags_and_char_components() -> void:
 						print("AUDIT char component: ", t)
 						shown += 1
 	print("AUDIT char components: ", char_kinds, " next-wave kinds: ", next_kinds.keys())
-	for t in ["crit_kill", "burning_kill", "steps", "half_wave"]:
+	for t in ["kill/crit", "kill/burning", "steps", "half_wave"]:
 		_check(seen_trig.has(t), "trigger generated: " + t)
 	for k in next_kinds:
 		_check(k in ["xp_gain", "loot_aliens"], "next-wave positive is xp or loot aliens: " + k)
@@ -1476,8 +1484,8 @@ func test_110_xp_needed_wave_start_and_frequency() -> void:
 				_check(not (e.trigger == "wave_start" and e.payload == "temp_stat"), "no wave-start temp stat: " + e.get_text(0, false))
 				if Catalog.TRIGGERS[e.trigger].kind == "event" and Catalog.TRIGGERS[e.trigger].e >= 20.0 and e.value > 0 and not Catalog.ENEMY_STATS.has(e.stat):
 					n_hf += 1
-					var r = Valuation.raw_rate(e.trigger, e.param, e.chance)
-					if r < Catalog.MIN_FIRES_HIGH_FREQ - 0.01:
+					var r = Valuation.raw_rate(e.to_clause())
+					if r < Catalog.MIN_FIRES_HIGH_FREQ - 0.01 and e.cooldown == 0:
 						low += 1
 						print("AUDIT low-frequency high-freq clause: " + e.get_text(0, false))
 					if e.payload in ["damage", "heal", "gold", "xp", "explode"] and shown < 8:
@@ -1759,8 +1767,9 @@ func test_114_tag_bindings() -> void:
 				var what = ""
 				if e is TriggerEffect and e.value > 0:
 					want += Catalog.tags_for_binding("trigger:" + e.trigger)
+					want += Catalog.tags_for_binding("cond:" + e.cond)
 					want += Catalog.tags_for_binding("payload:" + e.payload)
-					what = e.trigger + "/" + e.payload
+					what = e.trigger + ("+" + e.cond if e.cond != "" else "") + "/" + e.payload
 					if e.payload in ["damage", "explode"] and Catalog.STATS.has(e.stat):
 						want.push_back(e.stat)
 						what += "/" + e.stat
@@ -1787,7 +1796,7 @@ func test_114_tag_bindings() -> void:
 	for x in missing.slice(0, min(10, missing.size()) - 1) if not missing.empty() else []:
 		print("AUDIT   " + x)
 	_check(missing.empty(), "every generated effect carries its bound tags")
-	for k in ["dodge/", "gold/", "first_hit_", "ignite/", "crit_kill/"]:
+	for k in ["dodge/", "gold/", "first_hit", "ignite/", "kill+crit/"]:
 		var found = false
 		for w in checked:
 			if w.begins_with(k):
@@ -1982,7 +1991,7 @@ func test_120_minor_stats_starting_items_typed_hits() -> void:
 			var plan = Generator.new(cfg, sd).generate(isvc.items, isvc.characters, [], [])
 			for id in plan.items:
 				for e in plan.items[id].effects:
-					if e is TriggerEffect and e.trigger == "hit_typed":
+					if e is TriggerEffect and e.trigger == "hit_enemy" and e.cond == "dmg_type":
 						counts[on] += 1
 						if samples.size() < 6:
 							samples.push_back(e.get_text(0, false))
@@ -1993,8 +2002,10 @@ func test_120_minor_stats_starting_items_typed_hits() -> void:
 	_check(counts[true] > 0, "typed-hit triggers appear with more character effects")
 	_eq(counts[false], 0, "typed-hit triggers absent without more character effects")
 	var info = {"hp_pct": 80.0, "first_any": false, "first_stats": [], "stats": ["stat_ranged_damage"]}
-	_check(Runtime._matches("hit_typed", "hit_enemy", info, "stat_ranged_damage"), "ranged hit matches ranged hit_typed")
-	_check(not Runtime._matches("hit_typed", "hit_enemy", info, "stat_melee_damage"), "ranged hit does not match melee hit_typed")
+	var ranged = TriggerEffect.make({"trigger": "hit_enemy", "cond": "dmg_type", "dmg_type": "stat_ranged_damage", "payload": "gold", "value": 1})
+	var melee = TriggerEffect.make({"trigger": "hit_enemy", "cond": "dmg_type", "dmg_type": "stat_melee_damage", "payload": "gold", "value": 1})
+	_check(Runtime.info_ok(ranged, info), "ranged hit matches ranged typed hit")
+	_check(not Runtime.info_ok(melee, info), "ranged hit does not match melee typed hit")
 
 
 # 叠加有技术问题的原版独特效果：带这些效果的重组道具设为独特
@@ -2030,7 +2041,7 @@ func test_125_unique_mechanics() -> void:
 # 搬运的冰块效果来源改为持有者；潜水员的远程命中易伤不再搬运
 func test_126_vulnerability_stacking() -> void:
 	var b = load(MOD_DIR + "aa/enemy_behavior.gd").new()
-	var c1 = {"trigger": "hit_above_50", "payload": "vuln", "value": 15, "value2": 3}
+	var c1 = {"trigger": "hit_enemy", "cond": "enemy_hp_above", "cond_arg": 50, "payload": "vuln", "value": 15, "value2": 3}
 	var c2 = {"trigger": "crit", "payload": "vuln", "value": 20, "value2": 2}
 	var s1 = hash(JSON.print(TriggerEffect.make(c1).to_clause()))
 	var s2 = hash(JSON.print(TriggerEffect.make(c2).to_clause()))
@@ -2081,7 +2092,7 @@ func test_127_more_native_triggers() -> void:
 			_check(not k in gone, "decomposed native trigger not copied as a mechanic: " + k)
 	for p in ["hp_dmg", "rand_stats"]:
 		_check(gen.payload_prior.get(p, 0.0) > 0.0, "native prior for payload " + p)
-	_check(gen.trigger_prior.get("cursed_kill", 0.0) > 0.0, "native prior for cursed_kill")
+	_check(gen.cond_prior.get("cursed", 0.0) > 0.0, "native prior for the cursed condition")
 	var diver = isvc.get_element_safe(isvc.characters, "character_diver")
 	for e in diver.effects:
 		if e.custom_key == "enemy_percent_damage_taken":
@@ -2097,7 +2108,7 @@ func test_127_more_native_triggers() -> void:
 				var k = ""
 				if e.payload in ["hp_dmg", "rand_stats"]:
 					k = e.payload
-				elif e.trigger == "cursed_kill":
+				elif e.cond == "cursed":
 					k = "cursed_kill"
 				if k == "":
 					continue
@@ -2144,7 +2155,7 @@ func test_128_remaining_native_triggers() -> void:
 			var k = mech.effect.custom_key if mech.effect.custom_key != "" else mech.effect.key
 			_check(not k in ["burn_chance", "remove_speed", "gain_stat_for_equipped_item_with_stat"],
 				"decomposed native trigger not copied: " + k)
-	_eq(Catalog.TRIGGERS["cursed_kill"].e, 25.0, "cursed kills estimated at 1/4 of kills")
+	_eq(Valuation.base_rate({"trigger": "kill", "cond": "cursed"}), 25.0, "cursed kills estimated at 1/4 of kills")
 	var seen = {}
 	var samples = []
 	var curse_ok = 0
@@ -2163,7 +2174,7 @@ func test_128_remaining_native_triggers() -> void:
 					k = e.payload
 				elif e.trigger in ["tree_kill", "buy_stat"]:
 					k = e.trigger
-				if e.trigger == "cursed_kill" and e.value > 0:
+				if e.cond == "cursed" and e.value > 0:
 					has_ck = true
 				if k == "":
 					continue
@@ -2261,11 +2272,11 @@ func test_130_trigger_templates() -> void:
 					counted[e.trigger] = true
 					_check(Catalog.TRIGGERS[e.trigger].gate == "every", "counted only on gate-every triggers: " + e.trigger)
 					_check(not e.payload in Catalog.TARGET_PAYLOADS, "target payload not counted: " + e.get_text(0, false))
-				if e.trigger in Catalog.TYPED_TRIGGERS:
-					_check(Catalog.DMG_TYPES.has(e.dmg_type), "typed trigger has a damage type: " + e.trigger)
+				if e.cond == "dmg_type":
+					_check(Catalog.DMG_TYPES.has(e.dmg_type), "typed condition has a damage type: " + e.trigger)
 					typed[e.dmg_type] = typed.get(e.dmg_type, 0) + 1
 				else:
-					_eq(e.dmg_type, "", "untyped trigger has no damage type")
+					_eq(e.dmg_type, "", "untyped clause has no damage type")
 				if e.payload in ["damage", "explode"] and Catalog.DMG_TYPES.has(e.stat):
 					dmg_stats[e.stat] = dmg_stats.get(e.stat, 0) + 1
 				var txt = e.get_text(0, false)
@@ -2288,12 +2299,16 @@ func test_130_trigger_templates() -> void:
 			if not c.empty() and int(c.get("param", 1)) > 1:
 				shop_counted = true
 	_check(shop_counted, "count gate used on a shop trigger")
-	_check(typed.get("stat_engineering", 0) > 0 and typed.get("stat_engineering", 0) < typed.get("stat_melee_damage", 0), "engineering rarer than melee")
+	# 伤害类型条件与伤害 / 爆炸载荷共用同一抽取（近战 : 远程 : 元素 : 工程 = 2 : 2 : 2 : 1）
+	for k in typed:
+		dmg_stats[k] = dmg_stats.get(k, 0) + typed[k]
+	_check(dmg_stats.get("stat_engineering", 0) > 0 and dmg_stats.get("stat_engineering", 0) < dmg_stats.get("stat_melee_damage", 0), "engineering rarer than melee")
 	for tbl in [Catalog.LEGAL, Catalog.FREE_LEGAL]:
 		_check(not "fruit" in tbl.wave_end and not "fruit" in tbl.wave_start, "no fruit at wave start / end")
 	# 用某类伤害击杀
-	_check(Runtime._matches("kill_typed", "kill_typed", {"stats": ["stat_melee_damage"]}, "stat_melee_damage"), "melee kill matches")
-	_check(not Runtime._matches("kill_typed", "kill_typed", {"stats": ["stat_ranged_damage"]}, "stat_melee_damage"), "ranged kill does not match melee")
+	var mk = TriggerEffect.make({"trigger": "kill", "cond": "dmg_type", "dmg_type": "stat_melee_damage", "payload": "gold", "value": 1})
+	_check(Runtime.info_ok(mk, {"stats": ["stat_melee_damage"]}), "melee kill matches")
+	_check(not Runtime.info_ok(mk, {"stats": ["stat_ranged_damage"]}), "ranged kill does not match melee")
 	# 商店计次：每刷新 3 次商店
 	m.start_new_run()
 	var holder = _item("item_potato").duplicate()
@@ -2753,3 +2768,83 @@ func test_173_ui_font_scale() -> void:
 	_eq(ui._font_small.size, base_size, "UI font restored")
 	ui.queue_free()
 	m.save_settings()
+
+
+# ============================================================
+# 触发 + 条件 + 效果：每条至多一个机制条件、一个数值条件；条件只接在允许的扳机上；估值、运行时、文本
+# ============================================================
+func test_175_trigger_conditions() -> void:
+	var cfg = _cfg()
+	cfg.char_effects = true
+	var n = 0
+	var n_cond = 0
+	var n_num = 0
+	var conds = {}
+	var nums = {}
+	var trig = {}
+	var samples = []
+	for sd in range(1, 21):
+		var plan = Generator.new(cfg, sd).generate(isvc.items, isvc.characters, [], [])
+		for id in plan.items:
+			for e in plan.items[id].effects:
+				if not e is TriggerEffect:
+					continue
+				n += 1
+				trig[e.trigger] = trig.get(e.trigger, 0) + 1
+				var num = []
+				if e.param > 1 and e.trigger != "interval":
+					num.push_back("every")
+				if e.chance < 100:
+					num.push_back("chance")
+				if e.cap > 0:
+					num.push_back("cap")
+				if e.cooldown > 0:
+					num.push_back("cooldown")
+				_check(num.size() <= 1, "at most one numeric condition: " + e.get_text(0, false))
+				for k in num:
+					_check(k in Catalog.numeric_conds(e.trigger), "%s allowed on %s" % [k, e.trigger])
+					nums[k] = nums.get(k, 0) + 1
+				if not num.empty():
+					n_num += 1
+				if e.cond != "":
+					n_cond += 1
+					conds[e.cond] = conds.get(e.cond, 0) + 1
+					_check(e.cond in Catalog.conds_for(e.trigger), "%s allowed on %s" % [e.cond, e.trigger])
+					if samples.size() < 10:
+						samples.push_back(e.get_text(0, false))
+	print("AUDIT clauses %d: mechanism condition %.0f%% %s, numeric condition %.0f%% %s" % [n, 100.0 * n_cond / max(1, n), str(conds), 100.0 * n_num / max(1, n), str(nums)])
+	print("AUDIT condition samples: " + str(samples))
+	print("AUDIT triggers: " + str(trig))
+	_check(n_cond > n * 0.1 and n_cond < n * 0.5, "mechanism conditions on a minority of clauses")
+	for k in ["crit", "dmg_type", "enemy_hp_above", "still", "full_hp"]:
+		_check(conds.has(k), "condition generated: " + k)
+	for k in ["every", "chance", "cap", "cooldown"]:
+		_check(nums.has(k), "numeric condition generated: " + k)
+	# 估值：满足率、冷却
+	var kill = {"trigger": "kill", "payload": "gold", "value": 1}
+	var kc = kill.duplicate()
+	kc.cond = "crit"
+	_eq(Valuation.clause_value(kc, 4.0), Valuation.clause_value(kill, 4.0) * 0.5, "crit condition halves kills")
+	var cd = kill.duplicate()
+	cd.cooldown = 3
+	_check(abs(Valuation.raw_rate(cd) - 100.0 / (1.0 + 100.0 * 3.0 / 60.0)) < 0.01, "cooldown caps the rate")
+	# 运行时：冷却
+	var rt = _make_runtime([{"trigger": "dodge", "payload": "gold", "value": 1, "cooldown": 5}])
+	var g0 = rd.get_player_gold(0)
+	rt.fire("dodge", 0)
+	rt.fire("dodge", 0)
+	_eq(rd.get_player_gold(0), g0 + 1, "cooldown blocks the second fire")
+	rt._elapsed += 5.0
+	rt.fire("dodge", 0)
+	_eq(rd.get_player_gold(0), g0 + 2, "fires again after the cooldown")
+	rt.queue_free()
+	# 运行时：命中敌人 + 敌人生命
+	var hi = TriggerEffect.make({"trigger": "hit_enemy", "cond": "enemy_hp_above", "cond_arg": 75, "payload": "gold", "value": 1})
+	_check(Runtime.info_ok(hi, {"hp_pct": 80.0}), "80% enemy matches above 75%")
+	_check(not Runtime.info_ok(hi, {"hp_pct": 60.0}), "60% enemy does not match above 75%")
+	_check(not Runtime.info_ok(hi, null), "no info, no match")
+	# 文本：目标条件合写进扳机，自身状态写成后缀
+	var t1 = TriggerEffect.make({"trigger": "kill", "cond": "crit", "payload": "gold", "value": 1}).get_text(0, false)
+	_eq(t1, TriggerEffect.make({"trigger": "kill", "payload": "gold", "value": 1}).get_text(0, false).replace(tr("AA_T_KILL"), tr("AA_T_CRIT_KILL")), "crit kill text")
+	var t2 = TriggerEffect.make({"trigger": "kill", "cond": "still", "payload": "gold", "value": 1}).get_text(0, false)
+	_check(t2.ends_with(tr("AA_C_STILL")), "still condition as a suffix: " + t2)

@@ -234,7 +234,7 @@ func test_16b_permanent_caps() -> void:
 			continue
 		# 永久属性条款（永久获得效果的单位价值差异很大，上限按预算另算）
 		var perm = c.payload == "perm_stat"
-		if perm and Valuation.raw_rate(c.trigger, 1, 100) > 1.5:
+		if perm and Valuation.base_rate(c) > 1.5 and c.cap > 0:
 			caps.push_back(c.cap)
 			if shown < 5:
 				print("AUDIT perm clause: ", TriggerEffect.make(c).get_text(0, false))

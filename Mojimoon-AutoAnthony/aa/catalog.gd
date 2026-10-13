@@ -103,21 +103,23 @@ const XP_W = 0.25		# 每波获得 1 经验
 const DMG_W = 0.022		# 每波造成 1 点伤害
 # 高频扳机（每波 20 次以上）的最低有效触发次数：更低就换别的组合，避免"每命中 30 次"这类门槛过高的条款
 const MIN_FIRES_HIGH_FREQ = 6.0
-# 高频扳机预算不足时，改用几率门控（"击杀敌人时（25% 几率）"，类似幸运币）而不是"每 N 次"的概率
-const CHANCE_GATE_ON_EVERY = 0.5
 const EXPLOSION_TARGETS = 2.5	# 爆炸平均命中数
 
+# ------------------------------------------------------------
+# 触发 + 条件 + 效果
+# 一条触发条款 = 触发扳机 + 至多一个机制条件 + 至多一个数值条件 + 载荷
 # ------------------------------------------------------------
 # 触发扳机
 #   kind: event（事件）/ state（持续状态）/ shop（商店阶段事件）
 #   e: 每波期望次数（state 为在场率）
 #   timing: 临时属性叠层的时间系数（波开始时触发 = 整波生效）
-#   gate: every = 通用门控（单次 / 几率 / 每 N 次，字符串 AA_T_X + AA_T_X_EVERY）；chance = 单次 / 几率（治疗频率不稳定、箱子太少，不计次）；
-#         none = 只有单次（每波次数固定的扳机）
+#   gate: 可用的数值条件（见 numeric_conds）。every = 每 N 次 / 几率 / 每波上限 / 冷却（字符串 AA_T_X + AA_T_X_EVERY）；
+#         chance = 几率 / 每波上限 / 冷却（治疗频率不稳定、箱子太少，不计次）；none = 无（每波次数固定的扳机）
 #   w: 基础出现权重（与原版先验相加）
+#   cond_p: 带机制条件的概率（默认 COND_CHANCE）
 # ------------------------------------------------------------
 const TRIGGERS = {
-	"kill": {"kind": "event", "e": 100.0, "timing": 0.5, "gate": "every", "w": 1.0},
+	"kill": {"kind": "event", "e": 100.0, "timing": 0.5, "gate": "every", "w": 2.0, "cond_p": 0.6},
 	"hit": {"kind": "event", "e": 8.0, "timing": 0.5, "gate": "every", "w": 1.0},
 	"dodge": {"kind": "event", "e": 4.0, "timing": 0.5, "gate": "every", "w": 1.0},
 	"consumable": {"kind": "event", "e": 7.0, "timing": 0.5, "gate": "every", "w": 1.0},
@@ -132,9 +134,6 @@ const TRIGGERS = {
 	"low_hp": {"kind": "state", "e": 0.15, "timing": 1.0, "gate": "none", "w": 0.5},
 	"full_hp": {"kind": "state", "e": 0.45, "timing": 1.0, "gate": "none", "w": 0.4},
 	"reroll": {"kind": "shop", "e": 3.0, "timing": 0.0, "gate": "every", "w": 0.5},
-	# 暴击击杀（触手、狩猎奖杯）/ 击杀燃烧中的敌人（鬼火）：击杀的子集，频率取决于构筑；绑定暴击 / 元素词条
-	"crit_kill": {"kind": "event", "e": 50.0, "timing": 0.5, "gate": "every", "w": 0.7},
-	"burning_kill": {"kind": "event", "e": 30.0, "timing": 0.5, "gate": "every", "w": 0.3},
 	# 每走 N 步（徒步旅行者）：移动时约每秒 3.33 步，每波约 200 步，实际强度不足，需要低估
 	"steps": {"kind": "event", "e": 90.0, "timing": 0.5, "gate": "every", "w": 0.3},
 	# 波次进行到一半时（赛博格）
@@ -148,21 +147,10 @@ const TRIGGERS = {
 	"crit": {"kind": "event", "e": 100.0, "timing": 0.5, "gate": "every", "w": 0.3},
 	# 点燃敌人（敌人开始燃烧；原版以燃烧结算为准）
 	"ignite": {"kind": "event", "e": 40.0, "timing": 0.5, "gate": "every", "w": 0.15},
-	# 首次命中某个敌人（冰块、潜水员的"首次命中时"）；_typed = 限定伤害类型（条款的 dmg_type 字段，按命中的伤害缩放属性）
-	# 一局通常只用一种伤害类型：限定类型与不限定的期望次数相同
-	"first_hit": {"kind": "event", "e": 110.0, "timing": 0.5, "gate": "every", "w": 0.1},
-	"first_hit_typed": {"kind": "event", "e": 110.0, "timing": 0.5, "gate": "every", "w": 0.16},
-	# 命中生命值高于 / 低于 X% 的敌人（小鱼、原版"对高 / 低血敌人增伤"）：每次命中都计，按命中次数高估
-	"hit_above_50": {"kind": "event", "e": 150.0, "timing": 0.5, "gate": "every", "w": 0.06},
-	"hit_above_75": {"kind": "event", "e": 120.0, "timing": 0.5, "gate": "every", "w": 0.06},
-	"hit_above_90": {"kind": "event", "e": 100.0, "timing": 0.5, "gate": "every", "w": 0.04},
-	"hit_below_50": {"kind": "event", "e": 70.0, "timing": 0.5, "gate": "every", "w": 0.06},
-	# 每次用某类伤害命中敌人（潜水员"被远程伤害命中的敌人受到伤害提高"）：只在"更多角色效果"开启时出现
-	"hit_typed": {"kind": "event", "e": 150.0, "timing": 0.5, "gate": "every", "w": 0.2},
-	# 用某类伤害击杀敌人（致命一击的伤害缩放属性；燃烧致死算元素）：同上，与击杀相同
-	"kill_typed": {"kind": "event", "e": 100.0, "timing": 0.5, "gate": "every", "w": 0.3},
-	# 击杀被诅咒的敌人（黑旗）：只在有诅咒时出现被诅咒的敌人，按每波约 5 个估计
-	"cursed_kill": {"kind": "event", "e": 25.0, "timing": 0.5, "gate": "every", "w": 0.05},
+	# 首次命中某个敌人（冰块、潜水员的"首次命中时"）
+	"first_hit": {"kind": "event", "e": 110.0, "timing": 0.5, "gate": "every", "w": 0.25, "cond_p": 0.6},
+	# 命中敌人（每次命中都计；小鱼、丑牙、害怕的香肠）：多数带机制条件（敌人生命、伤害类型）
+	"hit_enemy": {"kind": "event", "e": 200.0, "timing": 0.5, "gate": "every", "w": 0.4, "cond_p": 0.9},
 	# 砍倒树木（口袋工厂）：每波约 3 棵
 	"tree_kill": {"kind": "event", "e": 3.0, "timing": 0.5, "gate": "every", "w": 0.1},
 	# 获得提升 [属性] 的道具（雪球）：商店阶段，条件属性 = 效果属性；每波约 0.5 件
@@ -170,18 +158,53 @@ const TRIGGERS = {
 }
 
 # 实验性扳机（低权重）
-const EXPERIMENTAL_TRIGGERS = [
-	"crate", "explode", "crit", "ignite", "first_hit", "first_hit_typed", "hit_above_50", "hit_above_75", "hit_above_90",
-	"hit_below_50", "hit_typed",
-]
-# 有目标敌人的扳机：可以挂"使该敌人受到的伤害提高"载荷
-# 作用于目标敌人的载荷：门控只用单次 / 几率
+const EXPERIMENTAL_TRIGGERS = ["crate", "explode", "crit", "ignite", "first_hit", "hit_enemy"]
+# 有目标敌人的扳机：可以挂作用于该敌人的载荷
+# 作用于目标敌人的载荷：数值条件只用几率 / 冷却
 const TARGET_PAYLOADS = ["vuln", "hp_dmg", "ignite", "slow"]
-const ENEMY_TARGET_TRIGGERS = [
-	"crit", "ignite", "first_hit", "first_hit_typed", "hit_above_50", "hit_above_75", "hit_above_90", "hit_below_50", "hit_typed",
+const ENEMY_TARGET_TRIGGERS = ["crit", "ignite", "first_hit", "hit_enemy"]
+
+# ------------------------------------------------------------
+# 机制条件：触发时检查的状态，满足才执行（与数值条件互不替代，每条至多一个）
+#   on: 可接的扳机；f: 满足率（有效触发次数 = 扳机次数 × f）；w: 抽取权重（也决定扳机带条件的概率，见 COND_CHANCE）
+#   args: 带参数的条件（敌人生命百分比）-> 满足率
+# 暴击击杀（触手、狩猎奖杯）/ 击杀燃烧中的敌人（鬼火）/ 击杀被诅咒的敌人（黑旗：按每波约 25 个估计，道具附带 +X 诅咒）；
+# 伤害类型（冰块、潜水员）：一局通常只用一种伤害类型，满足率按 1；在"命中敌人"上只在"更多角色效果"开启时出现；
+# 自身状态（静止 / 移动 / 低血 / 满血）：满足率同状态扳机的在场率
+# ------------------------------------------------------------
+const SELF_COND_TRIGGERS = [
+	"kill", "hit", "dodge", "consumable", "gold", "heal", "level_up", "interval", "steps", "crate", "explode", "crit",
+	"ignite", "first_hit", "hit_enemy", "tree_kill",
 ]
-# 限定伤害类型的扳机（条款的 dmg_type 字段）；hit_typed 只在"更多角色效果"开启时出现
-const TYPED_TRIGGERS = ["first_hit_typed", "hit_typed", "kill_typed"]
+const CONDS = {
+	"crit": {"on": ["kill"], "f": 0.5, "w": 0.7},
+	"burning": {"on": ["kill"], "f": 0.3, "w": 0.3},
+	"cursed": {"on": ["kill"], "f": 0.25, "w": 0.05},
+	"dmg_type": {"on": ["kill", "first_hit", "hit_enemy"], "f": 1.0, "w": 0.3},
+	"enemy_hp_above": {"on": ["hit_enemy"], "args": {50: 0.75, 75: 0.6, 90: 0.5}, "w": 0.5},
+	"enemy_hp_below": {"on": ["hit_enemy"], "args": {50: 0.35}, "w": 0.2},
+	"still": {"on": SELF_COND_TRIGGERS, "f": 0.25, "w": 0.1},
+	"moving": {"on": SELF_COND_TRIGGERS, "f": 0.75, "w": 0.06},
+	"low_hp": {"on": SELF_COND_TRIGGERS, "f": 0.15, "w": 0.08},
+	"full_hp": {"on": SELF_COND_TRIGGERS, "f": 0.45, "w": 0.08},
+}
+# 没有意义的组合：回血时满血（不会发生）、受伤时满血（满足率远低于在场率）、走路时静止 / 移动
+const COND_EXCLUDED = {"heal": ["full_hp"], "hit": ["full_hp"], "steps": ["still", "moving"]}
+# 条款带机制条件的概率 = COND_CHANCE × min(1, 可接条件的权重和)（扳机的 cond_p 优先）：
+# 击杀 60%（cond_p；多为暴击 / 燃烧 / 伤害类型），只能接自身状态的扳机约 13%
+const COND_CHANCE = 0.4
+# 无意义的条件 + 载荷：满血时回血
+const COND_PAYLOAD_EXCLUDED = {"full_hp": ["heal"]}
+# 机制条件与扳机合写成一句的文本（其余机制条件写成后缀 AA_C_X）
+const COND_TEXT = {
+	"kill/crit": "AA_T_CRIT_KILL", "kill/burning": "AA_T_BURNING_KILL", "kill/cursed": "AA_T_CURSED_KILL",
+	"kill/dmg_type": "AA_T_KILL_TYPED", "first_hit/dmg_type": "AA_T_FIRST_HIT_TYPED", "hit_enemy/dmg_type": "AA_T_HIT_TYPED",
+	"hit_enemy/enemy_hp_above": "AA_T_HIT_ABOVE", "hit_enemy/enemy_hp_below": "AA_T_HIT_BELOW",
+}
+# 冷却秒数的可选值（"每 N 秒最多触发一次"）
+const COOLDOWN_CHOICES = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 30]
+# 冷却只用于每波至少这么多次的扳机
+const COOLDOWN_MIN_RATE = 4.0
 # 伤害类型及其抽取权重（近战 : 远程 : 元素 : 工程 = 2 : 2 : 2 : 1）；伤害 / 爆炸载荷的缩放属性落在伤害类型上时同样按此分配
 const DMG_TYPES = {"stat_melee_damage": 2.0, "stat_ranged_damage": 2.0, "stat_elemental_damage": 2.0, "stat_engineering": 1.0}
 # 连锁深度上限（"A 触发 B、B 触发 C、C 触发 D"）；延迟生成的爆炸也携带深度
@@ -245,7 +268,6 @@ const PAYLOADS = {
 # 拾取材料可以挂材料（直接加到材料数，不生成掉落物，不会循环；原版金属探测器）；波末 / 波初没有敌人和伤害意义的载荷被排除。
 const LEGAL = {
 	"kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "fruit"],
-	"kill_typed": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "fruit"],
 	"hit": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode"],
 	"dodge": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode"],
 	"consumable": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats"],
@@ -261,8 +283,6 @@ const LEGAL = {
 	"low_hp": ["temp_stat"],
 	"full_hp": ["temp_stat"],
 	"reroll": ["perm_stat", "gold", "rand_stats"],
-	"crit_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "fruit"],
-	"burning_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "fruit"],
 	"steps": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "rand_stats"],
 	"half_wave": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "rand_stats"],
 	"crate": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "rand_stats"],
@@ -270,13 +290,7 @@ const LEGAL = {
 	"crit": ["temp_stat", "timed_stat", "heal", "gold", "damage", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
 	"ignite": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
 	"first_hit": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
-	"first_hit_typed": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
-	"hit_above_50": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
-	"hit_above_75": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
-	"hit_above_90": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
-	"hit_below_50": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
-	"hit_typed": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
-	"cursed_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "fruit"],
+	"hit_enemy": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
 	"tree_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "fruit"],
 	"buy_stat": ["perm_stat"],
 }
@@ -289,7 +303,6 @@ const LEGAL = {
 # ============================================================
 const FREE_LEGAL = {
 	"kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "fruit"],
-	"kill_typed": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "fruit"],
 	"hit": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
 	"dodge": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
 	"consumable": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
@@ -304,8 +317,6 @@ const FREE_LEGAL = {
 	"low_hp": ["temp_stat", "grant"],
 	"full_hp": ["temp_stat", "grant"],
 	"reroll": ["perm_stat", "gold", "grant", "rand_stats"],
-	"crit_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "fruit"],
-	"burning_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "fruit"],
 	"steps": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
 	"half_wave": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
 	"crate": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
@@ -314,13 +325,7 @@ const FREE_LEGAL = {
 	"crit": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
 	"ignite": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
 	"first_hit": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
-	"first_hit_typed": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
-	"hit_above_50": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
-	"hit_above_75": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
-	"hit_above_90": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
-	"hit_below_50": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
-	"hit_typed": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
-	"cursed_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "fruit"],
+	"hit_enemy": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "vuln", "hp_dmg", "rand_stats", "ignite", "slow", "fruit"],
 	"tree_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "fruit"],
 	"buy_stat": ["perm_stat"],
 }
@@ -337,7 +342,7 @@ const GRANT_BANNED_KEYS = [
 	"hp_start_next_wave", "hp_start_wave", "lose_hp_per_second", "jellyshield_count", "torture", "number_of_enemies",
 ]
 
-# 原版触发型效果 -> [扳机, 载荷]（custom_key 或 key）。这些原版行在重组时被"拆解"为先验，
+# 原版触发型效果 -> [扳机, 载荷, 机制条件, 条件参数]（custom_key 或 key；条件可省略）。这些原版行在重组时被"拆解"为先验，
 # 由通用触发器重新表达；不会原样搬到别的道具上。
 const NATIVE_TRIGGER_MAP = {
 	"stats_on_level_up": ["level_up", "perm_stat"],
@@ -347,8 +352,8 @@ const NATIVE_TRIGGER_MAP = {
 	"temp_stats_while_not_moving": ["still", "temp_stat"],
 	"temp_stats_while_moving": ["moving", "temp_stat"],
 	"stats_below_half_health": ["low_hp", "temp_stat"],
-	"temp_consumable_stats_while_max": ["consumable", "temp_stat"],
-	"consumable_stats_while_max": ["consumable", "perm_stat"],
+	"temp_consumable_stats_while_max": ["consumable", "temp_stat", "full_hp"],
+	"consumable_stats_while_max": ["consumable", "perm_stat", "full_hp"],
 	"temp_stats_per_interval": ["interval", "temp_stat"],
 	"decaying_stats_on_hit": ["hit", "timed_stat"],
 	"decaying_stats_on_consumable": ["consumable", "timed_stat"],
@@ -360,15 +365,15 @@ const NATIVE_TRIGGER_MAP = {
 	"dmg_when_heal": ["heal", "damage"],
 	"heal_on_dodge": ["dodge", "heal"],
 	"heal_on_kill": ["kill", "heal"],
-	"heal_on_crit_kill": ["crit_kill", "heal"],
+	"heal_on_crit_kill": ["kill", "heal", "crit"],
 	"heal_when_pickup_gold": ["gold", "heal"],
-	"gold_on_crit_kill": ["crit_kill", "gold"],
+	"gold_on_crit_kill": ["kill", "gold", "crit"],
 	"gain_stat_for_every_step_after_equip": ["steps", "perm_stat"],
 	"convert_stats_half_wave": ["half_wave", "temp_stat"],
 	"explode_on_hit": ["hit", "explode"],
 	"explode_on_death": ["kill", "explode"],
 	"explode_on_consumable": ["consumable", "explode"],
-	"gain_stat_for_killed_enemies_while_burning": ["burning_kill", "perm_stat"],
+	"gain_stat_for_killed_enemies_while_burning": ["kill", "perm_stat", "burning"],
 	"effect_gain_stat_every_killed_enemies": ["kill", "perm_stat"],
 	# 袋子：拾取箱子时获得材料
 	"item_box_gold": ["crate", "gold"],
@@ -380,14 +385,14 @@ const NATIVE_TRIGGER_MAP = {
 	# 糖果袋：每波结束时随机主属性
 	"gain_random_primary_stats_on_go_to_next_wave": ["wave_end", "rand_stats"],
 	# 黑旗：击杀被诅咒的敌人时获得材料
-	"gold_on_cursed_enemy_kill": ["cursed_kill", "gold"],
+	"gold_on_cursed_enemy_kill": ["kill", "gold", "cursed"],
 	# 害怕的香肠 / 丑牙：命中时点燃 / 减速（"命中敌人"类扳机，按命中高血敌人计）
-	"burn_chance": ["hit_above_50", "ignite"],
-	"remove_speed": ["hit_above_50", "slow"],
+	"burn_chance": ["hit_enemy", "ignite", "enemy_hp_above", 50],
+	"remove_speed": ["hit_enemy", "slow", "enemy_hp_above", 50],
 	# 雪球：获得提升 [属性] 的道具时 +[属性]
 	"gain_stat_for_equipped_item_with_stat": ["buy_stat", "perm_stat"],
 	# 冰块：首次被元素伤害命中时受伤加成（只认道具来源；潜水员的同类效果是角色身份）
-	"enemy_percent_damage_taken": ["first_hit_typed", "vuln"],
+	"enemy_percent_damage_taken": ["first_hit", "vuln", "dmg_type"],
 }
 # 原版先验在组合权重中的强度
 const NATIVE_PRIOR_STRENGTH = 0.6
@@ -490,7 +495,6 @@ const ADJ_BY_STAT = {
 	"consumable_heal": ["AA_ADJ_TASTY", "AA_ADJ_NOURISHING"],
 }
 const ADJ_BY_TRIGGER = {
-	"crit_kill": ["AA_ADJ_DEADLY", "AA_ADJ_EXECUTING"], "burning_kill": ["AA_ADJ_BLAZING", "AA_ADJ_SCORCHING"],
 	"steps": ["AA_ADJ_WANDERING", "AA_ADJ_HIKING"], "half_wave": ["AA_ADJ_MIDWAY", "AA_ADJ_TIMELY"],
 	"kill": ["AA_ADJ_HUNTING", "AA_ADJ_PREDATORY"], "hit": ["AA_ADJ_VENGEFUL", "AA_ADJ_SPITEFUL"],
 	"dodge": ["AA_ADJ_NIMBLE", "AA_ADJ_EVASIVE"], "consumable": ["AA_ADJ_HUNGRY", "AA_ADJ_GLUTTONOUS"],
@@ -502,13 +506,16 @@ const ADJ_BY_TRIGGER = {
 	"reroll": ["AA_ADJ_FICKLE", "AA_ADJ_GAMBLING"],
 	"crate": ["AA_ADJ_GREEDY", "AA_ADJ_CURIOUS"], "explode": ["AA_ADJ_BLAZING", "AA_ADJ_FIERCE"],
 	"crit": ["AA_ADJ_DEADLY", "AA_ADJ_KEEN"], "ignite": ["AA_ADJ_BLAZING", "AA_ADJ_SCORCHING"],
-	"first_hit": ["AA_ADJ_EAGER", "AA_ADJ_KEEN"], "first_hit_typed": ["AA_ADJ_EAGER", "AA_ADJ_FIERCE"],
-	"kill_typed": ["AA_ADJ_FIERCE", "AA_ADJ_KEEN"],
-	"hit_above_50": ["AA_ADJ_PREDATORY", "AA_ADJ_EAGER"], "hit_above_75": ["AA_ADJ_PREDATORY", "AA_ADJ_EAGER"],
-	"hit_above_90": ["AA_ADJ_PREDATORY", "AA_ADJ_EAGER"], "hit_below_50": ["AA_ADJ_EXECUTING", "AA_ADJ_DEADLY"],
-	"hit_typed": ["AA_ADJ_FIERCE", "AA_ADJ_KEEN"],
-	"cursed_kill": ["AA_ADJ_HUNTING", "AA_ADJ_DEADLY"],
+	"first_hit": ["AA_ADJ_EAGER", "AA_ADJ_KEEN"], "hit_enemy": ["AA_ADJ_FIERCE", "AA_ADJ_KEEN"],
 	"tree_kill": ["AA_ADJ_WANDERING", "AA_ADJ_CURIOUS"], "buy_stat": ["AA_ADJ_GROWING", "AA_ADJ_AMBITIOUS"],
+}
+# 带机制条件时按条件取形容词
+const ADJ_BY_COND = {
+	"crit": ["AA_ADJ_DEADLY", "AA_ADJ_EXECUTING"], "burning": ["AA_ADJ_BLAZING", "AA_ADJ_SCORCHING"],
+	"cursed": ["AA_ADJ_HUNTING", "AA_ADJ_DEADLY"], "dmg_type": ["AA_ADJ_FIERCE", "AA_ADJ_KEEN"],
+	"enemy_hp_above": ["AA_ADJ_PREDATORY", "AA_ADJ_EAGER"], "enemy_hp_below": ["AA_ADJ_EXECUTING", "AA_ADJ_DEADLY"],
+	"still": ["AA_ADJ_ROOTED", "AA_ADJ_CALM"], "moving": ["AA_ADJ_RESTLESS", "AA_ADJ_WANDERING"],
+	"low_hp": ["AA_ADJ_DESPERATE", "AA_ADJ_CORNERED"], "full_hp": ["AA_ADJ_PROUD", "AA_ADJ_PRISTINE"],
 }
 # 没有更具体特征时的保底形容词（机制行、角色效果……），多准备一些避免重复
 const ADJ_MECHANIC = [
@@ -575,6 +582,50 @@ static func events_per_wave(trigger: String, param: int) -> float:
 	if trigger == "interval":
 		return WAVE_SECONDS / max(1, param)
 	return TRIGGERS[trigger].e
+
+
+# 机制条件的满足率
+static func cond_factor(cond: String, arg: int = 0) -> float:
+	if not CONDS.has(cond):
+		return 1.0
+	var c = CONDS[cond]
+	if c.has("args"):
+		return float(c.args.get(arg, c.args.values()[0]))
+	return float(c.f)
+
+
+# 扳机可接的机制条件
+static func conds_for(trigger: String) -> Array:
+	var out = []
+	for k in CONDS:
+		if trigger in CONDS[k].on and not k in COND_EXCLUDED.get(trigger, []):
+			out.push_back(k)
+	return out
+
+
+# 扳机可用的数值条件：every 每 N 次 / chance 几率 / cap 每波上限 / cooldown 冷却（商店扳机只有前两种）
+static func numeric_conds(trigger: String) -> Array:
+	var t = TRIGGERS[trigger]
+	if t.kind == "state":
+		return []
+	if trigger == "interval":
+		return ["chance", "cap"]
+	if t.kind == "shop":
+		return ["every", "chance"] if t.gate == "every" else []
+	match t.gate:
+		"every":
+			return ["every", "chance", "cap", "cooldown"]
+		"chance":
+			return ["chance", "cap", "cooldown"]
+	return []
+
+
+# 条款名称的形容词候选：有机制条件时按条件，否则按扳机
+static func adj_options(c: Dictionary) -> Array:
+	var cond = str(c.get("cond", ""))
+	if ADJ_BY_COND.has(cond):
+		return ADJ_BY_COND[cond]
+	return ADJ_BY_TRIGGER.get(c.trigger, ADJ_MECHANIC)
 
 
 # ============================================================
@@ -747,13 +798,13 @@ static func remaining_waves(perm_mult: float) -> float:
 # 静止类（珊瑚、雕像）带静止；建筑相关带构筑物。原版漏标的"每个燃烧敌人""每个建筑"在这里补上。
 # ============================================================
 const TAG_BINDINGS = {
-	"trigger:crit_kill": ["stat_crit_chance"], "trigger:burning_kill": ["stat_elemental_damage"],
+	"cond:crit": ["stat_crit_chance"], "cond:burning": ["stat_elemental_damage"], "cond:still": ["stand_still"],
 	"trigger:still": ["stand_still"], "trigger:consumable": ["consumable"], "trigger:steps": ["stat_speed"],
 	"counter:burning_enemy": ["stat_elemental_damage"], "counter:structure": ["structure"], "counter:pet": ["pet"],
 	"counter:materials": ["economy"],
 	"payload:explode": ["explosive"], "payload:gold": ["economy"], "payload:xp": ["xp_gain"],
 	"trigger:explode": ["explosive"], "trigger:crit": ["stat_crit_chance"], "trigger:ignite": ["stat_elemental_damage"],
-	"trigger:cursed_kill": ["stat_curse"], "payload:hp_dmg": ["stat_percent_damage"],
+	"cond:cursed": ["stat_curse"], "payload:hp_dmg": ["stat_percent_damage"],
 	"trigger:tree_kill": ["exploration"], "payload:ignite": ["stat_elemental_damage"], "payload:slow": ["less_enemy_speed"],
 	"payload:fruit": ["consumable"],
 	"mech:pierce_on_crit": ["stat_crit_chance"], "mech:giant_crit_damage": ["stat_crit_chance"],

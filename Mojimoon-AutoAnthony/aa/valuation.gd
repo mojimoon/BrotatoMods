@@ -7,38 +7,50 @@ const Catalog = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/catalog.gd"
 const WeaponValue = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/weapon_value.gd")
 
 
-# 每波"原始"事件数（已计入每 N 次与几率，未计入每波上限）
-static func raw_rate(trigger: String, param: int, chance: int) -> float:
-	var t = Catalog.TRIGGERS[trigger]
-	var e: float = Catalog.events_per_wave(trigger, param)
-	if t.gate == "every":
-		e /= max(1, param)
-	return e * clamp(chance, 1, 100) / 100.0
+# 扳机事件数 × 机制条件满足率（未计入数值条件）
+static func base_rate(c: Dictionary) -> float:
+	return Catalog.events_per_wave(c.trigger, int(c.get("param", 1))) * Catalog.cond_factor(str(c.get("cond", "")), int(c.get("cond_arg", 0)))
+
+
+# 每波"原始"触发次数（已计入机制条件、每 N 次、几率与冷却，未计入每波上限）
+static func raw_rate(c: Dictionary) -> float:
+	var e = base_rate(c)
+	if Catalog.TRIGGERS[c.trigger].gate == "every":
+		e /= max(1, int(c.get("param", 1)))
+	# 冷却：事件近似均匀到达，每次触发后等待冷却，有效频率 = r / (1 + r × 冷却)
+	var cd = float(c.get("cooldown", 0))
+	if cd > 0:
+		e /= 1.0 + e * cd / Catalog.WAVE_SECONDS
+	return e * clamp(int(c.get("chance", 100)), 1, 100) / 100.0
+
+
+static func _cap(c: Dictionary) -> int:
+	return Catalog.effective_cap(c.trigger, int(c.get("param", 1)), int(c.get("cap", 0)))
 
 
 # 每波有效触发次数（计入上限）
-static func fires_per_wave(trigger: String, param: int, chance: int, cap: int) -> float:
-	cap = Catalog.effective_cap(trigger, param, cap)
-	var f = raw_rate(trigger, param, chance)
+static func fires_per_wave(c: Dictionary) -> float:
+	var cap = _cap(c)
+	var f = raw_rate(c)
 	if cap > 0:
 		f = min(f, float(cap))
 	return f
 
 
 # 本波临时属性的平均叠层（线性累积；有上限时在达到上限后保持）
-static func avg_stack(trigger: String, param: int, chance: int, cap: int, reset: bool = false) -> float:
-	cap = Catalog.effective_cap(trigger, param, cap)
-	var t = Catalog.TRIGGERS[trigger]
-	if reset and t.kind == "event" and t.timing > 0.0 and t.timing < 1.0:
+static func avg_stack(c: Dictionary) -> float:
+	var cap = _cap(c)
+	var t = Catalog.TRIGGERS[c.trigger]
+	if bool(c.get("reset", false)) and t.kind == "event" and t.timing > 0.0 and t.timing < 1.0:
 		# 受击清空：受击间隔近似指数分布（实际约每波 7 次），平均叠层 = 触发频率 × 平均受击间隔
-		var normal = avg_stack(trigger, param, chance, cap, false)
-		var rate = raw_rate(trigger, param, chance) / Catalog.WAVE_SECONDS
-		return min(normal, rate * Catalog.WAVE_SECONDS / Catalog.REAL_HITS_PER_WAVE)
+		var c2 = c.duplicate()
+		c2.reset = false
+		return min(avg_stack(c2), raw_rate(c) / Catalog.REAL_HITS_PER_WAVE)
 	if t.kind == "state":
 		return t.e
-	var e = raw_rate(trigger, param, chance)
+	var e = raw_rate(c)
 	if t.timing >= 1.0:
-		return fires_per_wave(trigger, param, chance, cap)
+		return fires_per_wave(c)
 	if t.timing <= 0.0:
 		return 0.0
 	if cap > 0 and cap < e:
@@ -64,10 +76,7 @@ static func next_wave_value(stat: String, value: int, perm_mult: float) -> float
 
 
 static func main_value(c: Dictionary, perm_mult: float) -> float:
-	var trigger: String = c.trigger
 	var payload: String = c.payload
-	var param: int = int(c.get("param", 1))
-	var chance: int = int(c.get("chance", 100))
 	var cap: int = int(c.get("cap", 0))
 	var stat: String = c.get("stat", "")
 	var v: float = float(c.value)
@@ -75,43 +84,43 @@ static func main_value(c: Dictionary, perm_mult: float) -> float:
 
 	match payload:
 		"temp_stat":
-			return _stat_sign(stat) * Catalog.stat_w(stat) * v * avg_stack(trigger, param, chance, cap, bool(c.get("reset", false)))
+			return _stat_sign(stat) * Catalog.stat_w(stat) * v * avg_stack(c)
 		"perm_stat":
-			return _stat_sign(stat) * Catalog.stat_w(stat) * v * fires_per_wave(trigger, param, chance, cap) * perm_mult * _capped_perm(cap)
+			return _stat_sign(stat) * Catalog.stat_w(stat) * v * fires_per_wave(c) * perm_mult * _capped_perm(cap)
 		"timed_stat":
-			var f = fires_per_wave(trigger, param, chance, cap)
+			var f = fires_per_wave(c)
 			return _stat_sign(stat) * Catalog.stat_w(stat) * v * f * v2 / Catalog.WAVE_SECONDS
 		"heal":
-			return Catalog.HEAL_W * v * fires_per_wave(trigger, param, chance, cap)
+			return Catalog.HEAL_W * v * fires_per_wave(c)
 		"gold":
-			return Catalog.GOLD_W * v * fires_per_wave(trigger, param, chance, cap)
+			return Catalog.GOLD_W * v * fires_per_wave(c)
 		"xp":
-			return Catalog.XP_W * v * fires_per_wave(trigger, param, chance, cap)
+			return Catalog.XP_W * v * fires_per_wave(c)
 		"damage":
-			return Catalog.DMG_W * damage_per_proc(stat, int(v)) * fires_per_wave(trigger, param, chance, cap)
+			return Catalog.DMG_W * damage_per_proc(stat, int(v)) * fires_per_wave(c)
 		"grant":
 			# 被获得效果的价值（作为整局持有的道具行）× 数量 × 叠层 / 在场率 或 永久累积
 			var unit = float(c.get("grant_unit", 0.0)) * v
 			if c.get("grant_mode", "temp") == "perm":
-				return unit * fires_per_wave(trigger, param, chance, cap) * perm_mult * _capped_perm(cap)
-			return unit * avg_stack(trigger, param, chance, cap, bool(c.get("reset", false)))
+				return unit * fires_per_wave(c) * perm_mult * _capped_perm(cap)
+			return unit * avg_stack(c)
 		"explode":
-			return Catalog.DMG_W * Catalog.EXPLOSION_TARGETS * damage_per_proc(stat, int(v)) * fires_per_wave(trigger, param, chance, cap)
+			return Catalog.DMG_W * Catalog.EXPLOSION_TARGETS * damage_per_proc(stat, int(v)) * fires_per_wave(c)
 		"ignite":
 			# 每跳 X + 100% 元素伤害（元素参考值），共 3 跳
 			var tick = v + Catalog.STATS["stat_elemental_damage"].ref
-			return Catalog.DMG_W * Catalog.IGNITE_TICKS * tick * fires_per_wave(trigger, param, chance, cap)
+			return Catalog.DMG_W * Catalog.IGNITE_TICKS * tick * fires_per_wave(c)
 		"slow":
-			return Catalog.SLOW_W * v * fires_per_wave(trigger, param, chance, cap)
+			return Catalog.SLOW_W * v * fires_per_wave(c)
 		"fruit":
-			return Catalog.FRUIT_W * v * fires_per_wave(trigger, param, chance, cap)
+			return Catalog.FRUIT_W * v * fires_per_wave(c)
 		"hp_dmg":
-			return Catalog.HP_DMG_W * v * fires_per_wave(trigger, param, chance, cap)
+			return Catalog.HP_DMG_W * v * fires_per_wave(c)
 		"rand_stats":
-			return Catalog.RAND_STAT_W * v * fires_per_wave(trigger, param, chance, cap) * perm_mult * _capped_perm(cap)
+			return Catalog.RAND_STAT_W * v * fires_per_wave(c) * perm_mult * _capped_perm(cap)
 		"vuln":
 			# 使该敌人受到的伤害 +X%，持续 N 秒 ≈ 对"被覆盖的那部分敌人"+X% 伤害；覆盖率 = 触发次数 × 有效持续 / (波长 × 同时受伤敌人数)
-			var cover = clamp(fires_per_wave(trigger, param, chance, cap) * min(v2, Catalog.VULN_MAX_USEFUL_SECONDS) \
+			var cover = clamp(fires_per_wave(c) * min(v2, Catalog.VULN_MAX_USEFUL_SECONDS) \
 				/ (Catalog.WAVE_SECONDS * Catalog.VULN_CONCURRENT_TARGETS), 0.0, 1.0)
 			return Catalog.stat_w("stat_percent_damage") * v * cover
 	return 0.0
