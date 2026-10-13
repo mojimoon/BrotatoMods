@@ -2,6 +2,8 @@ extends Button
 
 # 可搜索的下拉选择：点击后在按钮下方弹出列表（顶部搜索框），每行左边是本地化名称、右边灰色小字是键名。
 # items: [[名称, 键]...]；选中后发出 selected(键)。按名称或键名搜索，回车选第一项。
+# 名称已是本地化文本、键名是原文：按钮与列表的文字都不再经过翻译。
+# two_line：名称较长时键名单独成行（较小行距，行高接近单行）；allow_custom：可直接输入，列表首行为"使用输入的文本"。
 
 signal selected(key)
 
@@ -12,6 +14,8 @@ var items: Array = []
 var key = null
 var placeholder := ""
 var fixed_text := ""	# 非空时按钮始终显示这段文字（例如"+ 扳机"），不显示选中项
+var two_line := false
+var allow_custom := false
 var ui = null
 
 var _popup: Control = null
@@ -25,6 +29,7 @@ func setup(p_ui, p_items: Array, p_key = null) -> void:
 	ui = p_ui
 	items = p_items
 	key = p_key
+	set_message_translation(false)
 	focus_mode = Control.FOCUS_NONE
 	clip_text = true
 	align = Button.ALIGN_LEFT
@@ -123,10 +128,29 @@ func _fill(filter: String) -> void:
 	for c in _list.get_children():
 		_list.remove_child(c)
 		c.queue_free()
+	if allow_custom and _raw != "" and not _has_key(_raw):
+		_list.add_child(_row([ui.tr("BE_USE_INPUT").replace("{0}", _raw), _raw]))
 	for it in items:
 		if filter != "" and str(it[0]).to_lower().find(filter) < 0 and str(it[1]).to_lower().find(filter) < 0:
 			continue
 		_list.add_child(_row(it))
+
+
+func _has_key(k: String) -> bool:
+	for it in items:
+		if str(it[1]) == k:
+			return true
+	return false
+
+
+func _plain(text: String, font: Font, color: Color) -> Label:
+	var l = Label.new()
+	l.set_message_translation(false)
+	l.text = text
+	l.add_font_override("font", font)
+	l.add_color_override("font_color", color)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return l
 
 
 func _row(it: Array) -> Button:
@@ -139,34 +163,39 @@ func _row(it: Array) -> Button:
 	b.add_stylebox_override("hover", ui._style(ui.C_ACCENT_2.darkened(0.6), ui.C_ACCENT_2, 4, 1, 8, 2))
 	b.add_stylebox_override("pressed", ui._style(ui.C_ACCENT_2.darkened(0.7), ui.C_ACCENT_2, 4, 1, 8, 2))
 	b.add_stylebox_override("focus", StyleBoxEmpty.new())
-	var row = HBoxContainer.new()
+	var row = VBoxContainer.new() if two_line else HBoxContainer.new()
 	row.set_anchors_preset(Control.PRESET_WIDE)
 	row.margin_left = 10
 	row.margin_right = -10
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(row)
-	var name_lbl = ui._label(str(it[0]), ui.FONT_SMALL, ui.C_TEXT)
+	var name_lbl = _plain(str(it[0]), ui.FONT_DESC if two_line else ui.FONT_SMALL, ui.C_TEXT)
 	name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_lbl.clip_text = true
 	name_lbl.valign = Label.VALIGN_CENTER
 	name_lbl.size_flags_vertical = Control.SIZE_FILL
-	name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(name_lbl)
-	var key_lbl = ui._label(str(it[1]), ui.FONT_DESC, ui.C_TEXT_DIM)
-	key_lbl.set_message_translation(false)
+	var key_lbl = _plain(str(it[1]), ui.FONT_DESC, ui.C_TEXT_DIM)
 	key_lbl.valign = Label.VALIGN_CENTER
 	key_lbl.size_flags_vertical = Control.SIZE_FILL
-	key_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(key_lbl)
+	if two_line:
+		# 两行紧凑排列：行高 ≈ 两行小字，与单行相差不多
+		row.alignment = BoxContainer.ALIGN_CENTER
+		row.add_constant_override("separation", -4)
+		key_lbl.clip_text = true
+		b.rect_min_size.y = max(ROW_HEIGHT, ui.FONT_DESC.get_height() * 2 + 2)
 	b.connect("pressed", self, "_pick", [it[1]])
 	return b
 
 
 var _filter := ""
+var _raw := ""
 
 
 func _on_search(t: String) -> void:
-	_filter = t.strip_edges().to_lower()
+	_raw = t.strip_edges()
+	_filter = _raw.to_lower()
 	_fill(_filter)
 
 
@@ -177,6 +206,9 @@ func _on_enter(_t: String) -> void:
 		if str(it[0]).to_lower() == f or str(it[1]).to_lower() == f:
 			_pick(it[1])
 			return
+	if allow_custom and _raw != "":
+		_pick(_raw)
+		return
 	for it in items:
 		if f == "" or str(it[0]).to_lower().find(f) >= 0 or str(it[1]).to_lower().find(f) >= 0:
 			_pick(it[1])

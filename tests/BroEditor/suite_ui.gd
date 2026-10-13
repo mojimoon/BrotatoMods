@@ -438,6 +438,20 @@ func test_154_field_controls() -> void:
 	for it in ui.field_control("effect_sign", 0, ui, "_on_field_option", [0, "effect_sign"]).items:
 		signs.push_back(it[1])
 	_eq(signs, [0, 1, 2, 3, 5], "sign options: 4 hidden, curse shown")
+	# 文本：可直接输入，双行显示；列表文字不经过翻译
+	var tk = ui.field_control("text_key", "", ui, "_on_field_option", [0, "text_key"])
+	_check(tk.allow_custom and tk.two_line, "text_key allows input, two lines")
+	ui.add_child(tk)
+	var got = []
+	tk.connect("selected", self, "_on_sel", [got])
+	tk.open()
+	tk._on_search("MY_OWN_TEXT")
+	var first = tk._list.get_child(0)
+	_check(first.get_child(0) is VBoxContainer and not first.get_child(0).get_child(1).can_translate_messages(), "two-line row, key not translated")
+	_check(first.rect_min_size.y < 34 * 1.5, "two-line row stays compact")
+	tk._on_enter("")
+	_eq(got, ["MY_OWN_TEXT"], "typed text picked")
+	tk.queue_free()
 	var st = ui.field_control("stats_modified", ["stat_armor"], ui, "_on_field_option", [0, "stats_modified"])
 	_check(st != null and st.text.find(ui.stat_name("stat_armor")) >= 0, "stat list shows the stats")
 	var lbl = ui.field_control("storage_method", 1, ui, "_on_field_option", [0, "storage_method"])

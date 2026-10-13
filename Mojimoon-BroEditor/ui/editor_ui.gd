@@ -2300,8 +2300,12 @@ func _field_label(text: String, field: String) -> Control:
 
 
 func _key_label(text: String) -> Label:
-	var l = _label(text, FONT_DESC, C_TEXT_DIM)
+	# 先关闭翻译再设文字（Label 在设置文字时就翻译）
+	var l = Label.new()
 	l.set_message_translation(false)
+	l.text = text
+	l.add_font_override("font", FONT_DESC)
+	l.add_color_override("font_color", C_TEXT_DIM)
 	l.modulate.a = 0.8
 	l.clip_text = true
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -2605,6 +2609,9 @@ func field_control(name: String, cur, target: Object, method: String, binds: Arr
 			return null
 	var opt = _search_select(items, cur)
 	opt.rect_min_size = Vector2(200, 0)
+	if name == "text_key":
+		opt.two_line = true
+		opt.allow_custom = true
 	opt.connect("selected", target, method, binds)
 	return opt
 
