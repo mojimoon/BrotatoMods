@@ -22,7 +22,6 @@ func buy_item(item_data: ItemData, player_index: int) -> void:
 	_aa_apply_duplicates(taken, item_data, player_index)
 	var m = AAMain.get_mod()
 	if m != null:
-		m.fire_shop("buy", player_index)
 		m.fire_shop("buy_stat", player_index, item_data)
 	# 重组道具可能带有沙漏的"倒流"效果：购买后刷新"下一波"按钮上的波数
 	update_go_next_button_text()

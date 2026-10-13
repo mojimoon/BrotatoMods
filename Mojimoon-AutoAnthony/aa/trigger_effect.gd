@@ -235,6 +235,9 @@ func serialize() -> Dictionary:
 func deserialize_and_merge(s: Dictionary) -> void:
 	.deserialize_and_merge(s)
 	trigger = str(s.get("trigger", ""))
+	# 1.8.7 删除了"购买道具时"扳机：旧存档里的这类条款按"刷新商店时"处理
+	if trigger == "buy":
+		trigger = "reroll"
 	param = int(s.get("param", 1))
 	chance = int(s.get("chance", 100))
 	payload = str(s.get("payload", ""))

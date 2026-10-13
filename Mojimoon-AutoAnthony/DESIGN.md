@@ -104,7 +104,7 @@ AutoAnthony（STS2）的核心是三件事，本 mod 全部沿用：
 
 ```
 trigger  扳机   kill / hit / dodge / consumable / gold / heal / level_up / wave_start / wave_end / interval
-               still / moving / low_hp / full_hp（状态）/ reroll / buy（商店）/ 实验性扳机（见下）
+               still / moving / low_hp / full_hp（状态）/ reroll（商店）/ 实验性扳机（见下）
 payload  载荷   temp_stat / perm_stat / timed_stat / heal / gold / xp / damage / explode / 获得效果 / ……
 门控           param（每 N 次 / 间隔秒数）、chance（几率）、cap（每波上限）
 ```
@@ -202,7 +202,7 @@ payload  载荷   temp_stat / perm_stat / timed_stat / heal / gold / xp / damage
 
 **多样性**："本波属性 / 永久属性"两类载荷的基础权重被压低（原版里这两类最多）；原版先验取对数；同一道具池中已出现过的 (扳机, 载荷)、扳机、载荷会被降权。"获得效果"载荷权重 2.5。
 
-**运行时**：原版事件通过脚本扩展和信号转发进来（击杀、受击 / 闪避、拾取消耗品 / 材料、升级、回血、波次开始与结束、商店刷新与购买）；总线扫描玩家角色、道具、武器上的条款，处理门控后执行载荷。状态扳机每 0.2 秒轮询，进入时加临时属性、离开时移除；限时属性用带波次序号的计时器移除，防止波末整体重置后被错误扣减。
+**运行时**：原版事件通过脚本扩展和信号转发进来（击杀、受击 / 闪避、拾取消耗品 / 材料、升级、回血、波次开始与结束、商店刷新、获得道具）；总线扫描玩家角色、道具、武器上的条款，处理门控后执行载荷。状态扳机每 0.2 秒轮询，进入时加临时属性、离开时移除；限时属性用带波次序号的计时器移除，防止波末整体重置后被错误扣减。
 
 #### 3.3 "获得效果"载荷
 
