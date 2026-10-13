@@ -159,7 +159,7 @@ func _fill_scaling(sub: String) -> void:
 		var row = HBoxContainer.new()
 		row.add_constant_override("separation", 8)
 		box.add_child(row)
-		var opt = ui._stat_option(str(rows[i][0]))
+		var opt = ui._stat_option(str(rows[i][0]), Catalog.scaling_keys())
 		opt.connect("selected", self, "_on_scaling_stat", [sub, i])
 		row.add_child(opt)
 		var sb = ui._spin(-100, 100, 0.01)

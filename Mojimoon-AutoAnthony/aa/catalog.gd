@@ -139,7 +139,6 @@ const TRIGGERS = {
 	"steps": {"kind": "event", "e": 90.0, "timing": 0.5, "gate": "every", "w": 0.3},
 	# 波次进行到一半时（赛博格）
 	"half_wave": {"kind": "event", "e": 1.0, "timing": 0.5, "gate": "none", "w": 0.3},
-	"buy": {"kind": "shop", "e": 3.0, "timing": 0.0, "gate": "every", "w": 0.2},
 	# ---- 实验性扳机（低权重）----
 	# 拾取箱子（原版袋子）
 	"crate": {"kind": "event", "e": 0.8, "timing": 0.5, "gate": "chance", "w": 0.2},
@@ -262,7 +261,6 @@ const LEGAL = {
 	"low_hp": ["temp_stat"],
 	"full_hp": ["temp_stat"],
 	"reroll": ["perm_stat", "gold", "rand_stats"],
-	"buy": ["perm_stat", "gold", "rand_stats"],
 	"crit_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "fruit"],
 	"burning_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "fruit"],
 	"steps": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "rand_stats"],
@@ -306,7 +304,6 @@ const FREE_LEGAL = {
 	"low_hp": ["temp_stat", "grant"],
 	"full_hp": ["temp_stat", "grant"],
 	"reroll": ["perm_stat", "gold", "grant", "rand_stats"],
-	"buy": ["perm_stat", "gold", "grant", "rand_stats"],
 	"crit_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "fruit"],
 	"burning_kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "fruit"],
 	"steps": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
@@ -502,7 +499,7 @@ const ADJ_BY_TRIGGER = {
 	"wave_end": ["AA_ADJ_PATIENT", "AA_ADJ_DUSK"], "interval": ["AA_ADJ_TICKING", "AA_ADJ_RHYTHMIC"],
 	"still": ["AA_ADJ_ROOTED", "AA_ADJ_CALM"], "moving": ["AA_ADJ_RESTLESS", "AA_ADJ_WANDERING"],
 	"low_hp": ["AA_ADJ_DESPERATE", "AA_ADJ_CORNERED"], "full_hp": ["AA_ADJ_PROUD", "AA_ADJ_PRISTINE"],
-	"reroll": ["AA_ADJ_FICKLE", "AA_ADJ_GAMBLING"], "buy": ["AA_ADJ_THRIFTY", "AA_ADJ_SHOPAHOLIC"],
+	"reroll": ["AA_ADJ_FICKLE", "AA_ADJ_GAMBLING"],
 	"crate": ["AA_ADJ_GREEDY", "AA_ADJ_CURIOUS"], "explode": ["AA_ADJ_BLAZING", "AA_ADJ_FIERCE"],
 	"crit": ["AA_ADJ_DEADLY", "AA_ADJ_KEEN"], "ignite": ["AA_ADJ_BLAZING", "AA_ADJ_SCORCHING"],
 	"first_hit": ["AA_ADJ_EAGER", "AA_ADJ_KEEN"], "first_hit_typed": ["AA_ADJ_EAGER", "AA_ADJ_FIERCE"],

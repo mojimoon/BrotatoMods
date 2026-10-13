@@ -397,15 +397,11 @@ func test_42_shop_triggers() -> void:
 	var holder = _item("item_potato").duplicate()
 	holder.effects = [
 		TriggerEffect.make({"trigger": "reroll", "payload": "perm_stat", "stat": "stat_max_hp", "value": 1}),
-		TriggerEffect.make({"trigger": "buy", "payload": "gold", "value": 3}),
 	]
 	rd.players_data[0].items.push_back(holder)
 	var hp = rd.get_player_effects(0)[Keys.stat_max_hp_hash]
 	m.fire_shop("reroll", 0)
 	_eq(rd.get_player_effects(0)[Keys.stat_max_hp_hash], hp + 1, "reroll -> +1 max hp")
-	var g = rd.get_player_gold(0)
-	m.fire_shop("buy", 0)
-	_eq(rd.get_player_gold(0), g + 3, "buy -> gold")
 	m.on_menu_reset()
 
 
@@ -827,12 +823,12 @@ func test_89_grant_texts_serialization_and_modes() -> void:
 func test_89b_shop_grant() -> void:
 	m.start_new_run()
 	var holder = _item("item_potato").duplicate()
-	holder.effects = [TriggerEffect.make({"trigger": "buy", "payload": "grant", "value": 3, "grant": _plain("items_price", -1), "grant_mode": "perm", "grant_unit": 3.0})]
+	holder.effects = [TriggerEffect.make({"trigger": "reroll", "payload": "grant", "value": 3, "grant": _plain("items_price", -1), "grant_mode": "perm", "grant_unit": 3.0})]
 	rd.players_data[0].items.push_back(holder)
 	var ip = Keys.generate_hash("items_price")
 	var before = rd.get_player_effects(0)[ip]
-	m.fire_shop("buy", 0)
-	_eq(rd.get_player_effects(0)[ip], before - 3, "buy -> permanently -3% items price")
+	m.fire_shop("reroll", 0)
+	_eq(rd.get_player_effects(0)[ip], before - 3, "reroll -> permanently -3% items price")
 	rd.get_player_effects(0)[ip] = before
 	m.on_menu_reset()
 
@@ -2191,7 +2187,7 @@ func test_128_remaining_native_triggers() -> void:
 	m.start_new_run()
 	var holder = _item("item_potato").duplicate()
 	holder.effects = [TriggerEffect.make({"trigger": "buy_stat", "payload": "perm_stat", "stat": "stat_elemental_damage", "value": 2}),
-		TriggerEffect.make({"trigger": "buy", "payload": "rand_stats", "value": 3})]
+		TriggerEffect.make({"trigger": "reroll", "payload": "rand_stats", "value": 3})]
 	rd.add_item(holder, 0)
 	var h = Keys.stat_elemental_damage_hash
 	var before = rd.get_player_effects(0)[h]
@@ -2206,7 +2202,7 @@ func test_128_remaining_native_triggers() -> void:
 	var tot0 = 0
 	for s in Catalog.STATS:
 		tot0 += int(rd.get_player_effects(0).get(Keys.generate_hash(s), 0))
-	m.fire_shop("buy", 0)
+	m.fire_shop("reroll", 0)
 	var tot1 = 0
 	for s in Catalog.STATS:
 		tot1 += int(rd.get_player_effects(0).get(Keys.generate_hash(s), 0))
@@ -2287,7 +2283,7 @@ func test_130_trigger_templates() -> void:
 	for sd in range(1, 4):
 		var g = Generator.new(_cfg(), sd)
 		g.generate(isvc.items, isvc.characters, [], [])
-		for t in ["reroll", "buy"]:
+		for t in ["reroll"]:
 			var c = g.gen_clause(0.6, Catalog.PERM_MULT[0], false, t, "")
 			if not c.empty() and int(c.get("param", 1)) > 1:
 				shop_counted = true
