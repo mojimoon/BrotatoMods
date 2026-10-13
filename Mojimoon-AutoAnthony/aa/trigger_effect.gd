@@ -179,20 +179,19 @@ func _payload_text(colored: bool) -> String:
 		"xp":
 			return tr("AA_P_XP").replace("{0}", _col(str(value), good, colored))
 		"damage":
-			return tr("AA_P_DAMAGE").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", stat_name)
+			return tr("AA_P_DAMAGE").replace("{0}", _scaling_text(stat, value, colored))
 		"grant":
 			var inner = scaled_grant().get_text(0, colored) if grant != null else ""
 			var k = "AA_P_GRANT_PERM" if grant_mode == "perm" else ("AA_P_GRANT_STATE" if Catalog.TRIGGERS[trigger].kind == "state" else "AA_P_GRANT_TEMP")
 			return tr(k).replace("{0}", inner)
 		"explode":
-			return tr("AA_P_EXPLODE").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", stat_name)
+			return tr("AA_P_EXPLODE").replace("{0}", _scaling_text(stat, value, colored))
 		"hp_dmg":
 			# 原版的百分比写法：头目和精英为 1/10（巨型带 10% / 1%）
 			var boss = str(stepify(value / 10.0, 0.1)).trim_suffix(".0") + "%"
 			return tr("AA_P_HP_DMG").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", boss)
 		"ignite":
-			# 缩放属性同原版燃烧效果：带颜色时用属性图标，纯文本时写属性名
-			var sc = Utils.get_scaling_stat_icon_text(Keys.stat_elemental_damage_hash) if colored else "+100% " + tr("STAT_ELEMENTAL_DAMAGE")
+			var sc = _scaling_text("stat_elemental_damage", 100, colored, true)
 			return tr("AA_P_IGNITE").replace("{0}", _col(str(value), good, colored)).replace("{1}", str(Catalog.IGNITE_TICKS)).replace("{2}", sc)
 		"slow":
 			return tr("AA_P_SLOW").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", str(int(min(90, value * 4))) + "%")
@@ -203,6 +202,14 @@ func _payload_text(colored: bool) -> String:
 		"vuln":
 			return tr("AA_P_VULN").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", str(value2))
 	return ""
+
+
+# 缩放属性同原版（燃烧、炮台……）：带颜色时为"25%[属性图标]"，纯文本或属性没有图标时写属性名
+func _scaling_text(s: String, pct: int, colored: bool, plus: bool = false) -> String:
+	var h = Keys.generate_hash(s)
+	if colored and ItemService.get_stat_small_icon(h) != null:
+		return Utils.get_scaling_stat_icon_text(h, pct / 100.0, plus)
+	return ("+" if plus else "") + str(pct) + "% " + tr(s.to_upper())
 
 
 # grant 保存"单位"效果；实际获得的效果 = 单位 × 条款数量（诅咒会提高条款数量）

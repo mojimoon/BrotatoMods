@@ -807,8 +807,15 @@ func test_89_grant_texts_serialization_and_modes() -> void:
 				var back = _item("item_potato").duplicate()
 				back.deserialize_and_merge(JSON.parse(JSON.print(holder.serialize())).result)
 				_check(back.effects.size() == 1 and back.effects[0].grant != null and back.effects[0].get_text(0, false) == txt, "grant survives save: " + txt)
-	print("AUDIT grant clauses (1 seed): %d" % grants)
-	_check(grants > 10, "free triggers produce grants (%d)" % grants)
+	# 数量统计 3 个种子（单个种子在阈值附近波动）
+	for sd in [8, 9]:
+		var p2 = Generator.new(_cfg(), sd).generate(isvc.items, isvc.characters, [], [])
+		for id in p2.items:
+			for e in p2.items[id].effects:
+				if e is TriggerEffect and e.payload == "grant":
+					grants += 1
+	print("AUDIT grant clauses (3 seeds): %d" % grants)
+	_check(grants > 30, "free triggers produce grants (%d)" % grants)
 	var cfg = _cfg()
 	cfg.free_triggers = false
 	var plan2 = Generator.new(cfg, 7).generate(isvc.items, isvc.characters, [], [])
@@ -2848,3 +2855,9 @@ func test_175_trigger_conditions() -> void:
 	_eq(t1, TriggerEffect.make({"trigger": "kill", "payload": "gold", "value": 1}).get_text(0, false).replace(tr("AA_T_KILL"), tr("AA_T_CRIT_KILL")), "crit kill text")
 	var t2 = TriggerEffect.make({"trigger": "kill", "cond": "still", "payload": "gold", "value": 1}).get_text(0, false)
 	_check(t2.ends_with(tr("AA_C_STILL")), "still condition as a suffix: " + t2)
+	# 伤害 / 爆炸 / 点燃的缩放属性：带颜色时显示属性图标（同原版）
+	for c in [{"trigger": "kill", "payload": "damage", "stat": "stat_luck", "value": 25}, {"trigger": "kill", "payload": "explode", "stat": "stat_range", "value": 50},
+			{"trigger": "crit", "payload": "ignite", "value": 3}]:
+		var te = TriggerEffect.make(c)
+		_check(te.get_text(0, true).find("[img") != -1, "scaling icon: " + te.get_text(0, true))
+		_check(te.get_text(0, false).find("[img") == -1 and te.get_text(0, false).find("{") == -1, "plain scaling text: " + te.get_text(0, false))
