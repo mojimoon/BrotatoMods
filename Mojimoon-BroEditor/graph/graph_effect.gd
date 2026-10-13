@@ -237,7 +237,7 @@ static func _trigger_text(trig: Dictionary, every: int) -> String:
 	var base = "BE_TX_" + trig.kind.to_upper()
 	if every > 1 and _tr(base + "_EVERY") != base + "_EVERY":
 		return _tr(base + "_EVERY").replace("{0}", str(every))
-	return _tr(base).replace("{0}", str(int(_p(trig, "secs", 1))))
+	return _tr(base).replace("{0}", str(int(_p(trig, "secs", 1)))).replace("{pct}", str(int(_p(trig, "pct", 50))))
 
 
 static func _cond_text(n: Dictionary) -> String:

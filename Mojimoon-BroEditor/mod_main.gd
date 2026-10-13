@@ -854,6 +854,12 @@ static func _set_typed(obj, sets) -> void:
 				obj.set(k, bool(sets[k]))
 			TYPE_STRING:
 				obj.set(k, str(sets[k]))
+			TYPE_ARRAY:
+				if sets[k] is Array:
+					var arr = []
+					for x in sets[k]:
+						arr.push_back(str(x))
+					obj.set(k, arr)
 
 
 # 普通属性效果的原版描述 key（stat_ 以外的 key 没有同名文本，借用原版同 key 效果的 text_key）
@@ -939,6 +945,9 @@ func stat_effect(key: String, value: int):
 		g._generate_hashes()
 		return g
 	var sets = {"key": key, "value": value, "text_key": _plain_text_key(key)}
+	# 好坏按该属性在原版效果里的方向（如价格越低越好、敌人数量中立）：决定文本颜色与诅咒方向（有利放大、不利缩小、中立不变）
+	var dir = _good_dir(key) * (1 if value > 0 else -1)
+	sets.effect_sign = 0 if dir > 0 else (1 if dir < 0 else 2)
 	if key in CAP_KEYS or key in SET_KEYS:
 		sets.storage_method = 2
 	return make_effect({"set": sets})

@@ -507,6 +507,62 @@ func test_102_mod_effect_text_fallback() -> void:
 	_eq(m.effect_text(m.stat_effect("stat_armor", 3), false), m.stat_effect("stat_armor", 3).get_text(0, false), "vanilla uses own text")
 
 
+# 属性页效果的好坏（颜色 / 诅咒方向）、文本 / 好坏 / 计算方式 / 实际修改属性可编辑
+func test_77_effect_signs_and_fields() -> void:
+	_eq(m.stat_effect("stat_armor", 3).effect_sign, 0, "armor +3 good")
+	_eq(m.stat_effect("stat_armor", -3).effect_sign, 1, "armor -3 bad")
+	_eq(m.stat_effect("items_price", -10).effect_sign, 0, "price -10 good")
+	_eq(m.stat_effect("items_price", 10).effect_sign, 1, "price +10 bad")
+	var dlc = load("res://dlcs/dlc_1/dlc_1_data.gd").new() if ResourceLoader.exists("res://dlcs/dlc_1/dlc_1_data.gd") else null
+	if dlc != null:
+		_eq(dlc._boost_effect_value_positively(m.stat_effect("items_price", -10), 0.5), -15, "cursed price cut grows")
+		_eq(dlc._boost_effect_value_positively(m.stat_effect("stat_armor", -4), 1.0), -2, "cursed armor loss shrinks")
+	var names = []
+	for f in m.Catalog.editable_fields(m.stat_effect("stat_armor", 3)):
+		names.push_back(f.name)
+	_eq(names.slice(names.size() - 3, names.size() - 1), ["text_key", "effect_sign", "storage_method"], "advanced fields last")
+	var hidden = m.make_effect({"set": {"key": "stat_armor", "value": 3, "text_key": "[EMPTY]"}})
+	_eq(hidden.get_text(0, false), "", "[EMPTY] hides the text")
+	var rep = m.make_effect({"set": {"key": "dodge_cap", "value": 1, "storage_method": 0}})
+	_eq(rep.storage_method, 0, "storage method set")
+	var gain = null
+	for entry in m.library(true):
+		if "stats_modified" in entry.effect and entry.effect.stats_modified.size() > 1:
+			gain = entry
+			break
+	_check(gain != null, "multi-stat gain effect found")
+	if gain != null:
+		var e = m.make_effect({"from": gain.from, "i": gain.i, "set": {"stats_modified": ["stat_luck"]}})
+		_eq(Array(e.stats_modified), ["stat_luck"], "stats_modified edited")
+		var fn = []
+		for f in m.Catalog.editable_fields(e):
+			fn.push_back(f.name)
+		_check("stats_modified" in fn, "stats_modified editable")
+
+
+func test_78_graph_low_hp_and_difficulty() -> void:
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	var t = GE.add_node(g, "wave_start", Vector2.ZERO)
+	var d = GE.add_node(g, "diff_min", Vector2.ZERO, {"n": 99})
+	GE.add_link(g, t, d)
+	GE.add_link(g, d, GE.add_node(g, "perm_stat", Vector2.ZERO, {"stat": "stat_armor", "value": 1}))
+	var d2 = GE.add_node(g, "diff_max", Vector2.ZERO, {"n": 99})
+	GE.add_link(g, t, d2)
+	GE.add_link(g, d2, GE.add_node(g, "perm_stat", Vector2.ZERO, {"stat": "stat_luck", "value": 1}))
+	_graph_char(g)
+	var a0 = _armor()
+	var l0 = rd.get_player_effect(Keys.generate_hash("stat_luck"), 0)
+	m.runtime.fire("wave_start", 0)
+	_eq(_armor(), a0, "danger 99+ blocks")
+	_eq(rd.get_player_effect(Keys.generate_hash("stat_luck"), 0), l0 + 1, "danger <= 99 passes")
+	m.runtime.end_wave()
+	TranslationServer.set_locale("zh")
+	_eq(_path_line([["low_hp", {"pct": 30}], ["temp_stat", {"stat": "stat_armor", "value": 2}]]).find("30%") >= 0, true, "low hp threshold in text")
+	_check(_path_line([["wave_start", {}], ["diff_min", {"n": 3}], ["xp", {"value": 1}]]).find("危险3") >= 0, "danger text")
+	TranslationServer.set_locale("en")
+
+
 func test_110_path_text() -> void:
 	TranslationServer.set_locale("zh")
 	_eq(_path_line([["level_up", {}], ["perm_stat", {"stat": "stat_melee_damage", "value": 2}]]), "升级时+2近战伤害", "zh level up")
@@ -615,7 +671,7 @@ func test_121_attack_while_moving_rule() -> void:
 	rd.add_character(m.find_character(CH), 0)
 	_eq(int(rd.get_player_effect(Keys.can_attack_while_moving_hash, 0)), 0, "can be disabled")
 	_eq(m.stat_name("next_level_xp_needed"), "%升级需要经验值", "label without placeholder")
-	_eq(m.stat_name("torture"), "拷问", "torture label")
+	_eq(m.stat_name("torture"), "每秒固定回复（无法其他治疗）", "torture label")
 	TranslationServer.set_locale("en")
 
 

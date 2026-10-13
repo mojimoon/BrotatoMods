@@ -425,6 +425,35 @@ func test_153_weapon_attack_type() -> void:
 	yield(tree, "idle_frame")
 
 
+# 字段专用控件：好坏 / 文本 / 套装 / 按此属性为选择框，实际修改属性为多选，其余字段用通用控件
+func test_154_field_controls() -> void:
+	var ui = yield(_open_ui(CH), "completed")
+	for f in ["effect_sign", "text_key", "set_id", "stat_scaled", "weapon_stacked_id"]:
+		var c = ui.field_control(f, 0 if f == "effect_sign" else "", ui, "_on_field_option", [0, f])
+		_check(c != null and c.get_class() == "Button", "select for " + f)
+		if c != null:
+			c.free()
+	_check(ui.field_control("value", 1, ui, "_on_field_option", [0, "value"]) == null, "value uses the generic control")
+	var st = ui.field_control("stats_modified", ["stat_armor"], ui, "_on_field_option", [0, "stats_modified"])
+	_check(st != null and st.text.find(ui.stat_name("stat_armor")) >= 0, "stat list shows the stats")
+	var lbl = ui.field_control("storage_method", 1, ui, "_on_field_option", [0, "storage_method"])
+	_check(lbl is Label, "key-value storage is read-only")
+	for c in [st, lbl]:
+		if c != null:
+			c.free()
+	# 新词条
+	ui.set_kind("item")
+	ui._select(m.find_target("item", "item_coupon").my_id if m.find_target("item", "item_coupon") != null else ui._id)
+	ui._on_tab_pressed("overview")
+	ui._on_tag_new("be_test_tag")
+	_check("be_test_tag" in ui._p().tags, "custom tag added")
+	_check("be_test_tag" in ui._all_tags(), "custom tag listed")
+	ui._on_tag_pressed("be_test_tag")
+	_check(not "be_test_tag" in ui._all_tags(), "unused custom tag disappears")
+	ui.queue_free()
+	yield(tree, "idle_frame")
+
+
 func _find_label(n: Node, t: String):
 	if (n is Label or n is RichTextLabel) and n.text == t:
 		return n

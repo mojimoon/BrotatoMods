@@ -231,7 +231,11 @@ static func build_library(sources: Array, dedup: bool = true) -> Array:
 
 
 # 可在编辑器里修改的效果字段：脚本导出的 int / float / bool / String（数组和子资源保持模板原样）
-const HIDDEN_FIELDS = ["text_key", "custom_key", "storage_method", "effect_sign", "custom_args", "script", "resource_name", "resource_path", "resource_local_to_scene"]
+const HIDDEN_FIELDS = ["custom_key", "custom_args", "script", "resource_name", "resource_path", "resource_local_to_scene"]
+# 可编辑的数组字段（字符串数组）
+const ARRAY_FIELDS = ["stats_modified"]
+# 放在最后的高级字段
+const LATE_FIELDS = ["text_key", "effect_sign", "storage_method"]
 
 
 # ---------------- 蓝图诅咒 ----------------
@@ -247,6 +251,7 @@ const CURSE_SIGNS = {
 	"cooldown": {"secs": -1},
 	"hp_above": {"pct": -1},
 	"wave_min": {"n": -1},
+	"diff_min": {"n": -1},
 	"stat_min": {"n": -1},
 }
 # 诅咒默认改效果的数值；路径上有以下条件时改条件的数值、效果不变（同原版"每击杀 X 个敌人"诅咒的是 X）
@@ -304,9 +309,9 @@ static func editable_fields(e) -> Array:
 			continue
 		if p.name in HIDDEN_FIELDS or p.name.begins_with("_") or p.name.ends_with("_hash"):
 			continue
-		if p.type in [TYPE_INT, TYPE_REAL, TYPE_BOOL, TYPE_STRING]:
+		if p.type in [TYPE_INT, TYPE_REAL, TYPE_BOOL, TYPE_STRING] or (p.type == TYPE_ARRAY and p.name in ARRAY_FIELDS):
 			out.push_back({"name": p.name, "type": p.type})
-	# key / value 放最前
+	# key / value 放最前，文本 / 好坏 / 计算方式放最后
 	out.sort_custom(FieldSorter, "by_field")
 	return out
 
@@ -317,9 +322,9 @@ class FieldSorter:
 		var ia = order.find(a.name)
 		var ib = order.find(b.name)
 		if ia < 0:
-			ia = 99
+			ia = 99 if not a.name in LATE_FIELDS else 100 + LATE_FIELDS.find(a.name)
 		if ib < 0:
-			ib = 99
+			ib = 99 if not b.name in LATE_FIELDS else 100 + LATE_FIELDS.find(b.name)
 		if ia != ib:
 			return ia < ib
 		return a.name < b.name
@@ -360,7 +365,7 @@ const NODES = [
 	["buy", "trigger", []],
 	["still", "trigger", []],
 	["moving", "trigger", []],
-	["low_hp", "trigger", []],
+	["low_hp", "trigger", [["pct", "int", 50]]],
 	["full_hp", "trigger", []],
 	["chance", "cond", [["pct", "int", 25]]],
 	["every", "cond", [["n", "int", 5]]],
@@ -370,6 +375,8 @@ const NODES = [
 	["hp_above", "cond", [["pct", "int", 50]]],
 	["wave_min", "cond", [["n", "int", 5]]],
 	["wave_max", "cond", [["n", "int", 10]]],
+	["diff_min", "cond", [["n", "int", 3]]],
+	["diff_max", "cond", [["n", "int", 2]]],
 	["stat_min", "cond", [["stat", "stat", "stat_armor"], ["n", "int", 10]]],
 	["stat_max", "cond", [["stat", "stat", "stat_armor"], ["n", "int", 10]]],
 	["if_moving", "cond", []],

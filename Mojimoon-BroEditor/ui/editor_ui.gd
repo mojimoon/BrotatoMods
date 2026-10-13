@@ -1188,6 +1188,32 @@ func _tag_section(left: Control) -> void:
 		var b = _chip(_tag_name(tag), tag, tag in tags, C_ACCENT_3)
 		b.connect("pressed", self, "_on_tag_pressed", [tag])
 		grid.add_child(b)
+	# 新词条：输入后加入本对象（取消选择且没有其他对象使用时即消失）
+	var add_row = HBoxContainer.new()
+	add_row.add_constant_override("separation", 8)
+	tbox.add_child(add_row)
+	var le = _line_edit(tr("BE_TAG_NEW_HINT"))
+	le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	le.connect("text_entered", self, "_on_tag_new")
+	add_row.add_child(le)
+	var add = _button(tr("BE_TAG_NEW"), FONT_DESC)
+	_apply_action_style(add, C_ACCENT_3)
+	add.connect("pressed", self, "_on_tag_new_pressed", [le])
+	add_row.add_child(add)
+
+
+func _on_tag_new_pressed(le: LineEdit) -> void:
+	_on_tag_new(le.text)
+
+
+func _on_tag_new(text: String) -> void:
+	var tag = text.strip_edges()
+	var field = "wanted_tags" if _kind == "character" else "tags"
+	var v = _view()
+	var tags = v[field] if v[field] is Array else _mod.backup_value(_character(), field)
+	if tag == "" or tag in tags:
+		return
+	_on_tag_pressed(tag)
 
 
 const EFFECT_LINE = preload("res://items/global/effect_line.tscn")
@@ -1320,6 +1346,12 @@ func _all_tags() -> Array:
 				out.push_back(t)
 	for c in _isvc().characters:
 		for t in c.wanted_tags:
+			if not t in out:
+				out.push_back(t)
+	# 本对象未应用的修改里的词条（如刚添加的新词条）
+	var field = "wanted_tags" if _kind == "character" else "tags"
+	if _kind != "weapon" and _view()[field] is Array:
+		for t in _view()[field]:
 			if not t in out:
 				out.push_back(t)
 	out.sort()
@@ -2384,6 +2416,10 @@ func _build_effect_fields(col: Control, i: int, spec: Dictionary) -> void:
 			lbl_text = f.name
 		grid.add_child(_field_label(lbl_text, f.name))
 		var cur = e.get(f.name)
+		var special = field_control(f.name, cur, self, "_on_field_option", [i, f.name])
+		if special != null:
+			grid.add_child(special)
+			continue
 		match f.type:
 			TYPE_INT, TYPE_REAL:
 				var sb = _spin(-99999, 99999, 1 if f.type == TYPE_INT else 0.01)
@@ -2411,6 +2447,116 @@ func _build_effect_fields(col: Control, i: int, spec: Dictionary) -> void:
 					le.rect_min_size = Vector2(200, 0)
 					le.connect("text_changed", self, "_on_field_changed", [i, f.name])
 					grid.add_child(le)
+
+
+# 效果字段的专用控件（效果页与详细信息弹窗共用）：选择框 / 属性列表，修改时调用 target.method(值, binds...)；
+# 其他字段返回 null，由调用方用通用控件
+const SIGN_NAMES = ["BE_SIGN_POSITIVE", "BE_SIGN_NEGATIVE", "BE_SIGN_NEUTRAL", "BE_SIGN_FROM_VALUE", "BE_SIGN_FROM_ARG", "BE_SIGN_OVERRIDE"]
+const STORAGE_NAMES = ["SUM", "KEY_VALUE", "REPLACE", "APPEND_KEY", "APPEND_KEY_VALUE"]
+# "按此属性"（stat_scaled）除属性外可用的计数（原版 LinkedStats / get_scaling_bonus 特判的 key）
+const SCALED_SOURCES = [
+	"materials", "structure", "pet", "living_enemy", "burning_enemy", "living_tree", "percent_player_missing_health",
+	"different_item", "common_item", "legendary_item", "duplicate_item", "free_weapon_slots",
+]
+
+
+func field_control(name: String, cur, target: Object, method: String, binds: Array):
+	var items = []
+	match name:
+		"effect_sign":
+			for s in SIGN_NAMES.size():
+				if s <= 3 or s == int(cur):
+					items.push_back([tr(SIGN_NAMES[s]), s])
+		"storage_method":
+			# 只允许累加 / 替换互换；其余方式依赖 custom_key 的列表结构，只显示
+			if not int(cur) in [0, 2]:
+				return _label(STORAGE_NAMES[int(cur)] if int(cur) < STORAGE_NAMES.size() else str(cur), FONT_DESC, C_TEXT_DIM)
+			items = [[tr("BE_STORE_SUM"), 0], [tr("BE_STORE_REPLACE"), 2]]
+		"text_key":
+			items = _text_key_items()
+		"set_id":
+			for st in _isvc().sets:
+				if st != null:
+					items.push_back([tr(st.name), st.my_id])
+		"stat_scaled":
+			for k in SCALED_SOURCES:
+				items.push_back([stat_name(k), k])
+			for k in Catalog.stat_keys():
+				if _is_valid_stat(k):
+					items.push_back([stat_name(k), k])
+		"weapon_stacked_id":
+			var seen = {}
+			for w in _isvc().weapons:
+				if w != null and not seen.has(w.weapon_id):
+					seen[w.weapon_id] = true
+					items.push_back([tr(w.name), w.weapon_id])
+		"stats_modified":
+			return _stat_list_button(cur, target, method, binds)
+		_:
+			return null
+	var opt = _search_select(items, cur)
+	opt.rect_min_size = Vector2(200, 0)
+	opt.connect("selected", target, method, binds)
+	return opt
+
+
+# 文本：默认（按键名）、不显示，以及效果库里用过的全部原版文本
+func _text_key_items() -> Array:
+	var out = [[tr("BE_TEXT_DEFAULT"), ""], [tr("BE_TEXT_EMPTY"), "[EMPTY]"]]
+	var seen = {"": true, "[EMPTY]": true}
+	for entry in _mod.library(true):
+		var k = str(entry.effect.text_key)
+		if not seen.has(k.to_upper()):
+			seen[k.to_upper()] = true
+			out.push_back([tr(k.to_upper()), k])
+	return out
+
+
+# 属性列表（属性获取修改的 stats_modified）：按钮显示当前属性，点击弹出可多选的属性
+func _stat_list_button(cur, target: Object, method: String, binds: Array) -> Button:
+	var vals = Array(cur) if cur is Array else []
+	var b = _button(_stat_list_text(vals), FONT_DESC)
+	b.clip_text = true
+	b.rect_min_size = Vector2(200, 0)
+	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_apply_action_style(b, C_ACCENT_2)
+	b.connect("pressed", self, "_open_stat_list", [b, vals.duplicate(), target, method, binds])
+	return b
+
+
+func _stat_list_text(vals: Array) -> String:
+	var names = []
+	for k in vals:
+		names.push_back(stat_name(str(k)))
+	return PoolStringArray(names).join(", ") if not names.empty() else "-"
+
+
+func _open_stat_list(b: Button, vals: Array, target: Object, method: String, binds: Array) -> void:
+	var m = Modal.open(self, tr("BE_FIELD_STATS_MODIFIED"), C_ACCENT, Vector2(1000, 0))
+	m.add_button(tr("MENU_BACK"), C_TEXT_DIM, m, "close")
+	var grid = GridContainer.new()
+	grid.columns = 3
+	grid.add_constant_override("hseparation", 6)
+	grid.add_constant_override("vseparation", 6)
+	m.body.add_child(grid)
+	for g in Catalog.STAT_GROUPS:
+		if g[0] == "BE_GRP_GAIN":
+			for k in g[1]:
+				var s = k.substr(5)
+				var c = _chip(stat_name(s), s, s in vals, C_ACCENT_3)
+				c.connect("pressed", self, "_on_stat_list_chip", [c, s, b, vals, target, method, binds])
+				grid.add_child(c)
+
+
+func _on_stat_list_chip(c: Button, s: String, b: Button, vals: Array, target: Object, method: String, binds: Array) -> void:
+	if s in vals:
+		vals.erase(s)
+	else:
+		vals.push_back(s)
+	_apply_chip_style(c, s in vals, C_ACCENT_3)
+	if is_instance_valid(b):
+		b.text = _stat_list_text(vals)
+	target.callv(method, [vals.duplicate()] + binds)
 
 
 # 详细信息弹窗：直接改写该行的 spec

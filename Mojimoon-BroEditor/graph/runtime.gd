@@ -169,6 +169,10 @@ func _pass(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> bool:
 			return RunData.current_wave >= int(_param(n, "n", 1))
 		"wave_max":
 			return RunData.current_wave <= int(_param(n, "n", 1))
+		"diff_min":
+			return RunData.current_difficulty >= int(_param(n, "n", 0))
+		"diff_max":
+			return RunData.current_difficulty <= int(_param(n, "n", 0))
 		"stat_min":
 			return Utils.get_stat(Keys.generate_hash(str(_param(n, "stat", ""))), p) >= float(_param(n, "n", 0))
 		"stat_max":
@@ -495,7 +499,7 @@ func _physics_process(delta: float) -> void:
 						_walk(en, int(n.id), p, {"pos": null, "target": null, "hold": null}, 0)
 				elif n.kind in Catalog.STATE_TRIGGERS:
 					var st = _state(en, int(n.id))
-					var want = _state_holds(n.kind, pl)
+					var want = _state_holds(n, pl)
 					if want == st.active:
 						continue
 					st.active = want
@@ -508,14 +512,14 @@ func _physics_process(delta: float) -> void:
 						st.hold = []
 
 
-func _state_holds(kind: String, pl) -> bool:
-	match kind:
+func _state_holds(n: Dictionary, pl) -> bool:
+	match n.kind:
 		"still":
 			return pl._current_movement == Vector2.ZERO
 		"moving":
 			return pl._current_movement != Vector2.ZERO
 		"low_hp":
-			return pl.current_stats.health < pl.max_stats.health / 2.0
+			return pl.current_stats.health < pl.max_stats.health * float(_param(n, "pct", 50)) / 100.0
 		"full_hp":
 			return pl.current_stats.health >= pl.max_stats.health
 	return false
