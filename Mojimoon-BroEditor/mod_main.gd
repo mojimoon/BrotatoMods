@@ -30,6 +30,8 @@ const BUNDLE_PREFIX = {"character": "BEC:", "item": "BEI:", "weapon": "BEW:"}
 const ALL_PREFIX = "BEA:"
 # 蓝图分享码（只含节点图）
 const GRAPH_PREFIX = "BEB:"
+# 分享码正文：PACK + base64(deflate(JSON))；不以 PACK 开头的是旧格式 base64(JSON)（JSON 的 base64 总以 "ey" 开头）
+const PACK = "z"
 const BUNDLE_KEYS = {"character": "profiles", "item": "items", "weapon": "weapons"}
 const MAX_DESC = 300
 
@@ -270,6 +272,40 @@ static func new_family() -> Dictionary:
 	return {"custom": false, "base": "", "name": "", "icon": "", "sets": null, "tiers": [], "num": 0}
 
 
+# 保存 / 分享时去掉与默认值相同的字段（读取时 normalize_* 会补齐）
+static func compact(d: Dictionary, defaults: Dictionary) -> Dictionary:
+	var out = {}
+	for k in d:
+		if not defaults.has(k) or JSON.print(d[k]) != JSON.print(defaults[k]):
+			out[k] = d[k]
+	return out
+
+
+static func compact_all(ps: Dictionary, defaults: Dictionary) -> Dictionary:
+	var out = {}
+	for id in ps:
+		out[id] = compact(ps[id], defaults) if ps[id] is Dictionary else ps[id]
+	return out
+
+
+static func pack(data) -> String:
+	return PACK + Marshalls.raw_to_base64(JSON.print(data).to_utf8().compress(File.COMPRESSION_DEFLATE))
+
+
+# 分享码正文 -> 解析结果（无法解析返回 null）；兼容旧的未压缩格式
+static func unpack(body: String):
+	var text = ""
+	if body.begins_with(PACK):
+		var raw = Marshalls.base64_to_raw(body.substr(PACK.length()))
+		if raw.empty():
+			return null
+		text = raw.decompress_dynamic(16 * 1024 * 1024, File.COMPRESSION_DEFLATE).get_string_from_utf8()
+	else:
+		text = Marshalls.base64_to_utf8(body)
+	var parsed = JSON.parse(text)
+	return parsed.result if parsed.error == OK else null
+
+
 static func normalize_family(f) -> Dictionary:
 	var out = new_family()
 	if not f is Dictionary:
@@ -459,8 +495,8 @@ func custom_file_data(kind: String, id: String) -> Dictionary:
 			var tid = tier_id(id, t, true)
 			if weapon_profiles.has(tid):
 				tiers[tid] = weapon_profiles[tid]
-		return {"kind": kind, "id": id, "family": weapon_families[id], "tiers": tiers}
-	return {"kind": kind, "id": id, "profile": profiles_of(kind)[id]}
+		return {"kind": kind, "id": id, "family": compact(weapon_families[id], new_family()), "tiers": compact_all(tiers, new_profile())}
+	return {"kind": kind, "id": id, "profile": compact(profiles_of(kind)[id], new_profile())}
 
 
 # 全部自定义对象：[[种类, id]]
@@ -496,13 +532,13 @@ func save_profiles() -> void:
 	for pair in [["profiles", profiles], ["items", item_profiles]]:
 		for id in pair[1]:
 			if not pair[1][id].custom:
-				main[pair[0]][id] = pair[1][id]
+				main[pair[0]][id] = compact(pair[1][id], new_profile())
 	for id in weapon_profiles:
 		if not custom_tiers.has(id):
-			main.weapons[id] = weapon_profiles[id]
+			main.weapons[id] = compact(weapon_profiles[id], new_profile())
 	for wid in weapon_families:
 		if not weapon_families[wid].custom:
-			main.families[wid] = weapon_families[wid]
+			main.families[wid] = compact(weapon_families[wid], new_family())
 	main["version"] = 1
 	main["next_id"] = next_id
 	main["settings"] = {"debug": debug, "debug_detail": debug_detail, "font_scale": font_scale, "hide_numbers": hide_numbers, "library_dedup": library_dedup, "kinds": kind_enabled}
@@ -595,14 +631,14 @@ func export_code(id: String, kind: String = "character") -> String:
 	var ps = profiles_of(kind)
 	if not ps.has(id):
 		return ""
-	return SHARE_PREFIX + Marshalls.utf8_to_base64(JSON.print({"kind": kind, "id": id, "profile": ps[id]}))
+	return SHARE_PREFIX + pack({"kind": kind, "id": id, "profile": compact(ps[id], new_profile())})
 
 
 # 蓝图分享码：空图返回 ""
 static func export_graph(g) -> String:
 	if not g is Dictionary or g.get("nodes", []).empty():
 		return ""
-	return GRAPH_PREFIX + Marshalls.utf8_to_base64(JSON.print(g))
+	return GRAPH_PREFIX + pack(g)
 
 
 # 读取蓝图分享码；无法识别返回 null
@@ -610,10 +646,10 @@ static func import_graph(code: String):
 	code = code.strip_edges()
 	if not code.begins_with(GRAPH_PREFIX):
 		return null
-	var parsed = JSON.parse(Marshalls.base64_to_utf8(code.substr(GRAPH_PREFIX.length())))
-	if parsed.error != OK:
+	var g = unpack(code.substr(GRAPH_PREFIX.length()))
+	if g == null:
 		return null
-	return normalize_profile({"graph": parsed.result}).graph
+	return normalize_profile({"graph": g}).graph
 
 
 # 返回导入后的角色 id；无法识别返回 ""
@@ -627,15 +663,15 @@ func export_bundle(kind: String) -> String:
 		kinds = [kind]
 	var dis = {}
 	for k in kinds:
-		data[BUNDLE_KEYS[k]] = profiles_of(k)
+		data[BUNDLE_KEYS[k]] = compact_all(profiles_of(k), new_profile())
 		dis[k] = disabled[k]
 	if "weapon" in kinds:
-		data["families"] = weapon_families
+		data["families"] = compact_all(weapon_families, new_family())
 	data["disabled"] = dis
 	var has = _any_disabled(dis)
 	for k in data:
 		has = has or (k != "disabled" and not data[k].empty())
-	return prefix + Marshalls.utf8_to_base64(JSON.print(data)) if has else ""
+	return prefix + pack(data) if has else ""
 
 
 static func _any_disabled(dis: Dictionary) -> bool:
@@ -659,8 +695,8 @@ func import_bundle(code: String) -> int:
 				code = code.substr(BUNDLE_PREFIX[k].length())
 	if kinds.empty():
 		return -1
-	var parsed = JSON.parse(Marshalls.base64_to_utf8(code))
-	if parsed.error != OK or not parsed.result is Dictionary:
+	var parsed = {"result": unpack(code)}
+	if not parsed.result is Dictionary:
 		return -1
 	var n = 0
 	# 先建好自定义武器 / 补的等级，后面的武器档案才找得到目标
@@ -722,8 +758,8 @@ func import_code(code: String, target_id: String, kind: String = "character") ->
 	code = code.strip_edges()
 	if not code.begins_with(SHARE_PREFIX):
 		return ""
-	var parsed = JSON.parse(Marshalls.base64_to_utf8(code.substr(SHARE_PREFIX.length())))
-	if parsed.error != OK or not parsed.result is Dictionary or not parsed.result.get("profile") is Dictionary:
+	var parsed = {"result": unpack(code.substr(SHARE_PREFIX.length()))}
+	if not parsed.result is Dictionary or not parsed.result.get("profile") is Dictionary:
 		return ""
 	var p = normalize_profile(parsed.result.profile)
 	# 道具 / 武器的档案只能导入到同种类的对象上

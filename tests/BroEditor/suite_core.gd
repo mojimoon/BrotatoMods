@@ -188,6 +188,18 @@ func test_40_share_code() -> void:
 	var code2 = m.export_code(id)
 	var id2 = m.import_code(code2, CH)
 	_check(id2 != "" and id2 != id and m.is_custom(id2), "custom imported as new custom")
+	# 压缩格式：正文以 PACK 开头，只含非默认字段；旧的未压缩码仍可导入
+	_check(code2.begins_with(m.SHARE_PREFIX + m.PACK), "compressed body")
+	var body = m.unpack(code2.substr(m.SHARE_PREFIX.length()))
+	_check(body.profile.has("custom") and not body.profile.has("wstats") and not body.profile.has("price"), "defaults stripped: " + str(body.profile.keys()))
+	var old = m.SHARE_PREFIX + "eyJraW5kIjoiY2hhcmFjdGVyIiwiaWQiOiJjaGFyYWN0ZXJfd2VsbF9yb3VuZGVkXzc1MTYiLCJwcm9maWxlIjp7ImVuYWJsZWQiOnRydWUsImN1c3RvbSI6dHJ1ZSwibmFtZSI6IueZvemprOmTg+iWryIsImRlc2MiOiIiLCJiYXNlIjoiY2hhcmFjdGVyX3dpbGRsaW5nIiwiaWNvbiI6IiIsImVmZmVjdHMiOlt7ImZyb20iOiJjaGFyYWN0ZXJfZmlzaGVybWFuIiwiaSI6Miwic2V0Ijp7ImtleSI6Iml0ZW1fcmljb2NoZXQifX0seyJmcm9tIjoiY2hhcmFjdGVyX2Zpc2hlcm1hbiIsImkiOjMsInNldCI6eyJrZXkiOiJpdGVtX3JpY29jaGV0IiwidmFsdWUiOi05MH19LHsiZnJvbSI6ImNoYXJhY3Rlcl9nbHV0dG9uIiwiaSI6M30seyJncm91cCI6InN0YXRzIiwia2V5IjoiYm91bmNlX2RhbWFnZSJ9LHsiZ3JvdXAiOiJzdGF0cyIsImtleSI6InBpZXJjaW5nX2RhbWFnZSJ9LHsiZnJvbSI6ImNoYXJhY3Rlcl9yYW5nZXIiLCJpIjozfV0sInN0YXRzIjp7ImJvdW5jZV9kYW1hZ2UiOjEwMCwicGllcmNpbmdfZGFtYWdlIjotMTAwLCJnYWluX3N0YXRfcGVyY2VudF9kYW1hZ2UiOi0xMjV9LCJ3ZWFwb25zIjpbIndlYXBvbl9rbmlmZV8xIiwid2VhcG9uX3N0aWNrXzEiLCJ3ZWFwb25fZmlzdF8xIiwid2VhcG9uX2Nob3BwZXJfMSIsIndlYXBvbl9maWdodGluZ19zdGlja18xIiwid2VhcG9uX2NhY3RpX2NsdWJfMSIsIndlYXBvbl9oYXRjaGV0XzEiLCJ3ZWFwb25fc3Bpa3lfc2hpZWxkXzEiLCJ3ZWFwb25fZ2hvc3RfZmxpbnRfMSIsIndlYXBvbl93cmVuY2hfMSIsIndlYXBvbl9waXN0b2xfMSIsIndlYXBvbl9zbWdfMSIsIndlYXBvbl9kb3VibGVfYmFycmVsX3Nob3RndW5fMSIsIndlYXBvbl9zbGluZ3Nob3RfMSIsIndlYXBvbl90YXNlcl8xIiwid2VhcG9uX3dhbmRfMSIsIndlYXBvbl9pY2ljbGVfMSIsIndlYXBvbl9yYWlsX2d1bl8xIiwid2VhcG9uX2x1dGVfMSJdLCJzdGFydF9pdGVtcyI6W3siaWQiOiJpdGVtX3JpY29jaGV0IiwibiI6MSwiY3Vyc2VkIjpmYWxzZX1dLCJiYW5faXRlbXMiOlsiaXRlbV9zaGFycF9idWxsZXQiLCJpdGVtX2JhbmRhbmEiLCJpdGVtX2V5ZXBhdGNoIiwiaXRlbV9wdW1wa2luIl0sImJhbl93ZWFwb25zIjpbXSwid2FudGVkX3RhZ3MiOltdLCJncmFwaCI6bnVsbCwic3RhcnQiOnt9LCJwcmljZSI6LTEsInRpZXIiOi0xLCJtYXhfbmIiOi0yLCJ0YWdzIjpudWxsLCJ3c3RhdHMiOnt9LCJzY2FsaW5nIjpudWxsLCJudW0iOjJ9fQ=="
+	var id3 = m.import_code(old, CH)
+	_check(id3 != "" and m.profiles[id3].weapons.size() == 19 and m.profiles[id3].stats.get("bounce_damage") == 100, "old uncompressed code imports")
+	_eq(m.profiles[id3].wanted_tags, [], "explicit empty list kept")
+	_eq(m.compact({"wanted_tags": [], "tags": null, "price": -1}, m.new_profile()), {"wanted_tags": []}, "[] differs from null")
+	var g = {"nodes": [{"id": 1, "kind": "kill", "params": {}, "pos": [0, 0]}], "links": [], "next": 2}
+	var gc = m.export_graph(g)
+	_check(gc.begins_with(m.GRAPH_PREFIX + m.PACK) and m.import_graph(gc).nodes.size() == 1, "blueprint code compressed and round-trips")
 
 
 func test_41_normalize_profile() -> void:
@@ -844,6 +856,11 @@ func test_132_bundle_codes() -> void:
 	_eq(m.export_bundle("weapon"), "", "empty bundle exports nothing")
 	var all_code = m.export_bundle("")
 	_check(all_code.begins_with(m.ALL_PREFIX), "all prefix")
+	_check(kind_code.begins_with(m.BUNDLE_PREFIX.item + m.PACK) and all_code.begins_with(m.ALL_PREFIX + m.PACK), "bundles compressed")
+	_eq(m.unpack(kind_code.substr(m.BUNDLE_PREFIX.item.length())).items[it.my_id], {"price": 3}, "bundle keeps only edited fields")
+	_eq(m.import_bundle(m.BUNDLE_PREFIX.item + Marshalls.utf8_to_base64(JSON.print({"items": {it.my_id: {"price": 5}}}))), 1, "old uncompressed bundle imports")
+	_eq(m.item_profiles[it.my_id].price, 5, "old bundle content")
+	m.item_profiles[it.my_id].price = 3
 	m.item_profiles = {}
 	m.profiles = {}
 	_eq(m.import_bundle(kind_code), 1, "item bundle imported")
