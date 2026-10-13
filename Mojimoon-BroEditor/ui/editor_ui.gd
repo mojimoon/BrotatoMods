@@ -1599,13 +1599,14 @@ func _wstat_cell(grid: Control, k: String, type: String, base, v: Dictionary, w)
 		return
 	if k == "#attack":
 		var mode = _attack_mode(v.wstats.get("attack_type", base.attack_type), v.wstats.get("alternate_attack_type", base.alternate_attack_type))
+		var base_mode = _attack_mode(base.attack_type, base.alternate_attack_type)
 		var tb = _button(tr(ATTACK_MODES[mode]), FONT_DESC)
 		tb.rect_min_size = Vector2(150, 0)
 		tb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		_apply_chip_style(tb, mode > 0, C_ACCENT_2)
+		_apply_chip_style(tb, mode != base_mode, C_ACCENT_2)
 		tb.connect("pressed", self, "_on_attack_mode", [(mode + 1) % ATTACK_MODES.size()])
 		_attr_row(grid, tr("BE_WS_ATTACK_TYPE"), tb, "attack_type")
-		_mark_name("attack_type", str(mode), str(_attack_mode(base.attack_type, base.alternate_attack_type)))
+		_mark_name("attack_type", str(mode), str(base_mode))
 		return
 	var mode = WSTAT_SHOW.get(k, "")
 	var cur = v.wstats.get(k, base.get(k))
