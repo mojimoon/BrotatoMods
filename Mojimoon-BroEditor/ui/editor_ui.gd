@@ -2573,7 +2573,8 @@ func field_control(name: String, cur, target: Object, method: String, binds: Arr
 	match name:
 		"effect_sign":
 			for s in SIGN_NAMES.size():
-				if s <= 3 or s == int(cur):
+				# 4（按参数正负）只对 custom_args 的单个参数有意义，放在效果上与 3 相同：仅当前值为 4 时显示
+				if s != 4 or s == int(cur):
 					items.push_back([tr(SIGN_NAMES[s]), s])
 		"storage_method":
 			# 只允许累加 / 替换互换；其余方式依赖 custom_key 的列表结构，只显示

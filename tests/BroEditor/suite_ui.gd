@@ -434,6 +434,10 @@ func test_154_field_controls() -> void:
 		if c != null:
 			c.free()
 	_check(ui.field_control("value", 1, ui, "_on_field_option", [0, "value"]) == null, "value uses the generic control")
+	var signs = []
+	for it in ui.field_control("effect_sign", 0, ui, "_on_field_option", [0, "effect_sign"]).items:
+		signs.push_back(it[1])
+	_eq(signs, [0, 1, 2, 3, 5], "sign options: 4 hidden, curse shown")
 	var st = ui.field_control("stats_modified", ["stat_armor"], ui, "_on_field_option", [0, "stats_modified"])
 	_check(st != null and st.text.find(ui.stat_name("stat_armor")) >= 0, "stat list shows the stats")
 	var lbl = ui.field_control("storage_method", 1, ui, "_on_field_option", [0, "storage_method"])
