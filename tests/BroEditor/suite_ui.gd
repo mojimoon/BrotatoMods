@@ -531,6 +531,7 @@ func test_155_settings_and_font_scale() -> void:
 		_check(text.find(ui.tr("BE_NEW_CUSTOM" if kind == "character" else "BE_NEW_CUSTOM_" + kind.to_upper())) >= 0, kind + " help names its new button")
 		_eq(text.find(ui.tr("BE_TAB_BANS")) >= 0, kind == "character", kind + " help lists only its own pages")
 		_eq(text.find("+Tn") >= 0, kind == "weapon", kind + " help mentions tiers only for weapons")
+		_eq(text.find(ui.tr("BE_HELP_REPLACE").split("\n")[0]) >= 0, kind == "item", kind + " help has the replace section only for items")
 		var n0 = ui._modals.size()
 		ui.open_help()
 		_eq(ui._modals.size(), n0 + 1, kind + " help opens")

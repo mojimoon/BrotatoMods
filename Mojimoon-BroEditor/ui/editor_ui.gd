@@ -356,6 +356,8 @@ func open_help() -> void:
 	var scroll = _scroll()
 	m.body.add_child(scroll)
 	var r = _rich(help_bbcode(help_text()))
+	# 普通文字灰色，加粗（help_bbcode 着白色）与标题更醒目
+	r.add_color_override("default_color", C_TEXT_DIM)
 	r.add_font_override("normal_font", FONT_SMALL)
 	r.add_font_override("bold_font", FONT_SMALL)
 	scroll.add_child(r)
@@ -370,6 +372,8 @@ func help_text() -> String:
 		var k = "BE_HELP_P_" + t[0].to_upper()
 		var own = k + "_" + _kind.to_upper()
 		parts.push_back(tr(own) if tr(own) != own else tr(k))
+	if _kind == "item":
+		parts.push_back(tr("BE_HELP_REPLACE"))
 	parts.push_back(tr("BE_HELP_SHARE"))
 	var tags = {"character": "BE_SEC_TAGS", "item": "BE_SEC_ITEM_TAGS", "weapon": "BE_SEC_WEAPON_SETS"}[_kind]
 	var new_key = "BE_NEW_CUSTOM" if _kind == "character" else "BE_NEW_CUSTOM_" + _kind.to_upper()
@@ -1611,8 +1615,6 @@ func _build_attrs() -> void:
 		rep.connect("selected", self, "_on_replaced_by", [orig_rep_id])
 		_attr_row(grid, tr("BE_REPLACED_BY"), rep, "replaced_by")
 		_mark_name("replaced_by", cur_rep, orig_rep_id)
-		grid.add_child(Control.new())
-		grid.add_child(_desc(tr("BE_REPLACED_BY_DESC")))
 		box.add_child(_desc(tr("BE_ITEM_BASIC_DESC")))
 		_build_stat_tables(left, v)
 	else:
