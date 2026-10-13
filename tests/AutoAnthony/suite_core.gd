@@ -497,7 +497,7 @@ func test_51_ui_builds_and_previews() -> void:
 	ui.test_clipboard = ""
 	ui._on_export_pressed()
 	var code = ui.test_clipboard
-	_check(code.begins_with("AA1:"), "export puts a share code on the clipboard")
+	_check(code.begins_with("AA2:12345:"), "export puts a share code with the seed on the clipboard")
 	m.cfg_avg = 100
 	m.cfg_seed = 1
 	m.cfg_more_double = false
@@ -510,7 +510,15 @@ func test_51_ui_builds_and_previews() -> void:
 	ui.test_clipboard = "not a code"
 	ui._on_import_pressed()
 	_eq(m.cfg_avg, 135, "invalid code changes nothing")
-	_check(not m.import_settings_code("AA1:@@@"), "garbage code rejected")
+	_check(not m.import_settings_code("AA2:1:@@@"), "garbage code rejected")
+	_check(not m.import_settings_code("AA2:x:" + code.get_slice(":", 2)), "non-numeric seed rejected")
+	m.cfg_fixed_seed = false
+	var code2 = m.export_settings_code()
+	_check(code2.begins_with("AA2::"), "no fixed seed -> empty seed field")
+	_check(code2.length() < Marshalls.utf8_to_base64(JSON.print(m.get_cfg())).length(), "share code is compressed")
+	m.cfg_fixed_seed = true
+	_check(m.import_settings_code(code2) and not m.cfg_fixed_seed and m.cfg_seed == 12345, "empty seed disables fixed seed, keeps seed value")
+	m.cfg_fixed_seed = true
 	ui._on_preview_pressed()
 	for t in 4:
 		ui._on_tier_pressed(t)
@@ -2768,7 +2776,8 @@ func test_173_ui_font_scale() -> void:
 	m.cfg_font_scale = 100
 	m._load_settings()
 	_eq(m.cfg_font_scale, 125, "font scale saved")
-	_check(Marshalls.base64_to_utf8(m.export_settings_code().substr(4)).find("font_scale") == -1, "font scale not in share code")
+	var body = Marshalls.base64_to_raw(m.export_settings_code().get_slice(":", 2)).decompress_dynamic(1024 * 1024, File.COMPRESSION_DEFLATE).get_string_from_utf8()
+	_check(body.find("items") != -1 and body.find("font_scale") == -1 and body.find("seed") == -1, "font scale / seed not in share code body")
 	m.import_settings_code(m.export_settings_code())
 	_eq(m.cfg_font_scale, 125, "import keeps font scale")
 	ui._on_slider_changed(100.0, "cfg_font_scale")
