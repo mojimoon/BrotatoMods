@@ -621,6 +621,24 @@ func test_80_item_transform() -> void:
 	_check(not "item_alien_eyes" in ids and ids.count("item_coupon") == 1, "replaced once at wave end: " + str(ids))
 	_check(GE.graph_text(g, false).find(tr(m.find_target("item", "item_coupon").name)) >= 0, "transform text")
 	m.item_profiles.erase("item_alien_eyes")
+	m.apply_all()
+	# 列表为空：移除并换成"移除后变成"；指定了道具：不再额外加入"移除后变成"
+	var p3 = m.new_profile()
+	p3.graph = GE.new_graph()
+	GE.add_link(p3.graph, GE.add_node(p3.graph, "kill", Vector2.ZERO), GE.add_node(p3.graph, "transform", Vector2.ZERO))
+	p3.replaced_by = "item_bandana"
+	m.item_profiles["item_alien_eyes"] = p3
+	m.apply_all()
+	rd.add_item(it, 0)
+	m.runtime.start_wave(null)
+	m.runtime.fire("kill", 0)
+	m.runtime.end_wave()
+	ids = []
+	for x in rd.get_player_items_ref(0):
+		ids.push_back(x.my_id)
+	_check(not "item_alien_eyes" in ids and "item_bandana" in ids, "empty list uses replaced_by: " + str(ids))
+	_check(GE.graph_text(p3.graph, false) == tr("BE_PX_TRANSFORM_REPLACED") or GE.graph_text(p3.graph, false).find(tr("BE_PX_TRANSFORM_REPLACED")) >= 0, "replaced text")
+	m.item_profiles.erase("item_alien_eyes")
 	# 移除后变成
 	var p2 = m.new_profile()
 	p2.replaced_by = "item_coupon"

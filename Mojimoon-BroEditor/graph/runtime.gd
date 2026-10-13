@@ -277,16 +277,16 @@ func _execute(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> void:
 	_sync_lost_max_hp(p, hp_before)
 
 
-# 道具变为：持有者是道具时，移除它并加入列表中随机一件（原版 remove_item 同时处理 replaced_by）
+# 道具变为：持有者是道具时，换成列表中随机一件；列表为空时移除它（原版 remove_item 换成"移除后变成"的道具）
 func _transform(en: Dictionary, n: Dictionary, p: int) -> void:
 	var ids = _param(n, "items", [])
 	var src = en.get("src")
-	if not ids is Array or ids.empty() or not src is ItemData or src is CharacterData:
+	if not ids is Array or not src is ItemData or src is CharacterData:
 		return
 	for t in _transforms:
 		if t.src == src and t.p == p:
 			return
-	_transforms.push_back({"p": p, "src": src, "id": str(ids[randi() % ids.size()])})
+	_transforms.push_back({"p": p, "src": src, "id": str(ids[randi() % ids.size()]) if not ids.empty() else ""})
 	if wave_over:
 		_flush_transforms()
 
@@ -295,11 +295,17 @@ func _flush_transforms() -> void:
 	var list = _transforms
 	_transforms = []
 	for t in list:
-		var target = mod.find_target("item", t.id) if mod != null else null
-		if target == null or t.p >= RunData.get_player_count() or not t.src in RunData.get_player_items_ref(t.p):
+		var target = mod.find_target("item", t.id) if mod != null and t.id != "" else null
+		if (t.id != "" and target == null) or t.p >= RunData.get_player_count() or not t.src in RunData.get_player_items_ref(t.p):
 			continue
+		# 没有指定道具：移除，由原版换成"移除后变成"；指定了道具：只换成该道具
+		var rep = t.src.replaced_by
+		if target != null:
+			t.src.replaced_by = null
 		RunData.remove_item(t.src, t.p)
-		RunData.add_item(target, t.p)
+		t.src.replaced_by = rep
+		if target != null:
+			RunData.add_item(target, t.p)
 		# 商店中：刷新装备栏
 		var scene = get_tree().current_scene if is_inside_tree() else null
 		if scene != null and scene.has_method("_get_gear_container"):

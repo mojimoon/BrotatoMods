@@ -74,6 +74,7 @@ var next_id: int = 1
 var debug := false
 # 隐藏自定义对象图标右下角的编号（使用原版图标时才有编号）
 var hide_numbers := false
+var custom_tags: Dictionary = {}	# 自定义标签：键名 -> 名称（所有道具 / 角色可用；随 profiles.json 保存）
 # 效果库去重（同脚本、同 key 的效果只保留一条）；默认关：保留全部，包括同一武器各等级的效果
 var library_dedup := false
 # 更详细的键名（只在显示键名时生效）：效果显示全部键名、编辑时显示字段名
@@ -399,6 +400,7 @@ func load_profiles() -> void:
 	weapon_profiles = {}
 	weapon_families = {}
 	disabled = {"character": [], "item": [], "weapon": []}
+	custom_tags = {}
 	_load_main_file()
 	_load_custom_files()
 
@@ -422,6 +424,10 @@ func _load_main_file() -> void:
 	var kinds = settings.get("kinds", {}) if settings is Dictionary else {}
 	for k in KINDS:
 		kind_enabled[k] = bool(kinds.get(k, true)) if kinds is Dictionary else true
+	var tags = parsed.result.get("tags", {})
+	if tags is Dictionary:
+		for k in tags:
+			custom_tags[str(k)] = str(tags[k])
 	for pair in [["profiles", profiles], ["items", item_profiles], ["weapons", weapon_profiles]]:
 		var ps = parsed.result.get(pair[0], {})
 		if ps is Dictionary:
@@ -501,6 +507,7 @@ func save_profiles() -> void:
 	main["next_id"] = next_id
 	main["settings"] = {"debug": debug, "debug_detail": debug_detail, "font_scale": font_scale, "hide_numbers": hide_numbers, "library_dedup": library_dedup, "kinds": kind_enabled}
 	main["disabled"] = disabled
+	main["tags"] = custom_tags
 	var file = File.new()
 	if file.open(SAVE_PATH, File.WRITE) != OK:
 		ModLoaderLog.error("Failed to save profiles", MOD_ID)
@@ -996,6 +1003,16 @@ func build_effects(id: String, p: Dictionary) -> Array:
 		if not used.has(entry_sig(en.marker)):
 			out.push_back(en.effect)
 	return out
+
+
+# 删除自定义标签：同时从所有道具 / 角色的档案里移除
+func delete_custom_tag(tag: String) -> void:
+	custom_tags.erase(tag)
+	for pair in [[profiles, "wanted_tags"], [item_profiles, "tags"]]:
+		for id in pair[0]:
+			var arr = pair[0][id][pair[1]]
+			if arr is Array:
+				arr.erase(tag)
 
 
 # 以所在道具 id 为 key 的原版效果（金鱼"刷新时升级"、镜子"复制下一件"：原版按 key 找到并移除这件道具）

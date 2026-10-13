@@ -293,6 +293,8 @@ static func _payload_text(n: Dictionary, trigger_kind: String, colored: bool) ->
 		"transform":
 			var ids = _p(n, "items", [])
 			ids = ids if ids is Array else []
+			if ids.empty():
+				return _tr("BE_PX_TRANSFORM_REPLACED")
 			return _tr("BE_PX_TRANSFORM_RANDOM" if ids.size() > 1 else "BE_PX_TRANSFORM").replace("{0}", _item_names(ids))
 		"grant":
 			var inner = _grant_text(n, colored)

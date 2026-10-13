@@ -1188,32 +1188,106 @@ func _tag_section(left: Control) -> void:
 		var b = _chip(_tag_name(tag), tag, tag in tags, C_ACCENT_3)
 		b.connect("pressed", self, "_on_tag_pressed", [tag])
 		grid.add_child(b)
-	# 新词条：输入后加入本对象（取消选择且没有其他对象使用时即消失）
+	# 自定义标签：键名 + 名称（可选，默认同键名）；添加后所有道具 / 角色可用，并加入本对象
 	var add_row = HBoxContainer.new()
 	add_row.add_constant_override("separation", 8)
 	tbox.add_child(add_row)
-	var le = _line_edit(tr("BE_TAG_NEW_HINT"))
-	le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	le.connect("text_entered", self, "_on_tag_new")
-	add_row.add_child(le)
+	var key_le = _line_edit(tr("BE_TAG_NEW_HINT"))
+	key_le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	add_row.add_child(key_le)
+	var name_le = _line_edit(tr("BE_TAG_NAME_HINT"))
+	name_le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	add_row.add_child(name_le)
+	for le in [key_le, name_le]:
+		le.connect("text_entered", self, "_on_tag_new_entered", [key_le, name_le])
 	var add = _button(tr("BE_TAG_NEW"), FONT_DESC)
 	_apply_action_style(add, C_ACCENT_3)
-	add.connect("pressed", self, "_on_tag_new_pressed", [le])
+	add.connect("pressed", self, "_on_tag_new_pressed", [key_le, name_le])
 	add_row.add_child(add)
+	var manage = _button(tr("BE_TAG_MANAGE"), FONT_DESC)
+	_apply_action_style(manage, C_ACCENT_2)
+	manage.connect("pressed", self, "open_tag_manager")
+	add_row.add_child(manage)
 
 
-func _on_tag_new_pressed(le: LineEdit) -> void:
-	_on_tag_new(le.text)
+func _on_tag_new_entered(_text: String, key_le: LineEdit, name_le: LineEdit) -> void:
+	_on_tag_new_pressed(key_le, name_le)
 
 
-func _on_tag_new(text: String) -> void:
-	var tag = text.strip_edges()
+func _on_tag_new_pressed(key_le: LineEdit, name_le: LineEdit) -> void:
+	_on_tag_new(key_le.text, name_le.text)
+
+
+func _on_tag_new(key: String, name: String = "") -> void:
+	var tag = key.strip_edges()
+	if tag == "":
+		return
+	if _mod.custom_tags.has(tag) or not tag in _all_tags():
+		_mod.custom_tags[tag] = name.strip_edges() if name.strip_edges() != "" else tag
 	var field = "wanted_tags" if _kind == "character" else "tags"
 	var v = _view()
 	var tags = v[field] if v[field] is Array else _mod.backup_value(_character(), field)
-	if tag == "" or tag in tags:
+	if tag in tags:
+		_build_page()
 		return
 	_on_tag_pressed(tag)
+
+
+# 管理自定义标签：改名称、删除（删除时从所有道具 / 角色移除）
+func open_tag_manager() -> void:
+	var m = Modal.open(self, tr("BE_TAG_MANAGE_TITLE"), C_ACCENT_2, Vector2(900, 0))
+	m.add_button(tr("MENU_BACK"), C_TEXT_DIM, m, "close")
+	var list = VBoxContainer.new()
+	list.add_constant_override("separation", 6)
+	m.body.add_child(list)
+	m.set_meta("list", list)
+	_fill_tag_manager(list)
+
+
+func _fill_tag_manager(list: Control) -> void:
+	for c in list.get_children():
+		list.remove_child(c)
+		c.queue_free()
+	var keys = _mod.custom_tags.keys()
+	keys.sort()
+	if keys.empty():
+		list.add_child(_desc(tr("BE_TAG_NONE")))
+	for k in keys:
+		var row = HBoxContainer.new()
+		row.add_constant_override("separation", 8)
+		list.add_child(row)
+		var kl = _key_label(k)
+		kl.rect_min_size = Vector2(260, 0)
+		kl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(kl)
+		var le = _line_edit(k)
+		le.text = _mod.custom_tags[k]
+		le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		le.connect("text_changed", self, "_on_tag_rename", [k])
+		row.add_child(le)
+		var del = _button(tr("BE_DELETE"), FONT_DESC)
+		_apply_action_style(del, C_DANGER)
+		del.connect("pressed", self, "_on_tag_delete_ask", [k, list])
+		row.add_child(del)
+
+
+func _on_tag_rename(text: String, tag: String) -> void:
+	_mod.custom_tags[tag] = text.strip_edges() if text.strip_edges() != "" else tag
+	_changed()
+	_build_page()
+
+
+func _on_tag_delete_ask(tag: String, list: Control) -> void:
+	Modal.confirm(self, [tr("BE_TAG_DELETE_CONFIRM").replace("{0}", _tag_name(tag))], C_DANGER, self, "_on_tag_delete", [tag, list])
+
+
+func _on_tag_delete(tag: String, list: Control) -> void:
+	_mod.delete_custom_tag(tag)
+	_reregister()
+	_changed()
+	_build_page()
+	if is_instance_valid(list):
+		_fill_tag_manager(list)
 
 
 const EFFECT_LINE = preload("res://items/global/effect_line.tscn")
@@ -1348,7 +1422,10 @@ func _all_tags() -> Array:
 		for t in c.wanted_tags:
 			if not t in out:
 				out.push_back(t)
-	# 本对象未应用的修改里的词条（如刚添加的新词条）
+	for t in _mod.custom_tags:
+		if not t in out:
+			out.push_back(t)
+	# 本对象未应用的修改里的词条
 	var field = "wanted_tags" if _kind == "character" else "tags"
 	if _kind != "weapon" and _view()[field] is Array:
 		for t in _view()[field]:
@@ -1359,6 +1436,8 @@ func _all_tags() -> Array:
 
 
 func _tag_name(tag: String) -> String:
+	if _mod.custom_tags.has(tag):
+		return _mod.custom_tags[tag]
 	return _mod.stat_name(tag)
 
 
@@ -1532,6 +1611,8 @@ func _build_attrs() -> void:
 		rep.connect("selected", self, "_on_replaced_by", [orig_rep_id])
 		_attr_row(grid, tr("BE_REPLACED_BY"), rep, "replaced_by")
 		_mark_name("replaced_by", cur_rep, orig_rep_id)
+		grid.add_child(Control.new())
+		grid.add_child(_desc(tr("BE_REPLACED_BY_DESC")))
 		box.add_child(_desc(tr("BE_ITEM_BASIC_DESC")))
 		_build_stat_tables(left, v)
 	else:
