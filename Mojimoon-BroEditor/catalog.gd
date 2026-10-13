@@ -336,7 +336,9 @@ class FieldSorter:
 #   部分扳机非原版（同 AutoAnthony）：命中敌人 / 首次命中 / 点燃由敌人身上的效果行为（graph/enemy_behavior.gd）转发，
 #   引发爆炸由 WeaponService.explode 的扩展转发
 #   名称 key = BE_N_<ID>；路径文本见 graph_effect.gd（扳机句式 BE_TX_*、效果句式 BE_PX_*、条件后缀 BE_CX_*）
-#   状态扳机（still / moving / low_hp / full_hp）：进入状态时执行，离开时撤销"本波属性"与"本波获得"
+#   状态扳机（still / moving / low_hp / full_hp / always）：按路径轮询，扳机状态与路径上的状态条件（STATE_CONDS）都满足时进入并执行，
+#   任一不满足时撤销"本波属性"与"本波获得"
+#   transform（道具变为）：只对道具上的蓝图有效；敌袭中触发时等到敌袭结束再替换
 # ============================================================
 const NODES = [
 	["wave_start", "trigger", []],
@@ -367,6 +369,7 @@ const NODES = [
 	["moving", "trigger", []],
 	["low_hp", "trigger", [["pct", "int", 50]]],
 	["full_hp", "trigger", []],
+	["always", "trigger", []],
 	["chance", "cond", [["pct", "int", 25]]],
 	["every", "cond", [["n", "int", 5]]],
 	["cap", "cond", [["n", "int", 3]]],
@@ -399,13 +402,16 @@ const NODES = [
 	["vuln", "effect", [["pct", "int", 10], ["secs", "int", 3]]],
 	["rand_stats", "effect", [["value", "int", 1]]],
 	["fruit", "effect", [["value", "int", 1]]],
+	["transform", "effect", [["items", "items", []]]],
 	["grant", "effect", [["ref", "effect", null], ["n", "int", 1], ["mode", "mode:temp|timed|perm", "temp"], ["secs", "int", 5]]],
 ]
 # 只在某个参数取某值时显示的参数：[节点, 参数] -> [条件参数, 值]
 const PARAM_SHOW_IF = {"grant:secs": ["mode", "timed"]}
 # 伤害类型（条件"伤害类型"：命中 / 击杀的缩放属性）
 const DMG_TYPES = ["stat_melee_damage", "stat_ranged_damage", "stat_elemental_damage", "stat_engineering"]
-const STATE_TRIGGERS = ["still", "moving", "low_hp", "full_hp"]
+const STATE_TRIGGERS = ["still", "moving", "low_hp", "full_hp", "always"]
+# 状态条件：在状态扳机的路径上持续检查（全部满足时进入，任一不满足时撤销）；其余条件只在进入时检查一次
+const STATE_CONDS = ["hp_below", "hp_above", "wave_min", "wave_max", "diff_min", "diff_max", "stat_min", "stat_max", "if_moving", "if_still"]
 const SHOP_TRIGGERS = ["reroll", "buy"]
 
 # 原版触发型效果（Effect{key = 属性, value, custom_key = 扳机}）-> 蓝图 [扳机, [条件...], 效果]（"拆解"按钮用）
@@ -445,7 +451,7 @@ static func default_params(kind: String) -> Dictionary:
 	var d = node_def(kind)
 	if d != null:
 		for p in d[2]:
-			out[p[0]] = p[2]
+			out[p[0]] = p[2].duplicate() if p[2] is Array else p[2]
 	return out
 
 

@@ -450,6 +450,30 @@ func test_154_field_controls() -> void:
 	_check("be_test_tag" in ui._all_tags(), "custom tag listed")
 	ui._on_tag_pressed("be_test_tag")
 	_check(not "be_test_tag" in ui._all_tags(), "unused custom tag disappears")
+	# 移除后变成
+	ui._on_tab_pressed("stats")
+	ui._on_replaced_by("item_coupon", "")
+	_eq(ui._p().replaced_by, "item_coupon", "replaced_by set")
+	ui._build_page()
+	# 蓝图"道具变为"：添加 / 替换 / 删除道具
+	ui.set_kind("character")
+	ui._select(CH)
+	var GE = load("res://mods-unpacked/Mojimoon-BroEditor/graph/graph_effect.gd")
+	var g = GE.new_graph()
+	var tn = GE.add_node(g, "transform", Vector2.ZERO)
+	if not m.profiles.has(CH):
+		m.profiles[CH] = m.new_profile()
+	m.profiles[CH].graph = g
+	ui._on_tab_pressed("blueprint")
+	yield(tree, "idle_frame")
+	var bp = ui.blueprint
+	bp._on_items_param("item_coupon", tn, "items", -1)
+	bp._on_items_param("item_alien_eyes", tn, "items", -1)
+	bp._on_items_param("item_bandana", tn, "items", 0)
+	bp._on_items_param(null, tn, "items", 1)
+	yield(tree, "idle_frame")
+	_eq(GE.nodes_by_id(m.profiles[CH].graph)[tn].params.items, ["item_bandana"], "items list edited")
+	_eq(m.Catalog.default_params("transform").items, [], "default list not shared")
 	ui.queue_free()
 	yield(tree, "idle_frame")
 

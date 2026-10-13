@@ -230,10 +230,12 @@ static func path_text(by_id: Dictionary, path: Array, colored: bool = true) -> S
 	if tc.length() > 0:
 		tc = tc.substr(0, 1).to_upper() + tc.substr(1)
 	var c_text = str(stepify(chance, 0.1)).trim_suffix(".0") + "%"
-	return _tr(k).replace("{T}", tc).replace("{t}", t).replace("{p}", _payload_text(eff, trig.kind, colored)).replace("{c}", _col(c_text, true, colored)) + suffix
+	return _tr(k).replace("{T}", tc).replace("{t}", t).replace("{p}", _payload_text(eff, trig.kind, colored)).replace("{c}", _col(c_text, true, colored)).strip_edges() + suffix
 
 
 static func _trigger_text(trig: Dictionary, every: int) -> String:
+	if trig.kind == "always":
+		return ""
 	var base = "BE_TX_" + trig.kind.to_upper()
 	if every > 1 and _tr(base + "_EVERY") != base + "_EVERY":
 		return _tr(base + "_EVERY").replace("{0}", str(every))
@@ -288,6 +290,10 @@ static func _payload_text(n: Dictionary, trigger_kind: String, colored: bool) ->
 			return _tr("BE_PX_FRUIT_1" if v == 1 else "BE_PX_FRUIT").replace("{0}", _col(str(v), good, colored))
 		"rand_stats":
 			return _tr("BE_PX_RAND_STATS_1" if v == 1 else "BE_PX_RAND_STATS").replace("{0}", _col(str(v), good, colored))
+		"transform":
+			var ids = _p(n, "items", [])
+			ids = ids if ids is Array else []
+			return _tr("BE_PX_TRANSFORM_RANDOM" if ids.size() > 1 else "BE_PX_TRANSFORM").replace("{0}", _item_names(ids))
 		"grant":
 			var inner = _grant_text(n, colored)
 			var mode = str(_p(n, "mode", "temp"))
@@ -306,6 +312,15 @@ static func _grant_text(n: Dictionary, colored: bool) -> String:
 		return TranslationServer.translate("BE_GRANT_NONE")
 	e.value = e.value * int(n.params.get("n", 1))
 	return m.effect_text(e, colored)
+
+
+static func _item_names(ids: Array) -> String:
+	var m = _mod()
+	var names = []
+	for id in ids:
+		var it = m.find_target("item", str(id)) if m != null else null
+		names.push_back(TranslationServer.translate(it.name) if it != null else str(id))
+	return PoolStringArray(names).join(" / ") if not names.empty() else "-"
 
 
 static func _stat_name(key: String) -> String:

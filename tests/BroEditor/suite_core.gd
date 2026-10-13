@@ -563,6 +563,86 @@ func test_78_graph_low_hp_and_difficulty() -> void:
 	TranslationServer.set_locale("en")
 
 
+# 状态扳机"始终"：路径上的状态条件持续检查，满足时进入、不满足时撤销
+func test_79_always_state_paths() -> void:
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	var t = GE.add_node(g, "always", Vector2.ZERO)
+	var c = GE.add_node(g, "stat_min", Vector2.ZERO, {"stat": "stat_armor", "n": 500})
+	GE.add_link(g, t, c)
+	GE.add_link(g, c, GE.add_node(g, "temp_stat", Vector2.ZERO, {"stat": "stat_luck", "value": 5}))
+	GE.add_link(g, t, GE.add_node(g, "temp_stat", Vector2.ZERO, {"stat": "stat_speed", "value": 3}))
+	_graph_char(g)
+	var en = m.runtime.entries[0][0]
+	var trig = en.by_id[t]
+	var luck = Keys.generate_hash("stat_luck")
+	var speed = Keys.generate_hash("stat_speed")
+	var l0 = TempStats.get_stat(luck, 0)
+	var s0 = TempStats.get_stat(speed, 0)
+	m.runtime.poll_state(en, trig, 0, null)
+	m.runtime.poll_state(en, trig, 0, null)
+	_eq(TempStats.get_stat(speed, 0), s0 + 3, "always: unconditional path once")
+	_eq(TempStats.get_stat(luck, 0), l0, "armor too low: not entered")
+	RunData.add_stat(Keys.stat_armor_hash, 1000, 0)
+	Utils.reset_stat_cache(0)
+	m.runtime.poll_state(en, trig, 0, null)
+	_eq(TempStats.get_stat(luck, 0), l0 + 5, "armor reached: entered")
+	RunData.add_stat(Keys.stat_armor_hash, -1000, 0)
+	Utils.reset_stat_cache(0)
+	m.runtime.poll_state(en, trig, 0, null)
+	_eq(TempStats.get_stat(luck, 0), l0, "armor lost: reverted")
+	m.runtime.end_wave()
+	_eq(TempStats.get_stat(speed, 0), s0, "wave end reverts")
+	TranslationServer.set_locale("zh")
+	_check(_path_line([["always", {}], ["stat_min", {"stat": "stat_armor", "n": 10}], ["temp_stat", {"stat": "stat_luck", "value": 5}]]).begins_with("+5"), "always has no trigger text")
+	TranslationServer.set_locale("en")
+
+
+# 道具变为：敌袭中触发，敌袭结束时替换；移除后变成（replaced_by）；金鱼效果复制到别的道具上指向该道具
+func test_80_item_transform() -> void:
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	GE.add_link(g, GE.add_node(g, "kill", Vector2.ZERO), GE.add_node(g, "transform", Vector2.ZERO, {"items": ["item_coupon"]}))
+	_graph_char(GE.new_graph())
+	var p = m.new_profile()
+	p.graph = g
+	m.item_profiles["item_alien_eyes"] = p
+	m.apply_all()
+	var it = m.find_target("item", "item_alien_eyes")
+	rd.add_item(it, 0)
+	m.runtime.start_wave(null)
+	m.runtime.fire("kill", 0)
+	m.runtime.fire("kill", 0)
+	_check(it in rd.get_player_items_ref(0), "kept during the wave")
+	m.runtime.end_wave()
+	var ids = []
+	for x in rd.get_player_items_ref(0):
+		ids.push_back(x.my_id)
+	_check(not "item_alien_eyes" in ids and ids.count("item_coupon") == 1, "replaced once at wave end: " + str(ids))
+	_check(GE.graph_text(g, false).find(tr(m.find_target("item", "item_coupon").name)) >= 0, "transform text")
+	m.item_profiles.erase("item_alien_eyes")
+	# 移除后变成
+	var p2 = m.new_profile()
+	p2.replaced_by = "item_coupon"
+	m.item_profiles["item_alien_eyes"] = p2
+	m.apply_all()
+	_eq(it.replaced_by, m.find_target("item", "item_coupon"), "replaced_by applied")
+	m.item_profiles.erase("item_alien_eyes")
+	m.apply_all()
+	_eq(it.replaced_by, null, "replaced_by restored")
+	var fish = m.find_target("item", "item_goldfish")
+	if fish != null:
+		var cid = m.create_custom_item("item_goldfish")
+		var ci = m.find_target("item", cid)
+		m.apply_all()
+		_eq(ci.replaced_by, fish.replaced_by, "custom copy keeps replaced_by")
+		var keyed = false
+		for e in ci.effects:
+			keyed = keyed or (e.custom_key == "increase_tier_on_reroll" and e.key == cid)
+		_check(keyed, "copied goldfish effect points at the copy")
+		m.delete_custom_item(cid)
+
+
 func test_110_path_text() -> void:
 	TranslationServer.set_locale("zh")
 	_eq(_path_line([["level_up", {}], ["perm_stat", {"stat": "stat_melee_damage", "value": 2}]]), "升级时+2近战伤害", "zh level up")

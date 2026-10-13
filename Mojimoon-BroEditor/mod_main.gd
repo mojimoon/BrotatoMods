@@ -190,6 +190,7 @@ static func new_profile() -> Dictionary:
 		"tier": -1,
 		"max_nb": -2,
 		"tags": null,
+		"replaced_by": null,	# 道具：移除后变成的道具 id（"" = 无；null = 不修改）
 		"wstats": {},
 		"scaling": null,
 		# 自定义对象的图标编号
@@ -235,6 +236,8 @@ static func normalize_profile(p) -> Dictionary:
 	out.max_nb = int(out.max_nb)
 	if out.tags != null and not out.tags is Array:
 		out.tags = null
+	if out.replaced_by != null:
+		out.replaced_by = str(out.replaced_by)
 	var ws = {}
 	if out.wstats is Dictionary:
 		for k in out.wstats:
@@ -987,11 +990,25 @@ func build_effects(id: String, p: Dictionary) -> Array:
 			continue
 		var e = make_effect(spec)
 		if e != null:
+			_rekey_self(e, spec, id)
 			out.push_back(e)
 	for en in entries:
 		if not used.has(entry_sig(en.marker)):
 			out.push_back(en.effect)
 	return out
+
+
+# 以所在道具 id 为 key 的原版效果（金鱼"刷新时升级"、镜子"复制下一件"：原版按 key 找到并移除这件道具）
+# 复制到别的道具上时改指向该道具，否则会去找原来那件
+const SELF_KEYED = ["increase_tier_on_reroll", "duplicate_item"]
+
+
+func _rekey_self(e, spec: Dictionary, id: String) -> void:
+	var from = str(spec.get("from", ""))
+	if from == "" or from == id or e.key != from or not e.custom_key in SELF_KEYED or find_target("item", id) == null:
+		return
+	e.key = id
+	e._generate_hashes()
 
 
 # 生成的效果条目（默认顺序）：[{marker, effect}]
@@ -1091,7 +1108,7 @@ func _desc_effect(id: String, text: String):
 
 const BACKUP_FIELDS = {
 	"character": ["effects", "name", "starting_weapons", "wanted_tags"],
-	"item": ["effects", "name", "value", "tier", "max_nb", "tags"],
+	"item": ["effects", "name", "value", "tier", "max_nb", "tags", "replaced_by"],
 	"weapon": ["effects", "name", "value", "stats", "sets"],
 }
 
@@ -1210,6 +1227,8 @@ func _apply_items() -> void:
 			it.max_nb = p.max_nb
 		if p.tags is Array:
 			it.tags = p.tags.duplicate()
+		if p.replaced_by is String:
+			it.replaced_by = find_target("item", p.replaced_by) if p.replaced_by != "" else null
 
 
 # 武器：效果、名称、价格、武器属性（在原属性的副本上改写）
@@ -1530,6 +1549,8 @@ func create_custom_item(base_id: String, suffix: String = "") -> String:
 		p.tier = int(backup_value(base, "tier"))
 		p.max_nb = int(backup_value(base, "max_nb"))
 		p.tags = backup_value(base, "tags").duplicate()
+		var rep = backup_value(base, "replaced_by")
+		p.replaced_by = rep.my_id if rep != null else ""
 		p.effects = []
 		for i in orig_effects(base_id).size():
 			p.effects.push_back({"from": base_id, "i": i})

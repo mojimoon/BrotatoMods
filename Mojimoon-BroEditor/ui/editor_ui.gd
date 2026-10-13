@@ -1523,6 +1523,15 @@ func _build_attrs() -> void:
 			tiers.add_child(tb)
 		_attr_row(grid, tr("BE_TIER"), tiers, "tier")
 		_mark_name("tier", cur_tier, orig_tier)
+		# 移除后变成（原版 replaced_by：金鱼、沙漏、镜子这类会移除自身的道具）
+		var orig_rep = _mod.backup_value(r, "replaced_by")
+		var orig_rep_id = orig_rep.my_id if orig_rep != null else ""
+		var cur_rep = v.replaced_by if v.replaced_by is String else orig_rep_id
+		var rep = _search_select([[tr("BE_REPLACED_NONE"), ""]] + item_select_items(), cur_rep)
+		rep.rect_min_size = Vector2(260, 0)
+		rep.connect("selected", self, "_on_replaced_by", [orig_rep_id])
+		_attr_row(grid, tr("BE_REPLACED_BY"), rep, "replaced_by")
+		_mark_name("replaced_by", cur_rep, orig_rep_id)
 		box.add_child(_desc(tr("BE_ITEM_BASIC_DESC")))
 		_build_stat_tables(left, v)
 	else:
@@ -1541,6 +1550,22 @@ func _attr_row(grid: Control, text: String, ctl: Control, key: String = "") -> v
 
 
 # 价格 / 数量限制 / 稀有度：等于原值时记为"不修改"
+func _on_replaced_by(id, orig: String) -> void:
+	_p().replaced_by = null if str(id) == orig and not _mod.is_custom(_id) else str(id)
+	_mark_name("replaced_by", str(id), orig)
+	_reregister()
+	_changed()
+
+
+# 道具选择列表（不含角色）
+func item_select_items() -> Array:
+	var out = []
+	for it in _isvc().items:
+		if it != null and not it is CharacterData:
+			out.push_back([tr(it.name), it.my_id])
+	return out
+
+
 func _on_attr_changed(value, field: String, orig: int) -> void:
 	var unset = {"price": -1, "max_nb": -2, "tier": -1}[field]
 	_p()[field] = unset if int(value) == orig else int(value)

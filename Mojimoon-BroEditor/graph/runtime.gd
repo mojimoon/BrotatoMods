@@ -23,6 +23,7 @@ var _steps: Array = [0.0, 0.0, 0.0, 0.0]
 var _wave_serial := 0
 var _explosion_effect = null
 var _timed_list: Array = []	# 持续 N 秒的效果：[{p, u: 撤销列表}]
+var _transforms: Array = []	# 待替换的道具：[{p, src, id}]（敌袭结束 / 商店中执行）
 
 
 func _ready() -> void:
@@ -46,6 +47,10 @@ func end_wave() -> void:
 				var st = en.st[id]
 				if st.get("active", false):
 					_revert(p, st.get("hold", []))
+				for ps in st.get("paths", {}).values():
+					if ps.active:
+						_revert(p, ps.hold)
+				st.paths = {}
 				st.active = false
 				st.hold = []
 				st.fired = 0
@@ -57,6 +62,7 @@ func end_wave() -> void:
 		_revert(rec.p, rec.u)
 		rec.u = []
 	_timed_list = []
+	_flush_transforms()
 	main = null
 
 
@@ -82,7 +88,7 @@ func rebuild_all() -> void:
 						var en = old.get(e.get_instance_id())
 						if en == null:
 							var g = e.live_graph()
-							en = {"effect": e, "g": g, "by_id": GraphEffect.nodes_by_id(g), "st": {}, "granted": []}
+							en = {"effect": e, "g": g, "by_id": GraphEffect.nodes_by_id(g), "st": {}, "granted": [], "src": src, "sp": {}}
 						list.push_back(en)
 		entries[p] = list
 
@@ -264,9 +270,42 @@ func _execute(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> void:
 			_slow(n, ctx.target)
 		"fruit":
 			call_deferred("_drop_fruit", v, ctx.pos if ctx.pos != null else _player_pos(p))
+		"transform":
+			_transform(en, n, p)
 		"grant":
 			_grant(en, n, p, ctx)
 	_sync_lost_max_hp(p, hp_before)
+
+
+# 道具变为：持有者是道具时，移除它并加入列表中随机一件（原版 remove_item 同时处理 replaced_by）
+func _transform(en: Dictionary, n: Dictionary, p: int) -> void:
+	var ids = _param(n, "items", [])
+	var src = en.get("src")
+	if not ids is Array or ids.empty() or not src is ItemData or src is CharacterData:
+		return
+	for t in _transforms:
+		if t.src == src and t.p == p:
+			return
+	_transforms.push_back({"p": p, "src": src, "id": str(ids[randi() % ids.size()])})
+	if wave_over:
+		_flush_transforms()
+
+
+func _flush_transforms() -> void:
+	var list = _transforms
+	_transforms = []
+	for t in list:
+		var target = mod.find_target("item", t.id) if mod != null else null
+		if target == null or t.p >= RunData.get_player_count() or not t.src in RunData.get_player_items_ref(t.p):
+			continue
+		RunData.remove_item(t.src, t.p)
+		RunData.add_item(target, t.p)
+		# 商店中：刷新装备栏
+		var scene = get_tree().current_scene if is_inside_tree() else null
+		if scene != null and scene.has_method("_get_gear_container"):
+			var gear = scene._get_gear_container(t.p)
+			if gear != null:
+				gear.set_items_data(RunData.get_player_items(t.p))
 
 
 func _grant(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> void:
@@ -498,18 +537,60 @@ func _physics_process(delta: float) -> void:
 						st.acc = 0.0
 						_walk(en, int(n.id), p, {"pos": null, "target": null, "hold": null}, 0)
 				elif n.kind in Catalog.STATE_TRIGGERS:
-					var st = _state(en, int(n.id))
-					var want = _state_holds(n, pl)
-					if want == st.active:
-						continue
-					st.active = want
-					if want:
-						var ctx = {"pos": null, "target": null, "hold": []}
-						_walk(en, int(n.id), p, ctx, 0)
-						st.hold = ctx.hold
-					else:
-						_revert(p, st.hold)
-						st.hold = []
+					poll_state(en, n, p, pl)
+
+
+# 状态扳机：每条路径单独记录是否已进入。扳机状态与路径上的状态条件都满足时进入：检查其余条件（只此一次），
+# 通过则执行效果；任一状态不再满足时撤销本次的本波属性与本波获得
+func poll_state(en: Dictionary, trig: Dictionary, p: int, pl) -> void:
+	var st = _state(en, int(trig.id))
+	if not st.has("paths"):
+		st.paths = {}
+	var on = _state_holds(trig, pl)
+	for path in _state_paths(en, int(trig.id)):
+		var key = str(path)
+		if not st.paths.has(key):
+			st.paths[key] = {"active": false, "hold": []}
+		var ps = st.paths[key]
+		var want = on and _state_conds_hold(en, path, p)
+		if want == ps.active:
+			continue
+		ps.active = want
+		if not want:
+			_revert(p, ps.hold)
+			ps.hold = []
+			continue
+		var ctx = {"pos": null, "target": null, "hold": [], "info": {}}
+		var ok = true
+		for i in range(1, path.size() - 1):
+			var c = en.by_id[path[i]]
+			if not c.kind in Catalog.STATE_CONDS and not _pass(en, c, p, ctx):
+				ok = false
+				break
+		if ok:
+			_execute(en, en.by_id[path[-1]], p, ctx)
+		ps.hold = ctx.hold
+
+
+func _state_paths(en: Dictionary, trig_id: int) -> Array:
+	if not en.has("sp"):
+		en.sp = {}
+	if not en.sp.has(trig_id):
+		var out = []
+		for path in GraphEffect.paths(en.g):
+			if path[0] == trig_id:
+				out.push_back(path)
+		en.sp[trig_id] = out
+	return en.sp[trig_id]
+
+
+func _state_conds_hold(en: Dictionary, path: Array, p: int) -> bool:
+	var ctx = {"pos": null, "target": null, "hold": null, "info": {}}
+	for i in range(1, path.size() - 1):
+		var c = en.by_id[path[i]]
+		if c.kind in Catalog.STATE_CONDS and not _pass(en, c, p, ctx):
+			return false
+	return true
 
 
 func _state_holds(n: Dictionary, pl) -> bool:
@@ -522,6 +603,8 @@ func _state_holds(n: Dictionary, pl) -> bool:
 			return pl.current_stats.health < pl.max_stats.health * float(_param(n, "pct", 50)) / 100.0
 		"full_hp":
 			return pl.current_stats.health >= pl.max_stats.health
+		"always":
+			return true
 	return false
 
 
