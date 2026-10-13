@@ -52,7 +52,7 @@ const WSTAT_FIELDS = [
 	["lifesteal", "float", "pct"], ["speed_percent_modifier", "int", ""], ["effect_scale", "float", "pct"],
 	["nb_projectiles", "int", ""], ["projectile_spread", "float", ""], ["piercing", "int", ""],
 	["piercing_dmg_reduction", "float", "pct"], ["bounce", "int", ""], ["bounce_dmg_reduction", "float", "pct"],
-	["projectile_speed", "int", ""], ["attack_type", "int", ""],
+	["projectile_speed", "int", ""], ["attack_type", "int", ""], ["alternate_attack_type", "bool", ""],
 ]
 # 开局状态的默认值
 const START_DEFAULT = {

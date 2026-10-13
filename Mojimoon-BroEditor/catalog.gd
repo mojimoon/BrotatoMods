@@ -113,6 +113,16 @@ static func stat_keys() -> Array:
 	return out
 
 
+# 武器属性加成可选的属性：次要属性后加上等级（同原版短木棍）
+static func scaling_keys() -> Array:
+	var out = []
+	for g in STAT_GROUPS:
+		out += g[1]
+		if g[0] == "BE_GRP_SECONDARY":
+			out.push_back("stat_levels")
+	return out
+
+
 # 蓝图可用的属性：不含规则（开关 / 设定值型，如"无法使用近战武器"、最低武器等级）
 static func graph_stat_keys() -> Array:
 	var out = []

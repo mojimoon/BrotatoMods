@@ -1566,7 +1566,7 @@ func _build_weapon_stats(parent: Control, v: Dictionary, w) -> void:
 		icon.rect_min_size = Vector2(22, 22)
 		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(icon)
-		var opt = _stat_option(str(scaling[i][0]))
+		var opt = _stat_option(str(scaling[i][0]), Catalog.scaling_keys())
 		opt.rect_min_size = Vector2(260, 0)
 		opt.connect("selected", self, "_on_scaling_stat", [i])
 		row.add_child(opt)
@@ -1598,14 +1598,14 @@ func _wstat_cell(grid: Control, k: String, type: String, base, v: Dictionary, w)
 		grid.add_child(_label(tr("RANGED" if w.type == 1 else "MELEE"), FONT_SMALL, C_TEXT))
 		return
 	if k == "#attack":
-		var sweep = int(v.wstats.get("attack_type", base.attack_type)) == 1
-		var tb = _button(tr("BE_WS_SWEEP" if sweep else "BE_WS_THRUST"), FONT_DESC)
+		var mode = _attack_mode(v.wstats.get("attack_type", base.attack_type), v.wstats.get("alternate_attack_type", base.alternate_attack_type))
+		var tb = _button(tr(ATTACK_MODES[mode]), FONT_DESC)
 		tb.rect_min_size = Vector2(150, 0)
 		tb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		_apply_chip_style(tb, sweep, C_ACCENT_2)
-		tb.connect("pressed", self, "_on_wstat_changed", [0 if sweep else 1, ["attack_type", "int", ""]])
+		_apply_chip_style(tb, mode > 0, C_ACCENT_2)
+		tb.connect("pressed", self, "_on_attack_mode", [(mode + 1) % ATTACK_MODES.size()])
 		_attr_row(grid, tr("BE_WS_ATTACK_TYPE"), tb, "attack_type")
-		_mark_name("attack_type", str(int(sweep)), str(int(base.attack_type)))
+		_mark_name("attack_type", str(mode), str(_attack_mode(base.attack_type, base.alternate_attack_type)))
 		return
 	var mode = WSTAT_SHOW.get(k, "")
 	var cur = v.wstats.get(k, base.get(k))
@@ -1653,6 +1653,27 @@ func _on_wstat_changed(value, f: Array) -> void:
 		_changed()
 		if _aspd_label != null and is_instance_valid(_aspd_label):
 			_aspd_label.text = _aspd_text(_mod.weapon_stats_for(_character(), p))
+
+
+# 近战攻击方式：突刺 / 横扫 / 交替（原版 alternate_attack_type，从突刺开始）
+const ATTACK_MODES = ["BE_WS_THRUST", "BE_WS_SWEEP", "BE_WS_ALTERNATE"]
+
+
+static func _attack_mode(attack_type, alternate) -> int:
+	return 2 if alternate else int(attack_type)
+
+
+func _on_attack_mode(mode: int) -> void:
+	var p = _p()
+	var base = _mod.backup_value(_character(), "stats")
+	var vals = {"attack_type": 1 if mode == 1 else 0, "alternate_attack_type": mode == 2}
+	for k in vals:
+		if vals[k] == base.get(k):
+			p.wstats.erase(k)
+		else:
+			p.wstats[k] = vals[k]
+	_changed()
+	_build_page()
 
 
 func _on_wstats_reset() -> void:
@@ -1705,6 +1726,7 @@ func _is_valid_stat(key: String) -> bool:
 			var h = Keys.generate_hash(k)
 			if probe.has(h) and typeof(probe[h]) in [TYPE_INT, TYPE_REAL]:
 				_valid_keys[k] = true
+		_valid_keys["stat_levels"] = true
 	return _valid_keys.has(key)
 
 
