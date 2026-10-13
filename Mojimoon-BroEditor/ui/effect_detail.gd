@@ -87,6 +87,10 @@ func _field_name(name: String) -> String:
 
 func _field(grid: Control, f: Dictionary, cur, sub: String, where: String) -> void:
 	grid.add_child(ui._field_label(_field_name(f.name), f.name))
+	var special = ui.field_control(f.name, cur, self, "_on_value", [where, sub, f.name, f.type])
+	if special != null:
+		grid.add_child(special)
+		return
 	match f.type:
 		TYPE_INT, TYPE_REAL:
 			var sb = ui._spin(-99999, 99999, 1 if f.type == TYPE_INT else 0.01)

@@ -30,6 +30,8 @@ const BUNDLE_PREFIX = {"character": "BEC:", "item": "BEI:", "weapon": "BEW:"}
 const ALL_PREFIX = "BEA:"
 # 蓝图分享码（只含节点图）
 const GRAPH_PREFIX = "BEB:"
+# 分享码正文：PACK + base64(deflate(JSON))；不以 PACK 开头的是旧格式 base64(JSON)（JSON 的 base64 总以 "ey" 开头）
+const PACK = "z"
 const BUNDLE_KEYS = {"character": "profiles", "item": "items", "weapon": "weapons"}
 const MAX_DESC = 300
 
@@ -74,6 +76,7 @@ var next_id: int = 1
 var debug := false
 # 隐藏自定义对象图标右下角的编号（使用原版图标时才有编号）
 var hide_numbers := false
+var custom_tags: Dictionary = {}	# 自定义标签：键名 -> 名称（所有道具 / 角色可用；随 profiles.json 保存）
 # 效果库去重（同脚本、同 key 的效果只保留一条）；默认关：保留全部，包括同一武器各等级的效果
 var library_dedup := false
 # 更详细的键名（只在显示键名时生效）：效果显示全部键名、编辑时显示字段名
@@ -190,6 +193,7 @@ static func new_profile() -> Dictionary:
 		"tier": -1,
 		"max_nb": -2,
 		"tags": null,
+		"replaced_by": null,	# 道具：移除后变成的道具 id（"" = 无；null = 不修改）
 		"wstats": {},
 		"scaling": null,
 		# 自定义对象的图标编号
@@ -235,6 +239,8 @@ static func normalize_profile(p) -> Dictionary:
 	out.max_nb = int(out.max_nb)
 	if out.tags != null and not out.tags is Array:
 		out.tags = null
+	if out.replaced_by != null:
+		out.replaced_by = str(out.replaced_by)
 	var ws = {}
 	if out.wstats is Dictionary:
 		for k in out.wstats:
@@ -264,6 +270,40 @@ static func normalize_profile(p) -> Dictionary:
 # 武器家族档案：custom = 自定义武器（base = 外观与近 / 远战来源的原版家族）；tiers = 本模组新增的等级
 static func new_family() -> Dictionary:
 	return {"custom": false, "base": "", "name": "", "icon": "", "sets": null, "tiers": [], "num": 0}
+
+
+# 保存 / 分享时去掉与默认值相同的字段（读取时 normalize_* 会补齐）
+static func compact(d: Dictionary, defaults: Dictionary) -> Dictionary:
+	var out = {}
+	for k in d:
+		if not defaults.has(k) or JSON.print(d[k]) != JSON.print(defaults[k]):
+			out[k] = d[k]
+	return out
+
+
+static func compact_all(ps: Dictionary, defaults: Dictionary) -> Dictionary:
+	var out = {}
+	for id in ps:
+		out[id] = compact(ps[id], defaults) if ps[id] is Dictionary else ps[id]
+	return out
+
+
+static func pack(data) -> String:
+	return PACK + Marshalls.raw_to_base64(JSON.print(data).to_utf8().compress(File.COMPRESSION_DEFLATE))
+
+
+# 分享码正文 -> 解析结果（无法解析返回 null）；兼容旧的未压缩格式
+static func unpack(body: String):
+	var text = ""
+	if body.begins_with(PACK):
+		var raw = Marshalls.base64_to_raw(body.substr(PACK.length()))
+		if raw.empty():
+			return null
+		text = raw.decompress_dynamic(16 * 1024 * 1024, File.COMPRESSION_DEFLATE).get_string_from_utf8()
+	else:
+		text = Marshalls.base64_to_utf8(body)
+	var parsed = JSON.parse(text)
+	return parsed.result if parsed.error == OK else null
 
 
 static func normalize_family(f) -> Dictionary:
@@ -396,6 +436,7 @@ func load_profiles() -> void:
 	weapon_profiles = {}
 	weapon_families = {}
 	disabled = {"character": [], "item": [], "weapon": []}
+	custom_tags = {}
 	_load_main_file()
 	_load_custom_files()
 
@@ -419,6 +460,10 @@ func _load_main_file() -> void:
 	var kinds = settings.get("kinds", {}) if settings is Dictionary else {}
 	for k in KINDS:
 		kind_enabled[k] = bool(kinds.get(k, true)) if kinds is Dictionary else true
+	var tags = parsed.result.get("tags", {})
+	if tags is Dictionary:
+		for k in tags:
+			custom_tags[str(k)] = str(tags[k])
 	for pair in [["profiles", profiles], ["items", item_profiles], ["weapons", weapon_profiles]]:
 		var ps = parsed.result.get(pair[0], {})
 		if ps is Dictionary:
@@ -450,8 +495,8 @@ func custom_file_data(kind: String, id: String) -> Dictionary:
 			var tid = tier_id(id, t, true)
 			if weapon_profiles.has(tid):
 				tiers[tid] = weapon_profiles[tid]
-		return {"kind": kind, "id": id, "family": weapon_families[id], "tiers": tiers}
-	return {"kind": kind, "id": id, "profile": profiles_of(kind)[id]}
+		return {"kind": kind, "id": id, "family": compact(weapon_families[id], new_family()), "tiers": compact_all(tiers, new_profile())}
+	return {"kind": kind, "id": id, "profile": compact(profiles_of(kind)[id], new_profile())}
 
 
 # 全部自定义对象：[[种类, id]]
@@ -487,17 +532,18 @@ func save_profiles() -> void:
 	for pair in [["profiles", profiles], ["items", item_profiles]]:
 		for id in pair[1]:
 			if not pair[1][id].custom:
-				main[pair[0]][id] = pair[1][id]
+				main[pair[0]][id] = compact(pair[1][id], new_profile())
 	for id in weapon_profiles:
 		if not custom_tiers.has(id):
-			main.weapons[id] = weapon_profiles[id]
+			main.weapons[id] = compact(weapon_profiles[id], new_profile())
 	for wid in weapon_families:
 		if not weapon_families[wid].custom:
-			main.families[wid] = weapon_families[wid]
+			main.families[wid] = compact(weapon_families[wid], new_family())
 	main["version"] = 1
 	main["next_id"] = next_id
 	main["settings"] = {"debug": debug, "debug_detail": debug_detail, "font_scale": font_scale, "hide_numbers": hide_numbers, "library_dedup": library_dedup, "kinds": kind_enabled}
 	main["disabled"] = disabled
+	main["tags"] = custom_tags
 	var file = File.new()
 	if file.open(SAVE_PATH, File.WRITE) != OK:
 		ModLoaderLog.error("Failed to save profiles", MOD_ID)
@@ -585,14 +631,14 @@ func export_code(id: String, kind: String = "character") -> String:
 	var ps = profiles_of(kind)
 	if not ps.has(id):
 		return ""
-	return SHARE_PREFIX + Marshalls.utf8_to_base64(JSON.print({"kind": kind, "id": id, "profile": ps[id]}))
+	return SHARE_PREFIX + pack({"kind": kind, "id": id, "profile": compact(ps[id], new_profile())})
 
 
 # 蓝图分享码：空图返回 ""
 static func export_graph(g) -> String:
 	if not g is Dictionary or g.get("nodes", []).empty():
 		return ""
-	return GRAPH_PREFIX + Marshalls.utf8_to_base64(JSON.print(g))
+	return GRAPH_PREFIX + pack(g)
 
 
 # 读取蓝图分享码；无法识别返回 null
@@ -600,10 +646,10 @@ static func import_graph(code: String):
 	code = code.strip_edges()
 	if not code.begins_with(GRAPH_PREFIX):
 		return null
-	var parsed = JSON.parse(Marshalls.base64_to_utf8(code.substr(GRAPH_PREFIX.length())))
-	if parsed.error != OK:
+	var g = unpack(code.substr(GRAPH_PREFIX.length()))
+	if g == null:
 		return null
-	return normalize_profile({"graph": parsed.result}).graph
+	return normalize_profile({"graph": g}).graph
 
 
 # 返回导入后的角色 id；无法识别返回 ""
@@ -617,15 +663,15 @@ func export_bundle(kind: String) -> String:
 		kinds = [kind]
 	var dis = {}
 	for k in kinds:
-		data[BUNDLE_KEYS[k]] = profiles_of(k)
+		data[BUNDLE_KEYS[k]] = compact_all(profiles_of(k), new_profile())
 		dis[k] = disabled[k]
 	if "weapon" in kinds:
-		data["families"] = weapon_families
+		data["families"] = compact_all(weapon_families, new_family())
 	data["disabled"] = dis
 	var has = _any_disabled(dis)
 	for k in data:
 		has = has or (k != "disabled" and not data[k].empty())
-	return prefix + Marshalls.utf8_to_base64(JSON.print(data)) if has else ""
+	return prefix + pack(data) if has else ""
 
 
 static func _any_disabled(dis: Dictionary) -> bool:
@@ -649,8 +695,8 @@ func import_bundle(code: String) -> int:
 				code = code.substr(BUNDLE_PREFIX[k].length())
 	if kinds.empty():
 		return -1
-	var parsed = JSON.parse(Marshalls.base64_to_utf8(code))
-	if parsed.error != OK or not parsed.result is Dictionary:
+	var parsed = {"result": unpack(code)}
+	if not parsed.result is Dictionary:
 		return -1
 	var n = 0
 	# 先建好自定义武器 / 补的等级，后面的武器档案才找得到目标
@@ -712,8 +758,8 @@ func import_code(code: String, target_id: String, kind: String = "character") ->
 	code = code.strip_edges()
 	if not code.begins_with(SHARE_PREFIX):
 		return ""
-	var parsed = JSON.parse(Marshalls.base64_to_utf8(code.substr(SHARE_PREFIX.length())))
-	if parsed.error != OK or not parsed.result is Dictionary or not parsed.result.get("profile") is Dictionary:
+	var parsed = {"result": unpack(code.substr(SHARE_PREFIX.length()))}
+	if not parsed.result is Dictionary or not parsed.result.get("profile") is Dictionary:
 		return ""
 	var p = normalize_profile(parsed.result.profile)
 	# 道具 / 武器的档案只能导入到同种类的对象上
@@ -854,6 +900,12 @@ static func _set_typed(obj, sets) -> void:
 				obj.set(k, bool(sets[k]))
 			TYPE_STRING:
 				obj.set(k, str(sets[k]))
+			TYPE_ARRAY:
+				if sets[k] is Array:
+					var arr = []
+					for x in sets[k]:
+						arr.push_back(str(x))
+					obj.set(k, arr)
 
 
 # 普通属性效果的原版描述 key（stat_ 以外的 key 没有同名文本，借用原版同 key 效果的 text_key）
@@ -939,6 +991,9 @@ func stat_effect(key: String, value: int):
 		g._generate_hashes()
 		return g
 	var sets = {"key": key, "value": value, "text_key": _plain_text_key(key)}
+	# 好坏按该属性在原版效果里的方向（如价格越低越好、敌人数量中立）：决定文本颜色与诅咒方向（有利放大、不利缩小、中立不变）
+	var dir = _good_dir(key) * (1 if value > 0 else -1)
+	sets.effect_sign = 0 if dir > 0 else (1 if dir < 0 else 2)
 	if key in CAP_KEYS or key in SET_KEYS:
 		sets.storage_method = 2
 	return make_effect({"set": sets})
@@ -978,11 +1033,35 @@ func build_effects(id: String, p: Dictionary) -> Array:
 			continue
 		var e = make_effect(spec)
 		if e != null:
+			_rekey_self(e, spec, id)
 			out.push_back(e)
 	for en in entries:
 		if not used.has(entry_sig(en.marker)):
 			out.push_back(en.effect)
 	return out
+
+
+# 删除自定义标签：同时从所有道具 / 角色的档案里移除
+func delete_custom_tag(tag: String) -> void:
+	custom_tags.erase(tag)
+	for pair in [[profiles, "wanted_tags"], [item_profiles, "tags"]]:
+		for id in pair[0]:
+			var arr = pair[0][id][pair[1]]
+			if arr is Array:
+				arr.erase(tag)
+
+
+# 以所在道具 id 为 key 的原版效果（金鱼"刷新时升级"、镜子"复制下一件"：原版按 key 找到并移除这件道具）
+# 复制到别的道具上时改指向该道具，否则会去找原来那件
+const SELF_KEYED = ["increase_tier_on_reroll", "duplicate_item"]
+
+
+func _rekey_self(e, spec: Dictionary, id: String) -> void:
+	var from = str(spec.get("from", ""))
+	if from == "" or from == id or e.key != from or not e.custom_key in SELF_KEYED or find_target("item", id) == null:
+		return
+	e.key = id
+	e._generate_hashes()
 
 
 # 生成的效果条目（默认顺序）：[{marker, effect}]
@@ -1082,7 +1161,7 @@ func _desc_effect(id: String, text: String):
 
 const BACKUP_FIELDS = {
 	"character": ["effects", "name", "starting_weapons", "wanted_tags"],
-	"item": ["effects", "name", "value", "tier", "max_nb", "tags"],
+	"item": ["effects", "name", "value", "tier", "max_nb", "tags", "replaced_by"],
 	"weapon": ["effects", "name", "value", "stats", "sets"],
 }
 
@@ -1201,6 +1280,8 @@ func _apply_items() -> void:
 			it.max_nb = p.max_nb
 		if p.tags is Array:
 			it.tags = p.tags.duplicate()
+		if p.replaced_by is String:
+			it.replaced_by = find_target("item", p.replaced_by) if p.replaced_by != "" else null
 
 
 # 武器：效果、名称、价格、武器属性（在原属性的副本上改写）
@@ -1521,6 +1602,8 @@ func create_custom_item(base_id: String, suffix: String = "") -> String:
 		p.tier = int(backup_value(base, "tier"))
 		p.max_nb = int(backup_value(base, "max_nb"))
 		p.tags = backup_value(base, "tags").duplicate()
+		var rep = backup_value(base, "replaced_by")
+		p.replaced_by = rep.my_id if rep != null else ""
 		p.effects = []
 		for i in orig_effects(base_id).size():
 			p.effects.push_back({"from": base_id, "i": i})

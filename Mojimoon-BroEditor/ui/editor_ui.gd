@@ -356,6 +356,8 @@ func open_help() -> void:
 	var scroll = _scroll()
 	m.body.add_child(scroll)
 	var r = _rich(help_bbcode(help_text()))
+	# 普通文字灰色，加粗（help_bbcode 着白色）与标题更醒目
+	r.add_color_override("default_color", C_TEXT_DIM)
 	r.add_font_override("normal_font", FONT_SMALL)
 	r.add_font_override("bold_font", FONT_SMALL)
 	scroll.add_child(r)
@@ -370,6 +372,8 @@ func help_text() -> String:
 		var k = "BE_HELP_P_" + t[0].to_upper()
 		var own = k + "_" + _kind.to_upper()
 		parts.push_back(tr(own) if tr(own) != own else tr(k))
+	if _kind == "item":
+		parts.push_back(tr("BE_HELP_REPLACE"))
 	parts.push_back(tr("BE_HELP_SHARE"))
 	var tags = {"character": "BE_SEC_TAGS", "item": "BE_SEC_ITEM_TAGS", "weapon": "BE_SEC_WEAPON_SETS"}[_kind]
 	var new_key = "BE_NEW_CUSTOM" if _kind == "character" else "BE_NEW_CUSTOM_" + _kind.to_upper()
@@ -1188,6 +1192,106 @@ func _tag_section(left: Control) -> void:
 		var b = _chip(_tag_name(tag), tag, tag in tags, C_ACCENT_3)
 		b.connect("pressed", self, "_on_tag_pressed", [tag])
 		grid.add_child(b)
+	# 自定义标签：键名 + 名称（可选，默认同键名）；添加后所有道具 / 角色可用，并加入本对象
+	var add_row = HBoxContainer.new()
+	add_row.add_constant_override("separation", 8)
+	tbox.add_child(add_row)
+	var key_le = _line_edit(tr("BE_TAG_NEW_HINT"))
+	key_le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	add_row.add_child(key_le)
+	var name_le = _line_edit(tr("BE_TAG_NAME_HINT"))
+	name_le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	add_row.add_child(name_le)
+	for le in [key_le, name_le]:
+		le.connect("text_entered", self, "_on_tag_new_entered", [key_le, name_le])
+	var add = _button(tr("BE_TAG_NEW"), FONT_DESC)
+	_apply_action_style(add, C_ACCENT_3)
+	add.connect("pressed", self, "_on_tag_new_pressed", [key_le, name_le])
+	add_row.add_child(add)
+	var manage = _button(tr("BE_TAG_MANAGE"), FONT_DESC)
+	_apply_action_style(manage, C_ACCENT_2)
+	manage.connect("pressed", self, "open_tag_manager")
+	add_row.add_child(manage)
+
+
+func _on_tag_new_entered(_text: String, key_le: LineEdit, name_le: LineEdit) -> void:
+	_on_tag_new_pressed(key_le, name_le)
+
+
+func _on_tag_new_pressed(key_le: LineEdit, name_le: LineEdit) -> void:
+	_on_tag_new(key_le.text, name_le.text)
+
+
+func _on_tag_new(key: String, name: String = "") -> void:
+	var tag = key.strip_edges()
+	if tag == "":
+		return
+	if _mod.custom_tags.has(tag) or not tag in _all_tags():
+		_mod.custom_tags[tag] = name.strip_edges() if name.strip_edges() != "" else tag
+	var field = "wanted_tags" if _kind == "character" else "tags"
+	var v = _view()
+	var tags = v[field] if v[field] is Array else _mod.backup_value(_character(), field)
+	if tag in tags:
+		_build_page()
+		return
+	_on_tag_pressed(tag)
+
+
+# 管理自定义标签：改名称、删除（删除时从所有道具 / 角色移除）
+func open_tag_manager() -> void:
+	var m = Modal.open(self, tr("BE_TAG_MANAGE_TITLE"), C_ACCENT_2, Vector2(900, 0))
+	m.add_button(tr("MENU_BACK"), C_TEXT_DIM, m, "close")
+	var list = VBoxContainer.new()
+	list.add_constant_override("separation", 6)
+	m.body.add_child(list)
+	m.set_meta("list", list)
+	_fill_tag_manager(list)
+
+
+func _fill_tag_manager(list: Control) -> void:
+	for c in list.get_children():
+		list.remove_child(c)
+		c.queue_free()
+	var keys = _mod.custom_tags.keys()
+	keys.sort()
+	if keys.empty():
+		list.add_child(_desc(tr("BE_TAG_NONE")))
+	for k in keys:
+		var row = HBoxContainer.new()
+		row.add_constant_override("separation", 8)
+		list.add_child(row)
+		var kl = _key_label(k)
+		kl.rect_min_size = Vector2(260, 0)
+		kl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(kl)
+		var le = _line_edit(k)
+		le.text = _mod.custom_tags[k]
+		le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		le.connect("text_changed", self, "_on_tag_rename", [k])
+		row.add_child(le)
+		var del = _button(tr("BE_DELETE"), FONT_DESC)
+		_apply_action_style(del, C_DANGER)
+		del.connect("pressed", self, "_on_tag_delete_ask", [k, list])
+		row.add_child(del)
+
+
+func _on_tag_rename(text: String, tag: String) -> void:
+	_mod.custom_tags[tag] = text.strip_edges() if text.strip_edges() != "" else tag
+	_changed()
+	_build_page()
+
+
+func _on_tag_delete_ask(tag: String, list: Control) -> void:
+	Modal.confirm(self, [tr("BE_TAG_DELETE_CONFIRM").replace("{0}", _tag_name(tag))], C_DANGER, self, "_on_tag_delete", [tag, list])
+
+
+func _on_tag_delete(tag: String, list: Control) -> void:
+	_mod.delete_custom_tag(tag)
+	_reregister()
+	_changed()
+	_build_page()
+	if is_instance_valid(list):
+		_fill_tag_manager(list)
 
 
 const EFFECT_LINE = preload("res://items/global/effect_line.tscn")
@@ -1322,11 +1426,22 @@ func _all_tags() -> Array:
 		for t in c.wanted_tags:
 			if not t in out:
 				out.push_back(t)
+	for t in _mod.custom_tags:
+		if not t in out:
+			out.push_back(t)
+	# 本对象未应用的修改里的词条
+	var field = "wanted_tags" if _kind == "character" else "tags"
+	if _kind != "weapon" and _view()[field] is Array:
+		for t in _view()[field]:
+			if not t in out:
+				out.push_back(t)
 	out.sort()
 	return out
 
 
 func _tag_name(tag: String) -> String:
+	if _mod.custom_tags.has(tag):
+		return _mod.custom_tags[tag]
 	return _mod.stat_name(tag)
 
 
@@ -1491,6 +1606,15 @@ func _build_attrs() -> void:
 			tiers.add_child(tb)
 		_attr_row(grid, tr("BE_TIER"), tiers, "tier")
 		_mark_name("tier", cur_tier, orig_tier)
+		# 移除后变成（原版 replaced_by：金鱼、沙漏、镜子这类会移除自身的道具）
+		var orig_rep = _mod.backup_value(r, "replaced_by")
+		var orig_rep_id = orig_rep.my_id if orig_rep != null else ""
+		var cur_rep = v.replaced_by if v.replaced_by is String else orig_rep_id
+		var rep = _search_select([[tr("BE_REPLACED_NONE"), ""]] + item_select_items(), cur_rep)
+		rep.rect_min_size = Vector2(260, 0)
+		rep.connect("selected", self, "_on_replaced_by", [orig_rep_id])
+		_attr_row(grid, tr("BE_REPLACED_BY"), rep, "replaced_by")
+		_mark_name("replaced_by", cur_rep, orig_rep_id)
 		box.add_child(_desc(tr("BE_ITEM_BASIC_DESC")))
 		_build_stat_tables(left, v)
 	else:
@@ -1509,6 +1633,22 @@ func _attr_row(grid: Control, text: String, ctl: Control, key: String = "") -> v
 
 
 # 价格 / 数量限制 / 稀有度：等于原值时记为"不修改"
+func _on_replaced_by(id, orig: String) -> void:
+	_p().replaced_by = null if str(id) == orig and not _mod.is_custom(_id) else str(id)
+	_mark_name("replaced_by", str(id), orig)
+	_reregister()
+	_changed()
+
+
+# 道具选择列表（不含角色）
+func item_select_items() -> Array:
+	var out = []
+	for it in _isvc().items:
+		if it != null and not it is CharacterData:
+			out.push_back([tr(it.name), it.my_id])
+	return out
+
+
 func _on_attr_changed(value, field: String, orig: int) -> void:
 	var unset = {"price": -1, "max_nb": -2, "tier": -1}[field]
 	_p()[field] = unset if int(value) == orig else int(value)
@@ -2160,8 +2300,12 @@ func _field_label(text: String, field: String) -> Control:
 
 
 func _key_label(text: String) -> Label:
-	var l = _label(text, FONT_DESC, C_TEXT_DIM)
+	# 先关闭翻译再设文字（Label 在设置文字时就翻译）
+	var l = Label.new()
 	l.set_message_translation(false)
+	l.text = text
+	l.add_font_override("font", FONT_DESC)
+	l.add_color_override("font_color", C_TEXT_DIM)
 	l.modulate.a = 0.8
 	l.clip_text = true
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -2384,6 +2528,10 @@ func _build_effect_fields(col: Control, i: int, spec: Dictionary) -> void:
 			lbl_text = f.name
 		grid.add_child(_field_label(lbl_text, f.name))
 		var cur = e.get(f.name)
+		var special = field_control(f.name, cur, self, "_on_field_option", [i, f.name])
+		if special != null:
+			grid.add_child(special)
+			continue
 		match f.type:
 			TYPE_INT, TYPE_REAL:
 				var sb = _spin(-99999, 99999, 1 if f.type == TYPE_INT else 0.01)
@@ -2411,6 +2559,120 @@ func _build_effect_fields(col: Control, i: int, spec: Dictionary) -> void:
 					le.rect_min_size = Vector2(200, 0)
 					le.connect("text_changed", self, "_on_field_changed", [i, f.name])
 					grid.add_child(le)
+
+
+# 效果字段的专用控件（效果页与详细信息弹窗共用）：选择框 / 属性列表，修改时调用 target.method(值, binds...)；
+# 其他字段返回 null，由调用方用通用控件
+const SIGN_NAMES = ["BE_SIGN_POSITIVE", "BE_SIGN_NEGATIVE", "BE_SIGN_NEUTRAL", "BE_SIGN_FROM_VALUE", "BE_SIGN_FROM_ARG", "BE_SIGN_OVERRIDE"]
+const STORAGE_NAMES = ["SUM", "KEY_VALUE", "REPLACE", "APPEND_KEY", "APPEND_KEY_VALUE"]
+# "按此属性"（stat_scaled）除属性外可用的计数（原版 LinkedStats / get_scaling_bonus 特判的 key）
+const SCALED_SOURCES = [
+	"materials", "structure", "pet", "living_enemy", "burning_enemy", "living_tree", "percent_player_missing_health",
+	"different_item", "common_item", "legendary_item", "duplicate_item", "free_weapon_slots",
+]
+
+
+func field_control(name: String, cur, target: Object, method: String, binds: Array):
+	var items = []
+	match name:
+		"effect_sign":
+			for s in SIGN_NAMES.size():
+				# 4（按参数正负）只对 custom_args 的单个参数有意义，放在效果上与 3 相同：仅当前值为 4 时显示
+				if s != 4 or s == int(cur):
+					items.push_back([tr(SIGN_NAMES[s]), s])
+		"storage_method":
+			# 只允许累加 / 替换互换；其余方式依赖 custom_key 的列表结构，只显示
+			if not int(cur) in [0, 2]:
+				return _label(STORAGE_NAMES[int(cur)] if int(cur) < STORAGE_NAMES.size() else str(cur), FONT_DESC, C_TEXT_DIM)
+			items = [[tr("BE_STORE_SUM"), 0], [tr("BE_STORE_REPLACE"), 2]]
+		"text_key":
+			items = _text_key_items()
+		"set_id":
+			for st in _isvc().sets:
+				if st != null:
+					items.push_back([tr(st.name), st.my_id])
+		"stat_scaled":
+			for k in SCALED_SOURCES:
+				items.push_back([stat_name(k), k])
+			for k in Catalog.stat_keys():
+				if _is_valid_stat(k):
+					items.push_back([stat_name(k), k])
+		"weapon_stacked_id":
+			var seen = {}
+			for w in _isvc().weapons:
+				if w != null and not seen.has(w.weapon_id):
+					seen[w.weapon_id] = true
+					items.push_back([tr(w.name), w.weapon_id])
+		"stats_modified":
+			return _stat_list_button(cur, target, method, binds)
+		_:
+			return null
+	var opt = _search_select(items, cur)
+	opt.rect_min_size = Vector2(200, 0)
+	if name == "text_key":
+		opt.two_line = true
+		opt.allow_custom = true
+	opt.connect("selected", target, method, binds)
+	return opt
+
+
+# 文本：默认（按键名）、不显示，以及效果库里用过的全部原版文本
+func _text_key_items() -> Array:
+	var out = [[tr("BE_TEXT_DEFAULT"), ""], [tr("BE_TEXT_EMPTY"), "[EMPTY]"]]
+	var seen = {"": true, "[EMPTY]": true}
+	for entry in _mod.library(true):
+		var k = str(entry.effect.text_key)
+		if not seen.has(k.to_upper()):
+			seen[k.to_upper()] = true
+			out.push_back([tr(k.to_upper()), k])
+	return out
+
+
+# 属性列表（属性获取修改的 stats_modified）：按钮显示当前属性，点击弹出可多选的属性
+func _stat_list_button(cur, target: Object, method: String, binds: Array) -> Button:
+	var vals = Array(cur) if cur is Array else []
+	var b = _button(_stat_list_text(vals), FONT_DESC)
+	b.clip_text = true
+	b.rect_min_size = Vector2(200, 0)
+	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_apply_action_style(b, C_ACCENT_2)
+	b.connect("pressed", self, "_open_stat_list", [b, vals.duplicate(), target, method, binds])
+	return b
+
+
+func _stat_list_text(vals: Array) -> String:
+	var names = []
+	for k in vals:
+		names.push_back(stat_name(str(k)))
+	return PoolStringArray(names).join(", ") if not names.empty() else "-"
+
+
+func _open_stat_list(b: Button, vals: Array, target: Object, method: String, binds: Array) -> void:
+	var m = Modal.open(self, tr("BE_FIELD_STATS_MODIFIED"), C_ACCENT, Vector2(1000, 0))
+	m.add_button(tr("MENU_BACK"), C_TEXT_DIM, m, "close")
+	var grid = GridContainer.new()
+	grid.columns = 3
+	grid.add_constant_override("hseparation", 6)
+	grid.add_constant_override("vseparation", 6)
+	m.body.add_child(grid)
+	for g in Catalog.STAT_GROUPS:
+		if g[0] == "BE_GRP_GAIN":
+			for k in g[1]:
+				var s = k.substr(5)
+				var c = _chip(stat_name(s), s, s in vals, C_ACCENT_3)
+				c.connect("pressed", self, "_on_stat_list_chip", [c, s, b, vals, target, method, binds])
+				grid.add_child(c)
+
+
+func _on_stat_list_chip(c: Button, s: String, b: Button, vals: Array, target: Object, method: String, binds: Array) -> void:
+	if s in vals:
+		vals.erase(s)
+	else:
+		vals.push_back(s)
+	_apply_chip_style(c, s in vals, C_ACCENT_3)
+	if is_instance_valid(b):
+		b.text = _stat_list_text(vals)
+	target.callv(method, [vals.duplicate()] + binds)
 
 
 # 详细信息弹窗：直接改写该行的 spec
