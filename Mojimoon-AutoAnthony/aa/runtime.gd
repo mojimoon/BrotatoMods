@@ -2,7 +2,7 @@ extends Node
 
 # 战斗内的通用触发总线。挂在 main 场景下（每波创建、随场景释放）。
 # 原版的钩子（击杀 / 受击 / 闪避 / 拾取 / 升级 / 回血 / 波次开始与结束）通过脚本扩展转发到 fire()，
-# 由这里统一处理门控（每 N 次 / 几率 / 每波上限）并执行载荷。状态扳机（静止 / 移动 / 低血 / 满血）
+# 由这里统一检查机制条件与数值条件（每 N 次 / 几率 / 每波上限 / 冷却）并执行载荷。状态扳机（静止 / 移动 / 低血 / 满血）
 # 每 0.2 秒轮询一次，进入状态时加临时属性、离开时移除。
 
 const Catalog = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/catalog.gd")
@@ -62,8 +62,8 @@ func rebuild(player_index: int) -> void:
 				if old.has(id):
 					list.push_back(old[id])
 				else:
-					var show = Valuation.raw_rate(e.trigger, e.param, e.chance) <= FEEDBACK_MAX_RATE and not e.trigger in ["still", "moving"] and Catalog.STATS.has(e.stat)
-					list.push_back({"effect": e, "count": 0, "fired": 0, "active": false, "show": show, "stack": 0, "granted": []})
+					var show = Valuation.raw_rate(e.to_clause()) <= FEEDBACK_MAX_RATE and not e.trigger in ["still", "moving"] and Catalog.STATS.has(e.stat)
+					list.push_back({"effect": e, "count": 0, "fired": 0, "active": false, "show": show, "stack": 0, "granted": [], "last": -INF})
 	# 被移除的状态加成要撤销
 	var reverted = false
 	for id in old:
@@ -93,7 +93,9 @@ func _check_dirty() -> void:
 # 事件入口
 # ============================================================
 # chain_depth：延迟发生的事件（爆炸）携带的连锁深度；target：有目标敌人的事件（命中、暴击、点燃）；
-# info：命中事件的附加信息（hp_pct：命中前的生命百分比；first_any / first_stats：对该敌人的首次命中 / 首次某类伤害命中）
+# info：事件的附加信息（机制条件据此判断）
+#   命中 / 首次命中：hp_pct 命中前的生命百分比，stats 本次命中的伤害缩放属性，first_any / first_stats 对该敌人的首次命中 / 首次某类伤害命中
+#   击杀：stats 致命一击的伤害缩放属性，crit 暴击击杀，burning 燃烧中，cursed 被诅咒
 func fire(event: String, player_index: int, pos = null, chain_depth: int = -1, target = null, info = null) -> void:
 	if _wave_over or player_index < 0 or player_index >= RunData.get_player_count():
 		return
@@ -109,9 +111,11 @@ func fire(event: String, player_index: int, pos = null, chain_depth: int = -1, t
 	_depth += 1
 	for en in entries[player_index]:
 		var e = en.effect
-		if not _matches(e.trigger, event, info, e.dmg_type):
+		if e.trigger != event or not _cond_ok(e, player_index, info):
 			continue
 		if e.cap > 0 and en.fired >= e.cap:
+			continue
+		if e.cooldown > 0 and _elapsed - en.get("last", -INF) < e.cooldown:
 			continue
 		# 每秒触发次数上限（连锁保护）
 		var sec = int(_elapsed)
@@ -129,6 +133,7 @@ func fire(event: String, player_index: int, pos = null, chain_depth: int = -1, t
 			continue
 		en.fired += 1
 		en.rate_n += 1
+		en["last"] = _elapsed
 		execute(e, player_index, pos, en.show, en, target)
 		if e.reset and e.payload == "temp_stat":
 			en.stack = en.get("stack", 0) + e.value
@@ -137,30 +142,33 @@ func fire(event: String, player_index: int, pos = null, chain_depth: int = -1, t
 	_depth = saved_depth
 
 
-# 事件与扳机的对应：命中事件（hit_enemy）按命中前的生命百分比分发到"命中高 / 低血敌人"；
-# 首次命中事件按"对该敌人首次命中 / 首次某类伤害命中"分发
-static func _matches(trigger: String, event: String, info, dmg_type: String = "") -> bool:
-	if event == "hit_enemy":
-		if info == null:
-			return false
-		if trigger.begins_with("hit_above_"):
-			return info.hp_pct >= float(trigger.get_slice("_", 2))
-		if trigger.begins_with("hit_below_"):
-			return info.hp_pct <= float(trigger.get_slice("_", 2))
-		if trigger == "hit_typed":
-			return dmg_type in info.get("stats", [])
+# 机制条件。首次命中事件：无条件时要求对该敌人的首次命中，限定伤害类型时要求首次该类伤害命中
+func _cond_ok(e, player_index: int, info) -> bool:
+	if e.trigger == "first_hit" and e.cond != "dmg_type" and (info == null or not info.get("first_any", false)):
 		return false
-	if event == "first_hit":
-		if info == null:
-			return false
-		if trigger == "first_hit":
-			return info.get("first_any", false)
-		if trigger == "first_hit_typed":
-			return dmg_type in info.get("first_stats", [])
+	match e.cond:
+		"":
+			return true
+		"still", "moving", "low_hp", "full_hp":
+			var player = _get_player(player_index)
+			return player != null and _state_holds(e.cond, player)
+	return info_ok(e, info)
+
+
+# 针对事件本身的机制条件（不需要玩家节点）
+static func info_ok(e, info) -> bool:
+	if info == null:
 		return false
-	if event == "kill_typed":
-		return trigger == event and info != null and dmg_type in info.get("stats", [])
-	return trigger == event
+	match e.cond:
+		"crit", "burning", "cursed":
+			return info.get(e.cond, false)
+		"dmg_type":
+			return e.dmg_type in info.get("first_stats" if e.trigger == "first_hit" else "stats", [])
+		"enemy_hp_above":
+			return info.has("hp_pct") and info.hp_pct >= e.cond_arg
+		"enemy_hp_below":
+			return info.has("hp_pct") and info.hp_pct < e.cond_arg
+	return false
 
 
 # "受伤时清空"：撤销该条款本波累积的临时属性
@@ -206,7 +214,7 @@ func _physics_process(delta: float) -> void:
 				# count 以 0.2 秒为单位累积
 				if en.count * 0.2 + 0.001 >= e.param:
 					en.count = 0
-					if (e.cap <= 0 or en.fired < e.cap) and (e.chance >= 100 or randf() * 100.0 < e.chance):
+					if (e.cap <= 0 or en.fired < e.cap) and _cond_ok(e, p, null) and (e.chance >= 100 or randf() * 100.0 < e.chance):
 						en.fired += 1
 						execute(e, p, null, en.show, en)
 						if e.reset and e.payload == "temp_stat":
@@ -546,3 +554,4 @@ func on_wave_end() -> void:
 			en.fired = 0
 			en.count = 0
 			en.stack = 0
+			en.last = -INF

@@ -451,7 +451,7 @@ func test_122_feedback_crit_kill_and_state_max_hp() -> void:
 	m.start_new_run()
 	var holder = _item("item_potato").duplicate()
 	holder.effects = [
-		TriggerEffect.make({"trigger": "crit_kill", "param": 2, "payload": "perm_stat", "stat": "stat_crit_chance", "value": 1, "cap": 3}),
+		TriggerEffect.make({"trigger": "kill", "cond": "crit", "param": 2, "payload": "perm_stat", "stat": "stat_crit_chance", "value": 1, "cap": 3}),
 		TriggerEffect.make({"trigger": "moving", "payload": "temp_stat", "stat": "stat_max_hp", "value": -2}),
 		TriggerEffect.make({"trigger": "still", "payload": "temp_stat", "stat": "stat_max_hp", "value": 5}),
 	]

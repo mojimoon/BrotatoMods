@@ -236,16 +236,16 @@ func apply_settings(d: Dictionary) -> void:
 	cfg_seed = int(d.get("seed", 0))
 
 
-# 导出 / 导入设置：分享码 = "AA1:" + Base64(JSON)，与本地设置文件的字段相同
-const SHARE_PREFIX = "AA1:"
+# 导出 / 导入设置：分享码 = "AA2:" + 种子 + ":" + Base64(deflate(JSON))，种子为空 = 不固定种子；
+# JSON 与本地设置文件的字段相同（不含种子）
+const SHARE_PREFIX = "AA2:"
 
 
 func export_settings_code() -> String:
 	var data = get_cfg()
 	data["enabled"] = enabled
-	data["fixed_seed"] = cfg_fixed_seed
-	data["seed"] = cfg_seed
-	return SHARE_PREFIX + Marshalls.utf8_to_base64(JSON.print(data))
+	var body = Marshalls.raw_to_base64(JSON.print(data).to_utf8().compress(File.COMPRESSION_DEFLATE))
+	return SHARE_PREFIX + (str(cfg_seed) if cfg_fixed_seed else "") + ":" + body
 
 
 # 成功返回 true；无法识别的文本不改动任何设置
@@ -253,11 +253,19 @@ func import_settings_code(code: String) -> bool:
 	code = code.strip_edges()
 	if not code.begins_with(SHARE_PREFIX):
 		return false
-	var text = Marshalls.base64_to_utf8(code.substr(SHARE_PREFIX.length()))
-	var parsed = JSON.parse(text)
+	var parts = code.substr(SHARE_PREFIX.length()).split(":")
+	if parts.size() != 2 or (parts[0] != "" and not parts[0].is_valid_integer()):
+		return false
+	var raw = Marshalls.base64_to_raw(parts[1])
+	if raw.empty():
+		return false
+	var parsed = JSON.parse(raw.decompress_dynamic(1024 * 1024, File.COMPRESSION_DEFLATE).get_string_from_utf8())
 	if parsed.error != OK or not parsed.result is Dictionary or not parsed.result.has("items"):
 		return false
-	apply_settings(parsed.result)
+	var d = parsed.result
+	d["fixed_seed"] = parts[0] != ""
+	d["seed"] = int(parts[0]) if parts[0] != "" else cfg_seed
+	apply_settings(d)
 	save_settings()
 	return true
 
