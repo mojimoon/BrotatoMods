@@ -141,12 +141,12 @@ func _load_settings() -> void:
 	ModLoaderLog.info("Settings loaded: %d shop targets, %d crate targets, %d T4 crate targets" % [target_item_ids.size(), crate_item_ids.size(), legendary_item_ids.size()], MOD_ID)
 
 
-# 导出 / 导入设置：分享码 = "OITRTA1:" + Base64(JSON)，字段与本地设置文件相同
-const SHARE_PREFIX = "OITRTA1:"
+# 导出 / 导入设置：分享码 = "OI2:" + Base64(deflate(JSON))，字段与本地设置文件相同
+const SHARE_PREFIX = "OI2:"
 
 
 func export_settings_code() -> String:
-	return SHARE_PREFIX + Marshalls.utf8_to_base64(JSON.print(_settings_dict()))
+	return SHARE_PREFIX + Marshalls.raw_to_base64(JSON.print(_settings_dict()).to_utf8().compress(File.COMPRESSION_DEFLATE))
 
 
 # 成功返回 true；无法识别的文本不改动任何设置
@@ -154,7 +154,10 @@ func import_settings_code(code: String) -> bool:
 	code = code.strip_edges()
 	if not code.begins_with(SHARE_PREFIX):
 		return false
-	var parsed = JSON.parse(Marshalls.base64_to_utf8(code.substr(SHARE_PREFIX.length())))
+	var raw = Marshalls.base64_to_raw(code.substr(SHARE_PREFIX.length()))
+	if raw.empty():
+		return false
+	var parsed = JSON.parse(raw.decompress_dynamic(1024 * 1024, File.COMPRESSION_DEFLATE).get_string_from_utf8())
 	if parsed.error != OK or not parsed.result is Dictionary or not parsed.result.has("target_item_ids"):
 		return false
 	_apply_settings(parsed.result)

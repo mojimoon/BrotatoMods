@@ -926,6 +926,7 @@ func test_31_share_code_roundtrip() -> void:
 	m.cfg_replace_shop_first = true
 	var code: String = m.export_settings_code()
 	_check(code.begins_with(m.SHARE_PREFIX), "code has the prefix")
+	_check(code.length() < Marshalls.utf8_to_base64(JSON.print(m._settings_dict())).length(), "share code is compressed")
 	_reset()
 	_eq(m.target_item_ids, [], "reset cleared the pool")
 	_check(m.import_settings_code("  " + code + "\n"), "import succeeds (whitespace tolerated)")
@@ -949,10 +950,14 @@ func test_31_share_code_roundtrip() -> void:
 func test_32_share_code_rejects_garbage() -> void:
 	m.target_item_ids = [A]
 	m.crate_mode = m.Mode.ONCE
-	for bad in ["", "hello", "OITRTA1:", "OITRTA1:!!!", "OITRTA1:" + Marshalls.utf8_to_base64("[1,2]"), "OITRTA1:" + Marshalls.utf8_to_base64("{\"x\":1}"), "AA1:" + Marshalls.utf8_to_base64("{}")]:
+	for bad in ["", "hello", "OI2:", "OI2:!!!", "OI2:" + Marshalls.utf8_to_base64("{\"target_item_ids\":[]}"), "OI2:" + _deflate_b64("[1,2]"), "OI2:" + _deflate_b64("{\"x\":1}"), "OITRTA1:" + Marshalls.utf8_to_base64("{\"target_item_ids\":[]}"), "AA1:" + Marshalls.utf8_to_base64("{}")]:
 		_check(not m.import_settings_code(bad), "rejects %s" % bad)
 	_eq(m.target_item_ids, [A], "settings untouched after failures")
 	_eq(m.crate_mode, m.Mode.ONCE, "mode untouched after failures")
+
+
+func _deflate_b64(s: String) -> String:
+	return Marshalls.raw_to_base64(s.to_utf8().compress(File.COMPRESSION_DEFLATE))
 
 
 func test_33_ui_import_export() -> void:
