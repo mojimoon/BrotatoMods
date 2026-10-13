@@ -191,7 +191,9 @@ func _payload_text(colored: bool) -> String:
 			var boss = str(stepify(value / 10.0, 0.1)).trim_suffix(".0") + "%"
 			return tr("AA_P_HP_DMG").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", boss)
 		"ignite":
-			return tr("AA_P_IGNITE").replace("{0}", _col(str(value), good, colored)).replace("{1}", str(Catalog.IGNITE_TICKS))
+			# 缩放属性同原版燃烧效果：带颜色时用属性图标，纯文本时写属性名
+			var sc = Utils.get_scaling_stat_icon_text(Keys.stat_elemental_damage_hash) if colored else "+100% " + tr("STAT_ELEMENTAL_DAMAGE")
+			return tr("AA_P_IGNITE").replace("{0}", _col(str(value), good, colored)).replace("{1}", str(Catalog.IGNITE_TICKS)).replace("{2}", sc)
 		"slow":
 			return tr("AA_P_SLOW").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", str(int(min(90, value * 4))) + "%")
 		"fruit":
