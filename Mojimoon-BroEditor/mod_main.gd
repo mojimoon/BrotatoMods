@@ -74,6 +74,7 @@ var next_id: int = 1
 var debug := false
 # 隐藏自定义对象图标右下角的编号（使用原版图标时才有编号）
 var hide_numbers := false
+var custom_tags: Dictionary = {}	# 自定义标签：键名 -> 名称（所有道具 / 角色可用；随 profiles.json 保存）
 # 效果库去重（同脚本、同 key 的效果只保留一条）；默认关：保留全部，包括同一武器各等级的效果
 var library_dedup := false
 # 更详细的键名（只在显示键名时生效）：效果显示全部键名、编辑时显示字段名
@@ -190,6 +191,7 @@ static func new_profile() -> Dictionary:
 		"tier": -1,
 		"max_nb": -2,
 		"tags": null,
+		"replaced_by": null,	# 道具：移除后变成的道具 id（"" = 无；null = 不修改）
 		"wstats": {},
 		"scaling": null,
 		# 自定义对象的图标编号
@@ -235,6 +237,8 @@ static func normalize_profile(p) -> Dictionary:
 	out.max_nb = int(out.max_nb)
 	if out.tags != null and not out.tags is Array:
 		out.tags = null
+	if out.replaced_by != null:
+		out.replaced_by = str(out.replaced_by)
 	var ws = {}
 	if out.wstats is Dictionary:
 		for k in out.wstats:
@@ -396,6 +400,7 @@ func load_profiles() -> void:
 	weapon_profiles = {}
 	weapon_families = {}
 	disabled = {"character": [], "item": [], "weapon": []}
+	custom_tags = {}
 	_load_main_file()
 	_load_custom_files()
 
@@ -419,6 +424,10 @@ func _load_main_file() -> void:
 	var kinds = settings.get("kinds", {}) if settings is Dictionary else {}
 	for k in KINDS:
 		kind_enabled[k] = bool(kinds.get(k, true)) if kinds is Dictionary else true
+	var tags = parsed.result.get("tags", {})
+	if tags is Dictionary:
+		for k in tags:
+			custom_tags[str(k)] = str(tags[k])
 	for pair in [["profiles", profiles], ["items", item_profiles], ["weapons", weapon_profiles]]:
 		var ps = parsed.result.get(pair[0], {})
 		if ps is Dictionary:
@@ -498,6 +507,7 @@ func save_profiles() -> void:
 	main["next_id"] = next_id
 	main["settings"] = {"debug": debug, "debug_detail": debug_detail, "font_scale": font_scale, "hide_numbers": hide_numbers, "library_dedup": library_dedup, "kinds": kind_enabled}
 	main["disabled"] = disabled
+	main["tags"] = custom_tags
 	var file = File.new()
 	if file.open(SAVE_PATH, File.WRITE) != OK:
 		ModLoaderLog.error("Failed to save profiles", MOD_ID)
@@ -854,6 +864,12 @@ static func _set_typed(obj, sets) -> void:
 				obj.set(k, bool(sets[k]))
 			TYPE_STRING:
 				obj.set(k, str(sets[k]))
+			TYPE_ARRAY:
+				if sets[k] is Array:
+					var arr = []
+					for x in sets[k]:
+						arr.push_back(str(x))
+					obj.set(k, arr)
 
 
 # 普通属性效果的原版描述 key（stat_ 以外的 key 没有同名文本，借用原版同 key 效果的 text_key）
@@ -939,6 +955,9 @@ func stat_effect(key: String, value: int):
 		g._generate_hashes()
 		return g
 	var sets = {"key": key, "value": value, "text_key": _plain_text_key(key)}
+	# 好坏按该属性在原版效果里的方向（如价格越低越好、敌人数量中立）：决定文本颜色与诅咒方向（有利放大、不利缩小、中立不变）
+	var dir = _good_dir(key) * (1 if value > 0 else -1)
+	sets.effect_sign = 0 if dir > 0 else (1 if dir < 0 else 2)
 	if key in CAP_KEYS or key in SET_KEYS:
 		sets.storage_method = 2
 	return make_effect({"set": sets})
@@ -978,11 +997,35 @@ func build_effects(id: String, p: Dictionary) -> Array:
 			continue
 		var e = make_effect(spec)
 		if e != null:
+			_rekey_self(e, spec, id)
 			out.push_back(e)
 	for en in entries:
 		if not used.has(entry_sig(en.marker)):
 			out.push_back(en.effect)
 	return out
+
+
+# 删除自定义标签：同时从所有道具 / 角色的档案里移除
+func delete_custom_tag(tag: String) -> void:
+	custom_tags.erase(tag)
+	for pair in [[profiles, "wanted_tags"], [item_profiles, "tags"]]:
+		for id in pair[0]:
+			var arr = pair[0][id][pair[1]]
+			if arr is Array:
+				arr.erase(tag)
+
+
+# 以所在道具 id 为 key 的原版效果（金鱼"刷新时升级"、镜子"复制下一件"：原版按 key 找到并移除这件道具）
+# 复制到别的道具上时改指向该道具，否则会去找原来那件
+const SELF_KEYED = ["increase_tier_on_reroll", "duplicate_item"]
+
+
+func _rekey_self(e, spec: Dictionary, id: String) -> void:
+	var from = str(spec.get("from", ""))
+	if from == "" or from == id or e.key != from or not e.custom_key in SELF_KEYED or find_target("item", id) == null:
+		return
+	e.key = id
+	e._generate_hashes()
 
 
 # 生成的效果条目（默认顺序）：[{marker, effect}]
@@ -1082,7 +1125,7 @@ func _desc_effect(id: String, text: String):
 
 const BACKUP_FIELDS = {
 	"character": ["effects", "name", "starting_weapons", "wanted_tags"],
-	"item": ["effects", "name", "value", "tier", "max_nb", "tags"],
+	"item": ["effects", "name", "value", "tier", "max_nb", "tags", "replaced_by"],
 	"weapon": ["effects", "name", "value", "stats", "sets"],
 }
 
@@ -1201,6 +1244,8 @@ func _apply_items() -> void:
 			it.max_nb = p.max_nb
 		if p.tags is Array:
 			it.tags = p.tags.duplicate()
+		if p.replaced_by is String:
+			it.replaced_by = find_target("item", p.replaced_by) if p.replaced_by != "" else null
 
 
 # 武器：效果、名称、价格、武器属性（在原属性的副本上改写）
@@ -1521,6 +1566,8 @@ func create_custom_item(base_id: String, suffix: String = "") -> String:
 		p.tier = int(backup_value(base, "tier"))
 		p.max_nb = int(backup_value(base, "max_nb"))
 		p.tags = backup_value(base, "tags").duplicate()
+		var rep = backup_value(base, "replaced_by")
+		p.replaced_by = rep.my_id if rep != null else ""
 		p.effects = []
 		for i in orig_effects(base_id).size():
 			p.effects.push_back({"from": base_id, "i": i})

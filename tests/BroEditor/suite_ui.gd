@@ -425,6 +425,75 @@ func test_153_weapon_attack_type() -> void:
 	yield(tree, "idle_frame")
 
 
+# 字段专用控件：好坏 / 文本 / 套装 / 按此属性为选择框，实际修改属性为多选，其余字段用通用控件
+func test_154_field_controls() -> void:
+	var ui = yield(_open_ui(CH), "completed")
+	for f in ["effect_sign", "text_key", "set_id", "stat_scaled", "weapon_stacked_id"]:
+		var c = ui.field_control(f, 0 if f == "effect_sign" else "", ui, "_on_field_option", [0, f])
+		_check(c != null and c.get_class() == "Button", "select for " + f)
+		if c != null:
+			c.free()
+	_check(ui.field_control("value", 1, ui, "_on_field_option", [0, "value"]) == null, "value uses the generic control")
+	var signs = []
+	for it in ui.field_control("effect_sign", 0, ui, "_on_field_option", [0, "effect_sign"]).items:
+		signs.push_back(it[1])
+	_eq(signs, [0, 1, 2, 3, 5], "sign options: 4 hidden, curse shown")
+	var st = ui.field_control("stats_modified", ["stat_armor"], ui, "_on_field_option", [0, "stats_modified"])
+	_check(st != null and st.text.find(ui.stat_name("stat_armor")) >= 0, "stat list shows the stats")
+	var lbl = ui.field_control("storage_method", 1, ui, "_on_field_option", [0, "storage_method"])
+	_check(lbl is Label, "key-value storage is read-only")
+	for c in [st, lbl]:
+		if c != null:
+			c.free()
+	# 新词条
+	ui.set_kind("item")
+	ui._select(m.find_target("item", "item_coupon").my_id if m.find_target("item", "item_coupon") != null else ui._id)
+	ui._on_tab_pressed("overview")
+	ui._on_tag_new("be_test_tag", "")
+	_check("be_test_tag" in ui._p().tags, "custom tag added")
+	_eq(ui._tag_name("be_test_tag"), "be_test_tag", "name defaults to the key")
+	ui._on_tag_new("be_named_tag", "Named")
+	_eq(ui._tag_name("be_named_tag"), "Named", "custom tag name")
+	ui._on_tag_pressed("be_test_tag")
+	_check("be_test_tag" in ui._all_tags(), "unselected custom tag still listed")
+	ui.open_tag_manager()
+	var tm = ui._modals[-1]
+	_eq(tm.get_meta("list").get_child_count(), 2, "manager lists custom tags")
+	ui._on_tag_rename("Renamed", "be_named_tag")
+	_eq(ui._tag_name("be_named_tag"), "Renamed", "renamed")
+	ui._on_tag_delete("be_named_tag", tm.get_meta("list"))
+	_check(not "be_named_tag" in ui._all_tags() and not "be_named_tag" in ui._p().tags, "deleted everywhere")
+	_eq(tm.get_meta("list").get_child_count(), 1, "manager refreshed")
+	tm.close()
+	m.delete_custom_tag("be_test_tag")
+	# 移除后变成
+	ui._on_tab_pressed("stats")
+	ui._on_replaced_by("item_coupon", "")
+	_eq(ui._p().replaced_by, "item_coupon", "replaced_by set")
+	ui._build_page()
+	# 蓝图"道具变为"：添加 / 替换 / 删除道具
+	ui.set_kind("character")
+	ui._select(CH)
+	var GE = load("res://mods-unpacked/Mojimoon-BroEditor/graph/graph_effect.gd")
+	var g = GE.new_graph()
+	var tn = GE.add_node(g, "transform", Vector2.ZERO)
+	if not m.profiles.has(CH):
+		m.profiles[CH] = m.new_profile()
+	m.profiles[CH].graph = g
+	ui._on_tab_pressed("blueprint")
+	yield(tree, "idle_frame")
+	var bp = ui.blueprint
+	bp._on_items_param("item_coupon", tn, "items", -1)
+	bp._on_items_param("item_alien_eyes", tn, "items", -1)
+	bp._on_items_param("item_bandana", tn, "items", 0)
+	bp._on_items_param(null, tn, "items", 1)
+	yield(tree, "idle_frame")
+	_eq(GE.nodes_by_id(m.profiles[CH].graph)[tn].params.items, ["item_bandana"], "items list edited")
+	_eq(m.Catalog.default_params("transform").items, [], "default list not shared")
+	ui.queue_free()
+	yield(tree, "idle_frame")
+
+
 func _find_label(n: Node, t: String):
 	if (n is Label or n is RichTextLabel) and n.text == t:
 		return n
@@ -466,6 +535,7 @@ func test_155_settings_and_font_scale() -> void:
 		_check(text.find(ui.tr("BE_NEW_CUSTOM" if kind == "character" else "BE_NEW_CUSTOM_" + kind.to_upper())) >= 0, kind + " help names its new button")
 		_eq(text.find(ui.tr("BE_TAB_BANS")) >= 0, kind == "character", kind + " help lists only its own pages")
 		_eq(text.find("+Tn") >= 0, kind == "weapon", kind + " help mentions tiers only for weapons")
+		_eq(text.find(ui.tr("BE_HELP_REPLACE").split("\n")[0]) >= 0, kind == "item", kind + " help has the replace section only for items")
 		var n0 = ui._modals.size()
 		ui.open_help()
 		_eq(ui._modals.size(), n0 + 1, kind + " help opens")
