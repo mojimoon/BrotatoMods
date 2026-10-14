@@ -581,7 +581,8 @@ func _fill_preview(kind: String) -> void:
 	var plan = pv.plan
 	if plan == null:
 		return
-	var w = (pv.scroll.rect_size.x - 30) / PREVIEW_COLUMNS
+	# 减去竖直滚动条宽度：否则卡片总宽 = 滚动区宽度，滚动条出现后面板每次预览都被撑宽一点
+	var w = floor((pv.scroll.rect_size.x - 30 - pv.scroll.get_v_scrollbar().get_combined_minimum_size().x) / PREVIEW_COLUMNS)
 	if w < 200:
 		w = (PANEL_SIZE.x - 110) / PREVIEW_COLUMNS
 	for res in _preview_entries(plan, pv.tier, kind):

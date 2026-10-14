@@ -1289,7 +1289,10 @@ func _deep_candidate(fam: Dictionary, tw, tier: int, want: float, stats: Array, 
 			keys.push_back(key)
 			if key == JAVELIN_KEY:
 				jav_cd = float(dw.stats.crit_damage)
-			effects.push_back(_vary_fixed(_adapt(ne, tw), f))
+			ne = _vary_fixed(_adapt(ne, tw), f)
+			if WeaponValue.effect_id(ne) == "weapon_projectiles_on_hit":
+				ne.set_meta("aa_src", family_of(dw))
+			effects.push_back(ne)
 	var st = _bind_javelin(bp, effects, jav_cd)
 	if want_item:
 		var line = _item_effect(_item_spec(f, _spec_scaling(stats), true), tier, want)
@@ -1387,6 +1390,22 @@ func _deep_interp(fam: Dictionary, base: Dictionary, tiers: Array, mult: float) 
 		prev = {"effects": effects, "stats": st, "donor": base.donor, "scale": best_k, "want": got, "capped": excess > 0, "price": int(round(price))}
 		res.push_back(prev)
 	return res
+
+
+# 命中射出投射物（闪电刀）：投射物属性（伤害 / 暴击 / 弹跳）换成来源家族该稀有度原版的；
+# 否则逐级推出的高稀有度沿用最低一级的投射物（T1 闪电刀的投射物不弹跳，升级后也一直不弹跳）
+func _tier_projectiles(effects: Array, t: int) -> Array:
+	var out = []
+	for e in effects:
+		var fam = families.get(e.get_meta("aa_src")) if e.has_meta("aa_src") else null
+		if fam != null:
+			for q in _closest_tier(fam.tiers, t).effects:
+				if WeaponValue.effect_id(q) == "weapon_projectiles_on_hit" and q.weapon_stats != null:
+					e = _dup(e)
+					e.weapon_stats = q.weapon_stats.duplicate()
+					break
+		out.push_back(e)
+	return out
 
 
 # 不随稀有度强化的家族固定效果（砖头碎裂掉落的材料等）：高稀有度换成本稀有度原版的数值（同样按家族随机），
@@ -1655,6 +1674,7 @@ func _upgrade_chain(plan: Dictionary, tiers: Array, st0, e0: Array, k: float) ->
 		for j in e0.size():
 			fx_f[j] *= 1.0 + k * (float(p.fx_r[j]) - 1.0)
 			effects.push_back(_scale_effects([e0[j]], fx_f[j])[0] if fx_f[j] > 1.000001 else e0[j])
+		effects = _tier_projectiles(effects, t)
 		var names = []
 		for x in st.scaling_stats:
 			names.push_back(WeaponValue.stat_name(x[0]))
