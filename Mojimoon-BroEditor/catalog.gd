@@ -437,11 +437,18 @@ const SHOP_TRIGGERS = ["reroll", "buy"]
 const SPLIT_ANY_SCRIPT = ["gain_stat_for_every_step_after_equip", "charm_on_hit"]
 
 
+# 由 graph_effect._special_chain 拆解的原版效果（狩猎奖杯、肾上腺素、反击、巫妖、赛博球、小象、医疗箱……）
+const SPLIT_SPECIAL = ["charm_on_hit", "gold_on_crit_kill", "heal_on_dodge", "dmg_on_dodge", "dmg_when_heal", "dmg_when_death", "dmg_when_pickup_gold", "temp_stats_per_interval"]
+
+
 static func can_split(e) -> bool:
 	if e == null or not "custom_key" in e:
 		return false
-	if e.custom_key == "charm_on_hit":
-		return true
+	if e.custom_key in SPLIT_SPECIAL:
+		# 造成伤害的效果需要缩放属性；受击后重置的间隔效果不拆
+		if e.custom_key.begins_with("dmg_") and e.key == "":
+			return false
+		return not ("reset_on_hit" in e and e.reset_on_hit)
 	return NATIVE_SPLIT.has(e.custom_key) and (is_plain_effect(e) or e.custom_key in SPLIT_ANY_SCRIPT)
 
 

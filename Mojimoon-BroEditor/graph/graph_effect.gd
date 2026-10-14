@@ -427,21 +427,44 @@ static func remove_node(g: Dictionary, id: int) -> void:
 
 
 # 原版触发型效果 -> 一条路径（扳机 → 条件 → 效果）；不支持的返回 false
+# 结构不是"key = 属性、value = 数值"的原版扳机效果：直接给出节点链 [[类型, 参数]...]；不认识的返回 []
+static func _special_chain(e) -> Array:
+	var chance = [["chance", {"pct": int(e.chance)}]] if "chance" in e and int(e.chance) < 100 else []
+	match e.custom_key:
+		"charm_on_hit":
+			# 魅惑（浪漫之人 / 长笛）：命中敌人 → 敌人生命低于 value2% → 几率（浪漫之人按属性缩放）→ 魅惑
+			var ch = ["stat_chance", {"stat": e.key, "pct": int(e.value)}] if e.key != "" else ["chance", {"pct": int(e.value)}]
+			return [["enemy_hit", {}], ["enemy_hp_below", {"pct": int(e.value2)}], ch, ["charm", {}]]
+		"gold_on_crit_kill":
+			# 狩猎奖杯：暴击击杀时 value% 几率获得 1 材料
+			return [["crit_kill", {}], ["chance", {"pct": int(e.value)}], ["add_gold", {"value": 1}]]
+		"heal_on_dodge":
+			return [["dodge", {}]] + chance + [["heal_hp", {"value": int(e.value)}]]
+		"dmg_on_dodge", "dmg_when_heal", "dmg_when_death", "dmg_when_pickup_gold":
+			# 对随机敌人造成 属性 × value% 的伤害
+			var trig = {"dmg_on_dodge": "dodge", "dmg_when_heal": "heal", "dmg_when_death": "kill", "dmg_when_pickup_gold": "gold"}[e.custom_key]
+			return [[trig, {}]] + chance + [["damage", {"stat": e.key, "pct": int(e.value)}]]
+		"temp_stats_per_interval":
+			# 医疗箱：每 interval 秒 +属性（直至敌袭结束）
+			return [["interval", {"secs": int(e.interval)}], ["temp_stat", {"stat": e.key, "value": int(e.value)}]]
+	return []
+
+
+static func _chain(g: Dictionary, origin: Vector2, chain: Array) -> void:
+	var prev = -1
+	for i in chain.size():
+		var id = add_node(g, chain[i][0], origin + Vector2(300 * i, 0), chain[i][1])
+		if prev >= 0:
+			add_link(g, prev, id)
+		prev = id
+
+
 static func split_native(g: Dictionary, e, origin: Vector2) -> bool:
 	if not Catalog.can_split(e):
 		return false
-	# 魅惑（浪漫之人 / 长笛）：命中敌人 → 敌人生命低于 value2% → 几率（浪漫之人按属性缩放）→ 魅惑
-	if e.custom_key == "charm_on_hit":
-		var trig = add_node(g, "enemy_hit", origin)
-		var hp = add_node(g, "enemy_hp_below", origin + Vector2(300, 0), {"pct": int(e.value2)})
-		add_link(g, trig, hp)
-		var ch = -1
-		if e.key != "":
-			ch = add_node(g, "stat_chance", origin + Vector2(600, 0), {"stat": e.key, "pct": int(e.value)})
-		else:
-			ch = add_node(g, "chance", origin + Vector2(600, 0), {"pct": int(e.value)})
-		add_link(g, hp, ch)
-		add_link(g, ch, add_node(g, "charm", origin + Vector2(900, 0)))
+	var special = _special_chain(e)
+	if not special.empty():
+		_chain(g, origin, special)
 		return true
 	var d = Catalog.NATIVE_SPLIT[e.custom_key]
 	# 徒步旅行者：每走 value2 步

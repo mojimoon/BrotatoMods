@@ -89,7 +89,9 @@ func build(p_ui, parent: Control) -> void:
 	hide.pressed = bool(_graph().get("hide_text", false))
 	hide.connect("toggled", self, "_on_hide_text")
 	head.add_child(hide)
-	box.add_child(ui._desc(ui.tr("BE_GRAPH_HIDE_TEXT_DESC")))
+	_hide_desc = ui._desc(ui.tr("BE_GRAPH_HIDE_TEXT_DESC"))
+	_hide_desc.visible = hide.pressed
+	box.add_child(_hide_desc)
 	var scroll = ui._scroll()
 	box.add_child(scroll)
 	preview = RichTextLabel.new()
@@ -121,7 +123,11 @@ func _changed() -> void:
 	_refresh_preview()
 
 
+var _hide_desc: Control = null
+
+
 func _on_hide_text(on: bool) -> void:
+	_hide_desc.visible = on
 	var g = _edit_graph()
 	if on:
 		g.hide_text = true

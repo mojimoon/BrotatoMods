@@ -1739,3 +1739,55 @@ func test_204_charm_split_and_weapon_hits() -> void:
 	_eq(rd.players_data[0].gold, g0 + 2, "hits without a weapon fire")
 	m.runtime.end_wave()
 	m.delete_custom_weapon(m.find_target("weapon", wid).weapon_id)
+
+
+# 更多可拆解的原版效果；拆解后数值一致
+func test_205_more_splits() -> void:
+	var GE = load(GraphEffectScript)
+	var Catalog = load(MOD_DIR + "catalog.gd")
+	var cases = [
+		["item_hunting_trophy", "gold_on_crit_kill", ["crit_kill", "chance", "add_gold"]],
+		["item_adrenaline", "heal_on_dodge", ["dodge", "chance", "heal_hp"]],
+		["item_riposte", "dmg_on_dodge", ["dodge", "damage"]],
+		["character_lich", "dmg_when_heal", ["heal", "damage"]],
+		["item_cyberball", "dmg_when_death", ["kill", "chance", "damage"]],
+		["item_baby_elephant", "dmg_when_pickup_gold", ["gold", "chance", "damage"]],
+		["item_medikit", "temp_stats_per_interval", ["interval", "temp_stat"]],
+	]
+	for c in cases:
+		var e = null
+		for x in m.orig_effects(c[0]):
+			if x.custom_key == c[1]:
+				e = x
+		if e == null:
+			continue
+		_check(Catalog.can_split(e), c[0] + " splittable")
+		var g = GE.new_graph()
+		GE.split_native(g, e, Vector2.ZERO)
+		var kinds = []
+		for n in g.nodes:
+			kinds.push_back(n.kind)
+		_eq(kinds, c[2], c[0] + " nodes")
+		_eq(g.links.size(), c[2].size() - 1, c[0] + " linked")
+		if c[2][-1] == "damage":
+			_eq([g.nodes[-1].params.stat, int(g.nodes[-1].params.pct)], [e.key, int(e.value)], c[0] + " damage")
+	# 隐藏描述：编辑器预览也不显示
+	var g2 = GE.new_graph()
+	GE.add_link(g2, GE.add_node(g2, "wave_start", Vector2.ZERO), GE.add_node(g2, "add_gold", Vector2.ZERO, {"value": 1}))
+	g2.hide_text = true
+	var p = m.new_profile()
+	p.graph = g2
+	m.profiles[CH] = p
+	var ui = yield(_open_ui(CH), "completed")
+	var holder = VBoxContainer.new()
+	ui.add_child(holder)
+	ui._effect_lines([GE.make(g2)], holder)
+	_eq(holder.get_child_count(), 0, "hidden blueprint not in the preview")
+	ui._on_tab_pressed("blueprint")
+	yield(tree, "idle_frame")
+	_check(ui.blueprint._hide_desc.visible, "hint shown while checked")
+	ui.blueprint._on_hide_text(false)
+	_check(not ui.blueprint._hide_desc.visible, "hint hidden when unchecked")
+	ui.queue_free()
+	yield(tree, "idle_frame")
+
