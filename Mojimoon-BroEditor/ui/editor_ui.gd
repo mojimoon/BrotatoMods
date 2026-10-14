@@ -2947,7 +2947,7 @@ func _build_gear() -> void:
 		del.connect("pressed", self, "_on_start_item_delete", [i])
 		row.add_child(del)
 
-	# 融合角色（GNO）：开局获得这些角色的全部效果
+	# 融合角色（GMO）：开局获得这些角色的全部效果
 	var fbox = _section(box, "BE_SEC_FUSE", C_ACCENT_2)
 	fbox.add_child(_desc(tr("BE_FUSE_DESC")))
 	var fpick = _button(tr("BE_PICK_FUSE"), FONT_SMALL)

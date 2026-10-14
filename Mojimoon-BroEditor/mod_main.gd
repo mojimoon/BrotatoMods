@@ -185,7 +185,7 @@ static func new_profile() -> Dictionary:
 		"stats": {},
 		"weapons": null,
 		"start_items": [],
-		"fuse": [],	# 角色：融合的角色 id（开局获得它们的全部效果，同 GNO / cave-modtools）
+		"fuse": [],	# 角色：融合的角色 id（开局获得它们的全部效果，同 GMO / cave-modtools）
 		"ban_items": [],
 		"ban_weapons": [],
 		"wanted_tags": null,

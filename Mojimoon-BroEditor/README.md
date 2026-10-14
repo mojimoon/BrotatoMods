@@ -18,7 +18,7 @@
 - **Stats**: starting stats and stat modifiers for characters; price, rarity, limit and tags for items; damage, cooldown, crit, range, projectiles, scaling and more for weapons.
 - **Effects**: add any effect from every vanilla character, item and weapon, then tweak its values; drag to reorder.
 - **Blueprint**: build your own effects as *trigger → condition → effect* node graphs.
-- **Characters**: starting state (materials, levels, crates, starting wave…), starting weapons and items, banned items and weapons.
+- **Characters**: starting state (materials, levels, crates, starting wave…), starting weapons and items, **GMO (character fusion)**, banned items and weapons.
 - **Create new** characters, items and weapons from any vanilla one, then DIY whatever you want. Choose an icon or import your own.
 - **Disable** characters, items and weapons.
 - **Share** with a code (one object, a whole tab, or everything), or by sending the object's file (see below).
@@ -61,7 +61,7 @@ Files are saved in `%APPDATA%\Brotato\Mojimoon-BroEditor\` (Windows), `~/Library
 [*][b]Stats[/b]: starting stats and stat modifiers for characters; price, rarity, limit and tags for items; damage, cooldown, crit, range, projectiles, scaling and more for weapons.
 [*][b]Effects[/b]: add any effect from every vanilla character, item and weapon, then tweak its values; drag to reorder.
 [*][b]Blueprint[/b]: build your own effects as *trigger → condition → effect* node graphs.
-[*][b]Characters[/b]: starting state (materials, levels, crates, starting wave…), starting weapons and items, banned items and weapons.
+[*][b]Characters[/b]: starting state (materials, levels, crates, starting wave…), starting weapons and items, [b]GMO (character fusion)[/b], banned items and weapons.
 [*][b]Create new[/b] characters, items and weapons from any vanilla one, then DIY whatever you want. Choose an icon or import your own.
 [*][b]Disable[/b] characters, items and weapons.
 [*][b]Share[/b] with a code (one object, a whole tab, or everything), or by sending the object's file (see below).
@@ -133,7 +133,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 - **属性**：角色的初始属性与属性修改%；道具的价格、稀有度、数量限制、标签；武器的伤害、冷却、暴击、范围、投射物、属性加成等……一切都能随心修改。
 - **效果**：从全部原版角色、道具、武器的效果库中任选添加并修改数值和参数，拖动调整顺序。
 - **蓝图**：用"触发 → 条件 → 效果"的节点图，组合出成千上万种效果。
-- **角色**：开局状态（材料、等级、箱子、起始波次……）、初始武器与道具、禁用道具与武器。
+- **角色**：开局状态（材料、等级、箱子、起始波次……）、初始武器与道具、**GMO (角色融合)**、禁用道具与武器。
 - **新建**角色、道具、武器：以任意原版对象为基底，尽情 DIY。可选图标或导入图片。
 - **禁用**角色、道具和武器。
 - **分享**：可以导入、导出分享码（当前项目 / 角色 / 道具 / 武器 / 全部），或以文件形式分享（见下）。
@@ -175,7 +175,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 [*][b]属性[/b]：角色的初始属性与属性修改%；道具的价格、稀有度、数量限制、标签；武器的伤害、冷却、暴击、范围、投射物、属性加成等……一切都能随心修改。
 [*][b]效果[/b]：从全部原版角色、道具、武器的效果库中任选添加并修改数值和参数，拖动调整顺序。
 [*][b]蓝图[/b]：用"触发 → 条件 → 效果"的节点图，组合出成千上万种效果。
-[*][b]角色[/b]：开局状态（材料、等级、箱子、起始波次……）、初始武器与道具、禁用道具与武器。
+[*][b]角色[/b]：开局状态（材料、等级、箱子、起始波次……）、初始武器与道具、[b]GMO (角色融合)[/b]、禁用道具与武器。
 [*][b]新建[/b]角色、道具、武器：以任意原版对象为基底，尽情 DIY。可选图标或导入图片。
 [*][b]禁用[/b]角色、道具和武器。
 [*][b]分享[/b]：可以导入、导出分享码（当前项目 / 角色 / 道具 / 武器 / 全部），或以文件形式分享（见下）。
