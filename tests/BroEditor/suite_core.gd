@@ -1353,6 +1353,10 @@ func test_190_cursed_blueprint_values() -> void:
 			ids[r + ":" + step[0]] = id
 			GE.add_link(g, prev, id)
 			prev = id
+	var st = GE.add_node(g, "steps", Vector2.ZERO, {"n": 80})
+	ids["steps"] = st
+	ids["steps:perm_stat"] = GE.add_node(g, "perm_stat", Vector2.ZERO, {"stat": "stat_max_hp", "value": 1})
+	GE.add_link(g, st, ids["steps:perm_stat"])
 	var it = GE.add_node(g, "interval", Vector2.ZERO, {"secs": 5})
 	ids["interval"] = it
 	var gr = GE.add_node(g, "grant", Vector2.ZERO, {"ref": _burn_ref(20), "n": 1, "mode": "temp"})
@@ -1402,6 +1406,8 @@ func test_190_cursed_blueprint_values() -> void:
 		["stats:slow", "pct", _good(10), "  slow grows"],
 		["misc:rand_stats", "value", _good(1), "random stats grow"],
 		["fruit:fruit", "value", _good(1), "fruit grows"],
+		["steps", "n", _bad(80), "every X steps -> +hp: X shrinks (as the hiker's value2)"],
+		["steps:perm_stat", "value", 1, "  and the hp is unchanged"],
 		["interval", "secs", 5, "interval unchanged"],
 		["grant", "n", 1, "grant count unchanged"],
 	]

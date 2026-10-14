@@ -260,9 +260,11 @@ const CURSE_SIGNS = {
 	"wave_min": {"n": -1},
 	"diff_min": {"n": -1},
 	"stat_min": {"n": -1},
+	"steps": {"n": -1},
 }
-# 诅咒默认改效果的数值；路径上有以下条件时改条件的数值、效果不变（同原版"每击杀 X 个敌人"诅咒的是 X）
-const CURSE_TARGETS = {"every": "n"}
+# 诅咒默认改效果的数值；路径上有以下节点时改它的数值、效果不变（同原版"每击杀 X 个敌人"诅咒的是 X；
+# 徒步旅行者"每走 X 步"诅咒的也是步数 value2，获得的数值不变）
+const CURSE_TARGETS = {"every": "n", "steps": "n"}
 # 效果节点里被诅咒的数值参数（grant 引用的效果按原版对该类效果的规则诅咒，次数不变）
 const CURSE_EFFECT_PARAMS = {
 	"temp_stat": ["value"], "perm_stat": ["value"], "timed_stat": ["value", "secs"],
