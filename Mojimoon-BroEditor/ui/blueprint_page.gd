@@ -79,7 +79,17 @@ func build(p_ui, parent: Control) -> void:
 	var box = VBoxContainer.new()
 	box.add_constant_override("separation", 6)
 	card.add_child(box)
-	box.add_child(ui._label(ui.tr("BE_GRAPH_PATHS"), ui.FONT_NORMAL, ui.C_ACCENT))
+	var head = HBoxContainer.new()
+	box.add_child(head)
+	var title = ui._label(ui.tr("BE_GRAPH_PATHS"), ui.FONT_NORMAL, ui.C_ACCENT)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(title)
+	# 不在描述里显示自动生成的文本（自动文本太长时改用手写的描述）
+	var hide = ui._checkbox(ui.tr("BE_GRAPH_HIDE_TEXT"), ui.FONT_DESC)
+	hide.pressed = bool(_graph().get("hide_text", false))
+	hide.hint_tooltip = ui.tr("BE_GRAPH_HIDE_TEXT_DESC")
+	hide.connect("toggled", self, "_on_hide_text")
+	head.add_child(hide)
 	var scroll = ui._scroll()
 	box.add_child(scroll)
 	preview = RichTextLabel.new()
@@ -109,6 +119,15 @@ func _edit_graph() -> Dictionary:
 func _changed() -> void:
 	ui._changed()
 	_refresh_preview()
+
+
+func _on_hide_text(on: bool) -> void:
+	var g = _edit_graph()
+	if on:
+		g.hide_text = true
+	else:
+		g.erase("hide_text")
+	_changed()
 
 
 func _refresh_preview() -> void:
@@ -187,6 +206,14 @@ func _param_control(n: Dictionary, p: Array) -> Control:
 		return opt
 	if ptype == "items":
 		return _items_control(n, p[0], cur if cur is Array else [])
+	if ptype == "enemy":
+		var items = []
+		for e in ui._mod.enemy_list():
+			items.push_back([ui.tr(e.name), e.id])
+		var opt = ui._search_select(items, str(cur))
+		opt.rect_min_size = Vector2(170, 0)
+		opt.connect("selected", self, "_on_param_option", [int(n.id), p[0]])
+		return opt
 	if ptype.begins_with("mode:"):
 		var items = []
 		for m in ptype.substr(5).split("|"):

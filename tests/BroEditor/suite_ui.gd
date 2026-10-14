@@ -1074,3 +1074,45 @@ func _spin_for(ui, key: String):
 	var grid = n.get_parent()
 	var idx = n.get_index() + 1
 	return grid.get_child(idx) if idx < grid.get_child_count() and grid.get_child(idx) is SpinBox else null
+
+
+# 反馈 2：道具也有介绍、蓝图新节点的参数控件、隐藏蓝图描述、图标悬停提示
+func test_163_feedback2_ui() -> void:
+	var iid = m.create_custom_item(_plain_item().my_id, "fb2")
+	var ui = yield(_open_ui(CH), "completed")
+	ui.set_kind("item")
+	ui._select(iid)
+	ui._on_tab_pressed("overview")
+	yield(tree, "idle_frame")
+	var te = null
+	for nd in _all_nodes(ui._page):
+		if nd is TextEdit:
+			te = nd
+	_check(te != null, "item description box")
+	if te != null:
+		te.text = "hand written"
+		ui._on_desc_changed(te)
+		m.apply_all()
+		_check(m.effect_text(m.find_target("item", iid).effects[0], false).find("hand written") >= 0, "item description applied")
+	ui._on_tab_pressed("blueprint")
+	yield(tree, "idle_frame")
+	var bp = ui.blueprint
+	for k in ["spawn", "gain_item", "lose_item", "shop_add", "shop_remove", "charm", "break", "steps"]:
+		bp.add_node_kind(k)
+	yield(tree, "idle_frame")
+	var g = m.item_profiles[iid].graph
+	_eq(g.nodes.size(), 8, "new nodes added")
+	var hide = null
+	for nd in _all_nodes(ui._page):
+		if nd is CheckBox and nd.text == tr("BE_GRAPH_HIDE_TEXT"):
+			hide = nd
+	_check(hide != null, "hide text checkbox")
+	if hide != null:
+		hide.pressed = true
+		_check(g.get("hide_text", false), "hide text saved in the graph")
+		hide.pressed = false
+		_check(not g.has("hide_text"), "hide text cleared")
+	_check(ui._res_button(m.find_target("item", iid)).hint_tooltip.find(iid) >= 0, "icon tooltip has the id")
+	ui.queue_free()
+	yield(tree, "idle_frame")
+	m.delete_custom_item(iid)

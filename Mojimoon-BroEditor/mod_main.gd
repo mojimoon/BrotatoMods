@@ -95,6 +95,8 @@ var _custom_weapons: Dictionary = {}
 var _global_ban = null
 # 角色 id -> 禁用的道具 / 武器 hash（商店过滤用）
 var _ban_cache: Dictionary = {}
+# 本局商店的变化（蓝图效果"本局商店中出现 / 不再出现"）：每名玩家 {"add": [道具 id], "remove": [道具 id]}，随一局存档保存
+var run_shop: Array = new_run_shop()
 var _library = null
 var _weapon_library = null
 # 道具 / 武器稀有度被改过：还原或重新应用后要重建商店分档池
@@ -183,6 +185,7 @@ static func new_profile() -> Dictionary:
 		"stats": {},
 		"weapons": null,
 		"start_items": [],
+		"fuse": [],	# 角色：融合的角色 id（开局获得它们的全部效果，同 GNO / cave-modtools）
 		"ban_items": [],
 		"ban_weapons": [],
 		"wanted_tags": null,
@@ -226,9 +229,14 @@ static func normalize_profile(p) -> Dictionary:
 	for k in ["effects", "weapons", "wanted_tags"]:
 		if out[k] != null and not out[k] is Array:
 			out[k] = null
-	for k in ["start_items", "ban_items", "ban_weapons"]:
+	for k in ["start_items", "ban_items", "ban_weapons", "fuse"]:
 		if not out[k] is Array:
 			out[k] = []
+	var fuse = []
+	for id in out.fuse:
+		if not str(id) in fuse:
+			fuse.push_back(str(id))
+	out.fuse = fuse
 	if out.graph != null and not (out.graph is Dictionary and out.graph.get("nodes") is Array and out.graph.get("links") is Array):
 		out.graph = null
 	if out.graph != null:
@@ -833,6 +841,8 @@ func orig_effects(id: String) -> Array:
 		return _orig_effects[id]
 	var r = _find_any(id)
 	if r == null:
+		r = _find_dlc(id)
+	if r == null:
 		return []
 	var effects: Array = r.effects
 	if _backups.has(id):
@@ -965,11 +975,7 @@ func _plain_text_key(key: String) -> String:
 		return ""
 	tk = "BE_FX_" + key.to_upper()
 	if tr(tk) == tk:
-		if _desc_translation == null:
-			_desc_translation = Translation.new()
-			_desc_translation.locale = TranslationServer.get_locale()
-			TranslationServer.add_translation(_desc_translation)
-		_desc_translation.add_message(tk, stat_name(key))
+		_dyn_tr().add_message(tk, stat_name(key))
 		var text = _autoload("Text")
 		if text != null:
 			text.keys_needing_operator[tk.to_lower()] = [0]
@@ -1147,16 +1153,24 @@ func start_item_effect(s):
 
 # 描述：一条不生效的效果（key 为空，apply 直接返回），文本是动态注册的翻译
 func _desc_effect(id: String, text: String):
+	var key = "BE_DESC_" + id.to_upper()
+	_set_message(key, "[color=#" + Color(0.75, 0.8, 0.9).to_html(false) + "]" + text + "[/color]")
+	return make_effect({"set": {"key": "", "value": 0, "text_key": key, "effect_sign": 2}})
+
+
+# 动态注册的翻译（描述、属性名、自定义对象名）：每个语言都显示同一段文字
+func _dyn_tr() -> Translation:
 	if _desc_translation == null:
 		_desc_translation = Translation.new()
-		_desc_translation.locale = TranslationServer.get_locale()
 		TranslationServer.add_translation(_desc_translation)
-	var key = "BE_DESC_" + id.to_upper()
-	# 每个语言都显示同一段描述
 	_desc_translation.locale = TranslationServer.get_locale()
-	_desc_translation.erase_message(key)
-	_desc_translation.add_message(key, "[color=#" + Color(0.75, 0.8, 0.9).to_html(false) + "]" + text + "[/color]")
-	return make_effect({"set": {"key": "", "value": 0, "text_key": key, "effect_sign": 2}})
+	return _desc_translation
+
+
+func _set_message(key: String, text: String) -> void:
+	var t = _dyn_tr()
+	t.erase_message(key)
+	t.add_message(key, text)
 
 
 const BACKUP_FIELDS = {
@@ -1256,6 +1270,36 @@ func apply_all() -> void:
 				c.starting_weapons = ws
 		if p.wanted_tags is Array:
 			c.wanted_tags = p.wanted_tags.duplicate()
+	_apply_fusion()
+
+
+# 融合角色：把被融合角色自身的效果（含本编辑器的修改，不含它们的融合与介绍）复制一份接在后面
+func _apply_fusion() -> void:
+	var targets = []
+	var own = {}
+	for id in profiles:
+		var p = profiles[id]
+		if p.fuse.empty() or not (p.custom or (p.enabled and kind_enabled.character)):
+			continue
+		var c = find_character(id)
+		if c == null:
+			continue
+		targets.push_back([c, p])
+		for fid in p.fuse:
+			var f = find_character(fid)
+			if f != null and not own.has(fid):
+				own[fid] = f.effects.duplicate()
+	for t in targets:
+		var c = t[0]
+		_backup(c)
+		var add = []
+		for fid in t[1].fuse:
+			if fid == c.my_id or not own.has(fid):
+				continue
+			for e in own[fid]:
+				if e != null and not str(e.text_key).begins_with("BE_DESC_"):
+					add.push_back(e.duplicate())
+		c.effects = c.effects + add
 
 
 # 道具：效果、名称、价格、稀有度、数量限制、词条
@@ -1471,7 +1515,7 @@ func create_custom(base_id: String, suffix: String = "") -> String:
 		var bp = profiles.get(base_id)
 		if bp != null and bp.enabled:
 			# 基底已有档案：连同档案内容一起复制
-			for k in ["effects", "stats", "weapons", "start_items", "ban_items", "ban_weapons", "wanted_tags", "desc"]:
+			for k in ["effects", "stats", "weapons", "start_items", "fuse", "ban_items", "ban_weapons", "wanted_tags", "desc"]:
 				p[k] = bp[k].duplicate(true) if bp[k] is Array or bp[k] is Dictionary else bp[k]
 		if p.effects == null:
 			p.effects = []
@@ -1651,6 +1695,8 @@ func _register_custom_item(id: String) -> void:
 	# 基础字段直接取档案（自定义道具的档案总是完整的）
 	var base = find_target("item", p.base)
 	it.name = p.name if p.name != "" else tr("BE_NEW_ITEM")
+	# 原版"初始拥有"等效果文本按 tr(ID 大写) 显示名称
+	_set_message(id.to_upper(), it.name)
 	it.icon = custom_icon(id, p, "item")
 	it.item_appearances = base.item_appearances if base != null else []
 	it.value = max(0, p.price)
@@ -1950,6 +1996,7 @@ func _register_custom_weapon(weapon_id: String, t: int) -> void:
 	if f.custom:
 		w.icon = custom_icon(weapon_id, f, "weapon")
 		w.name = f.name if f.name != "" else tr("BE_NEW_WEAPON")
+		_set_message(weapon_id.to_upper(), w.name)
 	w.add_to_chars_as_starting = []
 	w.upgrades_into = null
 	w._generate_hashes()
@@ -2168,16 +2215,38 @@ func set_library_dedup(on: bool) -> void:
 	_weapon_library = null
 
 
+# 角色与道具；DLC 当前未启用（未拥有或在选择界面关闭）时也收录它的角色与道具
 func _library_sources() -> Array:
 	var isvc = _isvc()
 	var sources = []
-	for c in isvc.characters:
-		if c != null and not is_custom(c.my_id):
-			sources.push_back([c.my_id, orig_name(c), orig_effects(c.my_id)])
-	for it in isvc.items:
-		if it != null and not is_custom(it.my_id):
-			sources.push_back([it.my_id, orig_name(it), orig_effects(it.my_id)])
+	var seen = {}
+	var dlc_chars = []
+	var dlc_items = []
+	for d in _dlcs():
+		dlc_chars += d.characters
+		dlc_items += d.items
+	for arr in [isvc.characters + dlc_chars, isvc.items + dlc_items]:
+		for r in arr:
+			if r == null or seen.has(r.my_id) or is_custom(r.my_id):
+				continue
+			seen[r.my_id] = true
+			sources.push_back([r.my_id, orig_name(r), orig_effects(r.my_id)])
 	return sources
+
+
+func _dlcs() -> Array:
+	var pd = _autoload("ProgressData")
+	return pd.available_dlcs if pd != null and "available_dlcs" in pd else []
+
+
+# 未启用的 DLC 里的角色 / 道具（效果库引用它们的效果）
+func _find_dlc(id: String):
+	for d in _dlcs():
+		for arr in [d.characters, d.items]:
+			for r in arr:
+				if r != null and r.my_id == id:
+					return r
+	return null
 
 
 # 蓝图扳机的模板：custom_key -> spec（找不到返回 null）
@@ -2205,7 +2274,7 @@ func ban_hashes(player_index: int) -> Array:
 	if c == null:
 		return []
 	if _ban_cache.has(c.my_id):
-		return _ban_cache[c.my_id]
+		return _with_run_shop(_ban_cache[c.my_id], player_index)
 	var out = global_ban_hashes().duplicate()
 	var p = profiles.get(c.my_id)
 	if p != null and ((p.enabled and kind_enabled.character) or p.custom):
@@ -2216,7 +2285,81 @@ func ban_hashes(player_index: int) -> Array:
 				if w.weapon_id in p.ban_weapons:
 					out.push_back(w.my_id_hash)
 	_ban_cache[c.my_id] = out
+	return _with_run_shop(out, player_index)
+
+
+static func new_run_shop() -> Array:
+	var out = []
+	for _i in 4:
+		out.push_back({"add": [], "remove": []})
 	return out
+
+
+# 读档：存档里没有或格式不对时为空
+func load_run_shop(state) -> void:
+	run_shop = new_run_shop()
+	if not state is Array:
+		return
+	for i in min(4, state.size()):
+		if state[i] is Dictionary:
+			for k in ["add", "remove"]:
+				if state[i].get(k) is Array:
+					for id in state[i][k]:
+						run_shop[i][k].push_back(str(id))
+
+
+# 加入 / 移出本局商店（同一件道具后执行的为准）
+func run_shop_change(p: int, ids, add: bool) -> void:
+	if not ids is Array or p < 0 or p >= run_shop.size():
+		return
+	for id in ids:
+		id = str(id)
+		run_shop[p].add.erase(id)
+		run_shop[p].remove.erase(id)
+		run_shop[p]["add" if add else "remove"].push_back(id)
+
+
+func _with_run_shop(bans: Array, p: int) -> Array:
+	if p >= run_shop.size() or (run_shop[p].add.empty() and run_shop[p].remove.empty()):
+		return bans
+	var out = bans.duplicate()
+	for id in run_shop[p].add:
+		out.erase(Keys.generate_hash(id))
+	for id in run_shop[p].remove:
+		out.push_back(Keys.generate_hash(id))
+	return out
+
+
+# ============================================================
+# 敌人（蓝图效果"生成敌人"）：原版图鉴里的普通敌人（不含精英 / 首领）
+# ============================================================
+var _enemies = null
+
+
+func enemy_list() -> Array:
+	if _enemies == null:
+		_enemies = []
+		var isvc = _isvc()
+		for e in isvc.entities if isvc != null else []:
+			if e is ItemEnemy and not e.is_boss and not e.is_elite and e.icon != null:
+				var path = e.icon.resource_path.get_base_dir() + "/" + e.my_id + ".tscn"
+				if ResourceLoader.exists(path):
+					_enemies.push_back({"id": e.my_id, "name": e.name, "icon": e.icon, "scene": path})
+	return _enemies
+
+
+func enemy_scene(id: String):
+	for e in enemy_list():
+		if e.id == id:
+			return load(e.scene)
+	return null
+
+
+func enemy_name(id: String) -> String:
+	for e in enemy_list():
+		if e.id == id:
+			return tr(e.name)
+	return id
 
 
 # ============================================================

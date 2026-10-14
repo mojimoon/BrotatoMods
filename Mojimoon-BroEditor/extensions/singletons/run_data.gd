@@ -15,5 +15,23 @@ func add_starting_items_and_weapons() -> void:
 func reset(restart: bool = false) -> void:
 	.reset(restart)
 	var m = BEMain.get_mod()
+	if m != null:
+		m.run_shop = m.new_run_shop()
 	if m != null and restart:
 		m.apply_start_bans()
+
+
+# 本局商店的变化随一局存档保存
+func get_state() -> Dictionary:
+	var s = .get_state()
+	var m = BEMain.get_mod()
+	if m != null:
+		s["broeditor_shop"] = m.run_shop.duplicate(true)
+	return s
+
+
+func resume_from_state(state: Dictionary) -> void:
+	.resume_from_state(state)
+	var m = BEMain.get_mod()
+	if m != null:
+		m.load_run_shop(state.get("broeditor_shop"))

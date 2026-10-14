@@ -23,7 +23,7 @@ var _steps: Array = [0.0, 0.0, 0.0, 0.0]
 var _wave_serial := 0
 var _explosion_effect = null
 var _timed_list: Array = []	# 持续 N 秒的效果：[{p, u: 撤销列表}]
-var _transforms: Array = []	# 待替换的道具：[{p, src, id}]（敌袭结束 / 商店中执行）
+var _transforms: Array = []	# 待执行的道具变化：[{p, src: 移除的道具或 null, id: 加入的道具 id 或 "", self: 是否为道具变为}]（敌袭结束 / 商店中执行）
 
 
 func _ready() -> void:
@@ -123,8 +123,18 @@ func fire(event: String, player_index: int, pos = null, target = null, info = nu
 	var ctx = {"pos": pos, "target": target, "hold": null, "info": info if info is Dictionary else {}}
 	for en in entries[player_index]:
 		for n in en.g.get("nodes", []):
-			if n.kind == event:
+			if n.kind == event and (event != "steps" or _every_n_steps(en, n)):
 				_walk(en, int(n.id), player_index, ctx, 0)
+
+
+# 扳机"每走 N 步"：每个扳机节点单独计数
+func _every_n_steps(en: Dictionary, n: Dictionary) -> bool:
+	var st = _state(en, int(n.id))
+	st.count += 1
+	if st.count < max(1, int(_param(n, "n", 1))):
+		return false
+	st.count = 0
+	return true
 
 
 func _walk(en: Dictionary, from_id: int, p: int, ctx: Dictionary, depth: int) -> void:
@@ -272,6 +282,19 @@ func _execute(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> void:
 			call_deferred("_drop_fruit", v, ctx.pos if ctx.pos != null else _player_pos(p))
 		"transform":
 			_transform(en, n, p)
+		"gain_item":
+			_gain_item(n, p)
+		"lose_item":
+			_lose_item(n, p)
+		"charm":
+			_charm(p, ctx.target)
+		"spawn":
+			_spawn(n, p)
+		"break":
+			_break(en, v, p)
+		"shop_add", "shop_remove":
+			if mod != null:
+				mod.run_shop_change(p, _param(n, "items", []), n.kind == "shop_add")
 		"grant":
 			_grant(en, n, p, ctx)
 	_sync_lost_max_hp(p, hp_before)
@@ -284,9 +307,44 @@ func _transform(en: Dictionary, n: Dictionary, p: int) -> void:
 	if not ids is Array or not src is ItemData or src is CharacterData:
 		return
 	for t in _transforms:
-		if t.src == src and t.p == p:
+		if t.src == src and t.p == p and t.self:
 			return
-	_transforms.push_back({"p": p, "src": src, "id": str(ids[randi() % ids.size()]) if not ids.empty() else ""})
+	_queue_item_change(p, src, _pick_id(ids), true)
+
+
+# 获得道具：列表中随机一件；列表为空时为本波商店里可能出现的随机道具
+func _gain_item(n: Dictionary, p: int) -> void:
+	var ids = _param(n, "items", [])
+	var id = _pick_id(ids)
+	if id == "":
+		var it = ItemService.get_rand_item_for_wave(RunData.current_wave, p)
+		if it == null or not it is ItemData:
+			return
+		id = it.my_id
+	_queue_item_change(p, null, id, false)
+
+
+# 失去道具：已拥有的、列表中的道具里随机一件（列表为空时为任意已拥有的道具）；原版照常换成"移除后变成"
+func _lose_item(n: Dictionary, p: int) -> void:
+	var ids = _param(n, "items", [])
+	ids = ids if ids is Array else []
+	var owned = []
+	var queued = []
+	for t in _transforms:
+		queued.push_back(t.src)
+	for it in RunData.get_player_items_ref(p):
+		if (ids.empty() or it.my_id in ids) and not it in queued and not it is CharacterData:
+			owned.push_back(it)
+	if not owned.empty():
+		_queue_item_change(p, owned[randi() % owned.size()], "", false)
+
+
+func _pick_id(ids) -> String:
+	return str(ids[randi() % ids.size()]) if ids is Array and not ids.empty() else ""
+
+
+func _queue_item_change(p: int, src, id: String, is_self: bool) -> void:
+	_transforms.push_back({"p": p, "src": src, "id": id, "self": is_self})
 	if wave_over:
 		_flush_transforms()
 
@@ -296,14 +354,17 @@ func _flush_transforms() -> void:
 	_transforms = []
 	for t in list:
 		var target = mod.find_target("item", t.id) if mod != null and t.id != "" else null
-		if (t.id != "" and target == null) or t.p >= RunData.get_player_count() or not t.src in RunData.get_player_items_ref(t.p):
+		if (t.id != "" and target == null) or t.p >= RunData.get_player_count():
 			continue
-		# 没有指定道具：移除，由原版换成"移除后变成"；指定了道具：只换成该道具
-		var rep = t.src.replaced_by
-		if target != null:
-			t.src.replaced_by = null
-		RunData.remove_item(t.src, t.p)
-		t.src.replaced_by = rep
+		if t.src != null:
+			if not t.src in RunData.get_player_items_ref(t.p):
+				continue
+			# 道具变为：没有指定道具时由原版换成"移除后变成"；指定了道具时只换成该道具
+			var rep = t.src.replaced_by
+			if target != null and t.self:
+				t.src.replaced_by = null
+			RunData.remove_item(t.src, t.p)
+			t.src.replaced_by = rep
 		if target != null:
 			RunData.add_item(target, t.p)
 		# 商店中：刷新装备栏
@@ -312,6 +373,53 @@ func _flush_transforms() -> void:
 			var gear = scene._get_gear_container(t.p)
 			if gear != null:
 				gear.set_items_data(RunData.get_player_items(t.p))
+
+
+# 变为友方（同浪漫之人：原版魅惑行为，每名玩家最多同时 5 个）；敌人身上没有魅惑行为时补上
+const CHARM_SCENE = "res://dlcs/dlc_1/effect_behaviors/enemy/charm_enemy_effect_behavior.tscn"
+
+
+func _charm(p: int, target) -> void:
+	if target == null or not is_instance_valid(target) or target.dead or not "effect_behaviors" in target:
+		return
+	if target is Boss or target.is_loot or not target.can_be_charmed:
+		return
+	var b = null
+	for c in target.effect_behaviors.get_children():
+		if "charmed" in c:
+			b = c
+	if b == null:
+		if not ResourceLoader.exists(CHARM_SCENE):
+			return
+		b = load(CHARM_SCENE).instance().init(target)
+		target.effect_behaviors.add_child(b)
+	if b.charmed or RunData.current_charmed_enemies[p] >= b.max_charm_count:
+		return
+	b.charm(p)
+
+
+# 生成敌人：地图上随机位置（原版出生标记）
+func _spawn(n: Dictionary, p: int) -> void:
+	if main == null or not is_instance_valid(main) or mod == null:
+		return
+	var scene = mod.enemy_scene(str(_param(n, "enemy", "")))
+	if scene == null:
+		return
+	for _i in clamp(int(_param(n, "n", 1)), 0, 50):
+		main._entity_spawner.spawn_entity_birth(EntityType.ENEMY, scene, ZoneService.get_rand_pos(), null, p)
+
+
+# 损坏：持有者是武器时，这把武器损坏并掉落材料（同原版砖块）
+func _break(en: Dictionary, gold: int, p: int) -> void:
+	var src = en.get("src")
+	var pl = _player(p)
+	if not src is WeaponData or pl == null:
+		return
+	var pos = RunData.get_player_weapons_ref(p).find(src)
+	for w in pl.current_weapons:
+		if w.weapon_pos == pos:
+			pl.call_deferred("on_weapon_wanted_to_break", w, max(0, gold))
+			return
 
 
 func _grant(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> void:

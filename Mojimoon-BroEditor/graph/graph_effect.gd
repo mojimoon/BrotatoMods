@@ -179,7 +179,10 @@ static func _walk_paths(g: Dictionary, by_id: Dictionary, path: Array, out: Arra
 # ============================================================
 # 文本：每条路径一行 "扳机，条件，条件：效果"
 # ============================================================
+# 图里 hide_text = true 时不显示自动生成的描述（改用手写的描述）
 func get_text(_player_index: int, colored: bool = true) -> String:
+	if graph.get("hide_text", false):
+		return ""
 	return graph_text(live_graph(), colored)
 
 
@@ -205,7 +208,7 @@ static func path_text(by_id: Dictionary, path: Array, colored: bool = true) -> S
 	var trig = by_id[path[0]]
 	var eff = by_id[path[-1]]
 	var chance = 100.0
-	var every = 1
+	var every = max(1, int(_p(trig, "n", 1))) if trig.kind == "steps" else 1
 	var suffix = ""
 	for i in range(1, path.size() - 1):
 		var n = by_id[path[i]]
@@ -293,15 +296,40 @@ static func _payload_text(n: Dictionary, trigger_kind: String, colored: bool) ->
 		"transform":
 			var ids = _p(n, "items", [])
 			ids = ids if ids is Array else []
-			if ids.empty():
-				return _tr("BE_PX_TRANSFORM_REPLACED")
-			return _tr("BE_PX_TRANSFORM_RANDOM" if ids.size() > 1 else "BE_PX_TRANSFORM").replace("{0}", _item_names(ids))
+			var t = _tr("BE_PX_TRANSFORM_REPLACED")
+			if not ids.empty():
+				t = _tr("BE_PX_TRANSFORM_RANDOM" if ids.size() > 1 else "BE_PX_TRANSFORM").replace("{0}", _item_names(ids))
+			return t + _at_wave_end(trigger_kind)
+		"gain_item", "lose_item":
+			var ids = _p(n, "items", [])
+			ids = ids if ids is Array else []
+			var k = "BE_PX_" + n.kind.to_upper()
+			k += "_ANY" if ids.empty() else ("_RANDOM" if ids.size() > 1 else "")
+			return _tr(k).replace("{0}", _item_names(ids)) + _at_wave_end(trigger_kind)
+		"shop_add", "shop_remove":
+			var ids = _p(n, "items", [])
+			return _tr("BE_PX_" + n.kind.to_upper()).replace("{0}", _item_names(ids if ids is Array else []))
+		"charm":
+			return _tr("BE_PX_CHARM")
+		"spawn":
+			var m = _mod()
+			var en = str(_p(n, "enemy", ""))
+			return _tr("BE_PX_SPAWN").replace("{0}", _col(str(int(_p(n, "n", 1))), false, colored)).replace("{1}", m.enemy_name(en) if m != null else en)
+		"break":
+			return _tr("BE_PX_BREAK").replace("{0}", str(v))
 		"grant":
 			var inner = _grant_text(n, colored)
 			var mode = str(_p(n, "mode", "temp"))
 			var k = {"perm": "BE_PX_GRANT_PERM", "timed": "BE_PX_GRANT_TIMED"}.get(mode, "BE_PX_GRANT_STATE" if state else "BE_PX_GRANT_TEMP")
 			return _tr(k).replace("{0}", inner).replace("{1}", str(int(_p(n, "secs", 5))))
 	return ""
+
+
+# 道具变化在敌袭中触发时等到敌袭结束才执行（商店扳机、敌袭结束时扳机不需要说明）
+static func _at_wave_end(trigger_kind: String) -> String:
+	if trigger_kind in Catalog.SHOP_TRIGGERS or trigger_kind == "wave_end":
+		return ""
+	return _tr("BE_CX_AT_WAVE_END")
 
 
 static func _grant_text(n: Dictionary, colored: bool) -> String:
@@ -397,13 +425,18 @@ static func split_native(g: Dictionary, e, origin: Vector2) -> bool:
 	if e == null or not Catalog.NATIVE_SPLIT.has(e.custom_key):
 		return false
 	var d = Catalog.NATIVE_SPLIT[e.custom_key]
-	var prev = add_node(g, d[0], origin)
+	# 徒步旅行者：每走 value2 步
+	var prev = add_node(g, d[0], origin, {"n": int(e.value2)} if d[0] == "steps" and "value2" in e else null)
 	var x = origin.x
 	for c in d[1]:
 		x += 300
 		var cid = add_node(g, c[0], Vector2(x, origin.y), c[1])
 		add_link(g, prev, cid)
 		prev = cid
-	var eid = add_node(g, d[2], Vector2(x + 300, origin.y), {"stat": e.key, "value": e.value})
+	var eid = -1
+	if e.key == "gold":
+		eid = add_node(g, "add_gold", Vector2(x + 300, origin.y), {"value": e.value})
+	else:
+		eid = add_node(g, d[2], Vector2(x + 300, origin.y), {"stat": e.key, "value": e.value})
 	add_link(g, prev, eid)
 	return true

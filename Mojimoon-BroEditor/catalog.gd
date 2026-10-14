@@ -211,7 +211,8 @@ static func _split_words(s: String) -> Array:
 # 效果库：原版角色与道具上的全部效果，按 (脚本, text_key, custom_key, key) 去重。
 # sources: [[来源 id, 来源名称 key, 效果数组]...]（效果数组须为原版未改动的版本）
 # 返回 [{from, i, effect, src, cat}...]
-# dedup：同脚本、同 text_key / custom_key / key 的效果只保留第一条
+# dedup：同脚本、同 text_key（不分大小写）/ custom_key / key 的效果只保留第一条；
+# 属性联动的 key（获得哪个属性）可以直接修改：同脚本时 text_key 相同即合并，没有 text_key 时按 key 合并
 static func build_library(sources: Array, dedup: bool = true) -> Array:
 	var seen = {}
 	var out = []
@@ -221,12 +222,18 @@ static func build_library(sources: Array, dedup: bool = true) -> Array:
 			var e = effects[i]
 			if e == null or not e is Resource or not "key" in e:
 				continue
+			var cat = category_of(e)
 			if dedup:
-				var k = JSON.print([e.get_script().resource_path if e.get_script() != null else "", e.text_key, e.custom_key, e.key])
+				var script = e.get_script().resource_path if e.get_script() != null else ""
+				var tk = str(e.text_key).to_lower()
+				var sig = [script, tk, e.custom_key, e.key]
+				if cat == "scaling":
+					sig = [script, tk] if tk != "" else [script, "", e.key]
+				var k = JSON.print(sig)
 				if seen.has(k):
 					continue
 				seen[k] = true
-			out.push_back({"from": s[0], "i": i, "effect": e, "src": s[1], "cat": category_of(e)})
+			out.push_back({"from": s[0], "i": i, "effect": e, "src": s[1], "cat": cat})
 	return out
 
 
@@ -338,7 +345,9 @@ class FieldSorter:
 #   名称 key = BE_N_<ID>；路径文本见 graph_effect.gd（扳机句式 BE_TX_*、效果句式 BE_PX_*、条件后缀 BE_CX_*）
 #   状态扳机（still / moving / low_hp / full_hp / always）：按路径轮询，扳机状态与路径上的状态条件（STATE_CONDS）都满足时进入并执行，
 #   任一不满足时撤销"本波属性"与"本波获得"
-#   transform（道具变为）：只对道具上的蓝图有效；敌袭中触发时等到敌袭结束再替换
+#   transform（道具变为）：只对道具上的蓝图有效；gain_item / lose_item（获得 / 失去道具）同样等到敌袭结束再执行
+#   shop_add / shop_remove：本局商店（及箱子）中可以出现 / 不再出现某些道具（可解除"禁用"），随一局存档保存
+#   charm：使目标敌人变为友方（同浪漫之人）；spawn：生成敌人；break：持有者是武器时损坏（同砖块）
 # ============================================================
 const NODES = [
 	["wave_start", "trigger", []],
@@ -362,7 +371,7 @@ const NODES = [
 	["gold", "trigger", []],
 	["consumable", "trigger", []],
 	["crate", "trigger", []],
-	["steps", "trigger", []],
+	["steps", "trigger", [["n", "int", 1]]],
 	["reroll", "trigger", []],
 	["buy", "trigger", []],
 	["still", "trigger", []],
@@ -403,6 +412,13 @@ const NODES = [
 	["rand_stats", "effect", [["value", "int", 1]]],
 	["fruit", "effect", [["value", "int", 1]]],
 	["transform", "effect", [["items", "items", []]]],
+	["gain_item", "effect", [["items", "items", []]]],
+	["lose_item", "effect", [["items", "items", []]]],
+	["shop_add", "effect", [["items", "items", []]]],
+	["shop_remove", "effect", [["items", "items", []]]],
+	["charm", "effect", []],
+	["spawn", "effect", [["enemy", "enemy", "baby_alien"], ["n", "int", 1]]],
+	["break", "effect", [["value", "int", 10]]],
 	["grant", "effect", [["ref", "effect", null], ["n", "int", 1], ["mode", "mode:temp|timed|perm", "temp"], ["secs", "int", 5]]],
 ]
 # 只在某个参数取某值时显示的参数：[节点, 参数] -> [条件参数, 值]
@@ -416,7 +432,8 @@ const SHOP_TRIGGERS = ["reroll", "buy"]
 
 # 原版触发型效果（Effect{key = 属性, value, custom_key = 扳机}）-> 蓝图 [扳机, [条件...], 效果]（"拆解"按钮用）
 const NATIVE_SPLIT = {
-	"stats_on_level_up": ["level_up", [], "perm_stat"],
+		"stats_on_level_up": ["level_up", [], "perm_stat"],
+	"gain_stat_for_every_step_after_equip": ["steps", [], "perm_stat"],
 	"temp_stats_on_hit": ["hit", [], "temp_stat"],
 	"temp_stats_on_dodge": ["dodge", [], "temp_stat"],
 	"stats_end_of_wave": ["wave_end", [], "perm_stat"],

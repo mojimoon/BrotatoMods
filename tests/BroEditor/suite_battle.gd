@@ -100,6 +100,48 @@ func test_85_battle_graph() -> void:
 	yield(_frames(4), "completed")
 
 
+# 变为友方、生成敌人、武器损坏（战斗中）
+func test_86_battle_new_effects() -> void:
+	_setup_player(CH)
+	rd.players_data[0].items = []
+	rd.add_character(m.find_character(CH), 0)
+	rd.add_weapon(isvc.get_element_safe(isvc.weapons, "weapon_fist_1"), 0)
+	rd.add_weapon(isvc.get_element_safe(isvc.weapons, "weapon_fist_1"), 0)
+	rd.current_wave = 1
+	var _e = tree.change_scene("res://main.tscn")
+	yield(_frames(10), "completed")
+	var main = tree.current_scene
+	var player = main._players[0]
+	player.disable_hurtbox()
+	main._wave_timer.start(600)
+	var sp = main._entity_spawner
+	var births = sp.active_births
+	m.runtime._spawn({"params": {"enemy": "baby_alien", "n": 2}}, 0)
+	_eq(sp.active_births - births, 2, "two enemies spawning")
+	var enemy = null
+	for i in 300:
+		var es = sp.get_all_enemies(false)
+		if not es.empty():
+			enemy = es[0]
+			break
+		yield(tree, "idle_frame")
+	_check(enemy != null, "enemy spawned")
+	if enemy != null and ResourceLoader.exists(m.runtime.CHARM_SCENE):
+		m.runtime._charm(0, enemy)
+		_check(enemy.get_charmed_by_player_index() == 0, "charmed")
+	var ws = rd.get_player_weapons_ref(0)
+	var n = ws.size()
+	var gold0 = rd.players_data[0].gold
+	m.runtime._break({"src": ws[1]}, 3, 0)
+	yield(_frames(3), "completed")
+	_eq(rd.get_player_weapons_ref(0).size(), n - 1, "weapon broke")
+	_eq(player.current_weapons.size(), n - 1, "weapon node removed")
+	main._on_WaveTimer_timeout()
+	yield(_frames(2), "completed")
+	var _b = tree.change_scene(MenuData.character_selection_scene)
+	yield(_frames(4), "completed")
+
+
 # 一局进行中删除自定义道具 / 武器后读档继续：不应报错（找不到的对象被原版读档逻辑跳过）
 func test_150_resume_after_delete() -> void:
 	var pd = tree.root.get_node("ProgressData")

@@ -1524,3 +1524,156 @@ func _all_nodes(n: Node) -> Array:
 		out.push_back(c)
 		out += _all_nodes(c)
 	return out
+
+
+# 反馈 2：效果库合并属性联动、收录未启用 DLC 的角色；自定义道具名称用于"初始拥有"文本
+func test_200_library_dlc_and_names() -> void:
+	var dedup0 = m.library_dedup
+	m.set_library_dedup(true)
+	var seen = {}
+	var dup = false
+	for entry in m.library():
+		if entry.cat != "scaling":
+			continue
+		var e = entry.effect
+		var tk = str(e.text_key).to_lower()
+		var k = e.get_script().resource_path + "|" + (tk if tk != "" else "#" + e.key)
+		dup = dup or seen.has(k)
+		seen[k] = true
+	_check(not dup, "scaling effects merged by text_key")
+	var pd = tree.root.get_node("ProgressData")
+	var dlc = pd.get_dlc_data("abyssal_terrors")
+	if dlc != null:
+		dlc.remove_resources()
+		m.set_library_dedup(m.library_dedup)
+		var from_dlc = false
+		for entry in m.library():
+			from_dlc = from_dlc or entry.from == "character_romantic"
+		_check(from_dlc, "inactive DLC characters in the library")
+		var t = null
+		for entry in m.library():
+			if entry.from == "character_romantic":
+				t = entry
+				break
+		_check(t != null and m.make_effect({"from": t.from, "i": t.i}) != null, "inactive DLC effect usable as template")
+		dlc.add_resources()
+	m.set_library_dedup(dedup0)
+	var iid = m.create_custom_item(_plain_item().my_id, "knife")
+	m.item_profiles[iid].name = "Blade X"
+	m.apply_all()
+	_eq(tr(iid.to_upper()), "Blade X", "custom item name registered for vanilla text")
+	_check(m.effect_text(m.start_item_effect({"id": iid, "n": 1}), false).find("Blade X") >= 0, "starting item text shows the name")
+	m.delete_custom_item(iid)
+
+
+# 每走 N 步、徒步旅行者拆解、隐藏蓝图描述
+func test_201_steps_and_hidden_text() -> void:
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	GE.add_link(g, GE.add_node(g, "steps", Vector2.ZERO, {"n": 3}), GE.add_node(g, "add_gold", Vector2.ZERO, {"value": 1}))
+	_graph_char(g)
+	var g0 = rd.players_data[0].gold
+	for i in 7:
+		m.runtime.fire("steps", 0)
+	_eq(rd.players_data[0].gold - g0, 2, "every 3 steps")
+	m.runtime.end_wave()
+	_check(GE.graph_text(g, false).find("3") >= 0, "steps text shows N")
+	var ge = GE.make(g)
+	_check(ge.get_text(0, false) != "", "text shown by default")
+	g.hide_text = true
+	ge = GE.make(g)
+	_eq(ge.get_text(0, false), "", "hidden text")
+	var hiker = null
+	for e in m.orig_effects("character_hiker"):
+		if e.custom_key == "gain_stat_for_every_step_after_equip":
+			hiker = e
+	if hiker != null:
+		var g2 = GE.new_graph()
+		_check(GE.split_native(g2, hiker, Vector2.ZERO), "hiker effect splits")
+		_eq(int(g2.nodes[0].params.n), int(hiker.value2), "steps count from value2")
+
+
+# 获得 / 失去道具（敌袭结束时执行）、本局商店加入 / 移出（随存档保存）
+func test_202_item_and_shop_effects() -> void:
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	var k = GE.add_node(g, "kill", Vector2.ZERO)
+	GE.add_link(g, k, GE.add_node(g, "gain_item", Vector2.ZERO, {"items": ["item_coupon"]}))
+	GE.add_link(g, GE.add_node(g, "level_up", Vector2.ZERO), GE.add_node(g, "lose_item", Vector2.ZERO, {"items": ["item_coupon"]}))
+	var sa = GE.add_node(g, "shop_add", Vector2.ZERO, {"items": ["item_coupon"]})
+	GE.add_link(g, GE.add_node(g, "crate", Vector2.ZERO), sa)
+	GE.add_link(g, GE.add_node(g, "heal", Vector2.ZERO), GE.add_node(g, "shop_remove", Vector2.ZERO, {"items": ["item_coupon"]}))
+	_graph_char(g)
+	var coupon = m.find_target("item", "item_coupon")
+	m.runtime.fire("kill", 0)
+	_check(not coupon in rd.get_player_items_ref(0), "gain waits for wave end")
+	m.runtime.end_wave()
+	_check(coupon in rd.get_player_items_ref(0), "gained at wave end")
+	m.runtime.start_wave(null)
+	m.runtime.fire("level_up", 0)
+	m.runtime.end_wave()
+	_check(not coupon in rd.get_player_items_ref(0), "lost at wave end")
+	TranslationServer.set_locale("zh")
+	_check(GE.graph_text(g, false).find(tr("BE_CX_AT_WAVE_END")) >= 0, "wave end note in text")
+	TranslationServer.set_locale("en")
+	m.set_disabled("item", "item_coupon", true)
+	var h = Keys.generate_hash("item_coupon")
+	_check(h in m.ban_hashes(0), "disabled")
+	m.runtime.start_wave(null)
+	m.runtime.fire("crate", 0)
+	_check(not h in m.ban_hashes(0), "shop_add lifts the disable for this run")
+	var state = rd.get_state()
+	_eq(state.broeditor_shop[0].add, ["item_coupon"], "saved with the run")
+	m.runtime.fire("heal", 0)
+	_check(h in m.ban_hashes(0), "shop_remove bans again")
+	m.load_run_shop(state.broeditor_shop)
+	_check(not h in m.ban_hashes(0), "restored from the run state")
+	m.runtime.end_wave()
+	rd.reset()
+	_eq(m.run_shop[0].add.size() + m.run_shop[0].remove.size(), 0, "new run clears the changes")
+	m.set_disabled("item", "item_coupon", false)
+	_check(not m.enemy_list().empty(), "enemy list")
+	_check(m.enemy_scene("baby_alien") != null, "enemy scene")
+
+
+# 融合角色：被融合角色的效果接在后面（不含它的融合与介绍）；取消后还原
+func test_203_fusion() -> void:
+	var other = isvc.characters[1]
+	var n0 = m.find_character(CH).effects.size()
+	var own = other.effects.size()
+	var p = m.new_profile()
+	p.fuse = [other.my_id]
+	m.profiles[CH] = p
+	var po = m.new_profile()
+	po.desc = "hello"
+	po.fuse = [CH]
+	m.profiles[other.my_id] = po
+	m.apply_all()
+	var c = m.find_character(CH)
+	_eq(c.effects.size(), n0 + own, "fused effects appended (without the other's description and fusion)")
+	_eq(m.find_character(other.my_id).effects.size(), own + 1 + n0, "two-way fusion uses each side's own effects")
+	_eq(m.normalize_profile({"fuse": ["a", "a", 3]}).fuse, ["a", "3"], "normalized")
+	m.profiles.erase(CH)
+	m.profiles.erase(other.my_id)
+	m.apply_all()
+	_eq(m.find_character(CH).effects.size(), n0, "restored")
+	var cid = m.create_custom(CH)
+	m.apply_all()
+	var cn = m.find_character(cid).effects.size()
+	m.profiles[cid].fuse = [other.my_id]
+	m.apply_all()
+	_eq(m.find_character(cid).effects.size(), cn + own, "custom character fusion")
+	var ui = yield(_open_ui(cid), "completed")
+	ui._on_tab_pressed("gear")
+	yield(tree, "idle_frame")
+	var found = false
+	for nd in _all_nodes(ui._page):
+		found = found or (nd is Label and nd.text == tr(other.name))
+	_check(found, "fused character listed on the gear tab")
+	ui._open_picker("fuse")
+	_eq(ui._picker_sel, [other.my_id], "picker preselects")
+	ui._picker_sel = []
+	ui._on_picker_confirm()
+	_eq(m.profiles[cid].fuse, [], "picker clears")
+	ui.queue_free()
+	yield(tree, "idle_frame")

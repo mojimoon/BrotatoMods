@@ -1132,8 +1132,6 @@ func _basic_section(left: Control) -> void:
 	name_edit.connect("text_changed", self, "_on_name_changed")
 	box.add_child(name_edit)
 	box.add_child(_desc(tr("BE_WEAPON_NAME_DESC" if _kind == "weapon" else "BE_NAME_DESC")))
-	if _kind != "character":
-		return
 	box.add_child(_label(tr("BE_DESCRIPTION"), FONT_SMALL, C_TEXT))
 	var desc_edit = TextEdit.new()
 	desc_edit.rect_min_size = Vector2(0, 90)
@@ -1145,7 +1143,7 @@ func _basic_section(left: Control) -> void:
 	desc_edit.text = _view().desc
 	desc_edit.connect("text_changed", self, "_on_desc_changed", [desc_edit])
 	box.add_child(desc_edit)
-	box.add_child(_desc(tr("BE_DESCRIPTION_DESC")))
+	box.add_child(_desc(tr("BE_DESCRIPTION_DESC_WEAPON" if _kind == "weapon" else "BE_DESCRIPTION_DESC")))
 
 
 # 自定义对象的外观：基底、图标、导入图片、ID
@@ -2947,6 +2945,38 @@ func _build_gear() -> void:
 		del.connect("pressed", self, "_on_start_item_delete", [i])
 		row.add_child(del)
 
+	# 融合角色（GNO）：开局获得这些角色的全部效果
+	var fbox = _section(box, "BE_SEC_FUSE", C_ACCENT_2)
+	fbox.add_child(_desc(tr("BE_FUSE_DESC")))
+	var fpick = _button(tr("BE_PICK_FUSE"), FONT_SMALL)
+	_apply_action_style(fpick, C_ACCENT_2)
+	fpick.size_flags_horizontal = 0
+	fpick.connect("pressed", self, "_open_picker", ["fuse"])
+	fbox.add_child(fpick)
+	for i in v.fuse.size():
+		var fc = _mod.find_character(v.fuse[i])
+		if fc == null:
+			continue
+		var row = HBoxContainer.new()
+		row.add_constant_override("separation", 10)
+		fbox.add_child(row)
+		var b = _res_button(fc)
+		_set_icon_style(b, C_BORDER, 2)
+		row.add_child(b)
+		var nm = _label(tr(fc.name), FONT_SMALL, C_TEXT)
+		nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(nm)
+		var del = _button("X", FONT_DESC)
+		_apply_action_style(del, C_DANGER)
+		del.connect("pressed", self, "_on_fuse_delete", [i])
+		row.add_child(del)
+
+
+func _on_fuse_delete(i: int) -> void:
+	_p().fuse.remove(i)
+	_changed()
+	_build_page()
+
 
 func _start_weapon_ids() -> Array:
 	var v = _view()
@@ -3199,7 +3229,7 @@ func _on_bans_clear(kind: String) -> void:
 func _open_picker(mode: String) -> void:
 	_picker_mode = mode
 	_picker_filter = ""
-	_picker_multi = mode in ["start_weapons", "start_items", "start_items_w"]
+	_picker_multi = mode in ["start_weapons", "start_items", "start_items_w", "fuse"]
 	_picker_sel = []
 	var v = _view()
 	match mode:
@@ -3214,6 +3244,12 @@ func _open_picker(mode: String) -> void:
 			_picker_res = _isvc().items.duplicate()
 		"start_items_w":
 			_picker_res = _isvc().weapons.duplicate()
+		"fuse":
+			_picker_res = []
+			for c in _isvc().characters:
+				if c.my_id != _id:
+					_picker_res.push_back(c)
+			_picker_sel = v.fuse.duplicate()
 		"base":
 			match _kind:
 				"character":
@@ -3404,6 +3440,8 @@ func _on_picker_confirm() -> void:
 		"start_items", "start_items_w":
 			for id in _picker_sel:
 				p.start_items.push_back({"id": id, "n": 1, "cursed": false})
+		"fuse":
+			p.fuse = _picker_sel.duplicate()
 		"base":
 			if not _picker_sel.empty():
 				_look_p().base = _kind_base(_picker_sel[0])
@@ -3698,8 +3736,11 @@ func _icon_button(tex: Texture, size: int) -> Button:
 
 
 # 道具 / 武器 / 角色图标按钮
+# 鼠标悬停显示名称与 ID（图标相同的自定义对象也能区分）
 func _res_button(r) -> Button:
-	return _icon_button(r.icon, GRID_ICON)
+	var b = _icon_button(r.icon, GRID_ICON)
+	b.hint_tooltip = tr(r.name) + "\n" + r.my_id
+	return b
 
 
 # 方形图标格（同原版物品格：稀有度色底 + 边框）
