@@ -185,6 +185,8 @@ func _param_control(n: Dictionary, p: Array) -> Control:
 		opt.rect_min_size = Vector2(170, 0)
 		opt.connect("selected", self, "_on_param_option", [int(n.id), p[0]])
 		return opt
+	if ptype == "items":
+		return _items_control(n, p[0], cur if cur is Array else [])
 	if ptype.begins_with("mode:"):
 		var items = []
 		for m in ptype.substr(5).split("|"):
@@ -211,6 +213,49 @@ func _param_control(n: Dictionary, p: Array) -> Control:
 	det.connect("pressed", self, "_on_ref_details", [int(n.id)])
 	box.add_child(det)
 	return box
+
+
+# 道具列表：每行一件（可换 / 删除），最后一个"+ 道具"
+func _items_control(n: Dictionary, key: String, ids: Array) -> Control:
+	var box = VBoxContainer.new()
+	box.add_constant_override("separation", 4)
+	var items = ui.item_select_items()
+	for i in ids.size():
+		var row = HBoxContainer.new()
+		row.add_constant_override("separation", 4)
+		box.add_child(row)
+		var opt = ui._search_select(items, str(ids[i]))
+		opt.rect_min_size = Vector2(200, 0)
+		opt.connect("selected", self, "_on_items_param", [int(n.id), key, i])
+		row.add_child(opt)
+		var del = ui._button("X", ui.FONT_DESC)
+		ui._apply_action_style(del, ui.C_DANGER)
+		del.connect("pressed", self, "_on_items_param", [null, int(n.id), key, i])
+		row.add_child(del)
+	var add = ui._search_select(items, null)
+	add.fixed_text = ui.tr("BE_P_ITEMS_ADD")
+	add._refresh_text()
+	add.rect_min_size = Vector2(200, 0)
+	add.connect("selected", self, "_on_items_param", [int(n.id), key, -1])
+	box.add_child(add)
+	return box
+
+
+# value = null 删除第 i 件；i = -1 追加
+func _on_items_param(value, id: int, key: String, i: int) -> void:
+	var n = _find(_edit_graph(), id)
+	if n == null:
+		return
+	var ids = Array(n.params.get(key, [])).duplicate() if n.params.get(key) is Array else []
+	if i < 0:
+		ids.push_back(str(value))
+	elif value == null:
+		ids.remove(i)
+	else:
+		ids[i] = str(value)
+	n.params[key] = ids
+	_changed()
+	call_deferred("rebuild")
 
 
 func _find(g: Dictionary, id: int):

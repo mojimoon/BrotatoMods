@@ -231,7 +231,11 @@ static func build_library(sources: Array, dedup: bool = true) -> Array:
 
 
 # 可在编辑器里修改的效果字段：脚本导出的 int / float / bool / String（数组和子资源保持模板原样）
-const HIDDEN_FIELDS = ["text_key", "custom_key", "storage_method", "effect_sign", "custom_args", "script", "resource_name", "resource_path", "resource_local_to_scene"]
+const HIDDEN_FIELDS = ["custom_key", "custom_args", "script", "resource_name", "resource_path", "resource_local_to_scene"]
+# 可编辑的数组字段（字符串数组）
+const ARRAY_FIELDS = ["stats_modified"]
+# 放在最后的高级字段
+const LATE_FIELDS = ["text_key", "effect_sign", "storage_method"]
 
 
 # ---------------- 蓝图诅咒 ----------------
@@ -247,6 +251,7 @@ const CURSE_SIGNS = {
 	"cooldown": {"secs": -1},
 	"hp_above": {"pct": -1},
 	"wave_min": {"n": -1},
+	"diff_min": {"n": -1},
 	"stat_min": {"n": -1},
 }
 # 诅咒默认改效果的数值；路径上有以下条件时改条件的数值、效果不变（同原版"每击杀 X 个敌人"诅咒的是 X）
@@ -304,9 +309,9 @@ static func editable_fields(e) -> Array:
 			continue
 		if p.name in HIDDEN_FIELDS or p.name.begins_with("_") or p.name.ends_with("_hash"):
 			continue
-		if p.type in [TYPE_INT, TYPE_REAL, TYPE_BOOL, TYPE_STRING]:
+		if p.type in [TYPE_INT, TYPE_REAL, TYPE_BOOL, TYPE_STRING] or (p.type == TYPE_ARRAY and p.name in ARRAY_FIELDS):
 			out.push_back({"name": p.name, "type": p.type})
-	# key / value 放最前
+	# key / value 放最前，文本 / 好坏 / 计算方式放最后
 	out.sort_custom(FieldSorter, "by_field")
 	return out
 
@@ -317,9 +322,9 @@ class FieldSorter:
 		var ia = order.find(a.name)
 		var ib = order.find(b.name)
 		if ia < 0:
-			ia = 99
+			ia = 99 if not a.name in LATE_FIELDS else 100 + LATE_FIELDS.find(a.name)
 		if ib < 0:
-			ib = 99
+			ib = 99 if not b.name in LATE_FIELDS else 100 + LATE_FIELDS.find(b.name)
 		if ia != ib:
 			return ia < ib
 		return a.name < b.name
@@ -331,7 +336,9 @@ class FieldSorter:
 #   部分扳机非原版（同 AutoAnthony）：命中敌人 / 首次命中 / 点燃由敌人身上的效果行为（graph/enemy_behavior.gd）转发，
 #   引发爆炸由 WeaponService.explode 的扩展转发
 #   名称 key = BE_N_<ID>；路径文本见 graph_effect.gd（扳机句式 BE_TX_*、效果句式 BE_PX_*、条件后缀 BE_CX_*）
-#   状态扳机（still / moving / low_hp / full_hp）：进入状态时执行，离开时撤销"本波属性"与"本波获得"
+#   状态扳机（still / moving / low_hp / full_hp / always）：按路径轮询，扳机状态与路径上的状态条件（STATE_CONDS）都满足时进入并执行，
+#   任一不满足时撤销"本波属性"与"本波获得"
+#   transform（道具变为）：只对道具上的蓝图有效；敌袭中触发时等到敌袭结束再替换
 # ============================================================
 const NODES = [
 	["wave_start", "trigger", []],
@@ -360,8 +367,9 @@ const NODES = [
 	["buy", "trigger", []],
 	["still", "trigger", []],
 	["moving", "trigger", []],
-	["low_hp", "trigger", []],
+	["low_hp", "trigger", [["pct", "int", 50]]],
 	["full_hp", "trigger", []],
+	["always", "trigger", []],
 	["chance", "cond", [["pct", "int", 25]]],
 	["every", "cond", [["n", "int", 5]]],
 	["cap", "cond", [["n", "int", 3]]],
@@ -370,6 +378,8 @@ const NODES = [
 	["hp_above", "cond", [["pct", "int", 50]]],
 	["wave_min", "cond", [["n", "int", 5]]],
 	["wave_max", "cond", [["n", "int", 10]]],
+	["diff_min", "cond", [["n", "int", 3]]],
+	["diff_max", "cond", [["n", "int", 2]]],
 	["stat_min", "cond", [["stat", "stat", "stat_armor"], ["n", "int", 10]]],
 	["stat_max", "cond", [["stat", "stat", "stat_armor"], ["n", "int", 10]]],
 	["if_moving", "cond", []],
@@ -392,13 +402,16 @@ const NODES = [
 	["vuln", "effect", [["pct", "int", 10], ["secs", "int", 3]]],
 	["rand_stats", "effect", [["value", "int", 1]]],
 	["fruit", "effect", [["value", "int", 1]]],
+	["transform", "effect", [["items", "items", []]]],
 	["grant", "effect", [["ref", "effect", null], ["n", "int", 1], ["mode", "mode:temp|timed|perm", "temp"], ["secs", "int", 5]]],
 ]
 # 只在某个参数取某值时显示的参数：[节点, 参数] -> [条件参数, 值]
 const PARAM_SHOW_IF = {"grant:secs": ["mode", "timed"]}
 # 伤害类型（条件"伤害类型"：命中 / 击杀的缩放属性）
 const DMG_TYPES = ["stat_melee_damage", "stat_ranged_damage", "stat_elemental_damage", "stat_engineering"]
-const STATE_TRIGGERS = ["still", "moving", "low_hp", "full_hp"]
+const STATE_TRIGGERS = ["still", "moving", "low_hp", "full_hp", "always"]
+# 状态条件：在状态扳机的路径上持续检查（全部满足时进入，任一不满足时撤销）；其余条件只在进入时检查一次
+const STATE_CONDS = ["hp_below", "hp_above", "wave_min", "wave_max", "diff_min", "diff_max", "stat_min", "stat_max", "if_moving", "if_still"]
 const SHOP_TRIGGERS = ["reroll", "buy"]
 
 # 原版触发型效果（Effect{key = 属性, value, custom_key = 扳机}）-> 蓝图 [扳机, [条件...], 效果]（"拆解"按钮用）
@@ -438,7 +451,7 @@ static func default_params(kind: String) -> Dictionary:
 	var d = node_def(kind)
 	if d != null:
 		for p in d[2]:
-			out[p[0]] = p[2]
+			out[p[0]] = p[2].duplicate() if p[2] is Array else p[2]
 	return out
 
 

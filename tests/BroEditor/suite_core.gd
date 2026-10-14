@@ -188,6 +188,18 @@ func test_40_share_code() -> void:
 	var code2 = m.export_code(id)
 	var id2 = m.import_code(code2, CH)
 	_check(id2 != "" and id2 != id and m.is_custom(id2), "custom imported as new custom")
+	# 压缩格式：正文以 PACK 开头，只含非默认字段；旧的未压缩码仍可导入
+	_check(code2.begins_with(m.SHARE_PREFIX + m.PACK), "compressed body")
+	var body = m.unpack(code2.substr(m.SHARE_PREFIX.length()))
+	_check(body.profile.has("custom") and not body.profile.has("wstats") and not body.profile.has("price"), "defaults stripped: " + str(body.profile.keys()))
+	var old = m.SHARE_PREFIX + "eyJraW5kIjoiY2hhcmFjdGVyIiwiaWQiOiJjaGFyYWN0ZXJfd2VsbF9yb3VuZGVkXzc1MTYiLCJwcm9maWxlIjp7ImVuYWJsZWQiOnRydWUsImN1c3RvbSI6dHJ1ZSwibmFtZSI6IueZvemprOmTg+iWryIsImRlc2MiOiIiLCJiYXNlIjoiY2hhcmFjdGVyX3dpbGRsaW5nIiwiaWNvbiI6IiIsImVmZmVjdHMiOlt7ImZyb20iOiJjaGFyYWN0ZXJfZmlzaGVybWFuIiwiaSI6Miwic2V0Ijp7ImtleSI6Iml0ZW1fcmljb2NoZXQifX0seyJmcm9tIjoiY2hhcmFjdGVyX2Zpc2hlcm1hbiIsImkiOjMsInNldCI6eyJrZXkiOiJpdGVtX3JpY29jaGV0IiwidmFsdWUiOi05MH19LHsiZnJvbSI6ImNoYXJhY3Rlcl9nbHV0dG9uIiwiaSI6M30seyJncm91cCI6InN0YXRzIiwia2V5IjoiYm91bmNlX2RhbWFnZSJ9LHsiZ3JvdXAiOiJzdGF0cyIsImtleSI6InBpZXJjaW5nX2RhbWFnZSJ9LHsiZnJvbSI6ImNoYXJhY3Rlcl9yYW5nZXIiLCJpIjozfV0sInN0YXRzIjp7ImJvdW5jZV9kYW1hZ2UiOjEwMCwicGllcmNpbmdfZGFtYWdlIjotMTAwLCJnYWluX3N0YXRfcGVyY2VudF9kYW1hZ2UiOi0xMjV9LCJ3ZWFwb25zIjpbIndlYXBvbl9rbmlmZV8xIiwid2VhcG9uX3N0aWNrXzEiLCJ3ZWFwb25fZmlzdF8xIiwid2VhcG9uX2Nob3BwZXJfMSIsIndlYXBvbl9maWdodGluZ19zdGlja18xIiwid2VhcG9uX2NhY3RpX2NsdWJfMSIsIndlYXBvbl9oYXRjaGV0XzEiLCJ3ZWFwb25fc3Bpa3lfc2hpZWxkXzEiLCJ3ZWFwb25fZ2hvc3RfZmxpbnRfMSIsIndlYXBvbl93cmVuY2hfMSIsIndlYXBvbl9waXN0b2xfMSIsIndlYXBvbl9zbWdfMSIsIndlYXBvbl9kb3VibGVfYmFycmVsX3Nob3RndW5fMSIsIndlYXBvbl9zbGluZ3Nob3RfMSIsIndlYXBvbl90YXNlcl8xIiwid2VhcG9uX3dhbmRfMSIsIndlYXBvbl9pY2ljbGVfMSIsIndlYXBvbl9yYWlsX2d1bl8xIiwid2VhcG9uX2x1dGVfMSJdLCJzdGFydF9pdGVtcyI6W3siaWQiOiJpdGVtX3JpY29jaGV0IiwibiI6MSwiY3Vyc2VkIjpmYWxzZX1dLCJiYW5faXRlbXMiOlsiaXRlbV9zaGFycF9idWxsZXQiLCJpdGVtX2JhbmRhbmEiLCJpdGVtX2V5ZXBhdGNoIiwiaXRlbV9wdW1wa2luIl0sImJhbl93ZWFwb25zIjpbXSwid2FudGVkX3RhZ3MiOltdLCJncmFwaCI6bnVsbCwic3RhcnQiOnt9LCJwcmljZSI6LTEsInRpZXIiOi0xLCJtYXhfbmIiOi0yLCJ0YWdzIjpudWxsLCJ3c3RhdHMiOnt9LCJzY2FsaW5nIjpudWxsLCJudW0iOjJ9fQ=="
+	var id3 = m.import_code(old, CH)
+	_check(id3 != "" and m.profiles[id3].weapons.size() == 19 and m.profiles[id3].stats.get("bounce_damage") == 100, "old uncompressed code imports")
+	_eq(m.profiles[id3].wanted_tags, [], "explicit empty list kept")
+	_eq(m.compact({"wanted_tags": [], "tags": null, "price": -1}, m.new_profile()), {"wanted_tags": []}, "[] differs from null")
+	var g = {"nodes": [{"id": 1, "kind": "kill", "params": {}, "pos": [0, 0]}], "links": [], "next": 2}
+	var gc = m.export_graph(g)
+	_check(gc.begins_with(m.GRAPH_PREFIX + m.PACK) and m.import_graph(gc).nodes.size() == 1, "blueprint code compressed and round-trips")
 
 
 func test_41_normalize_profile() -> void:
@@ -507,6 +519,160 @@ func test_102_mod_effect_text_fallback() -> void:
 	_eq(m.effect_text(m.stat_effect("stat_armor", 3), false), m.stat_effect("stat_armor", 3).get_text(0, false), "vanilla uses own text")
 
 
+# 属性页效果的好坏（颜色 / 诅咒方向）、文本 / 好坏 / 计算方式 / 实际修改属性可编辑
+func test_77_effect_signs_and_fields() -> void:
+	_eq(m.stat_effect("stat_armor", 3).effect_sign, 0, "armor +3 good")
+	_eq(m.stat_effect("stat_armor", -3).effect_sign, 1, "armor -3 bad")
+	_eq(m.stat_effect("items_price", -10).effect_sign, 0, "price -10 good")
+	_eq(m.stat_effect("items_price", 10).effect_sign, 1, "price +10 bad")
+	var dlc = load("res://dlcs/dlc_1/dlc_1_data.gd").new() if ResourceLoader.exists("res://dlcs/dlc_1/dlc_1_data.gd") else null
+	if dlc != null:
+		_eq(dlc._boost_effect_value_positively(m.stat_effect("items_price", -10), 0.5), -15, "cursed price cut grows")
+		_eq(dlc._boost_effect_value_positively(m.stat_effect("stat_armor", -4), 1.0), -2, "cursed armor loss shrinks")
+	var names = []
+	for f in m.Catalog.editable_fields(m.stat_effect("stat_armor", 3)):
+		names.push_back(f.name)
+	_eq(names.slice(names.size() - 3, names.size() - 1), ["text_key", "effect_sign", "storage_method"], "advanced fields last")
+	var hidden = m.make_effect({"set": {"key": "stat_armor", "value": 3, "text_key": "[EMPTY]"}})
+	_eq(hidden.get_text(0, false), "", "[EMPTY] hides the text")
+	var rep = m.make_effect({"set": {"key": "dodge_cap", "value": 1, "storage_method": 0}})
+	_eq(rep.storage_method, 0, "storage method set")
+	var gain = null
+	for entry in m.library(true):
+		if "stats_modified" in entry.effect and entry.effect.stats_modified.size() > 1:
+			gain = entry
+			break
+	_check(gain != null, "multi-stat gain effect found")
+	if gain != null:
+		var e = m.make_effect({"from": gain.from, "i": gain.i, "set": {"stats_modified": ["stat_luck"]}})
+		_eq(Array(e.stats_modified), ["stat_luck"], "stats_modified edited")
+		var fn = []
+		for f in m.Catalog.editable_fields(e):
+			fn.push_back(f.name)
+		_check("stats_modified" in fn, "stats_modified editable")
+
+
+func test_78_graph_low_hp_and_difficulty() -> void:
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	var t = GE.add_node(g, "wave_start", Vector2.ZERO)
+	var d = GE.add_node(g, "diff_min", Vector2.ZERO, {"n": 99})
+	GE.add_link(g, t, d)
+	GE.add_link(g, d, GE.add_node(g, "perm_stat", Vector2.ZERO, {"stat": "stat_armor", "value": 1}))
+	var d2 = GE.add_node(g, "diff_max", Vector2.ZERO, {"n": 99})
+	GE.add_link(g, t, d2)
+	GE.add_link(g, d2, GE.add_node(g, "perm_stat", Vector2.ZERO, {"stat": "stat_luck", "value": 1}))
+	_graph_char(g)
+	var a0 = _armor()
+	var l0 = rd.get_player_effect(Keys.generate_hash("stat_luck"), 0)
+	m.runtime.fire("wave_start", 0)
+	_eq(_armor(), a0, "danger 99+ blocks")
+	_eq(rd.get_player_effect(Keys.generate_hash("stat_luck"), 0), l0 + 1, "danger <= 99 passes")
+	m.runtime.end_wave()
+	TranslationServer.set_locale("zh")
+	_eq(_path_line([["low_hp", {"pct": 30}], ["temp_stat", {"stat": "stat_armor", "value": 2}]]).find("30%") >= 0, true, "low hp threshold in text")
+	_check(_path_line([["wave_start", {}], ["diff_min", {"n": 3}], ["xp", {"value": 1}]]).find("危险3") >= 0, "danger text")
+	TranslationServer.set_locale("en")
+
+
+# 状态扳机"始终"：路径上的状态条件持续检查，满足时进入、不满足时撤销
+func test_79_always_state_paths() -> void:
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	var t = GE.add_node(g, "always", Vector2.ZERO)
+	var c = GE.add_node(g, "stat_min", Vector2.ZERO, {"stat": "stat_armor", "n": 500})
+	GE.add_link(g, t, c)
+	GE.add_link(g, c, GE.add_node(g, "temp_stat", Vector2.ZERO, {"stat": "stat_luck", "value": 5}))
+	GE.add_link(g, t, GE.add_node(g, "temp_stat", Vector2.ZERO, {"stat": "stat_speed", "value": 3}))
+	_graph_char(g)
+	var en = m.runtime.entries[0][0]
+	var trig = en.by_id[t]
+	var luck = Keys.generate_hash("stat_luck")
+	var speed = Keys.generate_hash("stat_speed")
+	var l0 = TempStats.get_stat(luck, 0)
+	var s0 = TempStats.get_stat(speed, 0)
+	m.runtime.poll_state(en, trig, 0, null)
+	m.runtime.poll_state(en, trig, 0, null)
+	_eq(TempStats.get_stat(speed, 0), s0 + 3, "always: unconditional path once")
+	_eq(TempStats.get_stat(luck, 0), l0, "armor too low: not entered")
+	RunData.add_stat(Keys.stat_armor_hash, 1000, 0)
+	Utils.reset_stat_cache(0)
+	m.runtime.poll_state(en, trig, 0, null)
+	_eq(TempStats.get_stat(luck, 0), l0 + 5, "armor reached: entered")
+	RunData.add_stat(Keys.stat_armor_hash, -1000, 0)
+	Utils.reset_stat_cache(0)
+	m.runtime.poll_state(en, trig, 0, null)
+	_eq(TempStats.get_stat(luck, 0), l0, "armor lost: reverted")
+	m.runtime.end_wave()
+	_eq(TempStats.get_stat(speed, 0), s0, "wave end reverts")
+	TranslationServer.set_locale("zh")
+	_check(_path_line([["always", {}], ["stat_min", {"stat": "stat_armor", "n": 10}], ["temp_stat", {"stat": "stat_luck", "value": 5}]]).begins_with("+5"), "always has no trigger text")
+	TranslationServer.set_locale("en")
+
+
+# 道具变为：敌袭中触发，敌袭结束时替换；移除后变成（replaced_by）；金鱼效果复制到别的道具上指向该道具
+func test_80_item_transform() -> void:
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	GE.add_link(g, GE.add_node(g, "kill", Vector2.ZERO), GE.add_node(g, "transform", Vector2.ZERO, {"items": ["item_coupon"]}))
+	_graph_char(GE.new_graph())
+	var p = m.new_profile()
+	p.graph = g
+	m.item_profiles["item_alien_eyes"] = p
+	m.apply_all()
+	var it = m.find_target("item", "item_alien_eyes")
+	rd.add_item(it, 0)
+	m.runtime.start_wave(null)
+	m.runtime.fire("kill", 0)
+	m.runtime.fire("kill", 0)
+	_check(it in rd.get_player_items_ref(0), "kept during the wave")
+	m.runtime.end_wave()
+	var ids = []
+	for x in rd.get_player_items_ref(0):
+		ids.push_back(x.my_id)
+	_check(not "item_alien_eyes" in ids and ids.count("item_coupon") == 1, "replaced once at wave end: " + str(ids))
+	_check(GE.graph_text(g, false).find(tr(m.find_target("item", "item_coupon").name)) >= 0, "transform text")
+	m.item_profiles.erase("item_alien_eyes")
+	m.apply_all()
+	# 列表为空：移除并换成"移除后变成"；指定了道具：不再额外加入"移除后变成"
+	var p3 = m.new_profile()
+	p3.graph = GE.new_graph()
+	GE.add_link(p3.graph, GE.add_node(p3.graph, "kill", Vector2.ZERO), GE.add_node(p3.graph, "transform", Vector2.ZERO))
+	p3.replaced_by = "item_bandana"
+	m.item_profiles["item_alien_eyes"] = p3
+	m.apply_all()
+	rd.add_item(it, 0)
+	m.runtime.start_wave(null)
+	m.runtime.fire("kill", 0)
+	m.runtime.end_wave()
+	ids = []
+	for x in rd.get_player_items_ref(0):
+		ids.push_back(x.my_id)
+	_check(not "item_alien_eyes" in ids and "item_bandana" in ids, "empty list uses replaced_by: " + str(ids))
+	_check(GE.graph_text(p3.graph, false) == tr("BE_PX_TRANSFORM_REPLACED") or GE.graph_text(p3.graph, false).find(tr("BE_PX_TRANSFORM_REPLACED")) >= 0, "replaced text")
+	m.item_profiles.erase("item_alien_eyes")
+	# 移除后变成
+	var p2 = m.new_profile()
+	p2.replaced_by = "item_coupon"
+	m.item_profiles["item_alien_eyes"] = p2
+	m.apply_all()
+	_eq(it.replaced_by, m.find_target("item", "item_coupon"), "replaced_by applied")
+	m.item_profiles.erase("item_alien_eyes")
+	m.apply_all()
+	_eq(it.replaced_by, null, "replaced_by restored")
+	var fish = m.find_target("item", "item_goldfish")
+	if fish != null:
+		var cid = m.create_custom_item("item_goldfish")
+		var ci = m.find_target("item", cid)
+		m.apply_all()
+		_eq(ci.replaced_by, fish.replaced_by, "custom copy keeps replaced_by")
+		var keyed = false
+		for e in ci.effects:
+			keyed = keyed or (e.custom_key == "increase_tier_on_reroll" and e.key == cid)
+		_check(keyed, "copied goldfish effect points at the copy")
+		m.delete_custom_item(cid)
+
+
 func test_110_path_text() -> void:
 	TranslationServer.set_locale("zh")
 	_eq(_path_line([["level_up", {}], ["perm_stat", {"stat": "stat_melee_damage", "value": 2}]]), "升级时+2近战伤害", "zh level up")
@@ -615,7 +781,7 @@ func test_121_attack_while_moving_rule() -> void:
 	rd.add_character(m.find_character(CH), 0)
 	_eq(int(rd.get_player_effect(Keys.can_attack_while_moving_hash, 0)), 0, "can be disabled")
 	_eq(m.stat_name("next_level_xp_needed"), "%升级需要经验值", "label without placeholder")
-	_eq(m.stat_name("torture"), "拷问", "torture label")
+	_eq(m.stat_name("torture"), "每秒固定回复（无法其他治疗）", "torture label")
 	TranslationServer.set_locale("en")
 
 
@@ -690,6 +856,11 @@ func test_132_bundle_codes() -> void:
 	_eq(m.export_bundle("weapon"), "", "empty bundle exports nothing")
 	var all_code = m.export_bundle("")
 	_check(all_code.begins_with(m.ALL_PREFIX), "all prefix")
+	_check(kind_code.begins_with(m.BUNDLE_PREFIX.item + m.PACK) and all_code.begins_with(m.ALL_PREFIX + m.PACK), "bundles compressed")
+	_eq(m.unpack(kind_code.substr(m.BUNDLE_PREFIX.item.length())).items[it.my_id], {"price": 3}, "bundle keeps only edited fields")
+	_eq(m.import_bundle(m.BUNDLE_PREFIX.item + Marshalls.utf8_to_base64(JSON.print({"items": {it.my_id: {"price": 5}}}))), 1, "old uncompressed bundle imports")
+	_eq(m.item_profiles[it.my_id].price, 5, "old bundle content")
+	m.item_profiles[it.my_id].price = 3
 	m.item_profiles = {}
 	m.profiles = {}
 	_eq(m.import_bundle(kind_code), 1, "item bundle imported")
