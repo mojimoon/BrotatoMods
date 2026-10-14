@@ -61,6 +61,9 @@ func on_hurt(hitbox: Hitbox) -> void:
 		return
 	var p: int = from.player_index
 	var info = {"hp_pct": hp_pct(), "stats": stats}
+	# 武器的命中：武器上的蓝图只响应自己的命中
+	if "weapon_pos" in from and int(from.weapon_pos) >= 0:
+		info.weapon_pos = int(from.weapon_pos)
 	var pos = _parent.global_position
 	if not _first_done.has(p):
 		_first_done[p] = true

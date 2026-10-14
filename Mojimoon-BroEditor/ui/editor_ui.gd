@@ -779,6 +779,7 @@ func _refresh_char_list() -> void:
 	list = _customs_first(list)
 	for r in list:
 		var b = _icon_button(r.icon, CHAR_ICON)
+		_hover_preview(b, r)
 		b.set_meta("id", r.my_id)
 		b.set_meta("key", _key_of(r))
 		b.set_meta("tier", -1 if _kind == "character" else int(_mod.backup_value(r, "tier")))
@@ -2475,7 +2476,7 @@ func _effect_row(i: int, spec) -> Control:
 	src.clip_text = true
 	src.align = Label.ALIGN_RIGHT
 	row.add_child(src)
-	if e != null and Catalog.NATIVE_SPLIT.has(e.custom_key) and Catalog.is_plain_effect(e):
+	if Catalog.can_split(e):
 		var split = _button(tr("BE_SPLIT"), FONT_DESC)
 		_apply_action_style(split, Color(1.0, 0.55, 0.35))
 		split.connect("pressed", self, "_on_effect_split", [i])
@@ -3736,11 +3737,45 @@ func _icon_button(tex: Texture, size: int) -> Button:
 
 
 # 道具 / 武器 / 角色图标按钮
-# 鼠标悬停显示名称与 ID（图标相同的自定义对象也能区分）
 func _res_button(r) -> Button:
 	var b = _icon_button(r.icon, GRID_ICON)
-	b.hint_tooltip = tr(r.name) + "\n" + r.my_id
+	_hover_preview(b, r)
 	return b
+
+
+# 鼠标悬停：原版物品弹窗（同商店 / cave-modtools），显示名称、效果、词条
+const ITEM_POPUP = "res://ui/menus/shop/item_popup.tscn"
+var _item_popup = null
+
+
+func _hover_preview(b: Control, r) -> void:
+	b.connect("mouse_entered", self, "_show_preview", [b, r])
+	b.connect("mouse_exited", self, "_hide_preview")
+	b.connect("tree_exiting", self, "_hide_preview")
+
+
+func _show_preview(b: Control, r) -> void:
+	if r == null or not is_instance_valid(b):
+		return
+	if _item_popup == null or not is_instance_valid(_item_popup):
+		_item_popup = load(ITEM_POPUP).instance()
+		_item_popup.buttons_enabled = false
+		add_child(_item_popup)
+		_ignore_mouse(_item_popup)
+	_item_popup.raise()
+	_item_popup.display_item_data(r, b, false)
+
+
+func _hide_preview() -> void:
+	if _item_popup != null and is_instance_valid(_item_popup):
+		_item_popup.hide()
+
+
+func _ignore_mouse(n: Node) -> void:
+	if n is Control:
+		n.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for c in n.get_children():
+		_ignore_mouse(c)
 
 
 # 方形图标格（同原版物品格：稀有度色底 + 边框）

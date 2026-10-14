@@ -87,9 +87,9 @@ func build(p_ui, parent: Control) -> void:
 	# 不在描述里显示自动生成的文本（自动文本太长时改用手写的描述）
 	var hide = ui._checkbox(ui.tr("BE_GRAPH_HIDE_TEXT"), ui.FONT_DESC)
 	hide.pressed = bool(_graph().get("hide_text", false))
-	hide.hint_tooltip = ui.tr("BE_GRAPH_HIDE_TEXT_DESC")
 	hide.connect("toggled", self, "_on_hide_text")
 	head.add_child(hide)
+	box.add_child(ui._desc(ui.tr("BE_GRAPH_HIDE_TEXT_DESC")))
 	var scroll = ui._scroll()
 	box.add_child(scroll)
 	preview = RichTextLabel.new()

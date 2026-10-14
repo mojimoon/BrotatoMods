@@ -1683,3 +1683,59 @@ func test_203_fusion() -> void:
 	_eq(m.profiles[cid].fuse, [], "picker clears")
 	ui.queue_free()
 	yield(tree, "idle_frame")
+
+
+# 浪漫之人 / 长笛的魅惑可拆解；按属性缩放的几率；武器上的命中扳机只响应这把武器
+func test_204_charm_split_and_weapon_hits() -> void:
+	var GE = load(GraphEffectScript)
+	var Catalog = load(MOD_DIR + "catalog.gd")
+	var rom = null
+	for e in m.orig_effects("character_romantic"):
+		if e.custom_key == "charm_on_hit":
+			rom = e
+	if rom != null:
+		_check(Catalog.can_split(rom), "romantic charm splittable")
+		var g = GE.new_graph()
+		GE.split_native(g, rom, Vector2.ZERO)
+		var kinds = []
+		for n in g.nodes:
+			kinds.push_back(n.kind)
+		_eq(kinds, ["enemy_hit", "enemy_hp_below", "stat_chance", "charm"], "split nodes")
+		_eq(int(g.nodes[1].params.pct), int(rom.value2), "hp threshold")
+		_eq([g.nodes[2].params.stat, int(g.nodes[2].params.pct)], [rom.key, int(rom.value)], "scaled chance")
+		TranslationServer.set_locale("zh")
+		var t = GE.graph_text(g, false)
+		_check(t.find("8") >= 0 and t.find(tr("BE_N_CHARM")) >= 0, "charm text: " + t)
+		TranslationServer.set_locale("en")
+	var fl = m.find_target("weapon", "weapon_flute_1")
+	if fl != null:
+		_check(Catalog.can_split(fl.effects[0]), "flute charm splittable")
+	var hiker = null
+	for e in m.orig_effects("character_hiker"):
+		if e.custom_key == "gain_stat_for_every_step_after_equip":
+			hiker = e
+	if hiker != null:
+		_check(Catalog.can_split(hiker), "hiker splittable in the effect list")
+	var g2 = GE.new_graph()
+	var sc = GE.add_node(g2, "stat_chance", Vector2.ZERO, {"stat": "stat_max_hp", "pct": 1000})
+	GE.add_link(g2, GE.add_node(g2, "enemy_hit", Vector2.ZERO), sc)
+	GE.add_link(g2, sc, GE.add_node(g2, "add_gold", Vector2.ZERO, {"value": 1}))
+	var wid = m.create_custom_weapon(_family_from(0, 0)[0].weapon_id)
+	m.weapon_profiles[wid].graph = g2
+	m.apply_all()
+	_setup_player(CH)
+	rd.players_data[0].items = []
+	rd.add_character(m.find_character(CH), 0)
+	rd.add_weapon(_family_from(0, 0)[0], 0)
+	rd.add_weapon(m.find_target("weapon", wid), 0)
+	m.graph_dirty = true
+	m.runtime.start_wave(null)
+	var g0 = rd.players_data[0].gold
+	m.runtime.fire("enemy_hit", 0, null, null, {"weapon_pos": 0})
+	_eq(rd.players_data[0].gold, g0, "another weapon's hit ignored")
+	m.runtime.fire("enemy_hit", 0, null, null, {"weapon_pos": 1})
+	_eq(rd.players_data[0].gold, g0 + 1, "own hit fires (max hp x 1000% chance)")
+	m.runtime.fire("enemy_hit", 0, null, null, {})
+	_eq(rd.players_data[0].gold, g0 + 2, "hits without a weapon fire")
+	m.runtime.end_wave()
+	m.delete_custom_weapon(m.find_target("weapon", wid).weapon_id)

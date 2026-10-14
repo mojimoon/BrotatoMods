@@ -100,7 +100,7 @@ func test_85_battle_graph() -> void:
 	yield(_frames(4), "completed")
 
 
-# 变为友方、生成敌人、武器损坏（战斗中）
+# 魅惑、生成敌人、武器损坏（战斗中）
 func test_86_battle_new_effects() -> void:
 	_setup_player(CH)
 	rd.players_data[0].items = []

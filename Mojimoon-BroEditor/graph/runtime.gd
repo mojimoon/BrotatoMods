@@ -122,6 +122,8 @@ func fire(event: String, player_index: int, pos = null, target = null, info = nu
 		return
 	var ctx = {"pos": pos, "target": target, "hold": null, "info": info if info is Dictionary else {}}
 	for en in entries[player_index]:
+		if ctx.info.has("weapon_pos") and en.src is WeaponData and RunData.get_player_weapons_ref(player_index).find(en.src) != int(ctx.info.weapon_pos):
+			continue
 		for n in en.g.get("nodes", []):
 			if n.kind == event and (event != "steps" or _every_n_steps(en, n)):
 				_walk(en, int(n.id), player_index, ctx, 0)
@@ -161,6 +163,10 @@ func _pass(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> bool:
 	match n.kind:
 		"chance":
 			return randf() * 100.0 < float(_param(n, "pct", 100))
+		"stat_chance":
+			# 同原版浪漫之人：几率 = max(1, 属性 × pct%)%
+			var stat_v = Utils.get_stat(Keys.generate_hash(str(_param(n, "stat", ""))), p)
+			return randf() * 100.0 < max(1.0, float(_param(n, "pct", 100)) / 100.0 * stat_v)
 		"every":
 			st.count += 1
 			if st.count >= max(1, int(_param(n, "n", 1))):
@@ -375,7 +381,7 @@ func _flush_transforms() -> void:
 				gear.set_items_data(RunData.get_player_items(t.p))
 
 
-# 变为友方（同浪漫之人：原版魅惑行为，每名玩家最多同时 5 个）；敌人身上没有魅惑行为时补上
+# 魅惑（同浪漫之人：原版魅惑行为，每名玩家最多同时 5 个）；敌人身上没有魅惑行为时补上
 const CHARM_SCENE = "res://dlcs/dlc_1/effect_behaviors/enemy/charm_enemy_effect_behavior.tscn"
 
 

@@ -209,12 +209,15 @@ static func path_text(by_id: Dictionary, path: Array, colored: bool = true) -> S
 	var eff = by_id[path[-1]]
 	var chance = 100.0
 	var every = max(1, int(_p(trig, "n", 1))) if trig.kind == "steps" else 1
+	var scaled = []
 	var suffix = ""
 	for i in range(1, path.size() - 1):
 		var n = by_id[path[i]]
 		match n.kind:
 			"chance":
 				chance *= float(_p(n, "pct", 100)) / 100.0
+			"stat_chance":
+				scaled.push_back(str(int(_p(n, "pct", 100))) + "% " + _stat_name(str(_p(n, "stat", ""))))
 			"every":
 				every *= max(1, int(_p(n, "n", 1)))
 			"cap":
@@ -227,12 +230,15 @@ static func path_text(by_id: Dictionary, path: Array, colored: bool = true) -> S
 		# 没有"每 N 次"句式的扳机：作为后缀
 		suffix = _tr("BE_CX_EVERY").replace("{n}", str(every)) + suffix
 	var k = "BE_FMT_GRANT" if eff.kind == "grant" else "BE_FMT"
-	if chance < 100.0:
+	if chance < 100.0 or not scaled.empty():
 		k += "_CHANCE"
 	var tc = t.strip_edges().lstrip(",，")
 	if tc.length() > 0:
 		tc = tc.substr(0, 1).to_upper() + tc.substr(1)
+	# 按属性缩放的几率同原版浪漫之人："50% 最大生命值"，与固定几率相乘时写在后面
 	var c_text = str(stepify(chance, 0.1)).trim_suffix(".0") + "%"
+	if not scaled.empty():
+		c_text = PoolStringArray(scaled).join(" × ") if chance >= 100.0 else c_text + " × " + PoolStringArray(scaled).join(" × ")
 	return _tr(k).replace("{T}", tc).replace("{t}", t).replace("{p}", _payload_text(eff, trig.kind, colored)).replace("{c}", _col(c_text, true, colored)).strip_edges() + suffix
 
 
@@ -310,7 +316,7 @@ static func _payload_text(n: Dictionary, trigger_kind: String, colored: bool) ->
 			var ids = _p(n, "items", [])
 			return _tr("BE_PX_" + n.kind.to_upper()).replace("{0}", _item_names(ids if ids is Array else []))
 		"charm":
-			return _tr("BE_PX_CHARM")
+			return _tr("BE_PX_CHARM").replace("{0}", str(Utils.CHARM_DURATION))
 		"spawn":
 			var m = _mod()
 			var en = str(_p(n, "enemy", ""))
@@ -422,8 +428,21 @@ static func remove_node(g: Dictionary, id: int) -> void:
 
 # 原版触发型效果 -> 一条路径（扳机 → 条件 → 效果）；不支持的返回 false
 static func split_native(g: Dictionary, e, origin: Vector2) -> bool:
-	if e == null or not Catalog.NATIVE_SPLIT.has(e.custom_key):
+	if not Catalog.can_split(e):
 		return false
+	# 魅惑（浪漫之人 / 长笛）：命中敌人 → 敌人生命低于 value2% → 几率（浪漫之人按属性缩放）→ 魅惑
+	if e.custom_key == "charm_on_hit":
+		var trig = add_node(g, "enemy_hit", origin)
+		var hp = add_node(g, "enemy_hp_below", origin + Vector2(300, 0), {"pct": int(e.value2)})
+		add_link(g, trig, hp)
+		var ch = -1
+		if e.key != "":
+			ch = add_node(g, "stat_chance", origin + Vector2(600, 0), {"stat": e.key, "pct": int(e.value)})
+		else:
+			ch = add_node(g, "chance", origin + Vector2(600, 0), {"pct": int(e.value)})
+		add_link(g, hp, ch)
+		add_link(g, ch, add_node(g, "charm", origin + Vector2(900, 0)))
+		return true
 	var d = Catalog.NATIVE_SPLIT[e.custom_key]
 	# 徒步旅行者：每走 value2 步
 	var prev = add_node(g, d[0], origin, {"n": int(e.value2)} if d[0] == "steps" and "value2" in e else null)

@@ -349,7 +349,7 @@ class FieldSorter:
 #   任一不满足时撤销"本波属性"与"本波获得"
 #   transform（道具变为）：只对道具上的蓝图有效；gain_item / lose_item（获得 / 失去道具）同样等到敌袭结束再执行
 #   shop_add / shop_remove：本局商店（及箱子）中可以出现 / 不再出现某些道具（可解除"禁用"），随一局存档保存
-#   charm：使目标敌人变为友方（同浪漫之人）；spawn：生成敌人；break：持有者是武器时损坏（同砖块）
+#   charm：魅惑目标敌人（同浪漫之人）；spawn：生成敌人；break：持有者是武器时损坏（同砖块）
 # ============================================================
 const NODES = [
 	["wave_start", "trigger", []],
@@ -382,6 +382,7 @@ const NODES = [
 	["full_hp", "trigger", []],
 	["always", "trigger", []],
 	["chance", "cond", [["pct", "int", 25]]],
+	["stat_chance", "cond", [["stat", "stat", "stat_max_hp"], ["pct", "int", 50]]],
 	["every", "cond", [["n", "int", 5]]],
 	["cap", "cond", [["n", "int", 3]]],
 	["cooldown", "cond", [["secs", "int", 3]]],
@@ -431,6 +432,18 @@ const STATE_TRIGGERS = ["still", "moving", "low_hp", "full_hp", "always"]
 # 状态条件：在状态扳机的路径上持续检查（全部满足时进入，任一不满足时撤销）；其余条件只在进入时检查一次
 const STATE_CONDS = ["hp_below", "hp_above", "wave_min", "wave_max", "diff_min", "diff_max", "stat_min", "stat_max", "if_moving", "if_still"]
 const SHOP_TRIGGERS = ["reroll", "buy"]
+
+# 不是普通 Effect 脚本、但也可以拆解的扳机（徒步旅行者的步数在 value2；浪漫之人 / 长笛的魅惑由 split_native 单独处理）
+const SPLIT_ANY_SCRIPT = ["gain_stat_for_every_step_after_equip", "charm_on_hit"]
+
+
+static func can_split(e) -> bool:
+	if e == null or not "custom_key" in e:
+		return false
+	if e.custom_key == "charm_on_hit":
+		return true
+	return NATIVE_SPLIT.has(e.custom_key) and (is_plain_effect(e) or e.custom_key in SPLIT_ANY_SCRIPT)
+
 
 # 原版触发型效果（Effect{key = 属性, value, custom_key = 扳机}）-> 蓝图 [扳机, [条件...], 效果]（"拆解"按钮用）
 const NATIVE_SPLIT = {

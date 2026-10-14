@@ -1112,7 +1112,12 @@ func test_163_feedback2_ui() -> void:
 		_check(g.get("hide_text", false), "hide text saved in the graph")
 		hide.pressed = false
 		_check(not g.has("hide_text"), "hide text cleared")
-	_check(ui._res_button(m.find_target("item", iid)).hint_tooltip.find(iid) >= 0, "icon tooltip has the id")
+	var rb = ui._res_button(m.find_target("item", iid))
+	ui._page.add_child(rb)
+	rb.emit_signal("mouse_entered")
+	_check(ui._item_popup != null and ui._item_popup.visible, "hover shows the item popup")
+	rb.emit_signal("mouse_exited")
+	_check(not ui._item_popup.visible, "leaving hides it")
 	ui.queue_free()
 	yield(tree, "idle_frame")
 	m.delete_custom_item(iid)

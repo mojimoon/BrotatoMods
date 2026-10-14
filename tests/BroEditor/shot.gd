@@ -9,6 +9,10 @@ func _initialize() -> void:
 	var out = OS.get_environment("BE_SHOT_DIR")
 	var m = root.get_node("ModLoader/Mojimoon-BroEditor")
 	var isvc = root.get_node("ItemService")
+	if OS.get_environment("BE_SHOT_HOVER") != "":
+		yield(_hover(m, out), "completed")
+		quit()
+		return
 	if OS.get_environment("BE_SHOT_KINDS") != "":
 		yield(_kinds(m, out), "completed")
 		quit()
@@ -121,3 +125,43 @@ func _shot(ui, path: String):
 	var img = root.get_texture().get_data()
 	img.flip_y()
 	img.save_png(path)
+
+
+# 悬停预览：左侧列表、初始装备页（含融合角色）
+func _hover(m, out: String):
+	var isvc = root.get_node("ItemService")
+	var ch = isvc.characters[0].my_id
+	var p = m.new_profile()
+	p.fuse = [isvc.characters[3].my_id]
+	p.start_items = [{"id": isvc.items[5].my_id, "n": 1}]
+	m.profiles[ch] = p
+	m.apply_all()
+	var ui = load("res://mods-unpacked/Mojimoon-BroEditor/ui/editor_ui.tscn").instance()
+	ui.initial_id = ch
+	root.add_child(ui)
+	yield(self, "idle_frame")
+	var b = ui._char_grid.get_child(4)
+	ui._show_preview(b, isvc.characters[4])
+	yield(_shot(ui, out + "/hover_list.png"), "completed")
+	ui._on_tab_pressed("gear")
+	yield(self, "idle_frame")
+	var btns = []
+	for n in _nodes(ui._page):
+		if n is Button and n.icon != null:
+			btns.push_back(n)
+	ui._show_preview(btns[-1], isvc.characters[3])
+	yield(_shot(ui, out + "/hover_fuse.png"), "completed")
+	ui.set_kind("weapon")
+	yield(self, "idle_frame")
+	ui._show_preview(ui._char_grid.get_child(2), m.find_target("weapon", ui._char_grid.get_child(2).get_meta("id")))
+	yield(_shot(ui, out + "/hover_weapon.png"), "completed")
+	ui.queue_free()
+	yield(self, "idle_frame")
+
+
+func _nodes(n: Node) -> Array:
+	var out = []
+	for c in n.get_children():
+		out.push_back(c)
+		out += _nodes(c)
+	return out
