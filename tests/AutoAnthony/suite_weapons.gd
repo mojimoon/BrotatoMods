@@ -788,6 +788,13 @@ func test_155_weapon_preview_player_seed() -> void:
 		ui._on_tier_pressed(t, "weapons")
 		yield(tree, "idle_frame")
 		_check(ui._pv.weapons.grid.get_child_count() > 5, "tier %d rendered" % t)
+	# 反复预览不撑宽面板（卡片宽度要扣掉滚动条）
+	var w0 = ui._pv.weapons.scroll.rect_size.x
+	for _i in 3:
+		ui._on_preview_pressed("weapons")
+		yield(tree, "idle_frame")
+		yield(tree, "idle_frame")
+	_check(ui._pv.weapons.scroll.rect_size.x <= w0 + 0.5, "preview keeps width %.1f -> %.1f" % [w0, ui._pv.weapons.scroll.rect_size.x])
 	ui.queue_free()
 
 
@@ -1887,3 +1894,50 @@ func test_174_chance_cap_and_brick_growth() -> void:
 					_check(mats[t] > mats[t - 1], "%s s%d brick T%d drops more than T%d %s" % [mode, sd, t + 1, t, str(mats)])
 	print("AUDIT chance effects capped at 100%%: %d" % capped)
 	m.cfg_weapon_mode = "deep"
+
+
+# 预览（只生成武器）与本局（先生成道具、角色）的武器一致；深度重组时闪电刀的投射物随稀有度成长（T1 起的家族升级后也弹跳）
+func test_175_weapons_independent_of_items_and_shiv_growth() -> void:
+	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
+	m.cfg_weapons = true
+	m.cfg_weapon_mode = "deep"
+	m.cfg_w_item_effects = true
+	var weapons = m.native_only(isvc.weapons)
+	var items = m.native_only(isvc.items)
+	var all_chars = m.native_only(isvc.characters)
+	var shiv = WG.family_of(isvc.get_element_safe(isvc.weapons, "weapon_lightning_shiv_1"))
+	var grew = 0
+	for sd in [665911790, 3, 11, 42]:
+		var cfg = m.get_cfg()
+		cfg.items = false
+		cfg.characters = false
+		var a = Generator.new(cfg, sd).generate(items, all_chars, [], weapons).weapons
+		cfg.items = true
+		cfg.characters = true
+		var g = Generator.new(cfg, sd)
+		g.player_wanted_tags = ["stat_elemental_damage"]
+		var b = g.generate(items, all_chars, [all_chars[0]], weapons).weapons
+		var bounces = {}
+		for id in a:
+			var ta = []
+			var tb = []
+			for e in a[id].effects:
+				ta.push_back(e.get_text(0, false))
+			for e in b[id].effects:
+				tb.push_back(e.get_text(0, false))
+			_check(ta == tb, "s%d %s same effects in preview and run: %s vs %s" % [sd, id, str(ta), str(tb)])
+			var w = isvc.get_element_safe(isvc.weapons, id)
+			for e in a[id].effects:
+				if e.has_meta("aa_src") and e.get_meta("aa_src") == shiv:
+					var f = WG.family_of(w)
+					if not bounces.has(f):
+						bounces[f] = {}
+					bounces[f][int(w.tier)] = int(e.weapon_stats.bounce)
+		for f in bounces:
+			var ts = bounces[f].keys()
+			ts.sort()
+			for i in range(1, ts.size()):
+				_check(bounces[f][ts[i]] >= bounces[f][ts[i - 1]], "s%d %s shiv bounce non-decreasing %s" % [sd, f, str(bounces[f])])
+			if ts.size() > 1 and bounces[f][ts[-1]] > bounces[f][ts[0]]:
+				grew += 1
+	_check(grew > 0, "some shiv-effect family gains bounces on upgrade (%d)" % grew)

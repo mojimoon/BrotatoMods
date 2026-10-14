@@ -3095,6 +3095,19 @@ func char_line_value(e) -> float:
 # 武器：见 weapon_gen.gd
 # ============================================================
 func generate_weapons(weapons: Array) -> Dictionary:
+	# 武器上的道具效果只由种子决定：清掉道具 / 角色生成留下的重复惩罚与临时状态，
+	# 否则预览（只生成武器）和本局（先生成道具、角色）的武器不同
+	used_combo = {}
+	used_trigger = {}
+	used_cond = {}
+	used_payload = {}
+	banned_triggers = []
+	banned_payloads = []
+	wanted_bias = []
+	cur_stat_bans = []
+	pos_cat = ""
+	neg_cat = ""
+	anchor_stat = ""
 	return WeaponGen.new(cfg, seed_value, self).generate(weapons)
 
 
