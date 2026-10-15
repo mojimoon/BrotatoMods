@@ -220,6 +220,17 @@ func _pass(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> bool:
 				if tag in it.tags:
 					c += 1
 			return _cmp(n, c)
+		"own_item":
+			# 道具按 my_id；武器按家族（weapon_id，任意等级）
+			var oid = str(_param(n, "id", ""))
+			var c = 0
+			for it in RunData.get_player_items(p):
+				if it.my_id == oid:
+					c += 1
+			for w in RunData.get_player_weapons(p):
+				if w.weapon_id == oid:
+					c += 1
+			return _cmp(n, c)
 		"own_set":
 			var sid = str(_param(n, "set", ""))
 			var c = 0

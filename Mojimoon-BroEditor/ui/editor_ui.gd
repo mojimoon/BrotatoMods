@@ -999,7 +999,7 @@ func _reregister() -> void:
 		"item":
 			_mod._register_custom_item(_id)
 		"weapon":
-			_mod._register_weapon_families()
+			_mod.reregister_weapons()
 
 
 func _is_modified(id: String) -> bool:
@@ -1169,18 +1169,7 @@ func _tag_section(left: Control) -> void:
 	var r = _character()
 	var title = {"character": "BE_SEC_TAGS", "item": "BE_SEC_ITEM_TAGS", "weapon": "BE_SEC_WEAPON_SETS"}[_kind]
 	var tbox = _section(left, title, C_ACCENT_3)
-	if _kind == "weapon":
-		var title_lbl = tbox.get_child(0)
-		title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var head = HBoxContainer.new()
-		tbox.remove_child(title_lbl)
-		head.add_child(title_lbl)
-		tbox.add_child(head)
-		tbox.move_child(head, 0)
-		var manage = _button(tr("BE_TAG_MANAGE"), FONT_DESC)
-		_apply_action_style(manage, C_ACCENT_2)
-		manage.connect("pressed", self, "open_set_manager")
-		head.add_child(manage)
+	_manage_head(tbox, "open_set_manager" if _kind == "weapon" else "open_tag_manager")
 	if _kind != "item":
 		tbox.add_child(_desc(tr("BE_TAGS_DESC" if _kind == "character" else "BE_SETS_DESC")))
 	var grid = GridContainer.new()
@@ -1204,34 +1193,32 @@ func _tag_section(left: Control) -> void:
 		var b = _chip(_tag_name(tag), tag, tag in tags, C_ACCENT_3)
 		b.connect("pressed", self, "_on_tag_pressed", [tag])
 		grid.add_child(b)
-	# 自定义标签：键名 + 名称（可选，默认同键名）；添加后所有道具 / 角色可用，并加入本对象
-	var add_row = HBoxContainer.new()
-	add_row.add_constant_override("separation", 8)
-	tbox.add_child(add_row)
-	var key_le = _line_edit(tr("BE_TAG_NEW_HINT"))
-	key_le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	add_row.add_child(key_le)
-	var name_le = _line_edit(tr("BE_TAG_NAME_HINT"))
-	name_le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	add_row.add_child(name_le)
-	for le in [key_le, name_le]:
-		le.connect("text_entered", self, "_on_tag_new_entered", [key_le, name_le])
-	var add = _button(tr("BE_TAG_NEW"), FONT_DESC)
-	_apply_action_style(add, C_ACCENT_3)
-	add.connect("pressed", self, "_on_tag_new_pressed", [key_le, name_le])
-	add_row.add_child(add)
+
+
+# 区块标题行右侧的"管理"按钮
+func _manage_head(box: VBoxContainer, method: String) -> void:
+	var title_lbl = box.get_child(0)
+	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var head = HBoxContainer.new()
+	box.remove_child(title_lbl)
+	head.add_child(title_lbl)
+	box.add_child(head)
+	box.move_child(head, 0)
 	var manage = _button(tr("BE_TAG_MANAGE"), FONT_DESC)
 	_apply_action_style(manage, C_ACCENT_2)
-	manage.connect("pressed", self, "open_tag_manager")
-	add_row.add_child(manage)
+	manage.connect("pressed", self, method)
+	head.add_child(manage)
 
 
-func _on_tag_new_entered(_text: String, key_le: LineEdit, name_le: LineEdit) -> void:
-	_on_tag_new_pressed(key_le, name_le)
+func _on_tag_new_entered(_text: String, key_le: LineEdit, name_le: LineEdit, m) -> void:
+	_on_tag_new_pressed(key_le, name_le, m)
 
 
-func _on_tag_new_pressed(key_le: LineEdit, name_le: LineEdit) -> void:
+func _on_tag_new_pressed(key_le: LineEdit, name_le: LineEdit, m) -> void:
 	_on_tag_new(key_le.text, name_le.text)
+	key_le.text = ""
+	name_le.text = ""
+	_fill_tag_manager(m.get_meta("list"))
 
 
 func _on_tag_new(key: String, name: String = "") -> void:
@@ -1253,6 +1240,24 @@ func _on_tag_new(key: String, name: String = "") -> void:
 func open_tag_manager() -> void:
 	var m = Modal.open(self, tr("BE_TAG_MANAGE_TITLE"), C_ACCENT_2, Vector2(900, 0))
 	m.add_button(tr("MENU_BACK"), C_TEXT_DIM, m, "close")
+	m.connect("closed", self, "_build_page")
+	# 新增：键名 + 名称（可选，默认同键名）；新增后所有道具 / 角色可用，并加入当前对象
+	var add_row = HBoxContainer.new()
+	add_row.add_constant_override("separation", 8)
+	m.body.add_child(add_row)
+	var key_le = _line_edit(tr("BE_TAG_NEW_HINT"))
+	key_le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	add_row.add_child(key_le)
+	var name_le = _line_edit(tr("BE_TAG_NAME_HINT"))
+	name_le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	add_row.add_child(name_le)
+	for le in [key_le, name_le]:
+		le.connect("text_entered", self, "_on_tag_new_entered", [key_le, name_le, m])
+	var add = _button(tr("BE_TAG_NEW"), FONT_DESC)
+	_apply_action_style(add, C_ACCENT_3)
+	add.connect("pressed", self, "_on_tag_new_pressed", [key_le, name_le, m])
+	add_row.add_child(add)
+	m.body.add_child(_desc(tr("BE_TAG_NEW_DESC")))
 	var list = VBoxContainer.new()
 	list.add_constant_override("separation", 6)
 	m.body.add_child(list)
@@ -1682,17 +1687,7 @@ func _on_set_lib_add(spec: Dictionary, m) -> void:
 # ============================================================
 func _group_section(left: Control) -> void:
 	var gbox = _section(left, "BE_SEC_GROUPS", C_ACCENT_2)
-	var title_lbl = gbox.get_child(0)
-	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var head = HBoxContainer.new()
-	gbox.remove_child(title_lbl)
-	head.add_child(title_lbl)
-	gbox.add_child(head)
-	gbox.move_child(head, 0)
-	var manage = _button(tr("BE_TAG_MANAGE"), FONT_DESC)
-	_apply_action_style(manage, C_ACCENT_2)
-	manage.connect("pressed", self, "open_group_manager")
-	head.add_child(manage)
+	_manage_head(gbox, "open_group_manager")
 	if _mod.groups.empty():
 		gbox.add_child(_desc(tr("BE_GROUPS_EMPTY")))
 		return
@@ -2170,6 +2165,17 @@ func _on_replaced_by(id, orig: String) -> void:
 
 
 # 道具选择列表（不含角色）
+# 道具 + 武器家族："拥有指定道具 / 武器"
+func owned_select_items() -> Array:
+	var out = item_select_items()
+	var seen = {}
+	for w in _isvc().weapons:
+		if w != null and not seen.has(w.weapon_id):
+			seen[w.weapon_id] = true
+			out.push_back([tr(w.name), w.weapon_id])
+	return out
+
+
 # 道具 + 武器（各等级）："商店必定出现"
 func goods_select_items() -> Array:
 	var out = item_select_items()

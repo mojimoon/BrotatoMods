@@ -1866,6 +1866,12 @@ func test_176_own_conds_shop_force_groups() -> void:
 	ns.params.cmp = "exactly"
 	ns.params.n = w0 + 3
 	_check(not m.runtime._pass({"st": {}}, ns, 0, ctx), "own_set exactly")
+	var no = {"id": 4, "kind": "own_item", "params": {"id": knife.weapon_id, "cmp": "at_least", "n": 2}}
+	_check(m.runtime._pass({"st": {}}, no, 0, ctx), "own_item counts the weapon family")
+	no.params.cmp = "exactly"
+	no.params.n = 3
+	_check(not m.runtime._pass({"st": {}}, no, 0, ctx), "own_item exactly")
+	_check(GE._cond_text(no).find(tr(knife.name)) >= 0, "own_item text names the weapon")
 	for w in rd.get_player_weapons(0).duplicate():
 		if w.my_id == "weapon_knife_1":
 			rd.remove_weapon(w, 0)

@@ -1565,6 +1565,15 @@ func tag_name(tag: String) -> String:
 	return custom_tags[tag] if custom_tags.has(tag) else stat_name(tag)
 
 
+# "拥有指定道具 / 武器"的名称：道具 my_id 或武器家族 weapon_id
+func owned_name(id: String) -> String:
+	var r = find_target("item", id)
+	if r == null:
+		var ms = family_members(id)
+		r = ms[0] if not ms.empty() else null
+	return tr(r.name) if r != null else id
+
+
 func weapon_set_name(id: String) -> String:
 	var s = find_set(id)
 	return tr(s.name) if s != null else id
@@ -2010,7 +2019,9 @@ func _register_custom_item(id: String) -> void:
 	it.tier = int(clamp(p.tier, 0, 3))
 	it.max_nb = p.max_nb if p.max_nb != -2 else -1
 	it.tags = p.tags.duplicate() if p.tags is Array else []
-	it.effects = []
+	# 效果由 _apply_items 按档案生成；编辑器里改名等重新注册时保留已生成的效果
+	if it.effects == null:
+		it.effects = []
 	it._generate_hashes()
 	if not it in isvc.items:
 		isvc.items.push_back(it)
@@ -2266,6 +2277,13 @@ func _weapon_template(weapon_id: String, t: int):
 		if best == null or abs(w.tier - t) < abs(best.tier - t):
 			best = w
 	return best
+
+
+# 编辑器里修改自定义武器后重新注册：注册会按基底重置属性 / 效果，再按档案写回
+func reregister_weapons() -> void:
+	_register_weapon_families()
+	_apply_weapons()
+	_apply_families()
 
 
 func _register_weapon_families() -> void:

@@ -256,8 +256,15 @@ static func _cond_text(n: Dictionary) -> String:
 	for k in ["n", "pct", "secs"]:
 		t = t.replace("{" + k + "}", str(int(_p(n, k, 0))))
 	var m = _mod()
-	if n.kind in ["own_tag", "own_set"] and m != null:
-		var what = m.tag_name(str(_p(n, "tag", ""))) if n.kind == "own_tag" else m.weapon_set_name(str(_p(n, "set", "")))
+	if n.kind in ["own_tag", "own_set", "own_item"] and m != null:
+		var what = ""
+		match n.kind:
+			"own_tag":
+				what = m.tag_name(str(_p(n, "tag", "")))
+			"own_set":
+				what = m.weapon_set_name(str(_p(n, "set", "")))
+			_:
+				what = m.owned_name(str(_p(n, "id", "")))
 		t = t.replace("{0}", what).replace("{cmp}", _tr("BE_CMP_" + str(_p(n, "cmp", "at_least")).to_upper()))
 	return t.replace("{stat}", _stat_name(str(_p(n, "stat", ""))))
 

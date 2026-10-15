@@ -212,9 +212,11 @@ func _param_control(n: Dictionary, p: Array) -> Control:
 		return opt
 	if ptype == "items" or ptype == "goods":
 		return _items_control(n, p[0], cur if cur is Array else [], ui.goods_select_items() if ptype == "goods" else ui.item_select_items())
-	if ptype in ["tag", "set", "group"]:
+	if ptype in ["tag", "set", "group", "owned"]:
 		var items = []
 		match ptype:
+			"owned":
+				items = ui.owned_select_items()
 			"tag":
 				for t in ui._all_tags():
 					items.push_back([ui._tag_name(t), t])

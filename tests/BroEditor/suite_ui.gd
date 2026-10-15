@@ -1202,11 +1202,57 @@ func test_165_group_ui_and_new_nodes() -> void:
 	_check(m.groups[gid].members.empty(), "chip toggles membership")
 	ui._on_tab_pressed("blueprint")
 	yield(tree, "idle_frame")
-	for k in ["own_tag", "own_set", "shop_force", "group_unlock", "group_lock"]:
+	for k in ["own_tag", "own_set", "own_item", "shop_force", "group_unlock", "group_lock"]:
 		ui.blueprint.add_node_kind(k)
 	yield(tree, "idle_frame")
-	_eq(m.profiles[CH].graph.nodes.size(), 5, "new nodes added")
+	_eq(m.profiles[CH].graph.nodes.size(), 6, "new nodes added")
 	m.delete_group(gid)
 	ui.queue_free()
 	yield(tree, "idle_frame")
+	m.reset_profile(CH)
+
+
+# 改名后自定义道具保留效果、自定义武器保留档案里的属性 / 效果；标签在管理弹窗里新增
+func test_166_rename_keeps_custom_and_tag_manager() -> void:
+	var iid = m.create_custom_item(_plain_item().my_id, "rn")
+	m.item_profiles[iid].effects = [{"set": {"key": "stat_armor", "value": 3, "text_key": m.stat_text_key("stat_armor")}}]
+	var base = m.family_members("weapon_knife")
+	var wid = m.create_custom_weapon(base[0].weapon_id)
+	m.weapon_profiles[wid].wstats = {"damage": 77}
+	m.apply_all()
+	var ui = yield(_open_ui(CH), "completed")
+	ui.set_kind("item")
+	ui._select(iid)
+	ui._on_tab_pressed("overview")
+	ui._on_name_changed("Renamed Item")
+	var it = m.find_target("item", iid)
+	_eq(it.name, "Renamed Item", "item renamed")
+	_eq(it.effects.size(), 1, "item keeps its effects after rename")
+	ui.set_kind("weapon")
+	ui._select(wid)
+	ui._on_tab_pressed("overview")
+	ui._on_name_changed("Renamed Weapon")
+	var w = m.find_target("weapon", wid)
+	_eq(tr(w.name), "Renamed Weapon", "weapon renamed")
+	_eq(int(w.stats.damage), 77, "weapon keeps its edited stats after rename")
+	ui.set_kind("character")
+	ui._select(CH)
+	ui._on_tab_pressed("overview")
+	ui.open_tag_manager()
+	var tm = ui._modals[-1]
+	var les = []
+	for nd in _all_nodes(tm.body):
+		if nd is LineEdit:
+			les.push_back(nd)
+	les[0].text = "be_mgr_tag"
+	les[1].text = "Mgr"
+	ui._on_tag_new_pressed(les[0], les[1], tm)
+	_check(m.custom_tags.has("be_mgr_tag") and "be_mgr_tag" in ui._p().wanted_tags, "tag added from the manager")
+	_eq(les[0].text, "", "inputs cleared")
+	tm.close()
+	m.delete_custom_tag("be_mgr_tag")
+	ui.queue_free()
+	yield(tree, "idle_frame")
+	m.delete_custom_item(iid)
+	m.delete_custom_weapon(m.find_target("weapon", wid).weapon_id)
 	m.reset_profile(CH)
