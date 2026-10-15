@@ -1447,6 +1447,17 @@ func test_168_weapon_users() -> void:
 	var cm = ui._modals[-1]
 	_check(cm.get_meta("grid").get_child_count() > 0, "copy list shows other weapons")
 	cm.close()
+	# 国王：原本只有 T2 以上的初始武器 -> 直接选择也至少 T2
+	m.set_weapon_users(wid, m.weapon_users(wid) + ["character_king"])
+	_check(m.char_weapon_tier("character_king", wid) >= 1, "king gets at least tier 2 when picked")
+	m.set_weapon_users(wid, [])
+	# 套用已有武器：沿用各角色在原武器上的等级
+	var king_w = m.find_target("weapon", m.char_weapon_ids("character_king")[0])
+	ui._on_weapon_users_copied(king_w.weapon_id, m.weapon_users(king_w.weapon_id), ui.Modal.open(ui, "", Color.white, Vector2(10, 10)))
+	_eq(m.char_weapon_tier("character_king", wid), king_w.tier, "copy keeps the king's tier")
+	for cid in m.weapon_users(wid):
+		var t = m.char_weapon_tier(cid, king_w.weapon_id)
+		_eq(m.char_weapon_tier(cid, wid), t, "copied tier for " + cid)
 	ui.queue_free()
 	yield(tree, "idle_frame")
 	for cid in m.profiles.keys():

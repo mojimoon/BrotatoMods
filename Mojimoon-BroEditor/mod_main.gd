@@ -1721,8 +1721,17 @@ func weapon_users(wid: String) -> Array:
 	return out
 
 
-# 设为 cids 这些角色的初始武器（其余角色移除该家族）
-func set_weapon_users(wid: String, cids: Array) -> void:
+# 角色在该家族里的初始武器等级（没有为 -1）
+func char_weapon_tier(cid: String, wid: String) -> int:
+	for id in char_weapon_ids(cid):
+		var w = find_target("weapon", str(id))
+		if w != null and w.weapon_id == wid:
+			return w.tier
+	return -1
+
+
+# 设为 cids 这些角色的初始武器（其余角色移除该家族）；tiers：角色 -> 想要的等级（套用已有武器时沿用原武器的等级）
+func set_weapon_users(wid: String, cids: Array, tiers: Dictionary = {}) -> void:
 	for c in _isvc().characters:
 		if c == null:
 			continue
@@ -1731,7 +1740,7 @@ func set_weapon_users(wid: String, cids: Array) -> void:
 		if _in_family(ids, wid) == want:
 			continue
 		if want:
-			var w = weapon_for_character(wid, c.my_id)
+			var w = weapon_for_character(wid, c.my_id, int(tiers.get(c.my_id, -1)))
 			if w == null:
 				continue
 			ids.push_back(w.my_id)
@@ -1745,14 +1754,23 @@ func set_weapon_users(wid: String, cids: Array) -> void:
 		profiles[c.my_id].weapons = ids
 
 
-# 角色可用的等级：取家族中最低的、满足角色"最低 / 最高武器等级"效果的一级
-func weapon_for_character(wid: String, cid: String):
+# 角色可用的等级：优先 prefer（可用时），否则取家族中最低的可用等级。
+# 可用 = 满足角色"最低 / 最高武器等级"效果，且不低于角色原本初始武器的最低等级（如国王只有 T2 以上）
+func weapon_for_character(wid: String, cid: String, prefer: int = -1):
 	var ms = family_members(wid)
 	if ms.empty():
 		return null
 	var lo = 0
 	var hi = 99
 	var c = find_character(cid)
+	if c != null:
+		var orig = backup_value(c, "starting_weapons")
+		if not orig.empty():
+			var t0 = 99
+			for w in orig:
+				if w != null:
+					t0 = min(t0, w.tier)
+			lo = max(lo, t0 if t0 < 99 else 0)
 	var effects = build_effects(cid, profiles[cid]) if profiles.has(cid) else (c.effects if c != null else [])
 	for e in effects:
 		if e != null and "key" in e:
@@ -1760,6 +1778,9 @@ func weapon_for_character(wid: String, cid: String):
 				lo = max(lo, int(e.value))
 			elif e.key == "max_weapon_tier":
 				hi = min(hi, int(e.value))
+	for w in ms:
+		if w.tier == prefer and w.tier >= lo and w.tier <= hi:
+			return w
 	for w in ms:
 		if w.tier >= lo and w.tier <= hi:
 			return w

@@ -1746,7 +1746,7 @@ func _open_weapon_users_copy() -> void:
 		b.rect_min_size = Vector2(300, 56)
 		b.size_flags_vertical = 0
 		_apply_action_style(b, C_CUSTOM_2)
-		b.connect("pressed", self, "_on_weapon_users_copied", [users, m])
+		b.connect("pressed", self, "_on_weapon_users_copied", [w.weapon_id, users, m])
 		grid.add_child(b)
 		var icons = _icon_grid(CHAR_WEAPON_COLUMNS)
 		icons.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1757,9 +1757,12 @@ func _open_weapon_users_copy() -> void:
 				icons.add_child(_icon_tile(c.icon, C_BORDER, 48))
 
 
-func _on_weapon_users_copied(users: Array, m) -> void:
+func _on_weapon_users_copied(from_wid: String, users: Array, m) -> void:
 	m.close()
-	_mod.set_weapon_users(_obj_key(), users)
+	var tiers = {}
+	for cid in users:
+		tiers[cid] = _mod.char_weapon_tier(cid, from_wid)
+	_mod.set_weapon_users(_obj_key(), users, tiers)
 	_changed()
 	_build_page()
 
