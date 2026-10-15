@@ -1267,6 +1267,11 @@ func apply_all() -> void:
 	if isvc == null:
 		return
 	restore()
+	# 本 mod 的 _ready 早于 ProgressData（DLC 在那之后才加入）：此前建好的效果库缓存不含 DLC，这里重建
+	_library = null
+	_weapon_library = null
+	_stat_text_keys = null
+	_good_dirs = null
 	_ban_cache.clear()
 	_global_ban = null
 	_register_customs()
@@ -2198,7 +2203,14 @@ func library(with_weapons: bool = false) -> Array:
 	if with_weapons:
 		if _weapon_library == null:
 			var sources = _library_sources()
-			for w in _isvc().weapons:
+			var dlc_weapons = []
+			for d in _dlcs():
+				dlc_weapons += d.weapons
+			var seen = {}
+			for w in _isvc().weapons + dlc_weapons:
+				if w == null or seen.has(w.my_id):
+					continue
+				seen[w.my_id] = true
 				if w != null and not w.effects.empty() and not _custom_weapons.has(w.my_id):
 					sources.push_back([w.my_id, orig_name(w), orig_effects(w.my_id)])
 			_weapon_library = Catalog.build_library(sources, library_dedup)
@@ -2400,7 +2412,7 @@ func _dlcs() -> Array:
 # 未启用的 DLC 里的角色 / 道具（效果库引用它们的效果）
 func _find_dlc(id: String):
 	for d in _dlcs():
-		for arr in [d.characters, d.items]:
+		for arr in [d.characters, d.items, d.weapons]:
 			for r in arr:
 				if r != null and r.my_id == id:
 					return r

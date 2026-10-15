@@ -223,6 +223,12 @@ static func build_library(sources: Array, dedup: bool = true) -> Array:
 			if e == null or not e is Resource or not "key" in e:
 				continue
 			var cat = category_of(e)
+			# 纯属性效果（stat_xxx）同名只保留一个（数值可在效果里改），不受去重设置影响
+			if is_plain_effect(e) and e.custom_key == "" and str(e.key).begins_with("stat_"):
+				var sk = "stat:" + str(e.key)
+				if seen.has(sk):
+					continue
+				seen[sk] = true
 			if dedup:
 				var script = e.get_script().resource_path if e.get_script() != null else ""
 				var tk = str(e.text_key).to_lower()

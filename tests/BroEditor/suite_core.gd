@@ -1791,3 +1791,39 @@ func test_205_more_splits() -> void:
 	ui.queue_free()
 	yield(tree, "idle_frame")
 
+
+
+
+
+# 效果库在 DLC 加入前就被建好（本 mod 早于 ProgressData 就绪）时，apply_all 要重建；纯属性效果同名只留一个
+func test_175_library_dlc_and_stat_dedup() -> void:
+	var Catalog = load(MOD_DIR + "catalog.gd")
+	m._library = []
+	m._weapon_library = []
+	m.apply_all()
+	var froms = {}
+	var stat_keys = {}
+	var dup = false
+	for e in m.library(false):
+		froms[e.from] = true
+		var ef = e.effect
+		if Catalog.is_plain_effect(ef) and ef.custom_key == "" and str(ef.key).begins_with("stat_"):
+			dup = dup or stat_keys.has(ef.key)
+			stat_keys[ef.key] = true
+	_check(froms.has("character_dwarf") and froms.has("character_romantic"), "dlc characters rebuilt into the library")
+	_check(stat_keys.has("stat_max_hp") and not dup, "plain stat effects deduped by key")
+	if not m._dlcs().empty():
+		var dlc = m._dlcs()[0]
+		dlc.remove_resources()
+		m._weapon_library = null
+		var wf = {}
+		for e in m.library(true):
+			wf[e.from] = true
+		var dlc_w = null
+		for w in dlc.weapons:
+			if not w.effects.empty():
+				dlc_w = w.my_id
+				break
+		_check(dlc_w == null or wf.has(dlc_w), "inactive dlc weapons in the weapon library")
+		dlc.add_resources()
+		m.apply_all()
