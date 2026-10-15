@@ -159,6 +159,9 @@ func _param(n: Dictionary, k: String, default = 0):
 
 
 func _pass(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> bool:
+	# 不认识的条件（来自更新的版本）不放行
+	if Catalog.node_def(n.kind) == null:
+		return false
 	var st = _state(en, int(n.id))
 	match n.kind:
 		"chance":
@@ -213,10 +216,47 @@ func _pass(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> bool:
 			return hp != null and hp < float(_param(n, "pct", 50))
 		"dmg_type":
 			return str(_param(n, "stat", "")) in ctx.info.get("stats", [])
+		"own_tag":
+			var tag = str(_param(n, "tag", ""))
+			var c = 0
+			for it in RunData.get_player_items(p):
+				if tag in it.tags:
+					c += 1
+			return _cmp(n, c)
+		"own_item":
+			# 道具按 my_id；武器按家族（weapon_id，任意等级）
+			var oid = str(_param(n, "id", ""))
+			var c = 0
+			for it in RunData.get_player_items(p):
+				if it.my_id == oid:
+					c += 1
+			for w in RunData.get_player_weapons(p):
+				if w.weapon_id == oid:
+					c += 1
+			return _cmp(n, c)
+		"own_set":
+			var sid = str(_param(n, "set", ""))
+			var c = 0
+			for w in RunData.get_player_weapons(p):
+				for s in w.sets:
+					if s.my_id == sid:
+						c += 1
+			return _cmp(n, c)
 		"once":
 			var tokens = GraphEffect.once_list(p)
 			return tokens != null and GraphEffect.take_once(tokens, en.effect.once_token(int(n.id)))
 	return true
+
+
+# 数量比较：至少 / 至多 / 恰好 n
+func _cmp(n: Dictionary, c: int) -> bool:
+	var want = int(_param(n, "n", 1))
+	match str(_param(n, "cmp", "at_least")):
+		"at_most":
+			return c <= want
+		"exactly":
+			return c == want
+	return c >= want
 
 
 # 目标敌人的生命百分比：命中事件为命中前，其余为当前；没有目标敌人为 null
@@ -303,6 +343,12 @@ func _execute(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> void:
 				mod.run_shop_change(p, _param(n, "items", []), n.kind == "shop_add")
 		"grant":
 			_grant(en, n, p, ctx)
+		"shop_force":
+			if mod != null:
+				mod.queue_shop_force(p, _param(n, "items", []))
+		"group_unlock", "group_lock":
+			if mod != null:
+				mod.set_group_locked(str(_param(n, "group", "")), n.kind == "group_lock")
 	_sync_lost_max_hp(p, hp_before)
 
 

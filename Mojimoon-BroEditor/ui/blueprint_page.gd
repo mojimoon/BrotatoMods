@@ -182,6 +182,11 @@ func _make_node(n: Dictionary) -> GraphNode:
 	gn.add_child(head)
 	gn.set_slot(0, t != "trigger", PORT_TYPE, color, t != "effect", PORT_TYPE, color)
 	var d = Catalog.node_def(n.kind)
+	# 不认识的节点（来自更新的版本）：只显示名称，保留在图里、不生效
+	if d == null:
+		gn.title = n.kind
+		gn.add_child(ui._desc(ui.tr("BE_NODE_UNKNOWN")))
+		return gn
 	for p in d[2]:
 		var show_if = Catalog.PARAM_SHOW_IF.get(n.kind + ":" + p[0])
 		if show_if != null and str(n.params.get(show_if[0], "")) != show_if[1]:
@@ -210,8 +215,27 @@ func _param_control(n: Dictionary, p: Array) -> Control:
 		opt.rect_min_size = Vector2(170, 0)
 		opt.connect("selected", self, "_on_param_option", [int(n.id), p[0]])
 		return opt
-	if ptype == "items":
-		return _items_control(n, p[0], cur if cur is Array else [])
+	if ptype == "items" or ptype == "goods":
+		return _items_control(n, p[0], cur if cur is Array else [], ui.goods_select_items() if ptype == "goods" else ui.item_select_items())
+	if ptype in ["tag", "set", "group", "owned"]:
+		var items = []
+		match ptype:
+			"owned":
+				items = ui.owned_select_items()
+			"tag":
+				for t in ui._all_tags():
+					items.push_back([ui._tag_name(t), t])
+			"set":
+				for s in ui._isvc().sets:
+					if s != null:
+						items.push_back([ui.tr(s.name), s.my_id])
+			"group":
+				for gid in ui._mod.groups:
+					items.push_back([ui._mod.group_name(gid), gid])
+		var opt = ui._search_select(items, str(cur))
+		opt.rect_min_size = Vector2(170, 0)
+		opt.connect("selected", self, "_on_param_option", [int(n.id), p[0]])
+		return opt
 	if ptype == "enemy":
 		var items = []
 		for e in ui._mod.enemy_list():
@@ -249,10 +273,9 @@ func _param_control(n: Dictionary, p: Array) -> Control:
 
 
 # 道具列表：每行一件（可换 / 删除），最后一个"+ 道具"
-func _items_control(n: Dictionary, key: String, ids: Array) -> Control:
+func _items_control(n: Dictionary, key: String, ids: Array, items: Array) -> Control:
 	var box = VBoxContainer.new()
 	box.add_constant_override("separation", 4)
-	var items = ui.item_select_items()
 	for i in ids.size():
 		var row = HBoxContainer.new()
 		row.add_constant_override("separation", 4)

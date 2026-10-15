@@ -17,10 +17,11 @@
 - **Three tabs: Characters / Items / Weapons**, each with a master switch to turn all its changes on or off.
 - **Stats**: starting stats and stat modifiers for characters; price, rarity, limit and tags for items; damage, cooldown, crit, range, projectiles, scaling and more for weapons.
 - **Effects**: add any effect from every vanilla character, item and weapon, then tweak its values; drag to reorder.
-- **Blueprint**: build your own effects as *trigger → condition → effect* node graphs.
+- **Blueprint**: build your own effects as *trigger → condition → effect* node graphs — e.g. "own 3 items tagged X", "guarantee an item in the next shop", charm, spawn enemies.
 - **Characters**: starting state (materials, levels, crates, starting wave…), starting weapons and items, **GMO (character fusion)**, banned items and weapons.
 - **Create new** characters, items and weapons from any vanilla one, then DIY whatever you want. Choose an icon or import your own.
 - **Disable** characters, items and weapons.
+- **More and more new features**: **Lock groups** (lock characters, items and weapons as groups, or set unlock condition with blueprint), **Convenient starting weapons** (pick which characters can start with a weapon in the weapons tab), **Weapon classes** (edit or create your own classes and their bonuses) ...
 - **Share** with a code (one object, a whole tab, or everything), or by sending the object's file (see below).
 - Dependency free, supports all 13 game languages, compatible with all mod objects.
 
@@ -60,10 +61,11 @@ Files are saved in `%APPDATA%\Brotato\Mojimoon-BroEditor\` (Windows), `~/Library
 [*][b]Three tabs[/b]: Characters / Items / Weapons, each with a master switch to turn all its changes on or off.
 [*][b]Stats[/b]: starting stats and stat modifiers for characters; price, rarity, limit and tags for items; damage, cooldown, crit, range, projectiles, scaling and more for weapons.
 [*][b]Effects[/b]: add any effect from every vanilla character, item and weapon, then tweak its values; drag to reorder.
-[*][b]Blueprint[/b]: build your own effects as *trigger → condition → effect* node graphs.
+[*][b]Blueprint[/b]: build your own effects as *trigger → condition → effect* node graphs — e.g. "own 3 items tagged X", "guarantee an item in the next shop", charm, spawn enemies.
 [*][b]Characters[/b]: starting state (materials, levels, crates, starting wave…), starting weapons and items, [b]GMO (character fusion)[/b], banned items and weapons.
 [*][b]Create new[/b] characters, items and weapons from any vanilla one, then DIY whatever you want. Choose an icon or import your own.
 [*][b]Disable[/b] characters, items and weapons.
+[*][b]More and more new features[/b]: [b]Lock groups[/b] (lock characters, items and weapons as groups, or set unlock condition with blueprint), [b]Convenient starting weapons[/b] (pick which characters can start with a weapon in the weapons tab), [b]Weapon classes[/b] (edit or create your own classes and their bonuses) ...
 [*][b]Share[/b] with a code (one object, a whole tab, or everything), or by sending the object's file (see below).
 [*]Dependency free, supports all 13 game languages, compatible with all mod objects.
 [/list]
@@ -107,19 +109,19 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 ### Screenshots
 
+![](../img/BroEditor/be-en-4.jpg)
+
 ![](../img/BroEditor/be-en-1.jpg)
 
 ![](../img/BroEditor/be-en-2.jpg)
 
 ![](../img/BroEditor/be-en-3.jpg)
 
-![](../img/BroEditor/be-en-4.jpg)
-
-![](../img/BroEditor/be-en-5.jpg)
+![](../img/BroEditor/be-en-8.jpg)
 
 ![](../img/BroEditor/be-en-6.jpg)
 
-![](../img/BroEditor/be-en-7.jpg)
+![](../img/BroEditor/be-en-5.jpg)
 
 ---
 
@@ -132,10 +134,11 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 - **分三页：角色 / 道具 / 武器**，每页都有一个总开关，可一键启用或禁用当前页的全部修改。
 - **属性**：角色的初始属性与属性修改%；道具的价格、稀有度、数量限制、标签；武器的伤害、冷却、暴击、范围、投射物、属性加成等……一切都能随心修改。
 - **效果**：从全部原版角色、道具、武器的效果库中任选添加并修改数值和参数，拖动调整顺序。
-- **蓝图**：用"触发 → 条件 → 效果"的节点图，组合出成千上万种效果。
+- **蓝图**：用"触发 → 条件 → 效果"的节点图，组合出成千上万种效果，如"拥有 3 件某标签道具""下次商店必定出现某道具"、魅惑、生成敌人等。
 - **角色**：开局状态（材料、等级、箱子、起始波次……）、初始武器与道具、**GMO (角色融合)**、禁用道具与武器。
 - **新建**角色、道具、武器：以任意原版对象为基底，尽情 DIY。可选图标或导入图片。
 - **禁用**角色、道具和武器。
+- **越来越多的新特性**：**分组锁定**（把角色、道具、武器归为一组锁定，用蓝图设置解锁条件）、**便捷初始武器**（在武器页选择哪些角色可以该武器开局，智能判断等级）、**武器类别**（修改或自定义类别及加成）……
 - **分享**：可以导入、导出分享码（当前项目 / 角色 / 道具 / 武器 / 全部），或以文件形式分享（见下）。
 - 免依赖，支持全部 13 种语言，兼容所有 mod 内容。
 
@@ -174,10 +177,11 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 [*][b]分三页：角色 / 道具 / 武器[/b]，每页都有一个总开关，可一键启用或禁用当前页的全部修改。
 [*][b]属性[/b]：角色的初始属性与属性修改%；道具的价格、稀有度、数量限制、标签；武器的伤害、冷却、暴击、范围、投射物、属性加成等……一切都能随心修改。
 [*][b]效果[/b]：从全部原版角色、道具、武器的效果库中任选添加并修改数值和参数，拖动调整顺序。
-[*][b]蓝图[/b]：用"触发 → 条件 → 效果"的节点图，组合出成千上万种效果。
+[*][b]蓝图[/b]：用"触发 → 条件 → 效果"的节点图，组合出成千上万种效果，如"拥有 3 件某标签道具""下次商店必定出现某道具"、魅惑、生成敌人等。
 [*][b]角色[/b]：开局状态（材料、等级、箱子、起始波次……）、初始武器与道具、[b]GMO (角色融合)[/b]、禁用道具与武器。
 [*][b]新建[/b]角色、道具、武器：以任意原版对象为基底，尽情 DIY。可选图标或导入图片。
 [*][b]禁用[/b]角色、道具和武器。
+[*][b]越来越多的新特性[/b]：[b]分组锁定[/b]（把角色、道具、武器归为一组锁定，用蓝图设置解锁条件）、[b]便捷初始武器[/b]（在武器页选择哪些角色可以该武器开局，智能判断等级）、[b]武器类别[/b]（修改或自定义类别及加成）……
 [*][b]分享[/b]：可以导入、导出分享码（当前项目 / 角色 / 道具 / 武器 / 全部），或以文件形式分享（见下）。
 [*]免依赖，支持全部 13 种语言，兼容所有 mod 内容。
 [/list]
@@ -219,19 +223,19 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 
 ### 截图
 
+![](../img/BroEditor/be-zh-4.jpg)
+
 ![](../img/BroEditor/be-zh-1.jpg)
 
 ![](../img/BroEditor/be-zh-2.jpg)
 
 ![](../img/BroEditor/be-zh-3.jpg)
 
-![](../img/BroEditor/be-zh-4.jpg)
-
-![](../img/BroEditor/be-zh-5.jpg)
+![](../img/BroEditor/be-zh-8.jpg)
 
 ![](../img/BroEditor/be-zh-6.jpg)
 
-![](../img/BroEditor/be-zh-7.jpg)
+![](../img/BroEditor/be-zh-5.jpg)
 
 <!--
 

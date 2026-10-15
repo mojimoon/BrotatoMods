@@ -13,6 +13,10 @@ func _initialize() -> void:
 		yield(_hover(m, out), "completed")
 		quit()
 		return
+	if OS.get_environment("BE_SHOT_GROUPS") != "":
+		yield(_groups(m, out), "completed")
+		quit()
+		return
 	if OS.get_environment("BE_SHOT_SETS") != "":
 		yield(_sets(m, out), "completed")
 		quit()
@@ -179,6 +183,53 @@ func _sets(m, out: String):
 	ui._open_set_library(1)
 	yield(_shot(ui, out + "/sets_library.png"), "completed")
 	m.weapon_sets.clear()
+	ui.queue_free()
+	yield(self, "idle_frame")
+
+
+# 内容分组：概览页的分组、管理弹窗；蓝图新节点
+func _groups(m, out: String):
+	var isvc = root.get_node("ItemService")
+	var ch = isvc.characters[0].my_id
+	var gid = m.create_group("Test Series")
+	m.toggle_group_member(gid, "character", ch)
+	m.toggle_group_member(gid, "item", isvc.items[3].my_id)
+	m.create_group("Other")
+	var ui = load("res://mods-unpacked/Mojimoon-BroEditor/ui/editor_ui.tscn").instance()
+	ui.initial_id = ch
+	root.add_child(ui)
+	yield(self, "idle_frame")
+	ui._on_tab_pressed("overview")
+	yield(_shot(ui, out + "/groups_overview.png"), "completed")
+	ui.open_group_manager()
+	yield(_shot(ui, out + "/groups_manager.png"), "completed")
+	ui._modals[-1].close()
+	ui.set_kind("weapon")
+	ui._select("weapon_knife_1")
+	ui._on_tab_pressed("overview")
+	yield(self, "idle_frame")
+	ui._page.get_child(0).get_child(0).scroll_vertical = 600
+	yield(_shot(ui, out + "/weapon_users.png"), "completed")
+	ui._open_picker("weapon_chars")
+	yield(_shot(ui, out + "/weapon_users_picker.png"), "completed")
+	ui._close_picker()
+	ui._open_weapon_users_copy()
+	ui._on_copy_filter(ui._modals[-1], "type", 1)
+	yield(_shot(ui, out + "/copy_from_weapon.png"), "completed")
+	ui._modals[-1].close()
+	ui.set_kind("character")
+	ui._open_char_weapons()
+	ui._on_copy_filter(ui._modals[-1], "src", "dlc1")
+	yield(_shot(ui, out + "/copy_from_character.png"), "completed")
+	ui._modals[-1].close()
+	ui._on_tab_pressed("blueprint")
+	yield(self, "idle_frame")
+	for k in ["own_tag", "own_set", "shop_force", "group_unlock"]:
+		ui.blueprint.add_node_kind(k)
+	yield(_shot(ui, out + "/groups_blueprint.png"), "completed")
+	for g in m.groups.keys():
+		m.delete_group(g)
+	m.profiles.erase(ch)
 	ui.queue_free()
 	yield(self, "idle_frame")
 

@@ -33,7 +33,7 @@ func test_51_ui_edits() -> void:
 	_eq([e.key, e.value, e.custom_key], ["stat_luck", 3, "stats_on_level_up"], "trigger effect")
 	_eq(ui._expanded, specs.size() - 1, "new effect expanded")
 	# 编辑字段
-	ui._on_field_changed(6.0, specs.size() - 1, "value")
+	ui._on_field_option(6.0, specs.size() - 1, "value")
 	_eq(m.make_effect(specs[-1]).value, 6, "field edit")
 	# 换扳机：保留属性和数值
 	ui._on_effect_trigger("", specs.size() - 1)
@@ -1151,6 +1151,7 @@ func test_164_weapon_set_manager() -> void:
 	_check(m.find_set("set_be_test") != null and m.find_set(cid) == null, "renamed")
 	ui._on_set_name("BE Test Set")
 	_eq(m.find_set("set_be_test").name, "BE Test Set", "name applied")
+	_eq(ui._set_chips["set_be_test"].text, "BE Test Set", "left list shows the new name right away")
 	ui._open_set_library(0)
 	var lm = ui._modals[-1]
 	var n0 = m.weapon_sets.set_be_test.bonuses[0].size()
@@ -1181,3 +1182,315 @@ func test_164_weapon_set_manager() -> void:
 	m.apply_all()
 	ui.queue_free()
 	yield(tree, "idle_frame")
+
+
+func test_165_group_ui_and_new_nodes() -> void:
+	var ui = yield(_open_ui(CH), "completed")
+	ui._on_tab_pressed("overview")
+	ui.open_group_manager()
+	var gm = ui._modals[-1]
+	var le = LineEdit.new()
+	le.text = "My Group"
+	ui._on_group_new(le, gm)
+	var gid = m.groups.keys()[0]
+	_eq(m.group_name(gid), "My Group", "group created")
+	_check(m.group_has(m.groups[gid], "character", CH), "current object added")
+	_eq(gm.get_meta("list").get_child_count(), 1, "manager lists the group")
+	ui._on_group_rename("Renamed", gid)
+	gm.close()
+	yield(tree, "idle_frame")
+	ui._on_group_toggle(gid)
+	_check(m.groups[gid].members.empty(), "chip toggles membership")
+	ui._on_tab_pressed("blueprint")
+	yield(tree, "idle_frame")
+	for k in ["own_tag", "own_set", "own_item", "shop_force", "group_unlock", "group_lock"]:
+		ui.blueprint.add_node_kind(k)
+	yield(tree, "idle_frame")
+	_eq(m.profiles[CH].graph.nodes.size(), 6, "new nodes added")
+	m.delete_group(gid)
+	ui.queue_free()
+	yield(tree, "idle_frame")
+	m.reset_profile(CH)
+
+
+# 改名后自定义道具保留效果、自定义武器保留档案里的属性 / 效果；标签在管理弹窗里新增
+func test_166_rename_keeps_custom_and_tag_manager() -> void:
+	var iid = m.create_custom_item(_plain_item().my_id, "rn")
+	m.item_profiles[iid].effects = [{"set": {"key": "stat_armor", "value": 3, "text_key": m.stat_text_key("stat_armor")}}]
+	var base = m.family_members("weapon_knife")
+	var wid = m.create_custom_weapon(base[0].weapon_id)
+	m.weapon_profiles[wid].wstats = {"damage": 77}
+	m.apply_all()
+	var ui = yield(_open_ui(CH), "completed")
+	ui.set_kind("item")
+	ui._select(iid)
+	ui._on_tab_pressed("overview")
+	ui._on_name_changed("Renamed Item")
+	var it = m.find_target("item", iid)
+	_eq(it.name, "Renamed Item", "item renamed")
+	_eq(it.effects.size(), 1, "item keeps its effects after rename")
+	ui.set_kind("weapon")
+	ui._select(wid)
+	ui._on_tab_pressed("overview")
+	ui._on_name_changed("Renamed Weapon")
+	var w = m.find_target("weapon", wid)
+	_eq(tr(w.name), "Renamed Weapon", "weapon renamed")
+	_eq(int(w.stats.damage), 77, "weapon keeps its edited stats after rename")
+	ui.set_kind("character")
+	ui._select(CH)
+	ui._on_tab_pressed("overview")
+	ui.open_tag_manager()
+	var tm = ui._modals[-1]
+	var les = []
+	for nd in _all_nodes(tm.body):
+		if nd is LineEdit:
+			les.push_back(nd)
+	les[0].text = "be_mgr_tag"
+	les[1].text = "Mgr"
+	ui._on_tag_new_pressed(les[0], les[1], tm)
+	_check(m.custom_tags.has("be_mgr_tag") and "be_mgr_tag" in ui._p().wanted_tags, "tag added from the manager")
+	_eq(les[0].text, "", "inputs cleared")
+	tm.close()
+	m.delete_custom_tag("be_mgr_tag")
+	ui.queue_free()
+	yield(tree, "idle_frame")
+	m.delete_custom_item(iid)
+	m.delete_custom_weapon(m.find_target("weapon", wid).weapon_id)
+	m.reset_profile(CH)
+
+
+# 导入不完全 / mod 未启用：档案提及未知的道具、武器、效果、标签、类别、分组、节点、图标时
+# 不生效、不篡改、不报错；补上相应内容后正常生效
+const LATE_ITEM = "item_be_late"
+const LATE_TAG = "tag_be_late"
+const LATE_SET = "set_be_late"
+
+
+func _unknown_profile() -> Dictionary:
+	var p = m.new_profile()
+	p.effects = [{"from": LATE_ITEM, "i": 0}, {"from": "character_be_missing", "i": 3}, {"set": {"key": "stat_armor", "value": 2, "text_key": m.stat_text_key("stat_armor")}}]
+	p.weapons = ["weapon_be_missing_1", "weapon_knife_1"]
+	p.start_items = [{"id": LATE_ITEM, "n": 2, "cursed": false}, {"id": "weapon_be_missing_1", "n": 1, "cursed": false}]
+	p.ban_items = [LATE_ITEM]
+	p.ban_weapons = ["weapon_be_missing"]
+	p.fuse = ["character_be_missing"]
+	p.wanted_tags = [LATE_TAG, "stat_armor"]
+	p.graph = {"next": 20, "links": [[1, 2], [2, 3], [1, 4], [4, 3], [1, 5], [1, 6], [1, 7], [1, 8], [1, 9], [1, 10], [1, 11], [1, 12], [1, 13], [13, 3], [1, 14], [14, 3], [15, 3]], "nodes": [
+		{"id": 1, "kind": "wave_start", "params": {}, "pos": [0, 0]},
+		{"id": 2, "kind": "be_future_cond", "params": {"x": 1}, "pos": [300, 0]},
+		{"id": 3, "kind": "temp_stat", "params": {"stat": "stat_be_missing", "value": 5}, "pos": [600, 0]},
+		{"id": 4, "kind": "own_item", "params": {"id": LATE_ITEM, "cmp": "at_least", "n": 1}, "pos": [300, 100]},
+		{"id": 5, "kind": "be_future_effect", "params": {}, "pos": [600, 100]},
+		{"id": 6, "kind": "gain_item", "params": {"items": [LATE_ITEM]}, "pos": [600, 200]},
+		{"id": 7, "kind": "shop_force", "params": {"items": [LATE_ITEM, "weapon_be_missing_1"]}, "pos": [600, 300]},
+		{"id": 8, "kind": "spawn", "params": {"enemy": "be_missing_enemy", "n": 1}, "pos": [600, 400]},
+		{"id": 9, "kind": "grant", "params": {"ref": {"from": LATE_ITEM, "i": 0}, "n": 1, "mode": "temp"}, "pos": [600, 500]},
+		{"id": 10, "kind": "group_unlock", "params": {"group": "group_be_missing"}, "pos": [600, 600]},
+		{"id": 11, "kind": "transform", "params": {"items": [LATE_ITEM]}, "pos": [600, 700]},
+		{"id": 12, "kind": "shop_add", "params": {"items": [LATE_ITEM]}, "pos": [600, 800]},
+		{"id": 13, "kind": "own_set", "params": {"set": LATE_SET, "cmp": "at_least", "n": 1}, "pos": [300, 200]},
+		{"id": 14, "kind": "own_tag", "params": {"tag": LATE_TAG, "cmp": "at_least", "n": 1}, "pos": [300, 300]},
+		{"id": 15, "kind": "be_future_trigger", "params": {}, "pos": [0, 300]},
+	]}
+	return p
+
+
+func test_167_unknown_references() -> void:
+	var cid = isvc.characters[1].my_id
+	var c = m.find_character(cid)
+	var orig_effects = m.backup_value(c, "effects").size()
+	m.profiles[cid] = _unknown_profile()
+	var coupon = m.find_target("item", "item_hourglass")
+	var orig_replaced = coupon.replaced_by
+	_check(orig_replaced != null, "hourglass has a vanilla replaced_by")
+	var ip = m.new_profile()
+	ip.tags = [LATE_TAG]
+	ip.replaced_by = LATE_ITEM
+	ip.effects = [{"from": LATE_ITEM, "i": 0}]
+	m.item_profiles["item_hourglass"] = ip
+	var knife = m.find_target("weapon", "weapon_knife_1")
+	var f = m.new_family()
+	f.sets = [LATE_SET, "set_precise"]
+	m.weapon_families[knife.weapon_id] = f
+	m.weapon_sets["set_be_missing"] = m.normalize_set({"bonuses": [[{"from": "set_be_missing#0", "i": 0}]]})
+	m.groups["group_be_test"] = {"name": "late", "members": [["item", LATE_ITEM], ["weapon", "weapon_be_missing"]], "locked": true}
+	var pd = tree.root.get_node("ProgressData")
+	var unlocked = pd.items_unlocked.size()
+	var cp = m.new_profile()
+	cp.custom = true
+	cp.base = "character_be_missing"
+	cp.icon = "file:be_missing_icon.png"
+	m.profiles["character_broeditor_be_orphan"] = cp
+	var cp2 = m.new_profile()
+	cp2.custom = true
+	cp2.base = isvc.characters[2].my_id
+	cp2.icon = "file:be_missing_icon.png"
+	m.profiles["character_broeditor_be_noicon"] = cp2
+	m.weapon_sets["set_be_orphan"] = {"custom": true, "base": "set_be_missing", "name": "Orphan", "bonuses": null}
+	var saved = JSON.print([m.profiles[cid], ip, f, m.groups])
+	m.apply_all()
+	# 不生效
+	_eq(c.effects.size(), 2, "only the known effect (and the blueprint) applies")
+	_eq(c.starting_weapons.size(), 1, "unknown starting weapon skipped")
+	_check(coupon.replaced_by == orig_replaced, "unknown replaced_by leaves the vanilla value")
+	_eq(coupon.effects.size(), 0, "unknown effect skipped on the item")
+	_eq(knife.sets.size(), 1, "unknown class skipped")
+	_eq(pd.items_unlocked.size(), unlocked, "unknown group members leave the unlock records alone")
+	_check(m.find_character("character_broeditor_be_orphan") == null, "custom character with a missing base not registered")
+	var noicon = m.find_character("character_broeditor_be_noicon")
+	_check(noicon != null and noicon.icon != null, "missing icon file falls back to the base icon")
+	_check(m.find_set("set_be_orphan") == null, "custom class with a missing base not registered")
+	_eq(m.GraphEffect.paths(m.profiles[cid].graph).size(), 10, "paths through unknown nodes dropped")
+	var text = m.GraphEffect.graph_text(m.profiles[cid].graph)
+	_check(text.find("be_future") < 0, "unknown nodes not in the text")
+	var gctx = {"pos": null, "target": null, "hold": null, "info": {}}
+	for n in m.profiles[cid].graph.nodes:
+		var t = m.Catalog.node_type(n.kind)
+		if t == "effect":
+			m.runtime._execute({"st": {}, "g": m.profiles[cid].graph, "granted": [], "src": null, "sp": {}}, n, 0, gctx)
+		elif t == "cond" or t == "":
+			var ok = m.runtime._pass({"st": {}}, n, 0, gctx)
+			_check(not ok or n.kind == "own_tag" or n.kind == "own_set", "unknown references do not pass: " + n.kind)
+	var shop = [[coupon, 1], [coupon, 1]]
+	m.inject_shop_force(shop, 0, 1)
+	_check(shop[0][0] == coupon and shop[1][0] == coupon, "unknown forced ids skipped")
+	# 编辑器各页不报错，编辑其他字段不丢掉未知的引用
+	var ui = yield(_open_ui(cid), "completed")
+	for tab in ["overview", "effects", "stats", "blueprint", "gear", "bans"]:
+		ui._on_tab_pressed(tab)
+		yield(tree, "idle_frame")
+	ui._on_stat_changed(3.0, "stat_armor")
+	ui._on_tag_pressed("stat_armor")
+	ui.set_kind("item")
+	ui._select("item_hourglass")
+	for tab in ["overview", "effects", "stats", "blueprint"]:
+		ui._on_tab_pressed(tab)
+		yield(tree, "idle_frame")
+	ui.set_kind("weapon")
+	ui._select("weapon_knife_1")
+	ui._on_tab_pressed("overview")
+	yield(tree, "idle_frame")
+	ui.open_group_manager()
+	yield(tree, "idle_frame")
+	ui._modals[-1].close()
+	ui.queue_free()
+	yield(tree, "idle_frame")
+	var p = m.profiles[cid]
+	_check("weapon_be_missing_1" in p.weapons and p.start_items.size() == 2 and LATE_TAG in p.wanted_tags and p.fuse == ["character_be_missing"], "unknown references kept in the profile")
+	_eq(p.graph.nodes.size(), 15, "unknown nodes kept")
+	_check(JSON.print([ip, f, m.groups]) == JSON.print([saved_part(saved, 1), saved_part(saved, 2), saved_part(saved, 3)]), "item / family / groups untouched")
+	# 补上内容（导入自定义道具、标签、类别）后生效
+	var data = {"kind": "item", "id": LATE_ITEM, "profile": {"custom": true, "base": "item_coupon", "effects": [{"set": {"key": "stat_armor", "value": 1, "text_key": m.stat_text_key("stat_armor")}}]}}
+	_eq(m.load_custom_data(data), LATE_ITEM, "late item imported")
+	m.custom_tags[LATE_TAG] = "Late"
+	m.weapon_sets[LATE_SET] = {"custom": true, "base": "set_precise", "name": "Late", "bonuses": null}
+	m.apply_all()
+	var late = m.find_target("item", LATE_ITEM)
+	_check(late != null, "late item registered")
+	_eq(c.effects.size(), 4, "effects from the late item now apply")
+	_check(coupon.replaced_by == late, "replaced_by resolves")
+	_eq(knife.sets.size(), 2, "late class now used")
+	_check(not pd.items_unlocked.has(Keys.generate_hash(LATE_ITEM)), "locked group now locks the late item")
+	# 清理
+	m.groups.clear()
+	m.weapon_sets.clear()
+	m.custom_tags.erase(LATE_TAG)
+	m.delete_custom_item(LATE_ITEM)
+	m.profiles.erase(cid)
+	m.profiles.erase("character_broeditor_be_orphan")
+	m.delete_custom("character_broeditor_be_noicon")
+	m.item_profiles.erase("item_hourglass")
+	m.weapon_families.erase(knife.weapon_id)
+	m.reset_kind("weapon", ["edits"])
+	m.apply_all()
+
+
+func saved_part(saved: String, i: int):
+	return JSON.parse(saved).result[i]
+
+
+# 武器概览页"初始武器"：选择使用者写入角色档案，按角色的最低武器等级取等级
+func test_168_weapon_users() -> void:
+	var knight = m.find_character("character_knight")
+	# 骑士和本角色都不用的武器家族（有 T1）
+	var knife = null
+	for w in isvc.weapons:
+		if w.tier == 0 and not m._in_family(m.char_weapon_ids("character_knight") + m.char_weapon_ids(CH), w.weapon_id) and m.family_members(w.weapon_id).size() == 4:
+			knife = w
+			break
+	var wid = knife.weapon_id
+	var before = m.weapon_users(wid)
+	var lo = 0
+	for e in knight.effects:
+		if e.key == "min_weapon_tier":
+			lo = int(e.value)
+	m.set_weapon_users(wid, before + ["character_knight", CH])
+	var kw = null
+	for id in m.profiles.character_knight.weapons:
+		var w = m.find_target("weapon", id)
+		if w.weapon_id == wid:
+			kw = w
+	_check(kw != null and kw.tier == lo, "knight gets the knife at its minimum tier")
+	_check(knife.my_id in m.char_weapon_ids(CH), "plain character gets tier 1")
+	_check("character_knight" in m.weapon_users(wid), "listed as a user")
+	var ui = yield(_open_ui(CH), "completed")
+	ui.set_kind("weapon")
+	ui._select(knife.my_id)
+	ui._on_tab_pressed("overview")
+	yield(tree, "idle_frame")
+	ui._open_picker("weapon_chars")
+	_check("character_knight" in ui._picker_sel, "picker preselects the users")
+	ui._picker_sel.erase("character_knight")
+	ui._on_picker_confirm()
+	_check(not "character_knight" in m.weapon_users(wid), "removed from the knight")
+	_check(not m.weapon_profiles.has(knife.my_id), "no weapon profile created")
+	ui._open_weapon_users_copy()
+	var cm = ui._modals[-1]
+	_check(cm.get_meta("grid").get_child_count() > 0, "copy list shows other weapons")
+	ui._on_copy_search("zzzz_no_match", cm)
+	_eq(_shown_rows(cm), 0, "search hides every weapon")
+	ui._on_copy_search("", cm)
+	var all_rows = _shown_rows(cm)
+	ui._on_copy_filter(cm, "type", 1)
+	var ranged = _shown_rows(cm)
+	_check(ranged > 0 and ranged < all_rows, "type filter")
+	cm.close()
+	ui.set_kind("character")
+	ui._select(CH)
+	ui._open_char_weapons()
+	var chm = ui._modals[-1]
+	var n_chars = _shown_rows(chm)
+	ui._on_copy_filter(chm, "src", "dlc1")
+	_check(_shown_rows(chm) < n_chars, "source filter on the character list")
+	ui._on_copy_search(tr(isvc.characters[2].name).to_lower(), chm)
+	ui._on_copy_filter(chm, "src", "all")
+	_check(_shown_rows(chm) >= 1 and _shown_rows(chm) < n_chars, "search on the character list")
+	chm.close()
+	ui.set_kind("weapon")
+	ui._select(knife.my_id)
+	# 国王：原本只有 T2 以上的初始武器 -> 直接选择也至少 T2
+	m.set_weapon_users(wid, m.weapon_users(wid) + ["character_king"])
+	_check(m.char_weapon_tier("character_king", wid) >= 1, "king gets at least tier 2 when picked")
+	m.set_weapon_users(wid, [])
+	# 套用已有武器：沿用各角色在原武器上的等级
+	var king_w = m.find_target("weapon", m.char_weapon_ids("character_king")[0])
+	ui._on_weapon_users_copied(king_w.weapon_id, m.weapon_users(king_w.weapon_id), ui.Modal.open(ui, "", Color.white, Vector2(10, 10)))
+	_eq(m.char_weapon_tier("character_king", wid), king_w.tier, "copy keeps the king's tier")
+	for cid in m.weapon_users(wid):
+		var t = m.char_weapon_tier(cid, king_w.weapon_id)
+		_eq(m.char_weapon_tier(cid, wid), t, "copied tier for " + cid)
+	ui.queue_free()
+	yield(tree, "idle_frame")
+	for cid in m.profiles.keys():
+		if not m.profiles[cid].custom:
+			m.profiles.erase(cid)
+	m.apply_all()
+
+
+
+func _shown_rows(m) -> int:
+	var n = 0
+	for row in m.get_meta("rows"):
+		if row[1][0].visible:
+			n += 1
+	return n

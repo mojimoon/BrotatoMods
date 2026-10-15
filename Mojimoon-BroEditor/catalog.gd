@@ -406,6 +406,9 @@ const NODES = [
 	["enemy_hp_below", "cond", [["pct", "int", 50]]],
 	["dmg_type", "cond", [["stat", "dmg", "stat_melee_damage"]]],
 	["once", "cond", []],
+	["own_tag", "cond", [["tag", "tag", ""], ["cmp", "mode:at_least|at_most|exactly", "at_least"], ["n", "int", 2]]],
+	["own_item", "cond", [["id", "owned", ""], ["cmp", "mode:at_least|at_most|exactly", "at_least"], ["n", "int", 1]]],
+	["own_set", "cond", [["set", "set", ""], ["cmp", "mode:at_least|at_most|exactly", "at_least"], ["n", "int", 2]]],
 	["temp_stat", "effect", [["stat", "stat", "stat_percent_damage"], ["value", "int", 5]]],
 	["perm_stat", "effect", [["stat", "stat", "stat_max_hp"], ["value", "int", 1]]],
 	["timed_stat", "effect", [["stat", "stat", "stat_attack_speed"], ["value", "int", 20], ["secs", "int", 3]]],
@@ -429,6 +432,9 @@ const NODES = [
 	["spawn", "effect", [["enemy", "enemy", "baby_alien"], ["n", "int", 1]]],
 	["break", "effect", [["value", "int", 10]]],
 	["grant", "effect", [["ref", "effect", null], ["n", "int", 1], ["mode", "mode:temp|timed|perm", "temp"], ["secs", "int", 5]]],
+	["shop_force", "effect", [["items", "goods", []]]],
+	["group_unlock", "effect", [["group", "group", ""]]],
+	["group_lock", "effect", [["group", "group", ""]]],
 ]
 # 只在某个参数取某值时显示的参数：[节点, 参数] -> [条件参数, 值]
 const PARAM_SHOW_IF = {"grant:secs": ["mode", "timed"]}
@@ -436,7 +442,7 @@ const PARAM_SHOW_IF = {"grant:secs": ["mode", "timed"]}
 const DMG_TYPES = ["stat_melee_damage", "stat_ranged_damage", "stat_elemental_damage", "stat_engineering"]
 const STATE_TRIGGERS = ["still", "moving", "low_hp", "full_hp", "always"]
 # 状态条件：在状态扳机的路径上持续检查（全部满足时进入，任一不满足时撤销）；其余条件只在进入时检查一次
-const STATE_CONDS = ["hp_below", "hp_above", "wave_min", "wave_max", "diff_min", "diff_max", "stat_min", "stat_max", "if_moving", "if_still"]
+const STATE_CONDS = ["hp_below", "hp_above", "wave_min", "wave_max", "diff_min", "diff_max", "stat_min", "stat_max", "if_moving", "if_still", "own_tag", "own_set", "own_item"]
 const SHOP_TRIGGERS = ["reroll", "buy"]
 
 # 不是普通 Effect 脚本、但也可以拆解的扳机（徒步旅行者的步数在 value2；浪漫之人 / 长笛的魅惑由 split_native 单独处理）

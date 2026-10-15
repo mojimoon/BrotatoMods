@@ -255,6 +255,17 @@ static func _cond_text(n: Dictionary) -> String:
 	var t = _tr("BE_CX_" + n.kind.to_upper())
 	for k in ["n", "pct", "secs"]:
 		t = t.replace("{" + k + "}", str(int(_p(n, k, 0))))
+	var m = _mod()
+	if n.kind in ["own_tag", "own_set", "own_item"] and m != null:
+		var what = ""
+		match n.kind:
+			"own_tag":
+				what = m.tag_name(str(_p(n, "tag", "")))
+			"own_set":
+				what = m.weapon_set_name(str(_p(n, "set", "")))
+			_:
+				what = m.owned_name(str(_p(n, "id", "")))
+		t = t.replace("{0}", what).replace("{cmp}", _tr("BE_CMP_" + str(_p(n, "cmp", "at_least")).to_upper()))
 	return t.replace("{stat}", _stat_name(str(_p(n, "stat", ""))))
 
 
@@ -312,9 +323,13 @@ static func _payload_text(n: Dictionary, trigger_kind: String, colored: bool) ->
 			var k = "BE_PX_" + n.kind.to_upper()
 			k += "_ANY" if ids.empty() else ("_RANDOM" if ids.size() > 1 else "")
 			return _tr(k).replace("{0}", _item_names(ids)) + _at_wave_end(trigger_kind)
-		"shop_add", "shop_remove":
+		"shop_add", "shop_remove", "shop_force":
 			var ids = _p(n, "items", [])
 			return _tr("BE_PX_" + n.kind.to_upper()).replace("{0}", _item_names(ids if ids is Array else []))
+		"group_unlock", "group_lock":
+			var m = _mod()
+			var gid = str(_p(n, "group", ""))
+			return _tr("BE_PX_" + n.kind.to_upper()).replace("{0}", m.group_name(gid) if m != null else gid)
 		"charm":
 			return _tr("BE_PX_CHARM").replace("{0}", str(Utils.CHARM_DURATION))
 		"spawn":
@@ -354,7 +369,7 @@ static func _item_names(ids: Array) -> String:
 	var m = _mod()
 	var names = []
 	for id in ids:
-		var it = m.find_target("item", str(id)) if m != null else null
+		var it = m._find_any(str(id)) if m != null else null
 		names.push_back(TranslationServer.translate(it.name) if it != null else str(id))
 	return PoolStringArray(names).join(" / ") if not names.empty() else "-"
 

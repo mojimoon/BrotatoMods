@@ -199,7 +199,7 @@ func _isvc():
 
 
 func _sig() -> String:
-	return JSON.print([_mod.profiles, _mod.item_profiles, _mod.weapon_profiles, _mod.kind_enabled, _mod.weapon_families, _mod.disabled, _mod.weapon_sets])
+	return JSON.print([_mod.profiles, _mod.item_profiles, _mod.weapon_profiles, _mod.kind_enabled, _mod.weapon_families, _mod.disabled, _mod.weapon_sets, _mod.groups])
 
 
 func _profiles() -> Dictionary:
@@ -999,7 +999,7 @@ func _reregister() -> void:
 		"item":
 			_mod._register_custom_item(_id)
 		"weapon":
-			_mod._register_weapon_families()
+			_mod.reregister_weapons()
 
 
 func _is_modified(id: String) -> bool:
@@ -1111,6 +1111,9 @@ func _build_overview() -> void:
 	if _look_custom():
 		_look_section(left)
 	_tag_section(left)
+	if _kind == "weapon":
+		_weapon_users_section(left)
+	_group_section(left)
 	_preview_card(cols)
 
 
@@ -1168,18 +1171,7 @@ func _tag_section(left: Control) -> void:
 	var r = _character()
 	var title = {"character": "BE_SEC_TAGS", "item": "BE_SEC_ITEM_TAGS", "weapon": "BE_SEC_WEAPON_SETS"}[_kind]
 	var tbox = _section(left, title, C_ACCENT_3)
-	if _kind == "weapon":
-		var title_lbl = tbox.get_child(0)
-		title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var head = HBoxContainer.new()
-		tbox.remove_child(title_lbl)
-		head.add_child(title_lbl)
-		tbox.add_child(head)
-		tbox.move_child(head, 0)
-		var manage = _button(tr("BE_TAG_MANAGE"), FONT_DESC)
-		_apply_action_style(manage, C_ACCENT_2)
-		manage.connect("pressed", self, "open_set_manager")
-		head.add_child(manage)
+	_manage_head(tbox, "open_set_manager" if _kind == "weapon" else "open_tag_manager")
 	if _kind != "item":
 		tbox.add_child(_desc(tr("BE_TAGS_DESC" if _kind == "character" else "BE_SETS_DESC")))
 	var grid = GridContainer.new()
@@ -1203,34 +1195,32 @@ func _tag_section(left: Control) -> void:
 		var b = _chip(_tag_name(tag), tag, tag in tags, C_ACCENT_3)
 		b.connect("pressed", self, "_on_tag_pressed", [tag])
 		grid.add_child(b)
-	# 自定义标签：键名 + 名称（可选，默认同键名）；添加后所有道具 / 角色可用，并加入本对象
-	var add_row = HBoxContainer.new()
-	add_row.add_constant_override("separation", 8)
-	tbox.add_child(add_row)
-	var key_le = _line_edit(tr("BE_TAG_NEW_HINT"))
-	key_le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	add_row.add_child(key_le)
-	var name_le = _line_edit(tr("BE_TAG_NAME_HINT"))
-	name_le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	add_row.add_child(name_le)
-	for le in [key_le, name_le]:
-		le.connect("text_entered", self, "_on_tag_new_entered", [key_le, name_le])
-	var add = _button(tr("BE_TAG_NEW"), FONT_DESC)
-	_apply_action_style(add, C_ACCENT_3)
-	add.connect("pressed", self, "_on_tag_new_pressed", [key_le, name_le])
-	add_row.add_child(add)
+
+
+# 区块标题行右侧的"管理"按钮
+func _manage_head(box: VBoxContainer, method: String) -> void:
+	var title_lbl = box.get_child(0)
+	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var head = HBoxContainer.new()
+	box.remove_child(title_lbl)
+	head.add_child(title_lbl)
+	box.add_child(head)
+	box.move_child(head, 0)
 	var manage = _button(tr("BE_TAG_MANAGE"), FONT_DESC)
 	_apply_action_style(manage, C_ACCENT_2)
-	manage.connect("pressed", self, "open_tag_manager")
-	add_row.add_child(manage)
+	manage.connect("pressed", self, method)
+	head.add_child(manage)
 
 
-func _on_tag_new_entered(_text: String, key_le: LineEdit, name_le: LineEdit) -> void:
-	_on_tag_new_pressed(key_le, name_le)
+func _on_tag_new_entered(_text: String, key_le: LineEdit, name_le: LineEdit, m) -> void:
+	_on_tag_new_pressed(key_le, name_le, m)
 
 
-func _on_tag_new_pressed(key_le: LineEdit, name_le: LineEdit) -> void:
+func _on_tag_new_pressed(key_le: LineEdit, name_le: LineEdit, m) -> void:
 	_on_tag_new(key_le.text, name_le.text)
+	key_le.text = ""
+	name_le.text = ""
+	_fill_tag_manager(m.get_meta("list"))
 
 
 func _on_tag_new(key: String, name: String = "") -> void:
@@ -1252,6 +1242,24 @@ func _on_tag_new(key: String, name: String = "") -> void:
 func open_tag_manager() -> void:
 	var m = Modal.open(self, tr("BE_TAG_MANAGE_TITLE"), C_ACCENT_2, Vector2(900, 0))
 	m.add_button(tr("MENU_BACK"), C_TEXT_DIM, m, "close")
+	m.connect("closed", self, "_build_page")
+	# 新增：键名 + 名称（可选，默认同键名）；新增后所有道具 / 角色可用，并加入当前对象
+	var add_row = HBoxContainer.new()
+	add_row.add_constant_override("separation", 8)
+	m.body.add_child(add_row)
+	var key_le = _line_edit(tr("BE_TAG_NEW_HINT"))
+	key_le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	add_row.add_child(key_le)
+	var name_le = _line_edit(tr("BE_TAG_NAME_HINT"))
+	name_le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	add_row.add_child(name_le)
+	for le in [key_le, name_le]:
+		le.connect("text_entered", self, "_on_tag_new_entered", [key_le, name_le, m])
+	var add = _button(tr("BE_TAG_NEW"), FONT_DESC)
+	_apply_action_style(add, C_ACCENT_3)
+	add.connect("pressed", self, "_on_tag_new_pressed", [key_le, name_le, m])
+	add_row.add_child(add)
+	m.body.add_child(_desc(tr("BE_TAG_NEW_DESC")))
 	var list = VBoxContainer.new()
 	list.add_constant_override("separation", 6)
 	m.body.add_child(list)
@@ -1313,6 +1321,7 @@ var _set_modal = null
 var _set_sel := ""
 var _set_expanded := ""	# 展开的效果 "级:序号"
 var _set_rows: Dictionary = {}	# "级:序号" -> 效果文本
+var _set_chips: Dictionary = {}	# 套装 id -> 左侧列表的按钮
 var _set_lib_cat := "all"
 var _set_lib_search := ""
 
@@ -1373,6 +1382,7 @@ func _fill_set_manager() -> void:
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	list.add_constant_override("separation", 4)
 	lscroll.add_child(list)
+	_set_chips = {}
 	for s in _isvc().sets:
 		if s == null:
 			continue
@@ -1382,6 +1392,7 @@ func _fill_set_manager() -> void:
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.connect("pressed", self, "_on_set_select", [s.my_id])
 		list.add_child(b)
+		_set_chips[s.my_id] = b
 
 	# 右：编辑选中的套装
 	var rscroll = _scroll()
@@ -1550,6 +1561,14 @@ func _on_set_rename(text: String) -> void:
 func _on_set_name(text: String) -> void:
 	_mod.weapon_sets[_set_sel].name = text.strip_edges()
 	_set_changed(false)
+	# 不重建整个窗口（输入框会失去焦点），只更新左侧列表里的名称
+	var b = _set_chips.get(_set_sel)
+	if b != null and is_instance_valid(b):
+		var name = tr(_mod.find_set(_set_sel).name)
+		if b.text != "":
+			b.text = name
+		elif b.get_child_count() > 0:
+			b.get_child(0).get_child(0).text = name
 
 
 func _on_set_reset() -> void:
@@ -1674,6 +1693,289 @@ func _on_set_lib_add(spec: Dictionary, m) -> void:
 	m.close()
 	_set_changed()
 	_set_status(tr("BE_EFFECT_ADDED"))
+
+
+# ============================================================
+# 武器概览页"初始武器"：选择以该武器为初始武器的角色（写入角色档案）
+# ============================================================
+func _weapon_users_section(left: Control) -> void:
+	var box = _section(left, "BE_SEC_WEAPON_USERS", C_CUSTOM_2)
+	box.add_child(_desc(tr("BE_WEAPON_USERS_DESC")))
+	var row = HBoxContainer.new()
+	row.add_constant_override("separation", 8)
+	box.add_child(row)
+	var pick = _button(tr("BE_PICK_CHARACTERS"), FONT_SMALL)
+	_apply_action_style(pick, C_CUSTOM_2)
+	pick.connect("pressed", self, "_open_picker", ["weapon_chars"])
+	row.add_child(pick)
+	var copy = _button(tr("BE_COPY_WEAPON_USERS"), FONT_SMALL)
+	_apply_action_style(copy, C_CUSTOM_2)
+	copy.connect("pressed", self, "_open_weapon_users_copy")
+	row.add_child(copy)
+	var grid = _icon_grid(8)
+	box.add_child(grid)
+	var users = _mod.weapon_users(_obj_key())
+	for cid in users:
+		var c = _mod.find_character(cid)
+		if c != null:
+			var b = _res_button(c)
+			_set_icon_style(b, C_BORDER, 1)
+			grid.add_child(b)
+	if users.empty():
+		box.add_child(_desc(tr("BE_WEAPON_USERS_EMPTY")))
+
+
+# 套用已有武器：列出每个武器家族的使用者，点击一行即采用同样的角色
+func _open_weapon_users_copy() -> void:
+	var m = Modal.open(self, tr("BE_COPY_WEAPON_USERS"), C_CUSTOM_2, Vector2(1240, 820))
+	var back = _button(tr("MENU_BACK"), FONT_SMALL)
+	_apply_action_style(back, C_TEXT_DIM)
+	back.connect("pressed", m, "close")
+	m.head.add_child(back)
+	_copy_filters(m, true)
+	var scroll = _scroll()
+	m.body.add_child(scroll)
+	var grid = GridContainer.new()
+	grid.columns = 2
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_constant_override("hseparation", 14)
+	grid.add_constant_override("vseparation", 6)
+	scroll.add_child(grid)
+	m.set_meta("grid", grid)
+	var seen = {_obj_key(): true}
+	for w in _isvc().weapons:
+		if w == null or seen.has(w.weapon_id):
+			continue
+		seen[w.weapon_id] = true
+		var users = _mod.weapon_users(w.weapon_id)
+		if users.empty():
+			continue
+		var b = _button(tr(w.name), FONT_SMALL)
+		b.icon = w.icon
+		b.expand_icon = true
+		b.align = Button.ALIGN_LEFT
+		b.clip_text = true
+		b.rect_min_size = Vector2(300, 56)
+		b.size_flags_vertical = 0
+		_apply_action_style(b, C_CUSTOM_2)
+		b.connect("pressed", self, "_on_weapon_users_copied", [w.weapon_id, users, m])
+		grid.add_child(b)
+		var icons = _icon_grid(CHAR_WEAPON_COLUMNS)
+		icons.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		grid.add_child(icons)
+		m.get_meta("rows").push_back([w, [b, icons]])
+		for cid in users:
+			var c = _mod.find_character(cid)
+			if c != null:
+				icons.add_child(_icon_tile(c.icon, C_BORDER, 48))
+
+
+# 复制弹窗的筛选：搜索名称 / ID + 来源（武器另有近战 / 远程）；行记在 meta "rows"：[对象, [控件...]]
+func _copy_filters(m, weapons: bool) -> void:
+	m.set_meta("rows", [])
+	m.set_meta("f", {"q": "", "src": "all", "type": -1})
+	m.set_meta("chips", {})
+	var search = _line_edit(tr("BE_SEARCH"))
+	search.connect("text_changed", self, "_on_copy_search", [m])
+	m.body.add_child(search)
+	search.call_deferred("grab_focus")
+	var frow = HBoxContainer.new()
+	frow.add_constant_override("separation", 16)
+	m.body.add_child(frow)
+	var groups = [["src", SOURCES]]
+	if weapons:
+		groups.push_back(["type", [[-1, "BE_FILTER_ALL"], [0, "MELEE"], [1, "RANGED"]]])
+	for gdef in groups:
+		var row = HBoxContainer.new()
+		row.add_constant_override("separation", 4)
+		frow.add_child(row)
+		var list = []
+		for d in gdef[1]:
+			var b = _button(tr(d[1]), FONT_DESC)
+			b.rect_min_size = Vector2(56, 0)
+			b.connect("pressed", self, "_on_copy_filter", [m, gdef[0], d[0]])
+			row.add_child(b)
+			list.push_back([b, d[0]])
+		m.get_meta("chips")[gdef[0]] = list
+	_style_copy_chips(m)
+
+
+func _style_copy_chips(m) -> void:
+	var f = m.get_meta("f")
+	var chips = m.get_meta("chips")
+	for k in chips:
+		for bv in chips[k]:
+			_apply_chip_style(bv[0], bv[1] == f[k], C_ACCENT_2)
+
+
+func _on_copy_search(text: String, m) -> void:
+	m.get_meta("f").q = text.strip_edges().to_lower()
+	_apply_copy_filters(m)
+
+
+func _on_copy_filter(m, key: String, value) -> void:
+	m.get_meta("f")[key] = value
+	_style_copy_chips(m)
+	_apply_copy_filters(m)
+
+
+func _apply_copy_filters(m) -> void:
+	var f = m.get_meta("f")
+	for row in m.get_meta("rows"):
+		var r = row[0]
+		var key = r.weapon_id if r is WeaponData else r.my_id
+		var shown = f.q == "" or tr(r.name).to_lower().find(f.q) >= 0 or key.find(f.q) >= 0
+		shown = shown and (f.src == "all" or _source(r) == f.src)
+		shown = shown and (f.type < 0 or not r is WeaponData or r.type == f.type)
+		for ctl in row[1]:
+			ctl.visible = shown
+
+
+func _on_weapon_users_copied(from_wid: String, users: Array, m) -> void:
+	m.close()
+	var tiers = {}
+	for cid in users:
+		tiers[cid] = _mod.char_weapon_tier(cid, from_wid)
+	_mod.set_weapon_users(_obj_key(), users, tiers)
+	_changed()
+	_build_page()
+
+
+# ============================================================
+# 内容分组：概览页勾选本对象所在的分组；"管理"弹窗里新建 / 改名 / 删除分组、整组锁定 / 解锁
+# ============================================================
+func _group_section(left: Control) -> void:
+	var gbox = _section(left, "BE_SEC_GROUPS", C_ACCENT_2)
+	_manage_head(gbox, "open_group_manager")
+	if _mod.groups.empty():
+		gbox.add_child(_desc(tr("BE_GROUPS_EMPTY")))
+		return
+	var grid = GridContainer.new()
+	grid.columns = 4
+	grid.add_constant_override("hseparation", 6)
+	grid.add_constant_override("vseparation", 6)
+	gbox.add_child(grid)
+	for gid in _mod.groups:
+		var g = _mod.groups[gid]
+		var text = _mod.group_name(gid) + (" " + tr("BE_GROUP_LOCKED_MARK") if g.locked else "")
+		var b = _chip(text, gid, BEMain.group_has(g, _kind, _obj_key()), C_ACCENT_2)
+		b.connect("pressed", self, "_on_group_toggle", [gid])
+		grid.add_child(b)
+
+
+func _on_group_toggle(gid: String) -> void:
+	_mod.toggle_group_member(gid, _kind, _obj_key())
+	_build_page()
+
+
+func open_group_manager() -> void:
+	var m = Modal.open(self, tr("BE_GROUP_MANAGE_TITLE"), C_ACCENT_2, Vector2(1100, 0))
+	m.add_button(tr("MENU_BACK"), C_TEXT_DIM, m, "close")
+	m.connect("closed", self, "_build_page")
+	m.body.add_child(_desc(tr("BE_GROUP_DESC")))
+	var add_row = HBoxContainer.new()
+	add_row.add_constant_override("separation", 8)
+	m.body.add_child(add_row)
+	var le = _line_edit(tr("BE_GROUP_NEW_HINT"))
+	le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	add_row.add_child(le)
+	var add = _button(tr("BE_GROUP_NEW"), FONT_DESC)
+	_apply_action_style(add, C_ACCENT_3)
+	add.connect("pressed", self, "_on_group_new", [le, m])
+	add_row.add_child(add)
+	var scroll = _scroll()
+	scroll.rect_min_size = Vector2(0, 600)
+	m.body.add_child(scroll)
+	var list = VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_constant_override("separation", 8)
+	scroll.add_child(list)
+	m.set_meta("list", list)
+	_fill_group_manager(m)
+
+
+func _fill_group_manager(m) -> void:
+	var list = m.get_meta("list")
+	for c in list.get_children():
+		list.remove_child(c)
+		c.queue_free()
+	if _mod.groups.empty():
+		list.add_child(_desc(tr("BE_GROUPS_EMPTY")))
+	for gid in _mod.groups:
+		var g = _mod.groups[gid]
+		var card = _card(list)
+		var box = VBoxContainer.new()
+		box.add_constant_override("separation", 6)
+		card.add_child(box)
+		var row = HBoxContainer.new()
+		row.add_constant_override("separation", 8)
+		box.add_child(row)
+		var name_le = _line_edit(gid)
+		name_le.text = g.name
+		name_le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_le.connect("text_changed", self, "_on_group_rename", [gid])
+		row.add_child(name_le)
+		var lock = _button(tr("BE_GROUP_UNLOCK" if g.locked else "BE_GROUP_LOCK"), FONT_DESC)
+		_apply_action_style(lock, C_ACCENT_3 if g.locked else C_ACCENT)
+		lock.connect("pressed", self, "_on_group_lock", [gid, not g.locked, m])
+		row.add_child(lock)
+		var del = _button(tr("BE_DELETE"), FONT_DESC)
+		_apply_action_style(del, C_DANGER)
+		del.connect("pressed", self, "_on_group_delete_ask", [gid, m])
+		row.add_child(del)
+		if g.locked:
+			box.add_child(_desc(tr("BE_GROUP_IS_LOCKED")))
+		var icons = _icon_grid(14)
+		box.add_child(icons)
+		for mem in g.members:
+			var r = _group_member_res(mem)
+			if r == null:
+				continue
+			var b = _res_button(r)
+			b.connect("pressed", self, "_on_group_member_remove", [gid, mem, m])
+			icons.add_child(b)
+		if g.members.empty():
+			box.add_child(_desc(tr("BE_GROUP_NO_MEMBERS")))
+
+
+func _group_member_res(mem: Array):
+	if mem[0] != "weapon":
+		return _mod.find_target(mem[0], mem[1])
+	var ms = _mod.family_members(mem[1])
+	return ms[0] if not ms.empty() else null
+
+
+func _on_group_new(le: LineEdit, m) -> void:
+	var gid = _mod.create_group(le.text.strip_edges())
+	if _kind != "":
+		_mod.toggle_group_member(gid, _kind, _obj_key())
+	le.text = ""
+	_fill_group_manager(m)
+
+
+func _on_group_rename(text: String, gid: String) -> void:
+	_mod.groups[gid].name = text.strip_edges()
+
+
+func _on_group_lock(gid: String, locked: bool, m) -> void:
+	_mod.set_group_locked(gid, locked)
+	_set_status(tr("BE_GROUP_LOCKED_DONE" if locked else "BE_GROUP_UNLOCKED_DONE"))
+	_fill_group_manager(m)
+
+
+func _on_group_delete_ask(gid: String, m) -> void:
+	Modal.confirm(self, [tr("BE_DELETE_CONFIRM_MSG").replace("{0}", _mod.group_name(gid))], C_DANGER, self, "_on_group_delete", [gid, m])
+
+
+func _on_group_delete(gid: String, m) -> void:
+	_mod.delete_group(gid)
+	if is_instance_valid(m):
+		_fill_group_manager(m)
+
+
+func _on_group_member_remove(gid: String, mem: Array, m) -> void:
+	_mod.toggle_group_member(gid, mem[0], mem[1])
+	_fill_group_manager(m)
 
 
 const EFFECT_LINE = preload("res://items/global/effect_line.tscn")
@@ -1823,9 +2125,7 @@ func _all_tags() -> Array:
 
 
 func _tag_name(tag: String) -> String:
-	if _mod.custom_tags.has(tag):
-		return _mod.custom_tags[tag]
-	return _mod.stat_name(tag)
+	return _mod.tag_name(tag)
 
 
 func _on_name_changed(text: String) -> void:
@@ -2024,6 +2324,26 @@ func _on_replaced_by(id, orig: String) -> void:
 
 
 # 道具选择列表（不含角色）
+# 道具 + 武器家族："拥有指定道具 / 武器"
+func owned_select_items() -> Array:
+	var out = item_select_items()
+	var seen = {}
+	for w in _isvc().weapons:
+		if w != null and not seen.has(w.weapon_id):
+			seen[w.weapon_id] = true
+			out.push_back([tr(w.name), w.weapon_id])
+	return out
+
+
+# 道具 + 武器（各等级）："商店必定出现"
+func goods_select_items() -> Array:
+	var out = item_select_items()
+	for w in _isvc().weapons:
+		if w != null:
+			out.push_back([tr(w.name) + ["", " II", " III", " IV"][int(clamp(w.tier, 0, 3))], w.my_id])
+	return out
+
+
 func item_select_items() -> Array:
 	var out = []
 	for it in _isvc().items:
@@ -3385,6 +3705,7 @@ func _open_char_weapons() -> void:
 	_apply_action_style(back, C_TEXT_DIM)
 	back.connect("pressed", m, "close")
 	m.head.add_child(back)
+	_copy_filters(m, false)
 	var scroll = _scroll()
 	m.body.add_child(scroll)
 	var grid = GridContainer.new()
@@ -3413,6 +3734,7 @@ func _open_char_weapons() -> void:
 		var row = _icon_grid(CHAR_WEAPON_COLUMNS)
 		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		grid.add_child(row)
+		m.get_meta("rows").push_back([c, [b, row]])
 		for w in c.starting_weapons:
 			row.add_child(_icon_tile(w.icon, ItemService.get_color_from_tier(w.tier), 48))
 
@@ -3616,7 +3938,7 @@ func _on_bans_clear(kind: String) -> void:
 func _open_picker(mode: String) -> void:
 	_picker_mode = mode
 	_picker_filter = ""
-	_picker_multi = mode in ["start_weapons", "start_items", "start_items_w", "fuse"]
+	_picker_multi = mode in ["start_weapons", "start_items", "start_items_w", "fuse", "weapon_chars"]
 	_picker_sel = []
 	var v = _view()
 	match mode:
@@ -3637,6 +3959,9 @@ func _open_picker(mode: String) -> void:
 				if c.my_id != _id:
 					_picker_res.push_back(c)
 			_picker_sel = v.fuse.duplicate()
+		"weapon_chars":
+			_picker_res = _isvc().characters.duplicate()
+			_picker_sel = _mod.weapon_users(_obj_key())
 		"base":
 			match _kind:
 				"character":
@@ -3672,6 +3997,10 @@ func _open_picker(mode: String) -> void:
 		_picker_chip_row(frow, "tier", tiers)
 		_picker_chip_row(frow, "type", [[-1, "BE_FILTER_ALL"], [0, "MELEE"], [1, "RANGED"]])
 		_picker_chip_row(frow, "src", SOURCES)
+	elif mode == "weapon_chars":
+		var frow = HBoxContainer.new()
+		box.add_child(frow)
+		_picker_chip_row(frow, "src", SOURCES)
 	var scroll = _scroll()
 	box.add_child(scroll)
 	_picker_grid = _icon_grid(16)
@@ -3679,9 +4008,10 @@ func _open_picker(mode: String) -> void:
 	var hint = _desc(tr("BE_PICKER_MULTI_DESC" if _picker_multi else "BE_PICKER_SINGLE_DESC"))
 	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_picker.foot.add_child(hint)
-	if mode == "start_weapons":
+	if mode in ["start_weapons", "weapon_chars"]:
 		_picker.add_button(tr("BE_PICKER_SELECT_SHOWN"), C_ACCENT_3, self, "_on_picker_shown", [true])
 		_picker.add_button(tr("BE_PICKER_DESELECT_SHOWN"), C_TEXT_DIM, self, "_on_picker_shown", [false])
+	if mode == "start_weapons":
 		_picker.add_button(tr("BE_PICKER_RESET_ALL"), C_DANGER, self, "_on_picker_reset")
 	elif _picker_multi:
 		_picker.add_button(tr("BE_PICKER_CLEAR"), C_DANGER, self, "_on_picker_clear")
@@ -3724,6 +4054,8 @@ func _on_picker_chip(key: String, value) -> void:
 func _picker_shown(r) -> bool:
 	if _picker_filter != "" and tr(r.name).to_lower().find(_picker_filter) < 0 and r.my_id.find(_picker_filter) < 0:
 		return false
+	if _picker_mode == "weapon_chars":
+		return _picker_f.src == "all" or _source(r) == _picker_f.src
 	if not _picker_weapons():
 		return true
 	return (_picker_f.tier < 0 or r.tier == _picker_f.tier) and (_picker_f.type < 0 or r.type == _picker_f.type) and (_picker_f.src == "all" or _source(r) == _picker_f.src)
@@ -3820,7 +4152,8 @@ func _on_picker_clear() -> void:
 
 
 func _on_picker_confirm() -> void:
-	var p = _p()
+	# 选择使用者改的是角色档案，不给当前武器建档案
+	var p = _p() if _picker_mode != "weapon_chars" else null
 	match _picker_mode:
 		"start_weapons":
 			p.weapons = _picker_sel.duplicate()
@@ -3829,6 +4162,8 @@ func _on_picker_confirm() -> void:
 				p.start_items.push_back({"id": id, "n": 1, "cursed": false})
 		"fuse":
 			p.fuse = _picker_sel.duplicate()
+		"weapon_chars":
+			_mod.set_weapon_users(_obj_key(), _picker_sel)
 		"base":
 			if not _picker_sel.empty():
 				_look_p().base = _kind_base(_picker_sel[0])
