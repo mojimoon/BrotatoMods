@@ -21,10 +21,7 @@
 - **Characters**: starting state (materials, levels, crates, starting wave…), starting weapons and items, **GMO (character fusion)**, banned items and weapons.
 - **Create new** characters, items and weapons from any vanilla one, then DIY whatever you want. Choose an icon or import your own.
 - **Disable** characters, items and weapons.
-- **Weapon classes**: edit the bonus of every class level (2–6 weapons), or create your own classes.
-- **Starting weapon** (weapons tab): pick which characters can start with a weapon; tiers follow each character's limits (e.g. King starts at T2+).
-- **Content groups**: put characters, items and weapons into groups, then lock or unlock a whole group with the vanilla unlock system — or let a blueprint unlock it when a condition is met.
-- **Robust**: references to missing content (incomplete imports, disabled mods) are simply ignored and kept, and work again once the content is back.
+- **More and more new features**: **Lock groups** (lock characters, items and weapons as groups, or set unlock condition with blueprint), **Convenient starting weapons** (pick which characters can start with a weapon in the weapons tab), **Weapon classes** (edit or create your own classes and their bonuses) ...
 - **Share** with a code (one object, a whole tab, or everything), or by sending the object's file (see below).
 - Dependency free, supports all 13 game languages, compatible with all mod objects.
 
@@ -68,10 +65,7 @@ Files are saved in `%APPDATA%\Brotato\Mojimoon-BroEditor\` (Windows), `~/Library
 [*][b]Characters[/b]: starting state (materials, levels, crates, starting wave…), starting weapons and items, [b]GMO (character fusion)[/b], banned items and weapons.
 [*][b]Create new[/b] characters, items and weapons from any vanilla one, then DIY whatever you want. Choose an icon or import your own.
 [*][b]Disable[/b] characters, items and weapons.
-[*][b]Weapon classes[/b]: edit the bonus of every class level (2–6 weapons), or create your own classes.
-[*][b]Starting weapon[/b] (weapons tab): pick which characters can start with a weapon; tiers follow each character's limits (e.g. King starts at T2+).
-[*][b]Content groups[/b]: put characters, items and weapons into groups, then lock or unlock a whole group with the vanilla unlock system — or let a blueprint unlock it when a condition is met.
-[*][b]Robust[/b]: references to missing content (incomplete imports, disabled mods) are simply ignored and kept, and work again once the content is back.
+[*][b]More and more new features[/b]: [b]Lock groups[/b] (lock characters, items and weapons as groups, or set unlock condition with blueprint), [b]Convenient starting weapons[/b] (pick which characters can start with a weapon in the weapons tab), [b]Weapon classes[/b] (edit or create your own classes and their bonuses) ...
 [*][b]Share[/b] with a code (one object, a whole tab, or everything), or by sending the object's file (see below).
 [*]Dependency free, supports all 13 game languages, compatible with all mod objects.
 [/list]
@@ -144,10 +138,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 - **角色**：开局状态（材料、等级、箱子、起始波次……）、初始武器与道具、**GMO (角色融合)**、禁用道具与武器。
 - **新建**角色、道具、武器：以任意原版对象为基底，尽情 DIY。可选图标或导入图片。
 - **禁用**角色、道具和武器。
-- **武器类别**：修改每个类别各级（2–6 件）的加成，或新建自己的类别。
-- **初始武器**（武器页）：选择哪些角色可以该武器开局；等级遵守角色的限制（如国王至少 T2）。
-- **内容分组**：把角色、道具、武器归为一组，用原版的解锁机制整组锁定 / 解锁——也可以让蓝图在满足条件时解锁。
-- **稳健**：提及缺失内容（导入不完全、mod 未启用）时不生效也不丢失，补上内容后自动恢复。
+- **越来越多的新特性**：**分组锁定**（把角色、道具、武器归为一组锁定，用蓝图设置解锁条件）、**便捷初始武器**（在武器页选择哪些角色可以该武器开局，智能判断等级）、**武器类别**（修改或自定义类别及加成）……
 - **分享**：可以导入、导出分享码（当前项目 / 角色 / 道具 / 武器 / 全部），或以文件形式分享（见下）。
 - 免依赖，支持全部 13 种语言，兼容所有 mod 内容。
 
@@ -190,10 +181,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 [*][b]角色[/b]：开局状态（材料、等级、箱子、起始波次……）、初始武器与道具、[b]GMO (角色融合)[/b]、禁用道具与武器。
 [*][b]新建[/b]角色、道具、武器：以任意原版对象为基底，尽情 DIY。可选图标或导入图片。
 [*][b]禁用[/b]角色、道具和武器。
-[*][b]武器类别[/b]：修改每个类别各级（2–6 件）的加成，或新建自己的类别。
-[*][b]初始武器[/b]（武器页）：选择哪些角色可以该武器开局；等级遵守角色的限制（如国王至少 T2）。
-[*][b]内容分组[/b]：把角色、道具、武器归为一组，用原版的解锁机制整组锁定 / 解锁——也可以让蓝图在满足条件时解锁。
-[*][b]稳健[/b]：提及缺失内容（导入不完全、mod 未启用）时不生效也不丢失，补上内容后自动恢复。
+[*][b]越来越多的新特性[/b]：[b]分组锁定[/b]（把角色、道具、武器归为一组锁定，用蓝图设置解锁条件）、[b]便捷初始武器[/b]（在武器页选择哪些角色可以该武器开局，智能判断等级）、[b]武器类别[/b]（修改或自定义类别及加成）……
 [*][b]分享[/b]：可以导入、导出分享码（当前项目 / 角色 / 道具 / 武器 / 全部），或以文件形式分享（见下）。
 [*]免依赖，支持全部 13 种语言，兼容所有 mod 内容。
 [/list]
