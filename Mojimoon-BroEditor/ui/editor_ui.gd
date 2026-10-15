@@ -1721,6 +1721,7 @@ func _open_weapon_users_copy() -> void:
 	_apply_action_style(back, C_TEXT_DIM)
 	back.connect("pressed", m, "close")
 	m.head.add_child(back)
+	_copy_filters(m, true)
 	var scroll = _scroll()
 	m.body.add_child(scroll)
 	var grid = GridContainer.new()
@@ -1751,10 +1752,72 @@ func _open_weapon_users_copy() -> void:
 		var icons = _icon_grid(CHAR_WEAPON_COLUMNS)
 		icons.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		grid.add_child(icons)
+		m.get_meta("rows").push_back([w, [b, icons]])
 		for cid in users:
 			var c = _mod.find_character(cid)
 			if c != null:
 				icons.add_child(_icon_tile(c.icon, C_BORDER, 48))
+
+
+# 复制弹窗的筛选：搜索名称 / ID + 来源（武器另有近战 / 远程）；行记在 meta "rows"：[对象, [控件...]]
+func _copy_filters(m, weapons: bool) -> void:
+	m.set_meta("rows", [])
+	m.set_meta("f", {"q": "", "src": "all", "type": -1})
+	m.set_meta("chips", {})
+	var search = _line_edit(tr("BE_SEARCH"))
+	search.connect("text_changed", self, "_on_copy_search", [m])
+	m.body.add_child(search)
+	search.call_deferred("grab_focus")
+	var frow = HBoxContainer.new()
+	frow.add_constant_override("separation", 16)
+	m.body.add_child(frow)
+	var groups = [["src", SOURCES]]
+	if weapons:
+		groups.push_back(["type", [[-1, "BE_FILTER_ALL"], [0, "MELEE"], [1, "RANGED"]]])
+	for gdef in groups:
+		var row = HBoxContainer.new()
+		row.add_constant_override("separation", 4)
+		frow.add_child(row)
+		var list = []
+		for d in gdef[1]:
+			var b = _button(tr(d[1]), FONT_DESC)
+			b.rect_min_size = Vector2(56, 0)
+			b.connect("pressed", self, "_on_copy_filter", [m, gdef[0], d[0]])
+			row.add_child(b)
+			list.push_back([b, d[0]])
+		m.get_meta("chips")[gdef[0]] = list
+	_style_copy_chips(m)
+
+
+func _style_copy_chips(m) -> void:
+	var f = m.get_meta("f")
+	var chips = m.get_meta("chips")
+	for k in chips:
+		for bv in chips[k]:
+			_apply_chip_style(bv[0], bv[1] == f[k], C_ACCENT_2)
+
+
+func _on_copy_search(text: String, m) -> void:
+	m.get_meta("f").q = text.strip_edges().to_lower()
+	_apply_copy_filters(m)
+
+
+func _on_copy_filter(m, key: String, value) -> void:
+	m.get_meta("f")[key] = value
+	_style_copy_chips(m)
+	_apply_copy_filters(m)
+
+
+func _apply_copy_filters(m) -> void:
+	var f = m.get_meta("f")
+	for row in m.get_meta("rows"):
+		var r = row[0]
+		var key = r.weapon_id if r is WeaponData else r.my_id
+		var shown = f.q == "" or tr(r.name).to_lower().find(f.q) >= 0 or key.find(f.q) >= 0
+		shown = shown and (f.src == "all" or _source(r) == f.src)
+		shown = shown and (f.type < 0 or not r is WeaponData or r.type == f.type)
+		for ctl in row[1]:
+			ctl.visible = shown
 
 
 func _on_weapon_users_copied(from_wid: String, users: Array, m) -> void:
@@ -3631,6 +3694,7 @@ func _open_char_weapons() -> void:
 	_apply_action_style(back, C_TEXT_DIM)
 	back.connect("pressed", m, "close")
 	m.head.add_child(back)
+	_copy_filters(m, false)
 	var scroll = _scroll()
 	m.body.add_child(scroll)
 	var grid = GridContainer.new()
@@ -3659,6 +3723,7 @@ func _open_char_weapons() -> void:
 		var row = _icon_grid(CHAR_WEAPON_COLUMNS)
 		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		grid.add_child(row)
+		m.get_meta("rows").push_back([c, [b, row]])
 		for w in c.starting_weapons:
 			row.add_child(_icon_tile(w.icon, ItemService.get_color_from_tier(w.tier), 48))
 

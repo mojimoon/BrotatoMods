@@ -1446,7 +1446,27 @@ func test_168_weapon_users() -> void:
 	ui._open_weapon_users_copy()
 	var cm = ui._modals[-1]
 	_check(cm.get_meta("grid").get_child_count() > 0, "copy list shows other weapons")
+	ui._on_copy_search("zzzz_no_match", cm)
+	_eq(_shown_rows(cm), 0, "search hides every weapon")
+	ui._on_copy_search("", cm)
+	var all_rows = _shown_rows(cm)
+	ui._on_copy_filter(cm, "type", 1)
+	var ranged = _shown_rows(cm)
+	_check(ranged > 0 and ranged < all_rows, "type filter")
 	cm.close()
+	ui.set_kind("character")
+	ui._select(CH)
+	ui._open_char_weapons()
+	var chm = ui._modals[-1]
+	var n_chars = _shown_rows(chm)
+	ui._on_copy_filter(chm, "src", "dlc1")
+	_check(_shown_rows(chm) < n_chars, "source filter on the character list")
+	ui._on_copy_search(tr(isvc.characters[2].name).to_lower(), chm)
+	ui._on_copy_filter(chm, "src", "all")
+	_check(_shown_rows(chm) >= 1 and _shown_rows(chm) < n_chars, "search on the character list")
+	chm.close()
+	ui.set_kind("weapon")
+	ui._select(knife.my_id)
 	# 国王：原本只有 T2 以上的初始武器 -> 直接选择也至少 T2
 	m.set_weapon_users(wid, m.weapon_users(wid) + ["character_king"])
 	_check(m.char_weapon_tier("character_king", wid) >= 1, "king gets at least tier 2 when picked")
@@ -1464,3 +1484,12 @@ func test_168_weapon_users() -> void:
 		if not m.profiles[cid].custom:
 			m.profiles.erase(cid)
 	m.apply_all()
+
+
+
+func _shown_rows(m) -> int:
+	var n = 0
+	for row in m.get_meta("rows"):
+		if row[1][0].visible:
+			n += 1
+	return n
