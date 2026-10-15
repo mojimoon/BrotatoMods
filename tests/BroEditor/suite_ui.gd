@@ -33,7 +33,7 @@ func test_51_ui_edits() -> void:
 	_eq([e.key, e.value, e.custom_key], ["stat_luck", 3, "stats_on_level_up"], "trigger effect")
 	_eq(ui._expanded, specs.size() - 1, "new effect expanded")
 	# 编辑字段
-	ui._on_field_changed(6.0, specs.size() - 1, "value")
+	ui._on_field_option(6.0, specs.size() - 1, "value")
 	_eq(m.make_effect(specs[-1]).value, 6, "field edit")
 	# 换扳机：保留属性和数值
 	ui._on_effect_trigger("", specs.size() - 1)
@@ -1181,3 +1181,32 @@ func test_164_weapon_set_manager() -> void:
 	m.apply_all()
 	ui.queue_free()
 	yield(tree, "idle_frame")
+
+
+func test_165_group_ui_and_new_nodes() -> void:
+	var ui = yield(_open_ui(CH), "completed")
+	ui._on_tab_pressed("overview")
+	ui.open_group_manager()
+	var gm = ui._modals[-1]
+	var le = LineEdit.new()
+	le.text = "My Group"
+	ui._on_group_new(le, gm)
+	var gid = m.groups.keys()[0]
+	_eq(m.group_name(gid), "My Group", "group created")
+	_check(m.group_has(m.groups[gid], "character", CH), "current object added")
+	_eq(gm.get_meta("list").get_child_count(), 1, "manager lists the group")
+	ui._on_group_rename("Renamed", gid)
+	gm.close()
+	yield(tree, "idle_frame")
+	ui._on_group_toggle(gid)
+	_check(m.groups[gid].members.empty(), "chip toggles membership")
+	ui._on_tab_pressed("blueprint")
+	yield(tree, "idle_frame")
+	for k in ["own_tag", "own_set", "shop_force", "group_unlock", "group_lock"]:
+		ui.blueprint.add_node_kind(k)
+	yield(tree, "idle_frame")
+	_eq(m.profiles[CH].graph.nodes.size(), 5, "new nodes added")
+	m.delete_group(gid)
+	ui.queue_free()
+	yield(tree, "idle_frame")
+	m.reset_profile(CH)

@@ -13,6 +13,10 @@ func _initialize() -> void:
 		yield(_hover(m, out), "completed")
 		quit()
 		return
+	if OS.get_environment("BE_SHOT_GROUPS") != "":
+		yield(_groups(m, out), "completed")
+		quit()
+		return
 	if OS.get_environment("BE_SHOT_SETS") != "":
 		yield(_sets(m, out), "completed")
 		quit()
@@ -179,6 +183,35 @@ func _sets(m, out: String):
 	ui._open_set_library(1)
 	yield(_shot(ui, out + "/sets_library.png"), "completed")
 	m.weapon_sets.clear()
+	ui.queue_free()
+	yield(self, "idle_frame")
+
+
+# 内容分组：概览页的分组、管理弹窗；蓝图新节点
+func _groups(m, out: String):
+	var isvc = root.get_node("ItemService")
+	var ch = isvc.characters[0].my_id
+	var gid = m.create_group("Test Series")
+	m.toggle_group_member(gid, "character", ch)
+	m.toggle_group_member(gid, "item", isvc.items[3].my_id)
+	m.create_group("Other")
+	var ui = load("res://mods-unpacked/Mojimoon-BroEditor/ui/editor_ui.tscn").instance()
+	ui.initial_id = ch
+	root.add_child(ui)
+	yield(self, "idle_frame")
+	ui._on_tab_pressed("overview")
+	yield(_shot(ui, out + "/groups_overview.png"), "completed")
+	ui.open_group_manager()
+	yield(_shot(ui, out + "/groups_manager.png"), "completed")
+	ui._modals[-1].close()
+	ui._on_tab_pressed("blueprint")
+	yield(self, "idle_frame")
+	for k in ["own_tag", "own_set", "shop_force", "group_unlock"]:
+		ui.blueprint.add_node_kind(k)
+	yield(_shot(ui, out + "/groups_blueprint.png"), "completed")
+	for g in m.groups.keys():
+		m.delete_group(g)
+	m.profiles.erase(ch)
 	ui.queue_free()
 	yield(self, "idle_frame")
 

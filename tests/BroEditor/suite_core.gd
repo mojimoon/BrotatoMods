@@ -1827,3 +1827,69 @@ func test_175_library_dlc_and_stat_dedup() -> void:
 		_check(dlc_w == null or wf.has(dlc_w), "inactive dlc weapons in the weapon library")
 		dlc.add_resources()
 		m.apply_all()
+
+
+# BroEditor+ 移植：拥有标签道具 / 类别武器条件、商店必定出现、内容分组锁定 / 解锁
+func test_176_own_conds_shop_force_groups() -> void:
+	var GE = load(MOD_DIR + "graph/graph_effect.gd")
+	var isvc = tree.root.get_node("ItemService")
+	var rd = tree.root.get_node("RunData")
+	var ctx = {"pos": null, "target": null, "hold": null, "info": {}}
+	var tagged = null
+	for it in isvc.items:
+		if not it.tags.empty():
+			tagged = it
+			break
+	var tag = tagged.tags[0]
+	var c0 = 0
+	for it in rd.get_player_items(0):
+		if tag in it.tags:
+			c0 += 1
+	rd.add_item(tagged, 0)
+	var n = {"id": 1, "kind": "own_tag", "params": {"tag": tag, "cmp": "exactly", "n": c0 + 1}}
+	_check(m.runtime._pass({"st": {}}, n, 0, ctx), "own_tag exactly")
+	n.params.cmp = "at_most"
+	n.params.n = c0
+	_check(not m.runtime._pass({"st": {}}, n, 0, ctx), "own_tag at most")
+	_check(GE._cond_text(n).find(m.tag_name(tag)) >= 0, "own_tag text names the tag")
+	rd.remove_item(tagged, 0)
+	var knife = isvc.get_element_safe(isvc.weapons, "weapon_knife_1")
+	var w0 = 0
+	for w in rd.get_player_weapons(0):
+		for st in w.sets:
+			if st.my_id == "set_precise":
+				w0 += 1
+	rd.add_weapon(knife, 0)
+	rd.add_weapon(knife, 0)
+	var ns = {"id": 2, "kind": "own_set", "params": {"set": "set_precise", "cmp": "at_least", "n": w0 + 2}}
+	_check(m.runtime._pass({"st": {}}, ns, 0, ctx), "own_set at least")
+	ns.params.cmp = "exactly"
+	ns.params.n = w0 + 3
+	_check(not m.runtime._pass({"st": {}}, ns, 0, ctx), "own_set exactly")
+	for w in rd.get_player_weapons(0).duplicate():
+		if w.my_id == "weapon_knife_1":
+			rd.remove_weapon(w, 0)
+	# 商店必定出现：从最后一格往前替换
+	m.queue_shop_force(0, ["weapon_knife_1", "item_coupon"])
+	var shop = [[null, 1], [null, 1], [null, 1], [null, 1]]
+	m.inject_shop_force(shop, 0, 1)
+	_eq(shop[3][0].my_id, "weapon_knife_1", "forced weapon in the last slot")
+	_eq(shop[2][0].my_id, "item_coupon", "forced item")
+	_check(m.run_shop[0].force.empty(), "queue consumed")
+	# 分组：锁定移出原版解锁记录与商店池，apply_all 后保持，蓝图效果解锁
+	var gid = m.create_group("T")
+	m.toggle_group_member(gid, "item", "item_coupon")
+	m.toggle_group_member(gid, "weapon", knife.weapon_id)
+	_check(m.is_unlocked("item", "item_coupon") and m.is_unlocked("weapon", knife.weapon_id), "unlocked before")
+	m.set_group_locked(gid, true)
+	_check(not m.is_unlocked("item", "item_coupon") and not m.is_unlocked("weapon", knife.weapon_id), "locked")
+	var coupon = isvc.get_element_safe(isvc.items, "item_coupon")
+	_check(not coupon in isvc.get_pool(coupon.tier, isvc.TierData.ITEMS), "locked item left the pool")
+	m.apply_all()
+	_check(not m.is_unlocked("item", "item_coupon"), "still locked after apply_all")
+	m.runtime._execute({"st": {}}, {"id": 3, "kind": "group_unlock", "params": {"group": gid}}, 0, ctx)
+	_check(m.is_unlocked("item", "item_coupon") and not m.groups[gid].locked, "blueprint unlocks the group")
+	_check(coupon in isvc.get_pool(coupon.tier, isvc.TierData.ITEMS), "back in the pool")
+	m.set_group_locked(gid, true)
+	m.delete_group(gid)
+	_check(m.is_unlocked("weapon", knife.weapon_id) and m.groups.empty(), "deleting a locked group unlocks it")

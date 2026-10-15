@@ -199,7 +199,7 @@ func _isvc():
 
 
 func _sig() -> String:
-	return JSON.print([_mod.profiles, _mod.item_profiles, _mod.weapon_profiles, _mod.kind_enabled, _mod.weapon_families, _mod.disabled, _mod.weapon_sets])
+	return JSON.print([_mod.profiles, _mod.item_profiles, _mod.weapon_profiles, _mod.kind_enabled, _mod.weapon_families, _mod.disabled, _mod.weapon_sets, _mod.groups])
 
 
 func _profiles() -> Dictionary:
@@ -1111,6 +1111,7 @@ func _build_overview() -> void:
 	if _look_custom():
 		_look_section(left)
 	_tag_section(left)
+	_group_section(left)
 	_preview_card(cols)
 
 
@@ -1676,6 +1677,153 @@ func _on_set_lib_add(spec: Dictionary, m) -> void:
 	_set_status(tr("BE_EFFECT_ADDED"))
 
 
+# ============================================================
+# 内容分组：概览页勾选本对象所在的分组；"管理"弹窗里新建 / 改名 / 删除分组、整组锁定 / 解锁
+# ============================================================
+func _group_section(left: Control) -> void:
+	var gbox = _section(left, "BE_SEC_GROUPS", C_ACCENT_2)
+	var title_lbl = gbox.get_child(0)
+	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var head = HBoxContainer.new()
+	gbox.remove_child(title_lbl)
+	head.add_child(title_lbl)
+	gbox.add_child(head)
+	gbox.move_child(head, 0)
+	var manage = _button(tr("BE_TAG_MANAGE"), FONT_DESC)
+	_apply_action_style(manage, C_ACCENT_2)
+	manage.connect("pressed", self, "open_group_manager")
+	head.add_child(manage)
+	if _mod.groups.empty():
+		gbox.add_child(_desc(tr("BE_GROUPS_EMPTY")))
+		return
+	var grid = GridContainer.new()
+	grid.columns = 4
+	grid.add_constant_override("hseparation", 6)
+	grid.add_constant_override("vseparation", 6)
+	gbox.add_child(grid)
+	for gid in _mod.groups:
+		var g = _mod.groups[gid]
+		var text = _mod.group_name(gid) + (" " + tr("BE_GROUP_LOCKED_MARK") if g.locked else "")
+		var b = _chip(text, gid, BEMain.group_has(g, _kind, _obj_key()), C_ACCENT_2)
+		b.connect("pressed", self, "_on_group_toggle", [gid])
+		grid.add_child(b)
+
+
+func _on_group_toggle(gid: String) -> void:
+	_mod.toggle_group_member(gid, _kind, _obj_key())
+	_build_page()
+
+
+func open_group_manager() -> void:
+	var m = Modal.open(self, tr("BE_GROUP_MANAGE_TITLE"), C_ACCENT_2, Vector2(1100, 0))
+	m.add_button(tr("MENU_BACK"), C_TEXT_DIM, m, "close")
+	m.connect("closed", self, "_build_page")
+	m.body.add_child(_desc(tr("BE_GROUP_DESC")))
+	var add_row = HBoxContainer.new()
+	add_row.add_constant_override("separation", 8)
+	m.body.add_child(add_row)
+	var le = _line_edit(tr("BE_GROUP_NEW_HINT"))
+	le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	add_row.add_child(le)
+	var add = _button(tr("BE_GROUP_NEW"), FONT_DESC)
+	_apply_action_style(add, C_ACCENT_3)
+	add.connect("pressed", self, "_on_group_new", [le, m])
+	add_row.add_child(add)
+	var scroll = _scroll()
+	scroll.rect_min_size = Vector2(0, 600)
+	m.body.add_child(scroll)
+	var list = VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_constant_override("separation", 8)
+	scroll.add_child(list)
+	m.set_meta("list", list)
+	_fill_group_manager(m)
+
+
+func _fill_group_manager(m) -> void:
+	var list = m.get_meta("list")
+	for c in list.get_children():
+		list.remove_child(c)
+		c.queue_free()
+	if _mod.groups.empty():
+		list.add_child(_desc(tr("BE_GROUPS_EMPTY")))
+	for gid in _mod.groups:
+		var g = _mod.groups[gid]
+		var card = _card(list)
+		var box = VBoxContainer.new()
+		box.add_constant_override("separation", 6)
+		card.add_child(box)
+		var row = HBoxContainer.new()
+		row.add_constant_override("separation", 8)
+		box.add_child(row)
+		var name_le = _line_edit(gid)
+		name_le.text = g.name
+		name_le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_le.connect("text_changed", self, "_on_group_rename", [gid])
+		row.add_child(name_le)
+		var lock = _button(tr("BE_GROUP_UNLOCK" if g.locked else "BE_GROUP_LOCK"), FONT_DESC)
+		_apply_action_style(lock, C_ACCENT_3 if g.locked else C_ACCENT)
+		lock.connect("pressed", self, "_on_group_lock", [gid, not g.locked, m])
+		row.add_child(lock)
+		var del = _button(tr("BE_DELETE"), FONT_DESC)
+		_apply_action_style(del, C_DANGER)
+		del.connect("pressed", self, "_on_group_delete_ask", [gid, m])
+		row.add_child(del)
+		if g.locked:
+			box.add_child(_desc(tr("BE_GROUP_IS_LOCKED")))
+		var icons = _icon_grid(14)
+		box.add_child(icons)
+		for mem in g.members:
+			var r = _group_member_res(mem)
+			if r == null:
+				continue
+			var b = _res_button(r)
+			b.connect("pressed", self, "_on_group_member_remove", [gid, mem, m])
+			icons.add_child(b)
+		if g.members.empty():
+			box.add_child(_desc(tr("BE_GROUP_NO_MEMBERS")))
+
+
+func _group_member_res(mem: Array):
+	if mem[0] != "weapon":
+		return _mod.find_target(mem[0], mem[1])
+	var ms = _mod.family_members(mem[1])
+	return ms[0] if not ms.empty() else null
+
+
+func _on_group_new(le: LineEdit, m) -> void:
+	var gid = _mod.create_group(le.text.strip_edges())
+	if _kind != "":
+		_mod.toggle_group_member(gid, _kind, _obj_key())
+	le.text = ""
+	_fill_group_manager(m)
+
+
+func _on_group_rename(text: String, gid: String) -> void:
+	_mod.groups[gid].name = text.strip_edges()
+
+
+func _on_group_lock(gid: String, locked: bool, m) -> void:
+	_mod.set_group_locked(gid, locked)
+	_set_status(tr("BE_GROUP_LOCKED_DONE" if locked else "BE_GROUP_UNLOCKED_DONE"))
+	_fill_group_manager(m)
+
+
+func _on_group_delete_ask(gid: String, m) -> void:
+	Modal.confirm(self, [tr("BE_DELETE_CONFIRM_MSG").replace("{0}", _mod.group_name(gid))], C_DANGER, self, "_on_group_delete", [gid, m])
+
+
+func _on_group_delete(gid: String, m) -> void:
+	_mod.delete_group(gid)
+	if is_instance_valid(m):
+		_fill_group_manager(m)
+
+
+func _on_group_member_remove(gid: String, mem: Array, m) -> void:
+	_mod.toggle_group_member(gid, mem[0], mem[1])
+	_fill_group_manager(m)
+
+
 const EFFECT_LINE = preload("res://items/global/effect_line.tscn")
 const SAFE_TEXT_DIRS = ["res://items/", "res://dlcs/", "res://effects/", "res://weapons/"]
 
@@ -1823,9 +1971,7 @@ func _all_tags() -> Array:
 
 
 func _tag_name(tag: String) -> String:
-	if _mod.custom_tags.has(tag):
-		return _mod.custom_tags[tag]
-	return _mod.stat_name(tag)
+	return _mod.tag_name(tag)
 
 
 func _on_name_changed(text: String) -> void:
@@ -2024,6 +2170,15 @@ func _on_replaced_by(id, orig: String) -> void:
 
 
 # 道具选择列表（不含角色）
+# 道具 + 武器（各等级）："商店必定出现"
+func goods_select_items() -> Array:
+	var out = item_select_items()
+	for w in _isvc().weapons:
+		if w != null:
+			out.push_back([tr(w.name) + ["", " II", " III", " IV"][int(clamp(w.tier, 0, 3))], w.my_id])
+	return out
+
+
 func item_select_items() -> Array:
 	var out = []
 	for it in _isvc().items:

@@ -76,6 +76,7 @@ var next_id: int = 1
 var debug := false
 # 隐藏自定义对象图标右下角的编号（使用原版图标时才有编号）
 var hide_numbers := false
+var groups: Dictionary = {}	# 内容分组：分组 id -> {"name", "members": [[种类, id]...], "locked"}
 var weapon_sets: Dictionary = {}	# 武器套装：套装 id -> 档案（见 new_set）
 var custom_tags: Dictionary = {}	# 自定义标签：键名 -> 名称（所有道具 / 角色可用；随 profiles.json 保存）
 # 效果库去重（同脚本、同 key 的效果只保留一条）；默认关：保留全部，包括同一武器各等级的效果
@@ -466,6 +467,7 @@ func load_profiles() -> void:
 	disabled = {"character": [], "item": [], "weapon": []}
 	custom_tags = {}
 	weapon_sets = {}
+	groups = {}
 	_load_main_file()
 	_load_custom_files()
 
@@ -489,6 +491,10 @@ func _load_main_file() -> void:
 	var kinds = settings.get("kinds", {}) if settings is Dictionary else {}
 	for k in KINDS:
 		kind_enabled[k] = bool(kinds.get(k, true)) if kinds is Dictionary else true
+	var gs = parsed.result.get("groups", {})
+	if gs is Dictionary:
+		for k in gs:
+			groups[str(k)] = normalize_group(gs[k])
 	var sets = parsed.result.get("sets", {})
 	if sets is Dictionary:
 		for k in sets:
@@ -578,6 +584,7 @@ func save_profiles() -> void:
 	main["disabled"] = disabled
 	main["tags"] = custom_tags
 	main["sets"] = compact_all(weapon_sets, new_set())
+	main["groups"] = groups
 	var file = File.new()
 	if file.open(SAVE_PATH, File.WRITE) != OK:
 		ModLoaderLog.error("Failed to save profiles", MOD_ID)
@@ -1311,6 +1318,8 @@ func apply_all() -> void:
 		if p.wanted_tags is Array:
 			c.wanted_tags = p.wanted_tags.duplicate()
 	_apply_fusion()
+	if apply_group_locks():
+		isvc.init_unlocked_pool()
 
 
 # 融合角色：把被融合角色自身的效果（含本编辑器的修改，不含它们的融合与介绍）复制一份接在后面
@@ -1529,6 +1538,139 @@ func reset_set(id: String) -> void:
 	else:
 		weapon_sets.erase(id)
 	apply_sets()
+
+
+# ============================================================
+# 内容分组：角色 / 道具 / 武器（家族）归为一组，可改名；整组锁定 / 解锁用原版的解锁记录
+# （ProgressData.characters_unlocked / items_unlocked / weapons_unlocked，记的是 id 的哈希；武器按 weapon_id）
+# 锁定 = 移出解锁记录并把 unlocked_by_default 设为 false（否则启动时又被原版加回）；解锁 = 加回
+# ============================================================
+const UNLOCK_LISTS = {"character": "characters_unlocked", "item": "items_unlocked", "weapon": "weapons_unlocked"}
+
+
+static func normalize_group(g) -> Dictionary:
+	var out = {"name": "", "members": [], "locked": false}
+	if not g is Dictionary:
+		return out
+	out.name = str(g.get("name", ""))
+	out.locked = bool(g.get("locked", false))
+	if g.get("members") is Array:
+		for m in g.members:
+			if m is Array and m.size() == 2 and str(m[0]) in KINDS:
+				out.members.push_back([str(m[0]), str(m[1])])
+	return out
+
+
+func tag_name(tag: String) -> String:
+	return custom_tags[tag] if custom_tags.has(tag) else stat_name(tag)
+
+
+func weapon_set_name(id: String) -> String:
+	var s = find_set(id)
+	return tr(s.name) if s != null else id
+
+
+func create_group(name: String) -> String:
+	var n = 1
+	while groups.has("group_" + str(n)):
+		n += 1
+	var gid = "group_" + str(n)
+	groups[gid] = {"name": name, "members": [], "locked": false}
+	return gid
+
+
+func group_name(gid: String) -> String:
+	var g = groups.get(gid)
+	return gid if g == null or g.name == "" else g.name
+
+
+static func group_has(g: Dictionary, kind: String, id: String) -> bool:
+	for m in g.members:
+		if m[0] == kind and m[1] == id:
+			return true
+	return false
+
+
+func toggle_group_member(gid: String, kind: String, id: String) -> void:
+	var g = groups.get(gid)
+	if g == null:
+		return
+	if group_has(g, kind, id):
+		for i in g.members.size():
+			if g.members[i][0] == kind and g.members[i][1] == id:
+				g.members.remove(i)
+				break
+		if g.locked:
+			_set_unlocked(kind, id, true)
+	else:
+		g.members.push_back([kind, id])
+	_after_lock_change()
+
+
+func delete_group(gid: String) -> void:
+	if groups.has(gid) and groups[gid].locked:
+		set_group_locked(gid, false)
+	groups.erase(gid)
+
+
+func set_group_locked(gid: String, locked: bool) -> void:
+	var g = groups.get(gid)
+	if g == null:
+		return
+	g.locked = locked
+	if not locked:
+		for m in g.members:
+			_set_unlocked(m[0], m[1], true)
+	_after_lock_change()
+
+
+# 解锁后仍在其他锁定分组里的对象保持锁定；写入存档并重建商店池
+func _after_lock_change() -> void:
+	var _any = apply_group_locks()
+	_isvc().init_unlocked_pool()
+	var pd = _autoload("ProgressData")
+	if pd != null and pd.SAVE_DIR != "":
+		pd.save()
+	save_profiles()
+
+
+# 锁定所有锁定分组的成员；返回是否有锁定分组
+func apply_group_locks() -> bool:
+	var any = false
+	for gid in groups:
+		if groups[gid].locked:
+			any = true
+			for m in groups[gid].members:
+				_set_unlocked(m[0], m[1], false)
+	return any
+
+
+func is_unlocked(kind: String, id: String) -> bool:
+	var pd = _autoload("ProgressData")
+	return pd != null and Keys.generate_hash(id) in pd.get(UNLOCK_LISTS[kind])
+
+
+func _set_unlocked(kind: String, id: String, on: bool) -> void:
+	var pd = _autoload("ProgressData")
+	if pd == null or not UNLOCK_LISTS.has(kind):
+		return
+	var list: Array = pd.get(UNLOCK_LISTS[kind])
+	var h = Keys.generate_hash(id)
+	var res = []
+	if kind == "weapon":
+		for w in _isvc().weapons:
+			if w != null and w.weapon_id == id:
+				res.push_back(w)
+	else:
+		var r = find_target(kind, id)
+		if r != null:
+			res.push_back(r)
+	for r in res:
+		r.unlocked_by_default = on
+	if on and not h in list:
+		list.push_back(h)
+	while not on and h in list:
+		list.erase(h)
 
 
 # 同一家族的全部等级（按等级排序）
@@ -2192,6 +2334,7 @@ func _unlock_new_characters() -> void:
 	if pd == null or pd.SAVE_DIR == "":
 		return
 	pd.add_unlocked_by_default()
+	var _locked = apply_group_locks()
 	pd.set_max_selectable_difficulty()
 	pd.save()
 
@@ -2461,7 +2604,7 @@ func ban_hashes(player_index: int) -> Array:
 static func new_run_shop() -> Array:
 	var out = []
 	for _i in 4:
-		out.push_back({"add": [], "remove": []})
+		out.push_back({"add": [], "remove": [], "force": []})
 	return out
 
 
@@ -2472,7 +2615,7 @@ func load_run_shop(state) -> void:
 		return
 	for i in min(4, state.size()):
 		if state[i] is Dictionary:
-			for k in ["add", "remove"]:
+			for k in ["add", "remove", "force"]:
 				if state[i].get(k) is Array:
 					for id in state[i][k]:
 						run_shop[i][k].push_back(str(id))
@@ -2487,6 +2630,28 @@ func run_shop_change(p: int, ids, add: bool) -> void:
 		run_shop[p].add.erase(id)
 		run_shop[p].remove.erase(id)
 		run_shop[p]["add" if add else "remove"].push_back(id)
+
+
+# 商店必定出现：下次刷新商店时放进商店（从最后一格往前替换）
+func queue_shop_force(p: int, ids) -> void:
+	if ids is Array and p >= 0 and p < run_shop.size():
+		for id in ids:
+			run_shop[p].force.push_back(str(id))
+
+
+func inject_shop_force(shop_items: Array, p: int, wave: int) -> void:
+	if p < 0 or p >= run_shop.size():
+		return
+	var q = run_shop[p].force
+	var k = 0
+	while not q.empty() and k < shop_items.size():
+		var r = _find_any(str(q.pop_front()))
+		if r == null or r is CharacterData:
+			continue
+		if r is ItemData:
+			r = _isvc().apply_item_effect_modifications(r, p)
+		shop_items[shop_items.size() - 1 - k] = [r, wave]
+		k += 1
 
 
 func _with_run_shop(bans: Array, p: int) -> Array:

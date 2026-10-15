@@ -210,8 +210,25 @@ func _param_control(n: Dictionary, p: Array) -> Control:
 		opt.rect_min_size = Vector2(170, 0)
 		opt.connect("selected", self, "_on_param_option", [int(n.id), p[0]])
 		return opt
-	if ptype == "items":
-		return _items_control(n, p[0], cur if cur is Array else [])
+	if ptype == "items" or ptype == "goods":
+		return _items_control(n, p[0], cur if cur is Array else [], ui.goods_select_items() if ptype == "goods" else ui.item_select_items())
+	if ptype in ["tag", "set", "group"]:
+		var items = []
+		match ptype:
+			"tag":
+				for t in ui._all_tags():
+					items.push_back([ui._tag_name(t), t])
+			"set":
+				for s in ui._isvc().sets:
+					if s != null:
+						items.push_back([ui.tr(s.name), s.my_id])
+			"group":
+				for gid in ui._mod.groups:
+					items.push_back([ui._mod.group_name(gid), gid])
+		var opt = ui._search_select(items, str(cur))
+		opt.rect_min_size = Vector2(170, 0)
+		opt.connect("selected", self, "_on_param_option", [int(n.id), p[0]])
+		return opt
 	if ptype == "enemy":
 		var items = []
 		for e in ui._mod.enemy_list():
@@ -249,10 +266,9 @@ func _param_control(n: Dictionary, p: Array) -> Control:
 
 
 # 道具列表：每行一件（可换 / 删除），最后一个"+ 道具"
-func _items_control(n: Dictionary, key: String, ids: Array) -> Control:
+func _items_control(n: Dictionary, key: String, ids: Array, items: Array) -> Control:
 	var box = VBoxContainer.new()
 	box.add_constant_override("separation", 4)
-	var items = ui.item_select_items()
 	for i in ids.size():
 		var row = HBoxContainer.new()
 		row.add_constant_override("separation", 4)

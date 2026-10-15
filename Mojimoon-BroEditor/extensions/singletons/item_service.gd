@@ -6,6 +6,15 @@ extends "res://singletons/item_service.gd"
 const BEMain = preload("res://mods-unpacked/Mojimoon-BroEditor/mod_main.gd")
 
 
+# 蓝图"商店必定出现"
+func get_player_shop_items(wave: int, player_index: int, args: ItemServiceGetShopItemsArgs) -> Array:
+	var out = .get_player_shop_items(wave, player_index, args)
+	var m = BEMain.get_mod()
+	if m != null:
+		m.inject_shop_force(out, player_index, wave)
+	return out
+
+
 func _get_rand_item_for_wave(wave: int, player_index: int, type: int, args: GetRandItemForWaveArgs) -> ItemParentData:
 	var m = BEMain.get_mod()
 	var extra = m.ban_hashes(player_index) if m != null else []
