@@ -1121,3 +1121,63 @@ func test_163_feedback2_ui() -> void:
 	ui.queue_free()
 	yield(tree, "idle_frame")
 	m.delete_custom_item(iid)
+
+
+func test_164_weapon_set_manager() -> void:
+	var ui = yield(_open_ui(CH), "completed")
+	ui.set_kind("weapon")
+	ui._select("weapon_knife_1")
+	ui._on_tab_pressed("overview")
+	ui.open_set_manager()
+	var sm = ui._modals[-1]
+	ui._on_set_select("set_blade")
+	var blade = m.find_set("set_blade")
+	var orig = blade.set_bonuses[0][0].value
+	_eq(m.set_specs("set_blade").size(), blade.set_bonuses.size(), "specs per level")
+	ui._on_set_effect_edit("0:0")
+	ui._on_set_field(orig + 7, 0, 0, "value")
+	_eq(blade.set_bonuses[0][0].value, orig + 7, "vanilla set effect edited")
+	_check(m.is_set_modified("set_blade"), "marked modified")
+	ui._on_set_copy_prev(1)
+	_eq(JSON.print(m.weapon_sets.set_blade.bonuses[1]), JSON.print(m.weapon_sets.set_blade.bonuses[0]), "copy previous level")
+	ui._on_set_reset()
+	_eq(blade.set_bonuses[0][0].value, orig, "reset restores vanilla")
+	_check(not m.weapon_sets.has("set_blade"), "reset drops the profile")
+	ui._on_set_new()
+	var cid = ui._set_sel
+	_check(cid.begins_with("set_custom_") and m.find_set(cid) != null, "custom set registered")
+	_eq(m.find_set(cid).set_bonuses.size(), blade.set_bonuses.size(), "custom set copies the base levels")
+	ui._on_set_rename("set_be_test")
+	_check(m.find_set("set_be_test") != null and m.find_set(cid) == null, "renamed")
+	ui._on_set_name("BE Test Set")
+	_eq(m.find_set("set_be_test").name, "BE Test Set", "name applied")
+	ui._open_set_library(0)
+	var lm = ui._modals[-1]
+	var n0 = m.weapon_sets.set_be_test.bonuses[0].size()
+	_check(lm.get_meta("list").get_child_count() > 0, "library listed")
+	lm.get_meta("list").get_child(0).get_child(0).emit_signal("pressed")
+	_eq(m.weapon_sets.set_be_test.bonuses[0].size(), n0 + 1, "library adds to the level")
+	_eq(m.find_set("set_be_test").set_bonuses[0].size(), n0 + 1, "added effect applied")
+	ui._on_set_pressed("set_be_test")
+	m.apply_all()
+	var has = false
+	for s in m.find_target("weapon", "weapon_knife_1").sets:
+		has = has or s.my_id == "set_be_test"
+	_check(has, "weapon uses the custom set")
+	m.save_profiles()
+	m.load_profiles()
+	m.apply_all()
+	_eq(m.weapon_sets.set_be_test.name, "BE Test Set", "custom set saved")
+	ui._set_sel = "set_be_test"
+	ui._on_set_delete()
+	_check(m.find_set("set_be_test") == null, "deleted")
+	_check(not "set_be_test" in m.weapon_families[m.find_target("weapon", "weapon_knife_1").weapon_id].sets, "references removed")
+	ui._on_set_select("set_gun")
+	ui._on_set_field(99, 0, 0, "value")
+	ui._on_set_reset_all()
+	_check(m.weapon_sets.empty() and not m.is_set_modified("set_gun"), "reset all")
+	sm.close()
+	m.reset_kind("weapon", ["edits"])
+	m.apply_all()
+	ui.queue_free()
+	yield(tree, "idle_frame")

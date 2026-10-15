@@ -13,6 +13,10 @@ func _initialize() -> void:
 		yield(_hover(m, out), "completed")
 		quit()
 		return
+	if OS.get_environment("BE_SHOT_SETS") != "":
+		yield(_sets(m, out), "completed")
+		quit()
+		return
 	if OS.get_environment("BE_SHOT_KINDS") != "":
 		yield(_kinds(m, out), "completed")
 		quit()
@@ -155,6 +159,26 @@ func _hover(m, out: String):
 	yield(self, "idle_frame")
 	ui._show_preview(ui._char_grid.get_child(2), m.find_target("weapon", ui._char_grid.get_child(2).get_meta("id")))
 	yield(_shot(ui, out + "/hover_weapon.png"), "completed")
+	ui.queue_free()
+	yield(self, "idle_frame")
+
+
+# 武器类别管理弹窗：原版类别（展开一条效果）、自定义类别、效果库
+func _sets(m, out: String):
+	var ui = load("res://mods-unpacked/Mojimoon-BroEditor/ui/editor_ui.tscn").instance()
+	root.add_child(ui)
+	yield(self, "idle_frame")
+	ui.set_kind("weapon")
+	ui._select("weapon_knife_1")
+	ui.open_set_manager()
+	ui._on_set_select("set_blade")
+	ui._on_set_effect_edit("0:0")
+	yield(_shot(ui, out + "/sets_vanilla.png"), "completed")
+	ui._on_set_new()
+	yield(_shot(ui, out + "/sets_custom.png"), "completed")
+	ui._open_set_library(1)
+	yield(_shot(ui, out + "/sets_library.png"), "completed")
+	m.weapon_sets.clear()
 	ui.queue_free()
 	yield(self, "idle_frame")
 

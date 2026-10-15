@@ -76,6 +76,7 @@ var next_id: int = 1
 var debug := false
 # 隐藏自定义对象图标右下角的编号（使用原版图标时才有编号）
 var hide_numbers := false
+var weapon_sets: Dictionary = {}	# 武器套装：套装 id -> 档案（见 new_set）
 var custom_tags: Dictionary = {}	# 自定义标签：键名 -> 名称（所有道具 / 角色可用；随 profiles.json 保存）
 # 效果库去重（同脚本、同 key 的效果只保留一条）；默认关：保留全部，包括同一武器各等级的效果
 var library_dedup := false
@@ -276,6 +277,25 @@ static func normalize_profile(p) -> Dictionary:
 
 # JSON 读回的数字是浮点：节点 id / 连线统一转为整数
 # 武器家族档案：custom = 自定义武器（base = 外观与近 / 远战来源的原版家族）；tiers = 本模组新增的等级
+# 武器套装档案：bonuses 为 null 时用原版（自定义套装：基底）的效果，否则为每一级的 spec 列表
+static func new_set() -> Dictionary:
+	return {"custom": false, "base": "", "name": "", "bonuses": null}
+
+
+static func normalize_set(s) -> Dictionary:
+	var out = new_set()
+	if not s is Dictionary:
+		return out
+	out.custom = bool(s.get("custom", false))
+	out.base = str(s.get("base", ""))
+	out.name = str(s.get("name", ""))
+	if s.get("bonuses") is Array:
+		out.bonuses = []
+		for lv in s.bonuses:
+			out.bonuses.push_back(lv.duplicate(true) if lv is Array else [])
+	return out
+
+
 static func new_family() -> Dictionary:
 	return {"custom": false, "base": "", "name": "", "icon": "", "sets": null, "tiers": [], "num": 0}
 
@@ -445,6 +465,7 @@ func load_profiles() -> void:
 	weapon_families = {}
 	disabled = {"character": [], "item": [], "weapon": []}
 	custom_tags = {}
+	weapon_sets = {}
 	_load_main_file()
 	_load_custom_files()
 
@@ -468,6 +489,10 @@ func _load_main_file() -> void:
 	var kinds = settings.get("kinds", {}) if settings is Dictionary else {}
 	for k in KINDS:
 		kind_enabled[k] = bool(kinds.get(k, true)) if kinds is Dictionary else true
+	var sets = parsed.result.get("sets", {})
+	if sets is Dictionary:
+		for k in sets:
+			weapon_sets[str(k)] = normalize_set(sets[k])
 	var tags = parsed.result.get("tags", {})
 	if tags is Dictionary:
 		for k in tags:
@@ -552,6 +577,7 @@ func save_profiles() -> void:
 	main["settings"] = {"debug": debug, "debug_detail": debug_detail, "font_scale": font_scale, "hide_numbers": hide_numbers, "library_dedup": library_dedup, "kinds": kind_enabled}
 	main["disabled"] = disabled
 	main["tags"] = custom_tags
+	main["sets"] = compact_all(weapon_sets, new_set())
 	var file = File.new()
 	if file.open(SAVE_PATH, File.WRITE) != OK:
 		ModLoaderLog.error("Failed to save profiles", MOD_ID)
@@ -839,6 +865,11 @@ func _find_any(id: String):
 func orig_effects(id: String) -> Array:
 	if _orig_effects.has(id):
 		return _orig_effects[id]
+	if id.find(SET_LEVEL_SEP) > 0:
+		var s = find_set(id.get_slice(SET_LEVEL_SEP, 0))
+		var lv = int(id.get_slice(SET_LEVEL_SEP, 1))
+		var bonuses = backup_value(s, "set_bonuses") if s != null else []
+		return bonuses[lv] if lv < bonuses.size() else []
 	var r = _find_any(id)
 	if r == null:
 		r = _find_dlc(id)
@@ -1177,6 +1208,7 @@ const BACKUP_FIELDS = {
 	"character": ["effects", "name", "starting_weapons", "wanted_tags"],
 	"item": ["effects", "name", "value", "tier", "max_nb", "tags", "replaced_by"],
 	"weapon": ["effects", "name", "value", "stats", "sets"],
+	"set": ["set_bonuses"],
 }
 
 
@@ -1185,6 +1217,8 @@ static func kind_of(res) -> String:
 		return "character"
 	if res is WeaponData:
 		return "weapon"
+	if res is SetData:
+		return "set"
 	return "item"
 
 
@@ -1238,6 +1272,7 @@ func apply_all() -> void:
 	_register_customs()
 	_register_custom_items()
 	_register_weapon_families()
+	apply_sets()
 	_apply_items()
 	_apply_weapons()
 	_apply_families()
@@ -1366,6 +1401,129 @@ func _apply_families() -> void:
 				w.name = f.name
 			if sets != null:
 				w.sets = sets.duplicate()
+
+
+# ============================================================
+# 武器套装
+# ============================================================
+const SET_LEVEL_SEP = "#"
+var _set_res: Dictionary = {}	# 自定义套装 id -> SetData（同一 id 一直用同一个资源，武器上的引用不会失效）
+
+
+func find_set(id: String):
+	for s in _isvc().sets:
+		if s != null and s.my_id == id:
+			return s
+	return null
+
+
+# 每一级的 spec 列表（没有修改时引用原版 / 基底套装的效果）
+func set_specs(id: String) -> Array:
+	var p = weapon_sets.get(id)
+	if p != null and p.bonuses is Array:
+		return p.bonuses
+	var base = p.base if p != null and p.custom else id
+	var s = find_set(base)
+	var out = []
+	if s != null:
+		var bonuses = backup_value(s, "set_bonuses")
+		for lv in bonuses.size():
+			var specs = []
+			for i in bonuses[lv].size():
+				specs.push_back({"from": base + SET_LEVEL_SEP + str(lv), "i": i})
+			out.push_back(specs)
+	return out
+
+
+func is_set_modified(id: String) -> bool:
+	return weapon_sets.has(id) and (weapon_sets[id].custom or weapon_sets[id].bonuses is Array)
+
+
+# 注册自定义套装、改写原版套装的效果（编辑器里每次修改后也调用）
+func apply_sets() -> void:
+	var isvc = _isvc()
+	for id in _set_res:
+		if not weapon_sets.has(id) or not weapon_sets[id].custom:
+			isvc.sets.erase(_set_res[id])
+	for s in isvc.sets:
+		if s != null and _backups.has(s.my_id) and s is SetData:
+			s.set_bonuses = _backups[s.my_id].fields.set_bonuses
+	for id in weapon_sets:
+		var p = weapon_sets[id]
+		var s = null
+		if p.custom:
+			s = _set_res.get(id)
+			if s == null:
+				s = SetData.new()
+				_set_res[id] = s
+			s.my_id = id
+			s.my_id_hash = Keys.generate_hash(id)
+			s.name = p.name if p.name != "" else id
+			if not s in isvc.sets:
+				isvc.sets.push_back(s)
+		else:
+			s = find_set(id)
+			if s == null or not p.bonuses is Array or not kind_enabled.weapon:
+				continue
+			_backup(s)
+		var bonuses = []
+		for lv in set_specs(id):
+			var effects = []
+			for spec in lv:
+				var e = make_effect(spec) if spec is Dictionary else null
+				if e != null:
+					effects.push_back(e)
+			bonuses.push_back(effects)
+		s.set_bonuses = bonuses
+
+
+# 以 base 为基底新建自定义套装（复制其当前效果）
+func create_set(base: String) -> String:
+	var n = 1
+	while weapon_sets.has("set_custom_" + str(n)) or find_set("set_custom_" + str(n)) != null:
+		n += 1
+	var id = "set_custom_" + str(n)
+	var src = weapon_sets.get(base, new_set())
+	var s = find_set(base)
+	weapon_sets[id] = {"custom": true, "base": src.base if src.custom else base,
+		"name": tr(s.name) if s != null else id, "bonuses": set_specs(base).duplicate(true)}
+	apply_sets()
+	return id
+
+
+# 改 id：武器家族里的引用一并改
+func rename_set(old_id: String, new_id: String) -> bool:
+	if new_id == "" or new_id == old_id or weapon_sets.has(new_id) or find_set(new_id) != null or not weapon_sets.has(old_id):
+		return false
+	weapon_sets[new_id] = weapon_sets[old_id]
+	weapon_sets.erase(old_id)
+	if _set_res.has(old_id):
+		_set_res[new_id] = _set_res[old_id]
+		_set_res.erase(old_id)
+	for wid in weapon_families:
+		var f = weapon_families[wid]
+		if f.sets is Array and old_id in f.sets:
+			f.sets[f.sets.find(old_id)] = new_id
+	apply_sets()
+	return true
+
+
+func delete_set(id: String) -> void:
+	weapon_sets.erase(id)
+	for wid in weapon_families:
+		var f = weapon_families[wid]
+		if f.sets is Array:
+			f.sets.erase(id)
+	apply_sets()
+
+
+# 原版套装恢复原版效果；自定义套装恢复为基底的效果
+func reset_set(id: String) -> void:
+	if weapon_sets.has(id) and weapon_sets[id].custom:
+		weapon_sets[id].bonuses = null
+	else:
+		weapon_sets.erase(id)
+	apply_sets()
 
 
 # 同一家族的全部等级（按等级排序）

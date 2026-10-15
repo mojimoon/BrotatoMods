@@ -199,7 +199,7 @@ func _isvc():
 
 
 func _sig() -> String:
-	return JSON.print([_mod.profiles, _mod.item_profiles, _mod.weapon_profiles, _mod.kind_enabled, _mod.weapon_families, _mod.disabled])
+	return JSON.print([_mod.profiles, _mod.item_profiles, _mod.weapon_profiles, _mod.kind_enabled, _mod.weapon_families, _mod.disabled, _mod.weapon_sets])
 
 
 func _profiles() -> Dictionary:
@@ -1168,6 +1168,18 @@ func _tag_section(left: Control) -> void:
 	var r = _character()
 	var title = {"character": "BE_SEC_TAGS", "item": "BE_SEC_ITEM_TAGS", "weapon": "BE_SEC_WEAPON_SETS"}[_kind]
 	var tbox = _section(left, title, C_ACCENT_3)
+	if _kind == "weapon":
+		var title_lbl = tbox.get_child(0)
+		title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var head = HBoxContainer.new()
+		tbox.remove_child(title_lbl)
+		head.add_child(title_lbl)
+		tbox.add_child(head)
+		tbox.move_child(head, 0)
+		var manage = _button(tr("BE_TAG_MANAGE"), FONT_DESC)
+		_apply_action_style(manage, C_ACCENT_2)
+		manage.connect("pressed", self, "open_set_manager")
+		head.add_child(manage)
 	if _kind != "item":
 		tbox.add_child(_desc(tr("BE_TAGS_DESC" if _kind == "character" else "BE_SETS_DESC")))
 	var grid = GridContainer.new()
@@ -1291,6 +1303,377 @@ func _on_tag_delete(tag: String, list: Control) -> void:
 	_build_page()
 	if is_instance_valid(list):
 		_fill_tag_manager(list)
+
+
+# ============================================================
+# 武器套装管理：左边套装列表（+ 新建 / 全部重置），右边编辑选中的套装
+# 自定义套装可改 id、名称、效果，可删除；其他套装只能改效果
+# ============================================================
+var _set_modal = null
+var _set_sel := ""
+var _set_expanded := ""	# 展开的效果 "级:序号"
+var _set_rows: Dictionary = {}	# "级:序号" -> 效果文本
+var _set_lib_cat := "all"
+var _set_lib_search := ""
+
+
+func open_set_manager() -> void:
+	_set_modal = Modal.open(self, tr("BE_SET_MANAGE_TITLE"), C_ACCENT_3, Vector2(1500, 880))
+	_set_modal.add_button(tr("MENU_BACK"), C_TEXT_DIM, _set_modal, "close")
+	_set_modal.connect("closed", self, "_on_set_manager_closed")
+	var cur = _look_view().sets if _look_view().sets is Array else _set_ids(_mod.backup_value(_character(), "sets"))
+	if _set_sel == "" or _mod.find_set(_set_sel) == null:
+		_set_sel = cur[0] if not cur.empty() else ""
+	_fill_set_manager()
+
+
+func _on_set_manager_closed() -> void:
+	_set_modal = null
+	_build_page()
+
+
+func _fill_set_manager() -> void:
+	if _set_modal == null:
+		return
+	_commit_focus()
+	var scrolls = _scroll_values(_set_modal.body, [])
+	for c in _set_modal.body.get_children():
+		_set_modal.body.remove_child(c)
+		c.queue_free()
+	if _mod.find_set(_set_sel) == null and not _isvc().sets.empty():
+		_set_sel = _isvc().sets[0].my_id
+	var cols = HBoxContainer.new()
+	cols.add_constant_override("separation", 12)
+	cols.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	cols.rect_min_size = Vector2(0, 760)
+	_set_modal.body.add_child(cols)
+
+	# 左：套装列表
+	var left = VBoxContainer.new()
+	left.rect_min_size = Vector2(340, 0)
+	left.add_constant_override("separation", 8)
+	cols.add_child(left)
+	var brow = HBoxContainer.new()
+	brow.add_constant_override("separation", 8)
+	left.add_child(brow)
+	var new_b = _button(tr("BE_SET_NEW"), FONT_SMALL)
+	new_b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_apply_action_style(new_b, C_CUSTOM)
+	new_b.connect("pressed", self, "_on_set_new")
+	brow.add_child(new_b)
+	var reset_all = _button(tr("BE_RESET_KIND"), FONT_SMALL)
+	reset_all.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_apply_action_style(reset_all, C_DANGER)
+	reset_all.connect("pressed", self, "_on_set_reset_all_ask")
+	brow.add_child(reset_all)
+	left.add_child(_desc(tr("BE_SET_NEW_DESC")))
+	var lscroll = _scroll()
+	left.add_child(lscroll)
+	var list = VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_constant_override("separation", 4)
+	lscroll.add_child(list)
+	for s in _isvc().sets:
+		if s == null:
+			continue
+		var custom = _mod.weapon_sets.has(s.my_id) and _mod.weapon_sets[s.my_id].custom
+		var text = tr(s.name) + ("  *" if _mod.is_set_modified(s.my_id) and not custom else "")
+		var b = _chip(text, s.my_id, s.my_id == _set_sel, C_CUSTOM if custom else C_ACCENT_3)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.connect("pressed", self, "_on_set_select", [s.my_id])
+		list.add_child(b)
+
+	# 右：编辑选中的套装
+	var rscroll = _scroll()
+	cols.add_child(rscroll)
+	var right = VBoxContainer.new()
+	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right.add_constant_override("separation", 10)
+	rscroll.add_child(right)
+	_set_rows = {}
+	var s = _mod.find_set(_set_sel)
+	if s != null:
+		_set_editor(right, s)
+	_restore_scroll_later(scrolls)
+
+
+func _set_editor(right: Control, s) -> void:
+	var p = _mod.weapon_sets.get(_set_sel, BEMain.new_set())
+	var head = HBoxContainer.new()
+	head.add_constant_override("separation", 8)
+	right.add_child(head)
+	if p.custom:
+		head.add_child(_label("ID", FONT_SMALL, C_TEXT_DIM))
+		var id_le = _line_edit("")
+		id_le.text = _set_sel
+		id_le.rect_min_size = Vector2(260, 0)
+		id_le.connect("text_entered", self, "_on_set_rename")
+		head.add_child(id_le)
+		var apply = _button(tr("BE_ID_APPLY"), FONT_DESC)
+		_apply_action_style(apply, C_ACCENT_2)
+		apply.connect("pressed", self, "_on_set_rename_pressed", [id_le])
+		head.add_child(apply)
+		head.add_child(_label(tr("BE_NAME"), FONT_SMALL, C_TEXT_DIM))
+		var name_le = _line_edit("")
+		name_le.text = p.name
+		name_le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_le.connect("text_changed", self, "_on_set_name")
+		head.add_child(name_le)
+	else:
+		var t = _label(tr(s.name), FONT_NORMAL, C_ACCENT_3)
+		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		head.add_child(t)
+		head.add_child(_key_label(_set_sel))
+	var reset = _button(tr("BE_RESET"), FONT_DESC)
+	_apply_action_style(reset, C_ACCENT)
+	reset.disabled = not (p.bonuses is Array)
+	reset.connect("pressed", self, "_on_set_reset")
+	head.add_child(reset)
+	if p.custom:
+		var del = _button(tr("BE_DELETE"), FONT_DESC)
+		_apply_action_style(del, C_DANGER)
+		del.connect("pressed", self, "_on_set_delete_ask")
+		head.add_child(del)
+	else:
+		right.add_child(_desc(tr("BE_SET_VANILLA_DESC")))
+	var specs = _mod.set_specs(_set_sel)
+	for lv in specs.size():
+		var card = _card(right)
+		var box = VBoxContainer.new()
+		box.add_constant_override("separation", 6)
+		card.add_child(box)
+		var lrow = HBoxContainer.new()
+		lrow.add_constant_override("separation", 8)
+		box.add_child(lrow)
+		var lt = _label(tr("BE_SET_LEVEL").replace("{0}", str(lv + 2)), FONT_SMALL, C_ACCENT_3)
+		lt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		lrow.add_child(lt)
+		if lv > 0:
+			var copy = _button(tr("BE_SET_COPY_PREV"), FONT_DESC)
+			_apply_action_style(copy, C_ACCENT_2)
+			copy.connect("pressed", self, "_on_set_copy_prev", [lv])
+			lrow.add_child(copy)
+		var add = _button(tr("BE_ADD_EFFECT"), FONT_DESC)
+		_apply_action_style(add, C_ACCENT_3)
+		add.connect("pressed", self, "_open_set_library", [lv])
+		lrow.add_child(add)
+		for i in specs[lv].size():
+			var spec = specs[lv][i]
+			var e = _mod.make_effect(spec) if spec is Dictionary else null
+			if e == null:
+				continue
+			var key = str(lv) + ":" + str(i)
+			var row_card = PanelContainer.new()
+			row_card.add_stylebox_override("panel", _style(C_BG_ITEM, C_ACCENT_2 if key == _set_expanded else C_BORDER, 6, 1, 10, 6))
+			box.add_child(row_card)
+			var col = VBoxContainer.new()
+			col.add_constant_override("separation", 4)
+			row_card.add_child(col)
+			var row = HBoxContainer.new()
+			row.add_constant_override("separation", 6)
+			col.add_child(row)
+			var txt = _rich(_effect_text(spec))
+			txt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			row.add_child(txt)
+			_set_rows[key] = txt
+			var edit = _button(tr("BE_EDIT"), FONT_DESC)
+			_apply_chip_style(edit, key == _set_expanded, C_ACCENT_2)
+			edit.connect("pressed", self, "_on_set_effect_edit", [key])
+			row.add_child(edit)
+			var del = _button("X", FONT_DESC)
+			_apply_action_style(del, C_DANGER)
+			del.connect("pressed", self, "_on_set_effect_delete", [lv, i])
+			row.add_child(del)
+			if key == _set_expanded:
+				var grid = GridContainer.new()
+				grid.columns = 4
+				grid.add_constant_override("hseparation", 10)
+				grid.add_constant_override("vseparation", 4)
+				col.add_child(grid)
+				_effect_field_rows(grid, e, "_on_set_field", [lv, i])
+
+
+# 修改前把"原版效果"展开为可编辑的 spec 列表
+func _set_edit_specs() -> Array:
+	if not _mod.weapon_sets.has(_set_sel):
+		_mod.weapon_sets[_set_sel] = BEMain.new_set()
+	var p = _mod.weapon_sets[_set_sel]
+	if not p.bonuses is Array:
+		p.bonuses = _mod.set_specs(_set_sel).duplicate(true)
+	return p.bonuses
+
+
+func _set_changed(rebuild: bool = true) -> void:
+	_mod.apply_sets()
+	if rebuild:
+		_fill_set_manager()
+
+
+func _on_set_select(id: String) -> void:
+	_set_sel = id
+	_set_expanded = ""
+	_fill_set_manager()
+
+
+func _on_set_new() -> void:
+	_set_sel = _mod.create_set(_set_sel)
+	_set_expanded = ""
+	_set_changed()
+
+
+func _on_set_reset_all_ask() -> void:
+	Modal.confirm(self, [tr("BE_SET_RESET_ALL_CONFIRM")], C_DANGER, self, "_on_set_reset_all")
+
+
+func _on_set_reset_all() -> void:
+	for id in _mod.weapon_sets.keys():
+		if _mod.weapon_sets[id].custom:
+			_mod.delete_set(id)
+	_mod.weapon_sets.clear()
+	_set_expanded = ""
+	_set_changed()
+
+
+func _on_set_rename_pressed(le: LineEdit) -> void:
+	_on_set_rename(le.text)
+
+
+func _on_set_rename(text: String) -> void:
+	if _mod.rename_set(_set_sel, text.strip_edges()):
+		_set_sel = text.strip_edges()
+		_set_status(tr("BE_ID_DONE"))
+		_fill_set_manager()
+	else:
+		_set_status(tr("BE_ID_TAKEN"))
+
+
+func _on_set_name(text: String) -> void:
+	_mod.weapon_sets[_set_sel].name = text.strip_edges()
+	_set_changed(false)
+
+
+func _on_set_reset() -> void:
+	_mod.reset_set(_set_sel)
+	_set_expanded = ""
+	_set_changed()
+
+
+func _on_set_delete_ask() -> void:
+	Modal.confirm(self, [tr("BE_DELETE_CONFIRM_MSG").replace("{0}", _mod.weapon_sets[_set_sel].name)], C_DANGER, self, "_on_set_delete")
+
+
+func _on_set_delete() -> void:
+	_mod.delete_set(_set_sel)
+	_set_sel = ""
+	_set_expanded = ""
+	_fill_set_manager()
+
+
+func _on_set_copy_prev(lv: int) -> void:
+	var specs = _set_edit_specs()
+	specs[lv] = specs[lv - 1].duplicate(true)
+	_set_expanded = ""
+	_set_changed()
+
+
+func _on_set_effect_edit(key: String) -> void:
+	_set_expanded = "" if _set_expanded == key else key
+	_fill_set_manager()
+
+
+func _on_set_effect_delete(lv: int, i: int) -> void:
+	_set_edit_specs()[lv].remove(i)
+	_set_expanded = ""
+	_set_changed()
+
+
+func _on_set_field(value, lv: int, i: int, field: String) -> void:
+	var spec = _set_edit_specs()[lv][i]
+	if not spec.has("set"):
+		spec["set"] = {}
+	spec.set[field] = value
+	var key = str(lv) + ":" + str(i)
+	if _set_rows.has(key) and is_instance_valid(_set_rows[key]):
+		_set_rows[key].bbcode_text = _effect_text(spec)
+	_set_changed(false)
+
+
+# 添加效果：效果库（同效果页），点"+"加入这一级
+func _open_set_library(lv: int) -> void:
+	var m = Modal.open(self, tr("BE_SEC_LIBRARY"), C_ACCENT, Vector2(1000, 0))
+	m.add_button(tr("MENU_BACK"), C_TEXT_DIM, m, "close")
+	var chips = _category_chips(m.body, _set_lib_cat, self, "_on_set_lib_cat", 6)
+	var search = _line_edit(tr("BE_LIBRARY_SEARCH"))
+	search.text = _set_lib_search
+	m.body.add_child(search)
+	var scroll = _scroll()
+	scroll.rect_min_size = Vector2(0, 640)
+	m.body.add_child(scroll)
+	var list = VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_constant_override("separation", 4)
+	scroll.add_child(list)
+	m.set_meta("list", list)
+	m.set_meta("chips", chips)
+	m.set_meta("lv", lv)
+	search.connect("text_changed", self, "_on_set_lib_search", [m])
+	for c in chips:
+		chips[c].disconnect("pressed", self, "_on_set_lib_cat")
+		chips[c].connect("pressed", self, "_on_set_lib_cat", [c, m])
+	_fill_set_library(m)
+
+
+func _on_set_lib_cat(cat: String, m) -> void:
+	_set_lib_cat = cat
+	var chips = m.get_meta("chips")
+	for c in chips:
+		_apply_chip_style(chips[c], c == cat, C_ACCENT)
+	_fill_set_library(m)
+
+
+func _on_set_lib_search(text: String, m) -> void:
+	_set_lib_search = text.strip_edges().to_lower()
+	_fill_set_library(m)
+
+
+func _fill_set_library(m) -> void:
+	var list = m.get_meta("list")
+	for c in list.get_children():
+		list.remove_child(c)
+		c.queue_free()
+	var shown = 0
+	for entry in _mod.library(false):
+		var text = _lib_entry_text(entry, _set_lib_cat, _set_lib_search)
+		if text == "":
+			continue
+		shown += 1
+		if shown > LIBRARY_LIMIT:
+			break
+		var row = HBoxContainer.new()
+		row.add_constant_override("separation", 6)
+		list.add_child(row)
+		var add = _button("+", FONT_SMALL)
+		_apply_action_style(add, C_ACCENT_3)
+		add.connect("pressed", self, "_on_set_lib_add", [{"from": entry.from, "i": entry.i}, m])
+		row.add_child(add)
+		var t = _rich(text)
+		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(t)
+		var src = _label(tr(entry.src), FONT_DESC, C_TEXT_DIM)
+		src.rect_min_size = Vector2(110, 0)
+		src.clip_text = true
+		src.align = Label.ALIGN_RIGHT
+		row.add_child(src)
+
+
+func _on_set_lib_add(spec: Dictionary, m) -> void:
+	var lv = int(m.get_meta("lv"))
+	var specs = _set_edit_specs()[lv]
+	specs.push_back(spec)
+	_set_expanded = str(lv) + ":" + str(specs.size() - 1)
+	m.close()
+	_set_changed()
+	_set_status(tr("BE_EFFECT_ADDED"))
 
 
 const EFFECT_LINE = preload("res://items/global/effect_line.tscn")
@@ -2521,6 +2904,11 @@ func _build_effect_fields(col: Control, i: int, spec: Dictionary) -> void:
 		det.connect("pressed", self, "_on_effect_details", [i])
 		grid.add_child(det)
 		grid.add_child(Control.new())
+	_effect_field_rows(grid, e, "_on_field_option", [i])
+
+
+# 效果的可编辑字段（标签 + 控件）；修改时调用 self.method(值, binds..., 字段名)
+func _effect_field_rows(grid: GridContainer, e, method: String, binds: Array) -> void:
 	for f in Catalog.editable_fields(e):
 		var name_key = "BE_FIELD_" + f.name.to_upper()
 		var lbl_text = tr(name_key)
@@ -2528,7 +2916,8 @@ func _build_effect_fields(col: Control, i: int, spec: Dictionary) -> void:
 			lbl_text = f.name
 		grid.add_child(_field_label(lbl_text, f.name))
 		var cur = e.get(f.name)
-		var special = field_control(f.name, cur, self, "_on_field_option", [i, f.name])
+		var fb = binds + [f.name]
+		var special = field_control(f.name, cur, self, method, fb)
 		if special != null:
 			grid.add_child(special)
 			continue
@@ -2537,7 +2926,7 @@ func _build_effect_fields(col: Control, i: int, spec: Dictionary) -> void:
 				var sb = _spin(-99999, 99999, 1 if f.type == TYPE_INT else 0.01)
 				sb.value = cur
 				sb.rect_min_size = Vector2(130, 0)
-				sb.connect("value_changed", self, "_on_field_changed", [i, f.name])
+				sb.connect("value_changed", self, method, fb)
 				grid.add_child(sb)
 			TYPE_BOOL:
 				var tb = _button(tr("BE_YES" if cur else "BE_NO"), FONT_DESC)
@@ -2546,18 +2935,18 @@ func _build_effect_fields(col: Control, i: int, spec: Dictionary) -> void:
 				tb.rect_min_size = Vector2(70, 0)
 				tb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 				_apply_chip_style(tb, cur, C_ACCENT_3)
-				tb.connect("toggled", self, "_on_bool_field", [i, f.name, tb])
+				tb.connect("toggled", self, "_on_bool_field", [tb, method, fb])
 				grid.add_child(tb)
 			TYPE_STRING:
 				if Catalog.is_stat_key(str(cur)) or (f.name in ["key", "stat", "stat_scaled", "stat_displayed"] and str(cur).begins_with("stat_")):
 					var opt = _stat_option(str(cur))
-					opt.connect("selected", self, "_on_field_option", [i, f.name])
+					opt.connect("selected", self, method, fb)
 					grid.add_child(opt)
 				else:
 					var le = _line_edit("")
 					le.text = str(cur)
 					le.rect_min_size = Vector2(200, 0)
-					le.connect("text_changed", self, "_on_field_changed", [i, f.name])
+					le.connect("text_changed", self, method, fb)
 					grid.add_child(le)
 
 
@@ -2690,10 +3079,10 @@ func _on_effect_detail_changed() -> void:
 	_changed()
 
 
-func _on_bool_field(pressed: bool, i: int, field: String, tb: Button) -> void:
+func _on_bool_field(pressed: bool, tb: Button, method: String, binds: Array) -> void:
 	tb.text = tr("BE_YES" if pressed else "BE_NO")
 	_apply_chip_style(tb, pressed, C_ACCENT_3)
-	_set_field(i, field, pressed)
+	callv(method, [pressed] + binds)
 
 
 func _on_effect_edit(i: int) -> void:
@@ -2756,10 +3145,6 @@ func _set_field(i: int, field: String, value) -> void:
 	if _effect_rows.has(i):
 		_effect_rows[i].bbcode_text = _effect_text(specs[i])
 	_changed()
-
-
-func _on_field_changed(value, i: int, field: String) -> void:
-	_set_field(i, field, value)
 
 
 func _on_field_option(key, i: int, field: String) -> void:
