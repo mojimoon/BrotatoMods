@@ -1318,7 +1318,7 @@ var _set_lib_search := ""
 
 
 func open_set_manager() -> void:
-	_set_modal = Modal.open(self, tr("BE_SET_MANAGE_TITLE"), C_ACCENT_3, Vector2(1500, 880))
+	_set_modal = Modal.open(self, tr("BE_SET_MANAGE_TITLE"), C_ACCENT_3, Vector2(1200, 880))
 	_set_modal.add_button(tr("MENU_BACK"), C_TEXT_DIM, _set_modal, "close")
 	_set_modal.connect("closed", self, "_on_set_manager_closed")
 	var cur = _look_view().sets if _look_view().sets is Array else _set_ids(_mod.backup_value(_character(), "sets"))
@@ -1350,7 +1350,7 @@ func _fill_set_manager() -> void:
 
 	# 左：套装列表
 	var left = VBoxContainer.new()
-	left.rect_min_size = Vector2(340, 0)
+	left.rect_min_size = Vector2(300, 0)
 	left.add_constant_override("separation", 8)
 	cols.add_child(left)
 	var brow = HBoxContainer.new()
