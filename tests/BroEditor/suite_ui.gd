@@ -1151,6 +1151,7 @@ func test_164_weapon_set_manager() -> void:
 	_check(m.find_set("set_be_test") != null and m.find_set(cid) == null, "renamed")
 	ui._on_set_name("BE Test Set")
 	_eq(m.find_set("set_be_test").name, "BE Test Set", "name applied")
+	_eq(ui._set_chips["set_be_test"].text, "BE Test Set", "left list shows the new name right away")
 	ui._open_set_library(0)
 	var lm = ui._modals[-1]
 	var n0 = m.weapon_sets.set_be_test.bonuses[0].size()

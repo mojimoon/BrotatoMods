@@ -1321,6 +1321,7 @@ var _set_modal = null
 var _set_sel := ""
 var _set_expanded := ""	# 展开的效果 "级:序号"
 var _set_rows: Dictionary = {}	# "级:序号" -> 效果文本
+var _set_chips: Dictionary = {}	# 套装 id -> 左侧列表的按钮
 var _set_lib_cat := "all"
 var _set_lib_search := ""
 
@@ -1381,6 +1382,7 @@ func _fill_set_manager() -> void:
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	list.add_constant_override("separation", 4)
 	lscroll.add_child(list)
+	_set_chips = {}
 	for s in _isvc().sets:
 		if s == null:
 			continue
@@ -1390,6 +1392,7 @@ func _fill_set_manager() -> void:
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.connect("pressed", self, "_on_set_select", [s.my_id])
 		list.add_child(b)
+		_set_chips[s.my_id] = b
 
 	# 右：编辑选中的套装
 	var rscroll = _scroll()
@@ -1558,6 +1561,14 @@ func _on_set_rename(text: String) -> void:
 func _on_set_name(text: String) -> void:
 	_mod.weapon_sets[_set_sel].name = text.strip_edges()
 	_set_changed(false)
+	# 不重建整个窗口（输入框会失去焦点），只更新左侧列表里的名称
+	var b = _set_chips.get(_set_sel)
+	if b != null and is_instance_valid(b):
+		var name = tr(_mod.find_set(_set_sel).name)
+		if b.text != "":
+			b.text = name
+		elif b.get_child_count() > 0:
+			b.get_child(0).get_child(0).text = name
 
 
 func _on_set_reset() -> void:
