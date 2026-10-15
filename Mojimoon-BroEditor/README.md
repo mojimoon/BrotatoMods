@@ -107,19 +107,19 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 ### Screenshots
 
+![](../img/BroEditor/be-en-4.jpg)
+
 ![](../img/BroEditor/be-en-1.jpg)
 
 ![](../img/BroEditor/be-en-2.jpg)
 
 ![](../img/BroEditor/be-en-3.jpg)
 
-![](../img/BroEditor/be-en-4.jpg)
-
-![](../img/BroEditor/be-en-5.jpg)
+![](../img/BroEditor/be-en-8.jpg)
 
 ![](../img/BroEditor/be-en-6.jpg)
 
-![](../img/BroEditor/be-en-7.jpg)
+![](../img/BroEditor/be-en-5.jpg)
 
 ---
 
@@ -219,19 +219,19 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 
 ### 截图
 
+![](../img/BroEditor/be-zh-4.jpg)
+
 ![](../img/BroEditor/be-zh-1.jpg)
 
 ![](../img/BroEditor/be-zh-2.jpg)
 
 ![](../img/BroEditor/be-zh-3.jpg)
 
-![](../img/BroEditor/be-zh-4.jpg)
-
-![](../img/BroEditor/be-zh-5.jpg)
+![](../img/BroEditor/be-zh-8.jpg)
 
 ![](../img/BroEditor/be-zh-6.jpg)
 
-![](../img/BroEditor/be-zh-7.jpg)
+![](../img/BroEditor/be-zh-5.jpg)
 
 <!--
 
