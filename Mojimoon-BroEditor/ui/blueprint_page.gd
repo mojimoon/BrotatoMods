@@ -182,6 +182,11 @@ func _make_node(n: Dictionary) -> GraphNode:
 	gn.add_child(head)
 	gn.set_slot(0, t != "trigger", PORT_TYPE, color, t != "effect", PORT_TYPE, color)
 	var d = Catalog.node_def(n.kind)
+	# 不认识的节点（来自更新的版本）：只显示名称，保留在图里、不生效
+	if d == null:
+		gn.title = n.kind
+		gn.add_child(ui._desc(ui.tr("BE_NODE_UNKNOWN")))
+		return gn
 	for p in d[2]:
 		var show_if = Catalog.PARAM_SHOW_IF.get(n.kind + ":" + p[0])
 		if show_if != null and str(n.params.get(show_if[0], "")) != show_if[1]:

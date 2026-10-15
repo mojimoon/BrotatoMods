@@ -159,6 +159,9 @@ func _param(n: Dictionary, k: String, default = 0):
 
 
 func _pass(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> bool:
+	# 不认识的条件（来自更新的版本）不放行
+	if Catalog.node_def(n.kind) == null:
+		return false
 	var st = _state(en, int(n.id))
 	match n.kind:
 		"chance":

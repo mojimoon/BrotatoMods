@@ -204,6 +204,16 @@ func _groups(m, out: String):
 	ui.open_group_manager()
 	yield(_shot(ui, out + "/groups_manager.png"), "completed")
 	ui._modals[-1].close()
+	ui.set_kind("weapon")
+	ui._select("weapon_knife_1")
+	ui._on_tab_pressed("overview")
+	yield(self, "idle_frame")
+	ui._page.get_child(0).get_child(0).scroll_vertical = 600
+	yield(_shot(ui, out + "/weapon_users.png"), "completed")
+	ui._open_picker("weapon_chars")
+	yield(_shot(ui, out + "/weapon_users_picker.png"), "completed")
+	ui._close_picker()
+	ui.set_kind("character")
 	ui._on_tab_pressed("blueprint")
 	yield(self, "idle_frame")
 	for k in ["own_tag", "own_set", "shop_force", "group_unlock"]:

@@ -1373,7 +1373,8 @@ func _apply_items() -> void:
 			it.max_nb = p.max_nb
 		if p.tags is Array:
 			it.tags = p.tags.duplicate()
-		if p.replaced_by is String:
+		# 未知的道具（导入不完全 / mod 未启用）：保持原版
+		if p.replaced_by is String and (p.replaced_by == "" or find_target("item", p.replaced_by) != null):
 			it.replaced_by = find_target("item", p.replaced_by) if p.replaced_by != "" else null
 
 
@@ -1466,6 +1467,11 @@ func apply_sets() -> void:
 		var p = weapon_sets[id]
 		var s = null
 		if p.custom:
+			# 基底缺失（导入不完全 / mod 未启用）且没有自己的效果：不注册（原版按件数取档位，空档位会出错）
+			if set_specs(id).empty():
+				if _set_res.has(id):
+					isvc.sets.erase(_set_res[id])
+				continue
 			s = _set_res.get(id)
 			if s == null:
 				s = SetData.new()
@@ -1680,6 +1686,84 @@ func _set_unlocked(kind: String, id: String, on: bool) -> void:
 		list.push_back(h)
 	while not on and h in list:
 		list.erase(h)
+
+
+# ============================================================
+# 武器的使用者：哪些角色以该武器家族为初始武器（改写的是角色档案的 weapons）
+# ============================================================
+# 角色的初始武器 id：档案改过时取档案，否则取原版
+func char_weapon_ids(cid: String) -> Array:
+	var p = profiles.get(cid)
+	if p != null and p.weapons is Array:
+		return p.weapons.duplicate()
+	var c = find_character(cid)
+	var out = []
+	if c != null:
+		for w in backup_value(c, "starting_weapons"):
+			if w != null and not w.my_id in out:
+				out.push_back(w.my_id)
+	return out
+
+
+func _in_family(ids: Array, wid: String) -> bool:
+	for id in ids:
+		var w = find_target("weapon", str(id))
+		if w != null and w.weapon_id == wid:
+			return true
+	return false
+
+
+func weapon_users(wid: String) -> Array:
+	var out = []
+	for c in _isvc().characters:
+		if c != null and _in_family(char_weapon_ids(c.my_id), wid):
+			out.push_back(c.my_id)
+	return out
+
+
+# 设为 cids 这些角色的初始武器（其余角色移除该家族）
+func set_weapon_users(wid: String, cids: Array) -> void:
+	for c in _isvc().characters:
+		if c == null:
+			continue
+		var ids = char_weapon_ids(c.my_id)
+		var want = c.my_id in cids
+		if _in_family(ids, wid) == want:
+			continue
+		if want:
+			var w = weapon_for_character(wid, c.my_id)
+			if w == null:
+				continue
+			ids.push_back(w.my_id)
+		else:
+			for id in ids.duplicate():
+				var w = find_target("weapon", str(id))
+				if w != null and w.weapon_id == wid:
+					ids.erase(id)
+		if not profiles.has(c.my_id):
+			profiles[c.my_id] = new_profile()
+		profiles[c.my_id].weapons = ids
+
+
+# 角色可用的等级：取家族中最低的、满足角色"最低 / 最高武器等级"效果的一级
+func weapon_for_character(wid: String, cid: String):
+	var ms = family_members(wid)
+	if ms.empty():
+		return null
+	var lo = 0
+	var hi = 99
+	var c = find_character(cid)
+	var effects = build_effects(cid, profiles[cid]) if profiles.has(cid) else (c.effects if c != null else [])
+	for e in effects:
+		if e != null and "key" in e:
+			if e.key == "min_weapon_tier":
+				lo = max(lo, int(e.value))
+			elif e.key == "max_weapon_tier":
+				hi = min(hi, int(e.value))
+	for w in ms:
+		if w.tier >= lo and w.tier <= hi:
+			return w
+	return ms[-1] if ms[-1].tier < lo else ms[0]
 
 
 # 同一家族的全部等级（按等级排序）
@@ -2907,7 +2991,7 @@ func _load_icon_file(name: String):
 	if _icon_cache.has(key):
 		return _icon_cache[key]
 	var img = Image.new()
-	if img.load(ICON_DIR + name) != OK:
+	if not File.new().file_exists(ICON_DIR + name) or img.load(ICON_DIR + name) != OK:
 		return null
 	var tex = ImageTexture.new()
 	tex.create_from_image(img, Texture.FLAG_FILTER)

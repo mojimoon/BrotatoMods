@@ -1111,6 +1111,8 @@ func _build_overview() -> void:
 	if _look_custom():
 		_look_section(left)
 	_tag_section(left)
+	if _kind == "weapon":
+		_weapon_users_section(left)
 	_group_section(left)
 	_preview_card(cols)
 
@@ -1680,6 +1682,86 @@ func _on_set_lib_add(spec: Dictionary, m) -> void:
 	m.close()
 	_set_changed()
 	_set_status(tr("BE_EFFECT_ADDED"))
+
+
+# ============================================================
+# 武器概览页"初始武器"：选择以该武器为初始武器的角色（写入角色档案）
+# ============================================================
+func _weapon_users_section(left: Control) -> void:
+	var box = _section(left, "BE_SEC_WEAPON_USERS", C_CUSTOM_2)
+	box.add_child(_desc(tr("BE_WEAPON_USERS_DESC")))
+	var row = HBoxContainer.new()
+	row.add_constant_override("separation", 8)
+	box.add_child(row)
+	var pick = _button(tr("BE_PICK_CHARACTERS"), FONT_SMALL)
+	_apply_action_style(pick, C_CUSTOM_2)
+	pick.connect("pressed", self, "_open_picker", ["weapon_chars"])
+	row.add_child(pick)
+	var copy = _button(tr("BE_COPY_WEAPON_USERS"), FONT_SMALL)
+	_apply_action_style(copy, C_CUSTOM_2)
+	copy.connect("pressed", self, "_open_weapon_users_copy")
+	row.add_child(copy)
+	var grid = _icon_grid(8)
+	box.add_child(grid)
+	var users = _mod.weapon_users(_obj_key())
+	for cid in users:
+		var c = _mod.find_character(cid)
+		if c != null:
+			var b = _res_button(c)
+			_set_icon_style(b, C_BORDER, 1)
+			grid.add_child(b)
+	if users.empty():
+		box.add_child(_desc(tr("BE_WEAPON_USERS_EMPTY")))
+
+
+# 套用已有武器：列出每个武器家族的使用者，点击一行即采用同样的角色
+func _open_weapon_users_copy() -> void:
+	var m = Modal.open(self, tr("BE_COPY_WEAPON_USERS"), C_CUSTOM_2, Vector2(1240, 820))
+	var back = _button(tr("MENU_BACK"), FONT_SMALL)
+	_apply_action_style(back, C_TEXT_DIM)
+	back.connect("pressed", m, "close")
+	m.head.add_child(back)
+	var scroll = _scroll()
+	m.body.add_child(scroll)
+	var grid = GridContainer.new()
+	grid.columns = 2
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_constant_override("hseparation", 14)
+	grid.add_constant_override("vseparation", 6)
+	scroll.add_child(grid)
+	m.set_meta("grid", grid)
+	var seen = {_obj_key(): true}
+	for w in _isvc().weapons:
+		if w == null or seen.has(w.weapon_id):
+			continue
+		seen[w.weapon_id] = true
+		var users = _mod.weapon_users(w.weapon_id)
+		if users.empty():
+			continue
+		var b = _button(tr(w.name), FONT_SMALL)
+		b.icon = w.icon
+		b.expand_icon = true
+		b.align = Button.ALIGN_LEFT
+		b.clip_text = true
+		b.rect_min_size = Vector2(300, 56)
+		b.size_flags_vertical = 0
+		_apply_action_style(b, C_CUSTOM_2)
+		b.connect("pressed", self, "_on_weapon_users_copied", [users, m])
+		grid.add_child(b)
+		var icons = _icon_grid(CHAR_WEAPON_COLUMNS)
+		icons.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		grid.add_child(icons)
+		for cid in users:
+			var c = _mod.find_character(cid)
+			if c != null:
+				icons.add_child(_icon_tile(c.icon, C_BORDER, 48))
+
+
+func _on_weapon_users_copied(users: Array, m) -> void:
+	m.close()
+	_mod.set_weapon_users(_obj_key(), users)
+	_changed()
+	_build_page()
 
 
 # ============================================================
@@ -3777,7 +3859,7 @@ func _on_bans_clear(kind: String) -> void:
 func _open_picker(mode: String) -> void:
 	_picker_mode = mode
 	_picker_filter = ""
-	_picker_multi = mode in ["start_weapons", "start_items", "start_items_w", "fuse"]
+	_picker_multi = mode in ["start_weapons", "start_items", "start_items_w", "fuse", "weapon_chars"]
 	_picker_sel = []
 	var v = _view()
 	match mode:
@@ -3798,6 +3880,9 @@ func _open_picker(mode: String) -> void:
 				if c.my_id != _id:
 					_picker_res.push_back(c)
 			_picker_sel = v.fuse.duplicate()
+		"weapon_chars":
+			_picker_res = _isvc().characters.duplicate()
+			_picker_sel = _mod.weapon_users(_obj_key())
 		"base":
 			match _kind:
 				"character":
@@ -3833,6 +3918,10 @@ func _open_picker(mode: String) -> void:
 		_picker_chip_row(frow, "tier", tiers)
 		_picker_chip_row(frow, "type", [[-1, "BE_FILTER_ALL"], [0, "MELEE"], [1, "RANGED"]])
 		_picker_chip_row(frow, "src", SOURCES)
+	elif mode == "weapon_chars":
+		var frow = HBoxContainer.new()
+		box.add_child(frow)
+		_picker_chip_row(frow, "src", SOURCES)
 	var scroll = _scroll()
 	box.add_child(scroll)
 	_picker_grid = _icon_grid(16)
@@ -3840,9 +3929,10 @@ func _open_picker(mode: String) -> void:
 	var hint = _desc(tr("BE_PICKER_MULTI_DESC" if _picker_multi else "BE_PICKER_SINGLE_DESC"))
 	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_picker.foot.add_child(hint)
-	if mode == "start_weapons":
+	if mode in ["start_weapons", "weapon_chars"]:
 		_picker.add_button(tr("BE_PICKER_SELECT_SHOWN"), C_ACCENT_3, self, "_on_picker_shown", [true])
 		_picker.add_button(tr("BE_PICKER_DESELECT_SHOWN"), C_TEXT_DIM, self, "_on_picker_shown", [false])
+	if mode == "start_weapons":
 		_picker.add_button(tr("BE_PICKER_RESET_ALL"), C_DANGER, self, "_on_picker_reset")
 	elif _picker_multi:
 		_picker.add_button(tr("BE_PICKER_CLEAR"), C_DANGER, self, "_on_picker_clear")
@@ -3885,6 +3975,8 @@ func _on_picker_chip(key: String, value) -> void:
 func _picker_shown(r) -> bool:
 	if _picker_filter != "" and tr(r.name).to_lower().find(_picker_filter) < 0 and r.my_id.find(_picker_filter) < 0:
 		return false
+	if _picker_mode == "weapon_chars":
+		return _picker_f.src == "all" or _source(r) == _picker_f.src
 	if not _picker_weapons():
 		return true
 	return (_picker_f.tier < 0 or r.tier == _picker_f.tier) and (_picker_f.type < 0 or r.type == _picker_f.type) and (_picker_f.src == "all" or _source(r) == _picker_f.src)
@@ -3981,7 +4073,8 @@ func _on_picker_clear() -> void:
 
 
 func _on_picker_confirm() -> void:
-	var p = _p()
+	# 选择使用者改的是角色档案，不给当前武器建档案
+	var p = _p() if _picker_mode != "weapon_chars" else null
 	match _picker_mode:
 		"start_weapons":
 			p.weapons = _picker_sel.duplicate()
@@ -3990,6 +4083,8 @@ func _on_picker_confirm() -> void:
 				p.start_items.push_back({"id": id, "n": 1, "cursed": false})
 		"fuse":
 			p.fuse = _picker_sel.duplicate()
+		"weapon_chars":
+			_mod.set_weapon_users(_obj_key(), _picker_sel)
 		"base":
 			if not _picker_sel.empty():
 				_look_p().base = _kind_base(_picker_sel[0])
