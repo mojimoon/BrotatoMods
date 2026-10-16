@@ -1899,3 +1899,20 @@ func test_176_own_conds_shop_force_groups() -> void:
 	m.set_group_locked(gid, true)
 	m.delete_group(gid)
 	_check(m.is_unlocked("weapon", knife.weapon_id) and m.groups.empty(), "deleting a locked group unlocks it")
+
+
+
+# 按属性几率的初始值
+func test_177_stat_chance_base() -> void:
+	var GE = load(MOD_DIR + "graph/graph_effect.gd")
+	var ctx = {"pos": null, "target": null, "hold": null, "info": {}}
+	var n = {"id": 1, "kind": "stat_chance", "params": {"base": 100, "stat": "stat_max_hp", "pct": 0}}
+	_check(m.runtime._pass({"st": {}}, n, 0, ctx), "base 100 always passes")
+	n.params.base = -1000
+	_check(not m.runtime._pass({"st": {}}, n, 0, ctx), "negative base never passes")
+	var g = GE.new_graph()
+	var t = GE.add_node(g, "kill", Vector2.ZERO)
+	var c = GE.add_node(g, "stat_chance", Vector2.ZERO, {"base": 10, "stat": "stat_max_hp", "pct": 50})
+	GE.add_link(g, t, c)
+	GE.add_link(g, c, GE.add_node(g, "heal_hp", Vector2.ZERO, {"value": 1}))
+	_check(GE.graph_text(g, false).find("10%") >= 0, "text shows the base chance")
