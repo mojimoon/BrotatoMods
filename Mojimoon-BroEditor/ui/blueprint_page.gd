@@ -187,6 +187,12 @@ func _make_node(n: Dictionary) -> GraphNode:
 		gn.title = n.kind
 		gn.add_child(ui._desc(ui.tr("BE_NODE_UNKNOWN")))
 		return gn
+	# 备注：提供 / 需要的上下文与注意事项（没有备注的节点不显示）
+	var note = ui.tr("BE_NN_" + n.kind.to_upper())
+	if note != "BE_NN_" + n.kind.to_upper():
+		var nl = ui._desc(note)
+		nl.rect_min_size = Vector2(240, 0)
+		gn.add_child(nl)
 	for p in d[2]:
 		var show_if = Catalog.PARAM_SHOW_IF.get(n.kind + ":" + p[0])
 		if show_if != null and str(n.params.get(show_if[0], "")) != show_if[1]:

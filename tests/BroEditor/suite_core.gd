@@ -571,7 +571,7 @@ func test_78_graph_low_hp_and_difficulty() -> void:
 	m.runtime.end_wave()
 	TranslationServer.set_locale("zh")
 	_eq(_path_line([["low_hp", {"pct": 30}], ["temp_stat", {"stat": "stat_armor", "value": 2}]]).find("30%") >= 0, true, "low hp threshold in text")
-	_check(_path_line([["wave_start", {}], ["diff_min", {"n": 3}], ["xp", {"value": 1}]]).find("危险3") >= 0, "danger text")
+	_check(_path_line([["wave_start", {}], ["diff_min", {"n": 3}], ["xp", {"value": 1}]]).find("危险等级不低于3") >= 0, "danger text")
 	TranslationServer.set_locale("en")
 
 
@@ -606,7 +606,8 @@ func test_79_always_state_paths() -> void:
 	m.runtime.end_wave()
 	_eq(TempStats.get_stat(speed, 0), s0, "wave end reverts")
 	TranslationServer.set_locale("zh")
-	_check(_path_line([["always", {}], ["stat_min", {"stat": "stat_armor", "n": 10}], ["temp_stat", {"stat": "stat_luck", "value": 5}]]).begins_with("+5"), "always has no trigger text")
+	var at = _path_line([["always", {}], ["stat_min", {"stat": "stat_armor", "n": 10}], ["temp_stat", {"stat": "stat_luck", "value": 5}]])
+	_check(at.find("+5") >= 0 and not at.begins_with(",") and not at.begins_with("，"), "always has no trigger text: " + at)
 	TranslationServer.set_locale("en")
 
 
@@ -675,15 +676,19 @@ func test_80_item_transform() -> void:
 
 func test_110_path_text() -> void:
 	TranslationServer.set_locale("zh")
-	_eq(_path_line([["level_up", {}], ["perm_stat", {"stat": "stat_melee_damage", "value": 2}]]), "升级时+2近战伤害", "zh level up")
-	_eq(_path_line([["kill", {}], ["chance", {"pct": 20}], ["add_gold", {"value": 3}]]), "杀死敌人时有20%概率获得3个材料", "zh chance")
+	_eq(_path_line([["level_up", {}], ["perm_stat", {"stat": "stat_melee_damage", "value": 2}]]), "升级时，+2近战伤害", "zh level up")
+	_eq(_path_line([["kill", {}], ["chance", {"pct": 20}], ["add_gold", {"value": 3}]]), "杀死敌人时，有20%几率获得3个材料", "zh chance")
 	_eq(_path_line([["kill", {}], ["every", {"n": 5}], ["cap", {"n": 3}], ["temp_stat", {"stat": "stat_armor", "value": 1}]]), "每杀死5个敌人，+1护甲，直至敌袭结束（每波最多3次）", "zh every + cap")
-	_eq(_path_line([["still", {}], ["temp_stat", {"stat": "stat_percent_damage", "value": 10}]]), "站立不动时+10%伤害", "zh state")
-	_eq(_path_line([["level_up", {}], ["every", {"n": 2}], ["hp_below", {"pct": 50}], ["heal_hp", {"value": 5}]]), "升级时恢复5点生命值（每2次）（生命值低于50%时）", "zh conds as suffix")
-	_eq(_path_line([["hit", {}], ["timed_stat", {"stat": "stat_dodge", "value": 20, "secs": 3}]]), "受到伤害时+20%闪避，持续3秒", "zh timed")
+	_eq(_path_line([["still", {}], ["temp_stat", {"stat": "stat_percent_damage", "value": 10}]]), "站立不动时，+10%伤害", "zh state")
+	_eq(_path_line([["level_up", {}], ["every", {"n": 2}], ["hp_below", {"pct": 50}], ["heal_hp", {"value": 5}]]), "升级时，生命值低于50%，恢复5点生命值（每2次）", "zh conds inline")
+	_eq(_path_line([["hit", {}], ["timed_stat", {"stat": "stat_dodge", "value": 20, "secs": 3}]]), "受到伤害时，+20%闪避，持续3秒", "zh timed")
 	TranslationServer.set_locale("en")
 	_eq(_path_line([["kill", {}], ["chance", {"pct": 20}], ["add_gold", {"value": 3}]]), "+3 materials when you kill an enemy (20% chance)", "en chance")
 	_eq(_path_line([["interval", {"secs": 5}], ["xp", {"value": 2}]]), "+2 XP every 5 seconds", "en interval")
+	_eq(_path_line([["enemy_hit", {}], ["hp_below", {"pct": 50}], ["enemy_hp_below", {"pct": 30}], ["chance", {"pct": 10}], ["xp", {"value": 2}]]), "+2 XP when you hit an enemy, if you are below 50% HP and the enemy is below 30% HP (10% chance)", "en conds inline")
+	TranslationServer.set_locale("zh")
+	_eq(_path_line([["enemy_hit", {}], ["hp_below", {"pct": 50}], ["enemy_hp_below", {"pct": 30}], ["chance", {"pct": 10}], ["xp", {"value": 2}]]), "命中敌人时，生命值低于50%且该敌人生命值低于30%，有10%几率获得2经验", "zh conds joined")
+	TranslationServer.set_locale("en")
 
 
 func test_111_stat_names() -> void:
@@ -1705,7 +1710,7 @@ func test_204_charm_split_and_weapon_hits() -> void:
 		_eq([g.nodes[2].params.stat, int(g.nodes[2].params.pct)], [rom.key, int(rom.value)], "scaled chance")
 		TranslationServer.set_locale("zh")
 		var t = GE.graph_text(g, false)
-		_check(t.find("8") >= 0 and t.find(tr("BE_N_CHARM")) >= 0, "charm text: " + t)
+		_check(t.find("8") >= 0 and t.find("魅惑") >= 0, "charm text: " + t)
 		TranslationServer.set_locale("en")
 	var fl = m.find_target("weapon", "weapon_flute_1")
 	if fl != null:

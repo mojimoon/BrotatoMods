@@ -186,8 +186,9 @@ func get_text(_player_index: int, colored: bool = true) -> String:
 	return graph_text(live_graph(), colored)
 
 
-# 一条路径的文本，句式同 AutoAnthony / 原版："扳机 + 效果"，几率与"每 N 次"并入句式，
-# 其余条件与每波上限以括号后缀接在后面。语序由各语言的 BE_FMT* 决定（中文"扳机在前"，英文"效果在前"）
+# 一条路径的文本，句式同 AutoAnthony / 原版："扳机 + 效果"，几率与"每 N 次"并入句式。
+# 情境条件（生命值、波次、目标……）以 BE_COND_AND 连接、经 BE_COND_WRAP 填入 {k}（中文"扳机，条件，效果"）；
+# 冷却、仅一次与每波上限以括号后缀接在后面。语序由各语言的 BE_FMT* 决定（中文"扳机在前"，英文"效果在前"）
 static func graph_text(g: Dictionary, colored: bool = true) -> String:
 	var by_id = nodes_by_id(g)
 	var lines = []
@@ -210,6 +211,7 @@ static func path_text(by_id: Dictionary, path: Array, colored: bool = true) -> S
 	var chance = 100.0
 	var every = max(1, int(_p(trig, "n", 1))) if trig.kind == "steps" else 1
 	var scaled = []
+	var conds = []
 	var suffix = ""
 	for i in range(1, path.size() - 1):
 		var n = by_id[path[i]]
@@ -225,8 +227,10 @@ static func path_text(by_id: Dictionary, path: Array, colored: bool = true) -> S
 			"cap":
 				var c = int(_p(n, "n", 1))
 				suffix += _tr("BE_CAP_1") if c == 1 else _tr("BE_CAP").replace("{0}", str(c))
-			_:
+			"cooldown", "once":
 				suffix += _cond_text(n)
+			_:
+				conds.push_back(_cond_text(n))
 	var t = _trigger_text(trig, every)
 	if every > 1 and _tr("BE_TX_" + trig.kind.to_upper() + "_EVERY") == "BE_TX_" + trig.kind.to_upper() + "_EVERY":
 		# 没有"每 N 次"句式的扳机：作为后缀
@@ -241,7 +245,10 @@ static func path_text(by_id: Dictionary, path: Array, colored: bool = true) -> S
 	var c_text = str(stepify(chance, 0.1)).trim_suffix(".0") + "%"
 	if not scaled.empty():
 		c_text = PoolStringArray(scaled).join(" × ") if chance >= 100.0 else c_text + " × " + PoolStringArray(scaled).join(" × ")
-	return _tr(k).replace("{T}", tc).replace("{t}", t).replace("{p}", _payload_text(eff, trig.kind, colored)).replace("{c}", _col(c_text, true, colored)).strip_edges() + suffix
+	var k_text = "" if conds.empty() else _tr("BE_COND_WRAP").replace("{0}", PoolStringArray(conds).join(_tr("BE_COND_AND")))
+	var out = _tr(k).replace("{T}", tc).replace("{t}", t).replace("{k}", k_text).replace("{p}", _payload_text(eff, trig.kind, colored)).replace("{c}", _col(c_text, true, colored))
+	# 没有扳机文本（始终）时去掉句首的分隔符
+	return out.strip_edges().lstrip(",，、").strip_edges() + suffix
 
 
 static func _trigger_text(trig: Dictionary, every: int) -> String:
