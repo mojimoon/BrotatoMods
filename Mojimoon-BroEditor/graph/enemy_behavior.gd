@@ -49,9 +49,7 @@ func on_hurt(hitbox: Hitbox) -> void:
 	var from = hitbox.from
 	if not is_instance_valid(from) or not "player_index" in from or from.player_index < 0:
 		return
-	var stats = []
-	for s in hitbox.scaling_stats:
-		stats.push_back(Keys.hash_to_string.get(s[0], ""))
+	var stats = stat_names(hitbox.scaling_stats)
 	last_stats = stats
 	# 蓝图自己的爆炸不再触发命中扳机（防止"命中 -> 爆炸 -> 命中"无限连锁）
 	if from.has_meta("be_bp") and from.get_meta("be_bp"):
@@ -71,13 +69,20 @@ func on_hurt(hitbox: Hitbox) -> void:
 	rt.fire("enemy_hit", p, pos, _parent, info)
 
 
-func on_burned(_burning_data: BurningData, from_player_index: int) -> void:
+static func stat_names(scaling: Array) -> Array:
+	var out = []
+	for s in scaling:
+		out.push_back(Keys.hash_to_string.get(s[0], "") if s[0] is int else str(s[0]))
+	return out
+
+
+func on_burned(burning_data: BurningData, from_player_index: int) -> void:
 	if _burn_seen or from_player_index < 0 or _parent == null or _parent.dead:
 		return
 	_burn_seen = true
 	var rt = _rt()
 	if rt != null:
-		rt.fire("on_ignite", from_player_index, _parent.global_position, _parent, {"hp_pct": hp_pct(), "stats": ["stat_elemental_damage"]})
+		rt.fire("on_ignite", from_player_index, _parent.global_position, _parent, {"hp_pct": hp_pct(), "stats": stat_names(burning_data.scaling_stats)})
 
 
 func _process(delta: float) -> void:

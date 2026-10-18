@@ -192,7 +192,7 @@ func test_87_tick_trigger_charm_ignite() -> void:
 	GE.add_link(g, t, hp)
 	GE.add_link(g, hp, ch)
 	GE.add_link(g, ch, GE.add_node(g, "charm", Vector2.ZERO, {"secs": 2}))
-	GE.add_link(g, hp, GE.add_node(g, "ignite", Vector2.ZERO, {"value": 3, "secs": 5, "spread": 1, "stat": "stat_elemental_damage", "pct": 100}))
+	GE.add_link(g, hp, GE.add_node(g, "ignite", Vector2.ZERO, {"value": 3, "secs": 5, "spread": 1, "stat": "stat_max_hp", "pct": 50}))
 	var p = m.new_profile()
 	p.graph = g
 	m.profiles[CH] = p
@@ -227,7 +227,8 @@ func test_87_tick_trigger_charm_ignite() -> void:
 				timer = c.get_node("CharmTimer")
 		_check(timer != null and timer.time_left <= 2.0 and timer.wait_time == 8, "charm lasts the node's duration; vanilla duration restored")
 		_check(enemy._burning != null and enemy._burning.duration == 5 and enemy._burning.spread >= 1, "ignite duration and spread")
-		_check(enemy._burning != null and enemy._burning.damage >= 3, "ignite damage goes through the vanilla burning setup")
+		var want = WeaponService.apply_damage_bonus(3 + int(Utils.get_stat(Keys.stat_max_hp_hash, 0) * 0.5), 0)
+		_check(enemy._burning != null and enemy._burning.damage == want and want > 3, "ignite scales with the chosen stat (50% max HP)")
 	main._on_WaveTimer_timeout()
 	yield(_frames(2), "completed")
 	var _b = tree.change_scene(MenuData.character_selection_scene)

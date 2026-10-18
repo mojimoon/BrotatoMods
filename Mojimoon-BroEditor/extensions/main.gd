@@ -55,8 +55,10 @@ func _on_enemy_died(enemy: Enemy, args: Entity.DieArgs) -> void:
 	var pos = enemy.global_position
 	var burning = args.is_burning or (is_instance_valid(enemy) and enemy._is_burning)
 	var cursed = _be_is_cursed(enemy)
-	# 致命一击的伤害类型（条件"伤害类型"）：燃烧致死算元素，否则取最后一次命中的缩放属性
-	var info = {"stats": ["stat_elemental_damage"] if args.is_burning else []}
+	# 致命一击的伤害类型（条件"伤害类型"）：燃烧致死取燃烧的缩放属性，否则取最后一次命中的缩放属性
+	var info = {"stats": []}
+	if args.is_burning:
+		info.stats = BEBehavior.stat_names(enemy._burning.scaling_stats) if is_instance_valid(enemy) and enemy._burning != null else ["stat_elemental_damage"]
 	var b = BEBehavior.find_on(enemy)
 	if b != null and not args.is_burning:
 		info.stats = b.last_stats
