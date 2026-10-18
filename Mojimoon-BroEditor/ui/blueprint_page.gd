@@ -216,8 +216,8 @@ func _param_control(n: Dictionary, p: Array) -> Control:
 		sb.rect_min_size = Vector2(130, 0)
 		sb.connect("value_changed", self, "_on_param", [int(n.id), p[0]])
 		return sb
-	if ptype == "stat" or ptype == "dmg":
-		var opt = ui._stat_option(str(cur), Catalog.DMG_TYPES if ptype == "dmg" else Catalog.graph_stat_keys())
+	if ptype == "stat":
+		var opt = ui._stat_option(str(cur), Catalog.graph_stat_keys())
 		opt.rect_min_size = Vector2(170, 0)
 		opt.connect("selected", self, "_on_param_option", [int(n.id), p[0]])
 		return opt

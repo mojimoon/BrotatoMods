@@ -229,6 +229,11 @@ func test_87_tick_trigger_charm_ignite() -> void:
 		_check(enemy._burning != null and enemy._burning.duration == 5 and enemy._burning.spread >= 1, "ignite duration and spread")
 		var want = WeaponService.apply_damage_bonus(3 + int(Utils.get_stat(Keys.stat_max_hp_hash, 0) * 0.5), 0)
 		_check(enemy._burning != null and enemy._burning.damage == want and want > 3, "ignite scales with the chosen stat (50% max HP)")
+		var sp = enemy.current_stats.speed
+		m.runtime._slow({"id": 99, "kind": "slow", "params": {"pct": -10, "secs": 1}}, enemy)
+		_check(enemy.current_stats.speed > sp, "negative slow speeds the enemy up")
+		yield(tree.create_timer(1.3), "timeout")
+		_check(is_instance_valid(enemy) and abs(enemy.current_stats.speed - sp) < 0.5, "slow with a duration is restored")
 	main._on_WaveTimer_timeout()
 	yield(_frames(2), "completed")
 	var _b = tree.change_scene(MenuData.character_selection_scene)

@@ -2325,13 +2325,17 @@ func _on_replaced_by(id, orig: String) -> void:
 
 # 道具选择列表（不含角色）
 # 道具 + 武器家族："拥有指定道具 / 武器"
+# 道具 + 武器（任意等级 / 指定等级）："拥有指定道具 / 武器"
 func owned_select_items() -> Array:
 	var out = item_select_items()
 	var seen = {}
 	for w in _isvc().weapons:
 		if w != null and not seen.has(w.weapon_id):
 			seen[w.weapon_id] = true
-			out.push_back([tr(w.name), w.weapon_id])
+			out.push_back([tr(w.name) + tr("BE_ANY_TIER"), w.weapon_id])
+	for w in _isvc().weapons:
+		if w != null:
+			out.push_back([tr(w.name) + ["", " II", " III", " IV"][int(clamp(w.tier, 0, 3))], w.my_id])
 	return out
 
 

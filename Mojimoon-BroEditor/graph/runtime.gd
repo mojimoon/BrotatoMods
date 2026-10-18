@@ -224,16 +224,21 @@ func _pass(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> bool:
 					c += 1
 			return _cmp(n, c)
 		"own_item":
-			# 道具按 my_id；武器按家族（weapon_id，任意等级）
+			# 道具按 my_id；武器按家族（weapon_id，任意等级）或指定等级（my_id）
 			var oid = str(_param(n, "id", ""))
 			var c = 0
 			for it in RunData.get_player_items(p):
 				if it.my_id == oid:
 					c += 1
 			for w in RunData.get_player_weapons(p):
-				if w.weapon_id == oid:
+				if w.weapon_id == oid or w.my_id == oid:
 					c += 1
 			return _cmp(n, c)
+		"weapon_kinds":
+			var kinds = {}
+			for w in RunData.get_player_weapons(p):
+				kinds[w.weapon_id] = true
+			return _cmp(n, kinds.size())
 		"own_set":
 			var sid = str(_param(n, "set", ""))
 			var c = 0
@@ -311,8 +316,9 @@ func _execute(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> void:
 		"xp":
 			RunData.add_xp(v, p)
 		"rand_stats":
-			for _i in max(0, v):
-				RunData.add_stat(RunData.get_random_primary_stats(), 1, p)
+			# 负数：随机失去主要属性
+			for _i in abs(v):
+				RunData.add_stat(RunData.get_random_primary_stats(), 1 if v > 0 else -1, p)
 			LinkedStats.reset_player(p)
 		"damage":
 			_deal_damage(n, p)
@@ -648,10 +654,23 @@ func _ignite(n: Dictionary, p: int, target) -> void:
 func _slow(n: Dictionary, target) -> void:
 	if target == null or not is_instance_valid(target) or target.dead or not "current_stats" in target:
 		return
+	# 每次降低最大速度的 pct%，最多降到 (1 - 4 × pct%)（不低于 10%）；负数为加速，最多加到 (1 + 4 × |pct|%)。
+	# 持续时间 > 0 时到时还原这次的改变，0 为永久
 	var pct = float(_param(n, "pct", 10))
-	var floor_speed = target.max_stats.speed * (1.0 - min(0.9, 4.0 * pct / 100.0))
-	if target.current_stats.speed > floor_speed:
-		target.current_stats.speed = max(floor_speed, target.current_stats.speed - target.max_stats.speed * pct / 100.0)
+	var mx = target.max_stats.speed
+	var before = target.current_stats.speed
+	if pct >= 0:
+		var floor_speed = mx * (1.0 - min(0.9, 4.0 * pct / 100.0))
+		if before > floor_speed:
+			target.current_stats.speed = max(floor_speed, before - mx * pct / 100.0)
+	else:
+		var ceil_speed = mx * (1.0 + 4.0 * -pct / 100.0)
+		if before < ceil_speed:
+			target.current_stats.speed = min(ceil_speed, before - mx * pct / 100.0)
+	var secs = float(_param(n, "secs", 0))
+	var b = EnemyBehavior.find_on(target)
+	if secs > 0 and b != null and target.current_stats.speed != before:
+		b.add_speed_restore(before - target.current_stats.speed, secs)
 
 
 func _drop_fruit(count: int, pos) -> void:

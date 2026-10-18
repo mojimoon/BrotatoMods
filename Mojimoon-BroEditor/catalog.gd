@@ -405,11 +405,12 @@ const NODES = [
 	["if_still", "cond", []],
 	["enemy_hp_above", "cond", [["pct", "int", 50]]],
 	["enemy_hp_below", "cond", [["pct", "int", 50]]],
-	["dmg_type", "cond", [["stat", "dmg", "stat_melee_damage"]]],
+	["dmg_type", "cond", [["stat", "stat", "stat_melee_damage"]]],
 	["once", "cond", []],
 	["own_tag", "cond", [["tag", "tag", ""], ["cmp", "mode:at_least|at_most|exactly", "at_least"], ["n", "int", 2]]],
 	["own_item", "cond", [["id", "owned", ""], ["cmp", "mode:at_least|at_most|exactly", "at_least"], ["n", "int", 1]]],
 	["own_set", "cond", [["set", "set", ""], ["cmp", "mode:at_least|at_most|exactly", "at_least"], ["n", "int", 2]]],
+	["weapon_kinds", "cond", [["cmp", "mode:at_least|at_most|exactly", "at_least"], ["n", "int", 3]]],
 	["temp_stat", "effect", [["stat", "stat", "stat_percent_damage"], ["value", "int", 5]]],
 	["perm_stat", "effect", [["stat", "stat", "stat_max_hp"], ["value", "int", 1]]],
 	["timed_stat", "effect", [["stat", "stat", "stat_attack_speed"], ["value", "int", 20], ["secs", "int", 3]]],
@@ -420,7 +421,7 @@ const NODES = [
 	["explode", "effect", [["stat", "stat", "stat_elemental_damage"], ["pct", "int", 100]]],
 	["hp_dmg", "effect", [["pct", "int", 5]]],
 	["ignite", "effect", [["value", "int", 5], ["secs", "int", 3], ["spread", "int", 0], ["stat", "stat", "stat_elemental_damage"], ["pct", "int", 100]]],
-	["slow", "effect", [["pct", "int", 10]]],
+	["slow", "effect", [["pct", "int", 10], ["secs", "int", 0]]],
 	["vuln", "effect", [["pct", "int", 10], ["secs", "int", 3]]],
 	["rand_stats", "effect", [["value", "int", 1]]],
 	["fruit", "effect", [["value", "int", 1]]],
@@ -439,12 +440,9 @@ const NODES = [
 ]
 # 只在某个参数取某值时显示的参数：[节点, 参数] -> [条件参数, 值]
 const PARAM_SHOW_IF = {"grant:secs": ["mode", "timed"]}
-# 伤害类型（条件"伤害类型"：命中 / 击杀的缩放属性）
-# 伤害类型 = 命中的缩放属性：武器 / 道具（外星眼球按最大生命值……）可按任一主要属性缩放
-const DMG_TYPES = STAT_GROUPS[0][1]
 const STATE_TRIGGERS = ["still", "moving", "low_hp", "full_hp", "always"]
 # 状态条件：在状态扳机的路径上持续检查（全部满足时进入，任一不满足时撤销）；其余条件只在进入时检查一次
-const STATE_CONDS = ["hp_below", "hp_above", "wave_min", "wave_max", "diff_min", "diff_max", "stat_min", "stat_max", "if_moving", "if_still", "own_tag", "own_set", "own_item"]
+const STATE_CONDS = ["hp_below", "hp_above", "wave_min", "wave_max", "diff_min", "diff_max", "stat_min", "stat_max", "if_moving", "if_still", "own_tag", "own_set", "own_item", "weapon_kinds"]
 const SHOP_TRIGGERS = ["reroll", "buy"]
 
 # 不是普通 Effect 脚本、但也可以拆解的扳机（徒步旅行者的步数在 value2；浪漫之人 / 长笛的魅惑由 split_native 单独处理）

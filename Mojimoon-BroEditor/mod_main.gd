@@ -1582,10 +1582,13 @@ func tag_name(tag: String) -> String:
 # "拥有指定道具 / 武器"的名称：道具 my_id 或武器家族 weapon_id
 func owned_name(id: String) -> String:
 	var r = find_target("item", id)
-	if r == null:
-		var ms = family_members(id)
-		r = ms[0] if not ms.empty() else null
-	return tr(r.name) if r != null else id
+	if r != null:
+		return tr(r.name)
+	r = find_target("weapon", id)
+	if r != null:
+		return tr(r.name) + ["", " II", " III", " IV"][int(clamp(r.tier, 0, 3))]
+	var ms = family_members(id)
+	return tr(ms[0].name) if not ms.empty() else id
 
 
 func weapon_set_name(id: String) -> String:

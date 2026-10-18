@@ -265,6 +265,8 @@ static func _cond_text(n: Dictionary) -> String:
 	for k in ["n", "pct", "secs"]:
 		t = t.replace("{" + k + "}", str(int(_p(n, k, 0))))
 	var m = _mod()
+	if n.kind == "weapon_kinds":
+		t = t.replace("{cmp}", _tr("BE_CMP_" + str(_p(n, "cmp", "at_least")).to_upper()))
 	if n.kind in ["own_tag", "own_set", "own_item"] and m != null:
 		var what = ""
 		match n.kind:
@@ -314,13 +316,20 @@ static func _payload_text(n: Dictionary, trigger_kind: String, colored: bool) ->
 			var spread = int(_p(n, "spread", 0))
 			return t + (_tr("BE_PX_IGNITE_SPREAD").replace("{0}", _col(str(spread), true, colored)) if spread > 0 else "")
 		"vuln":
-			return _tr("BE_PX_VULN").replace("{0}", _col(str(int(_p(n, "pct", 10))) + "%", true, colored)).replace("{1}", str(int(_p(n, "secs", 3))))
+			var pct = int(_p(n, "pct", 10))
+			return _tr("BE_PX_VULN" if pct >= 0 else "BE_PX_VULN_LESS").replace("{0}", _col(str(abs(pct)) + "%", pct >= 0, colored)).replace("{1}", str(int(_p(n, "secs", 3))))
 		"slow":
 			var pct = int(_p(n, "pct", 10))
-			return _tr("BE_PX_SLOW").replace("{0}", _col(str(pct) + "%", true, colored)).replace("{1}", str(int(min(90, pct * 4))) + "%")
+			var t = _tr("BE_PX_SLOW").replace("{0}", _col(str(pct) + "%", true, colored)).replace("{1}", str(int(min(90, pct * 4))) + "%")
+			if pct < 0:
+				t = _tr("BE_PX_HASTE").replace("{0}", _col(str(-pct) + "%", false, colored)).replace("{1}", str(-pct * 4) + "%")
+			var secs = int(_p(n, "secs", 0))
+			return t + (_tr("BE_PX_FOR_SECS").replace("{0}", str(secs)) if secs > 0 else "")
 		"fruit":
 			return _tr("BE_PX_FRUIT_1" if v == 1 else "BE_PX_FRUIT").replace("{0}", _col(str(v), good, colored))
 		"rand_stats":
+			if v < 0:
+				return _tr("BE_PX_RAND_STATS_LOSE").replace("{0}", _col(str(-v), false, colored))
 			return _tr("BE_PX_RAND_STATS_1" if v == 1 else "BE_PX_RAND_STATS").replace("{0}", _col(str(v), good, colored))
 		"transform":
 			var ids = _p(n, "items", [])

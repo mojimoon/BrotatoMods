@@ -13,6 +13,7 @@ var last_stats: Array = []	# 最近一次命中的伤害缩放属性（击杀的
 var _burn_seen := false
 var _vulns: Dictionary = {}	# 来源 -> [百分比, 剩余秒数]
 var _vuln_total := 0
+var _speed_restores: Array = []	# [到时加回的速度, 剩余秒数]（蓝图效果"减速敌人"的持续时间）
 
 
 static func find_on(enemy):
@@ -88,6 +89,13 @@ func on_burned(burning_data: BurningData, from_player_index: int) -> void:
 func _process(delta: float) -> void:
 	if _burn_seen and _parent != null and not _parent._is_burning:
 		_burn_seen = false
+	for i in range(_speed_restores.size() - 1, -1, -1):
+		var r = _speed_restores[i]
+		r[1] -= delta
+		if r[1] <= 0.0:
+			if _parent != null and not _parent.dead:
+				_parent.current_stats.speed += r[0]
+			_speed_restores.remove(i)
 	if _vulns.empty():
 		return
 	for src in _vulns.keys():
@@ -98,11 +106,15 @@ func _process(delta: float) -> void:
 			_vulns.erase(src)
 
 
+func add_speed_restore(amount: float, seconds: float) -> void:
+	_speed_restores.push_back([amount, seconds])
+
+
 # 同原版受伤加成（冰块）：同一来源不叠层，取较大数值并刷新持续时间；不同来源相加
 func add_vuln(pct: int, seconds: float, source) -> void:
 	if _vulns.has(source):
 		var v = _vulns[source]
-		if pct > v[0]:
+		if abs(pct) > abs(v[0]):
 			_vuln_total += pct - v[0]
 			v[0] = pct
 		v[1] = max(v[1], seconds)
@@ -112,4 +124,4 @@ func add_vuln(pct: int, seconds: float, source) -> void:
 
 
 func get_bonus_damage(_hitbox: Hitbox, _from_player_index: int) -> int:
-	return _vuln_total
+	return int(max(-90, _vuln_total))

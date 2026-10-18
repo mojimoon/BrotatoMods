@@ -1942,6 +1942,45 @@ func test_178_burn_chance_scaling_and_dmg_types() -> void:
 	e.unapply(0)
 	_eq(JSON.print(g.scaling_stats), old, "removing the effect restores the scaling")
 	var Catalog = load(MOD_DIR + "catalog.gd")
-	_check("stat_max_hp" in Catalog.DMG_TYPES and "stat_armor" in Catalog.DMG_TYPES, "damage type lists every primary stat")
+	_check("stat_max_hp" in Catalog.graph_stat_keys() and "xp_gain" in Catalog.graph_stat_keys() and Catalog.node_def("dmg_type")[2][0][1] == "stat", "damage type lists every stat")
 	var eyes = load("res://items/all/alien_eyes/alien_eyes_stats.tres")
 	_check("stat_max_hp" in load(MOD_DIR + "graph/enemy_behavior.gd").stat_names(eyes.scaling_stats), "alien eyes hit counts as max HP damage")
+
+
+
+# 武器种类数；"拥有指定道具 / 武器"可指定等级；随机主要属性可为负；减速 / 受伤加成为负时的文本
+func test_179_weapon_kinds_tiers_negatives() -> void:
+	var GE = load(MOD_DIR + "graph/graph_effect.gd")
+	var isvc = tree.root.get_node("ItemService")
+	var rd = tree.root.get_node("RunData")
+	var ctx = {"pos": null, "target": null, "hold": null, "info": {}}
+	var kinds = {}
+	for w in rd.get_player_weapons(0):
+		kinds[w.weapon_id] = true
+	var knife1 = isvc.get_element_safe(isvc.weapons, "weapon_knife_1")
+	var knife2 = isvc.get_element_safe(isvc.weapons, "weapon_knife_2")
+	var added = [rd.add_weapon(knife1, 0), rd.add_weapon(knife2, 0)]
+	var want = kinds.size() + (0 if kinds.has(knife1.weapon_id) else 1)
+	var nk = {"id": 1, "kind": "weapon_kinds", "params": {"cmp": "exactly", "n": want}}
+	_check(m.runtime._pass({"st": {}}, nk, 0, ctx), "weapon kinds: tiers of one weapon count once")
+	_check(GE._cond_text(nk).find(str(want)) >= 0, "weapon kinds text")
+	var no = {"id": 2, "kind": "own_item", "params": {"id": "weapon_knife_2", "cmp": "exactly", "n": 1}}
+	_check(m.runtime._pass({"st": {}}, no, 0, ctx), "own_item counts a specific tier")
+	_check(GE._cond_text(no).find("II") >= 0, "own_item text shows the tier")
+	for w in added:
+		rd.remove_weapon(w, 0)
+	var before = 0
+	for k in Catalog_primary():
+		before += rd.get_stat(Keys.generate_hash(k), 0)
+	m.runtime._execute({"st": {}, "g": {}}, {"id": 3, "kind": "rand_stats", "params": {"value": -2}}, 0, ctx)
+	var after = 0
+	for k in Catalog_primary():
+		after += rd.get_stat(Keys.generate_hash(k), 0)
+	_eq(int(before - after), 2, "negative random stats removes points")
+	m.runtime._execute({"st": {}, "g": {}}, {"id": 4, "kind": "rand_stats", "params": {"value": 2}}, 0, ctx)
+	_check(GE._payload_text({"kind": "slow", "params": {"pct": -10, "secs": 3}}, "enemy_hit", false) == tr("BE_PX_HASTE").replace("{0}", "10%").replace("{1}", "40%") + tr("BE_PX_FOR_SECS").replace("{0}", "3"), "haste text")
+	_check(GE._payload_text({"kind": "vuln", "params": {"pct": -20, "secs": 3}}, "enemy_hit", false).find("20%") >= 0, "less damage text")
+
+
+func Catalog_primary() -> Array:
+	return load(MOD_DIR + "catalog.gd").STAT_GROUPS[0][1]
