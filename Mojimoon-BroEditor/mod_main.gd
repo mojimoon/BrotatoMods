@@ -38,6 +38,7 @@ const MAX_DESC = 300
 const Catalog = preload("res://mods-unpacked/Mojimoon-BroEditor/catalog.gd")
 const GraphEffect = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/graph_effect.gd")
 const Runtime = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/runtime.gd")
+const BurnChance = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/burn_chance_effect.gd")
 # 上限类属性：角色效果直接设定上限值（原版 REPLACE 存储），而不是加减
 const CAP_KEYS = ["hp_cap", "speed_cap", "dodge_cap", "crit_chance_cap"]
 # 设定值型规则：直接设定数值（原版士兵的"移动时不能攻击"就是 REPLACE 为 0）；界面默认显示角色自身的值，0 也是有效值
@@ -905,6 +906,13 @@ func make_effect(spec: Dictionary):
 		if t == null:
 			return null
 		e = t.duplicate()
+		# 燃烧几率：换成会带上属性加成的子类（见 graph/burn_chance_effect.gd）
+		if e is BurnChanceEffect:
+			var be = BurnChance.new()
+			for pr in e.get_property_list():
+				if pr.usage & PROPERTY_USAGE_STORAGE and pr.name != "script":
+					be.set(pr.name, e.get(pr.name))
+			e = be
 	else:
 		e = load(EFFECT_SCRIPT).new()
 		e.effect_sign = 3	# FROM_VALUE

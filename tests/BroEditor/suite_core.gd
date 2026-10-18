@@ -1899,3 +1899,44 @@ func test_176_own_conds_shop_force_groups() -> void:
 	m.set_group_locked(gid, true)
 	m.delete_group(gid)
 	_check(m.is_unlocked("weapon", knife.weapon_id) and m.groups.empty(), "deleting a locked group unlocks it")
+
+
+
+# 按属性几率的初始值
+func test_177_stat_chance_base() -> void:
+	var GE = load(MOD_DIR + "graph/graph_effect.gd")
+	var ctx = {"pos": null, "target": null, "hold": null, "info": {}}
+	var n = {"id": 1, "kind": "stat_chance", "params": {"base": 100, "stat": "stat_max_hp", "pct": 0}}
+	_check(m.runtime._pass({"st": {}}, n, 0, ctx), "base 100 always passes")
+	n.params.base = -1000
+	_check(not m.runtime._pass({"st": {}}, n, 0, ctx), "negative base never passes")
+	var g = GE.new_graph()
+	var t = GE.add_node(g, "kill", Vector2.ZERO)
+	var c = GE.add_node(g, "stat_chance", Vector2.ZERO, {"base": 10, "stat": "stat_max_hp", "pct": 50})
+	GE.add_link(g, t, c)
+	GE.add_link(g, c, GE.add_node(g, "heal_hp", Vector2.ZERO, {"value": 1}))
+	_check(GE.graph_text(g, false).find("10%") >= 0, "text shows the base chance")
+
+
+# 燃烧几率效果改了属性加成：全局燃烧按改后的属性加成（原版合并时丢掉加成）；伤害类型条件可选所有主要属性
+func test_178_burn_chance_scaling_and_dmg_types() -> void:
+	var i = 0
+	while not m.template("item_scared_sausage", i) is BurnChanceEffect:
+		i += 1
+	var e = m.make_effect({"from": "item_scared_sausage", "i": i, "sub": {"burning_data": {"scaling_stats": [["stat_max_hp", 0.5]]}}})
+	_check(e is BurnChanceEffect and e.burning_data.chance > 0, "edited burn chance keeps its fields")
+	var g = RunData.get_player_effects(0)[Keys.burn_chance_hash]
+	var old = JSON.print(g.scaling_stats)
+	e.apply(0)
+	_eq(JSON.print(g.scaling_stats), JSON.print([[Keys.stat_max_hp_hash, 0.5]]), "global burn scales with the edited stat")
+	var vanilla = m.template("item_scared_sausage", i)
+	vanilla.apply(0)
+	var bd = WeaponService.init_burning_data(BurningData.new(), 0)
+	_eq(bd.scaling_stats.size(), 2, "a vanilla burn source gained later keeps elemental scaling")
+	vanilla.unapply(0)
+	e.unapply(0)
+	_eq(JSON.print(g.scaling_stats), old, "removing the effect restores the scaling")
+	var Catalog = load(MOD_DIR + "catalog.gd")
+	_check("stat_max_hp" in Catalog.DMG_TYPES and "stat_armor" in Catalog.DMG_TYPES, "damage type lists every primary stat")
+	var eyes = load("res://items/all/alien_eyes/alien_eyes_stats.tres")
+	_check("stat_max_hp" in load(MOD_DIR + "graph/enemy_behavior.gd").stat_names(eyes.scaling_stats), "alien eyes hit counts as max HP damage")

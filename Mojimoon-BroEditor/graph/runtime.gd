@@ -167,9 +167,9 @@ func _pass(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> bool:
 		"chance":
 			return randf() * 100.0 < float(_param(n, "pct", 100))
 		"stat_chance":
-			# 同原版浪漫之人：几率 = max(1, 属性 × pct%)%
+			# 同原版浪漫之人：几率 = 初始值 + max(1, 属性 × pct%)%（原版初始值为 0）
 			var stat_v = Utils.get_stat(Keys.generate_hash(str(_param(n, "stat", ""))), p)
-			return randf() * 100.0 < max(1.0, float(_param(n, "pct", 100)) / 100.0 * stat_v)
+			return randf() * 100.0 < float(_param(n, "base", 0)) + max(1.0, float(_param(n, "pct", 100)) / 100.0 * stat_v)
 		"every":
 			st.count += 1
 			if st.count >= max(1, int(_param(n, "n", 1))):
@@ -333,7 +333,7 @@ func _execute(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> void:
 		"lose_item":
 			_lose_item(n, p)
 		"charm":
-			_charm(p, ctx.target)
+			_charm(p, ctx.target, float(_param(n, "secs", Utils.CHARM_DURATION)))
 		"spawn":
 			_spawn(n, p)
 		"break":
@@ -431,7 +431,7 @@ func _flush_transforms() -> void:
 const CHARM_SCENE = "res://dlcs/dlc_1/effect_behaviors/enemy/charm_enemy_effect_behavior.tscn"
 
 
-func _charm(p: int, target) -> void:
+func _charm(p: int, target, secs: float = Utils.CHARM_DURATION) -> void:
 	if target == null or not is_instance_valid(target) or target.dead or not "effect_behaviors" in target:
 		return
 	if target is Boss or target.is_loot or not target.can_be_charmed:
@@ -447,7 +447,14 @@ func _charm(p: int, target) -> void:
 		target.effect_behaviors.add_child(b)
 	if b.charmed or RunData.current_charmed_enemies[p] >= b.max_charm_count:
 		return
+	# 持续时间：原版的魅惑计时器在 charm() 里启动，临时改等待时间后还原（原版魅惑仍为 8 秒）
+	var t = b.get_node_or_null("CharmTimer")
+	var old = t.wait_time if t != null else 0.0
+	if t != null:
+		t.wait_time = max(0.1, secs)
 	b.charm(p)
+	if t != null:
+		t.wait_time = old
 
 
 # 生成敌人：地图上随机位置（原版出生标记）
@@ -627,11 +634,13 @@ func _hp_damage(n: Dictionary, p: int, target) -> void:
 func _ignite(n: Dictionary, p: int, target) -> void:
 	if target == null or not is_instance_valid(target) or target.dead:
 		return
-	var bd = BurningData.new()
-	bd.chance = 1.0
-	bd.damage = int(max(1, int(_param(n, "value", 1))))
-	bd.duration = 3
-	bd.scaling_stats = [[Keys.stat_elemental_damage_hash, 1.0]]
+	var base = BurningData.new()
+	base.chance = 1.0
+	base.damage = int(max(1, int(_param(n, "value", 1))))
+	base.duration = int(max(1, int(_param(n, "secs", 3))))
+	base.spread = int(max(0, int(_param(n, "spread", 0))))
+	base.scaling_stats = [[Keys.generate_hash(str(_param(n, "stat", "stat_elemental_damage"))), float(_param(n, "pct", 100)) / 100.0]]
+	var bd = WeaponService.init_burning_data(base, p)
 	bd.from = _player(p)
 	target.apply_burning(bd)
 
@@ -684,6 +693,7 @@ func _physics_process(delta: float) -> void:
 		return
 	_elapsed += delta
 	_count_steps(delta)
+	_tick()
 	_poll += delta
 	if _poll < 0.2:
 		return
@@ -704,6 +714,45 @@ func _physics_process(delta: float) -> void:
 						_walk(en, int(n.id), p, {"pos": null, "target": null, "hold": null}, 0)
 				elif n.kind in Catalog.STATE_TRIGGERS:
 					poll_state(en, n, p, pl)
+
+
+# 扳机"每帧检查"：每帧走一遍（不像状态扳机只在进入时执行一次）。
+# 路径上有针对敌人的条件或效果（敌人生命、魅惑、燃烧……）时，对每个存活的敌人各走一遍，目标为该敌人
+const TARGET_KINDS = ["enemy_hp_above", "enemy_hp_below", "charm", "ignite", "slow", "vuln", "hp_dmg"]
+
+
+func _tick() -> void:
+	_check_dirty()
+	var enemies = null
+	for p in min(entries.size(), RunData.get_player_count()):
+		var pl = _player(p)
+		if pl == null or pl.dead:
+			continue
+		for en in entries[p]:
+			for n in en.g.get("nodes", []):
+				if n.kind != "tick":
+					continue
+				if not _tick_targets(en, int(n.id)):
+					_walk(en, int(n.id), p, {"pos": null, "target": null, "hold": null, "info": {}}, 0)
+					continue
+				if enemies == null:
+					enemies = main._entity_spawner.get_all_enemies(false)
+				for e in enemies:
+					if is_instance_valid(e) and not e.dead:
+						_walk(en, int(n.id), p, {"pos": e.global_position, "target": e, "hold": null, "info": {}}, 0)
+
+
+func _tick_targets(en: Dictionary, trig_id: int) -> bool:
+	if not en.has("tt"):
+		en.tt = {}
+	if not en.tt.has(trig_id):
+		var any = false
+		for path in _state_paths(en, trig_id):
+			for id in path:
+				if en.by_id[id].kind in TARGET_KINDS:
+					any = true
+		en.tt[trig_id] = any
+	return en.tt[trig_id]
 
 
 # 状态扳机：每条路径单独记录是否已进入。扳机状态与路径上的状态条件都满足时进入：检查其余条件（只此一次），

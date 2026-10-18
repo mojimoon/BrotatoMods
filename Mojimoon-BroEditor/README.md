@@ -251,4 +251,20 @@ BroEditor 多功能可视化编辑器现已上线！
 - 一键分享：以分享码或文件形式分享单个对象、整页或全部内容，或者单独一张蓝图。
 - 免依赖，支持游戏全部 13 种语言，兼容 BroLab 与 Modtools。
 
+BroEditor v2.0 is out! Grand new version with many, many new features, including:
+
+- Lock groups: set unlock conditions with blueprints
+- Convenient starting weapons: pick which characters can start with a weapon in the weapons tab
+- Custom weapon classes, GMO (character fusion), better effect library, and more!
+
+If you like this mod, please consider giving a :steamthumbsup: and thank you!
+
+BroEditor v2.0 已上线！全新版本带来更多新特性，包括：
+
+- 分组锁定：用蓝图设置解锁条件
+- 便捷初始武器：在武器页选择哪些角色可以该武器开局
+- 自定义武器套装、GMO（角色融合）、更完善的效果库，还有很多！
+
+如果喜欢，别忘了点个赞 :steamthumbsup: 支持一下，谢谢！
+
 --->

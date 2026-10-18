@@ -217,7 +217,9 @@ static func path_text(by_id: Dictionary, path: Array, colored: bool = true) -> S
 			"chance":
 				chance *= float(_p(n, "pct", 100)) / 100.0
 			"stat_chance":
-				scaled.push_back(str(int(_p(n, "pct", 100))) + "% " + _stat_name(str(_p(n, "stat", ""))))
+				var st_text = str(int(_p(n, "pct", 100))) + "% " + _stat_name(str(_p(n, "stat", "")))
+				var base = int(_p(n, "base", 0))
+				scaled.push_back(st_text if base == 0 else "(" + str(base) + "% + " + st_text + ")")
 			"every":
 				every *= max(1, int(_p(n, "n", 1)))
 			"cap":
@@ -300,7 +302,10 @@ static func _payload_text(n: Dictionary, trigger_kind: String, colored: bool) ->
 			var pct = int(_p(n, "pct", 1))
 			return _tr("BE_PX_HP_DMG").replace("{0}", _col(str(pct) + "%", true, colored)).replace("{1}", str(stepify(pct / 10.0, 0.1)).trim_suffix(".0") + "%")
 		"ignite":
-			return _tr("BE_PX_IGNITE").replace("{0}", _col(str(v), true, colored)).replace("{1}", "3")
+			var t = _tr("BE_PX_IGNITE").replace("{0}", _col(str(v), true, colored)).replace("{1}", str(int(_p(n, "secs", 3))))
+			t = t.replace("{2}", str(int(_p(n, "pct", 100))) + "%").replace("{3}", _stat_name(str(_p(n, "stat", "stat_elemental_damage"))))
+			var spread = int(_p(n, "spread", 0))
+			return t + (_tr("BE_PX_IGNITE_SPREAD").replace("{0}", _col(str(spread), true, colored)) if spread > 0 else "")
 		"vuln":
 			return _tr("BE_PX_VULN").replace("{0}", _col(str(int(_p(n, "pct", 10))) + "%", true, colored)).replace("{1}", str(int(_p(n, "secs", 3))))
 		"slow":
@@ -331,7 +336,7 @@ static func _payload_text(n: Dictionary, trigger_kind: String, colored: bool) ->
 			var gid = str(_p(n, "group", ""))
 			return _tr("BE_PX_" + n.kind.to_upper()).replace("{0}", m.group_name(gid) if m != null else gid)
 		"charm":
-			return _tr("BE_PX_CHARM").replace("{0}", str(Utils.CHARM_DURATION))
+			return _tr("BE_PX_CHARM").replace("{0}", str(int(_p(n, "secs", Utils.CHARM_DURATION))))
 		"spawn":
 			var m = _mod()
 			var en = str(_p(n, "enemy", ""))

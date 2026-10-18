@@ -180,3 +180,58 @@ func test_150_resume_after_delete() -> void:
 	var _b = tree.change_scene(MenuData.character_selection_scene)
 	yield(_frames(4), "completed")
 	pd.reset_and_save_new_run_state()
+
+
+# "每帧检查"：对每个敌人持续检查（敌人生命低于 X% → 按属性几率 → 魅惑 N 秒）；燃烧的持续时间 / 扩散 / 伤害类型
+func test_87_tick_trigger_charm_ignite() -> void:
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	var t = GE.add_node(g, "tick", Vector2.ZERO)
+	var hp = GE.add_node(g, "enemy_hp_below", Vector2.ZERO, {"pct": 101})
+	var ch = GE.add_node(g, "stat_chance", Vector2.ZERO, {"base": 100, "stat": "stat_max_hp", "pct": 0})
+	GE.add_link(g, t, hp)
+	GE.add_link(g, hp, ch)
+	GE.add_link(g, ch, GE.add_node(g, "charm", Vector2.ZERO, {"secs": 2}))
+	GE.add_link(g, hp, GE.add_node(g, "ignite", Vector2.ZERO, {"value": 3, "secs": 5, "spread": 1, "stat": "stat_max_hp", "pct": 50}))
+	var p = m.new_profile()
+	p.graph = g
+	m.profiles[CH] = p
+	m.apply_all()
+	var text = GE.graph_text(g, false)
+	_check(text.find("2") >= 0 and text.find("5") >= 0, "charm / ignite text shows the new fields")
+	_setup_player(CH)
+	rd.players_data[0].items = []
+	rd.add_character(m.find_character(CH), 0)
+	rd.add_weapon(isvc.get_element_safe(isvc.weapons, "weapon_fist_1"), 0)
+	rd.current_wave = 1
+	TempStats.reset()
+	var _e = tree.change_scene("res://main.tscn")
+	yield(_frames(10), "completed")
+	var main = tree.current_scene
+	main._players[0].disable_hurtbox()
+	main._wave_timer.start(600)
+	var enemy = null
+	for i in 300:
+		var es = main._entity_spawner.get_all_enemies(false)
+		if not es.empty():
+			enemy = es[0]
+			break
+		yield(tree, "idle_frame")
+	_check(enemy != null, "enemy spawned")
+	if enemy != null:
+		yield(_frames(3), "completed")
+		_check(enemy.get_charmed_by_player_index() == 0, "tick trigger charmed the enemy without a hit")
+		var timer = null
+		for c in enemy.effect_behaviors.get_children():
+			if "charmed" in c:
+				timer = c.get_node("CharmTimer")
+		_check(timer != null and timer.time_left <= 2.0 and timer.wait_time == 8, "charm lasts the node's duration; vanilla duration restored")
+		_check(enemy._burning != null and enemy._burning.duration == 5 and enemy._burning.spread >= 1, "ignite duration and spread")
+		var want = WeaponService.apply_damage_bonus(3 + int(Utils.get_stat(Keys.stat_max_hp_hash, 0) * 0.5), 0)
+		_check(enemy._burning != null and enemy._burning.damage == want and want > 3, "ignite scales with the chosen stat (50% max HP)")
+	main._on_WaveTimer_timeout()
+	yield(_frames(2), "completed")
+	var _b = tree.change_scene(MenuData.character_selection_scene)
+	yield(_frames(4), "completed")
+	m.profiles.erase(CH)
+	m.apply_all()

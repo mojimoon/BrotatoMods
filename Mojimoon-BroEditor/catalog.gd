@@ -387,8 +387,9 @@ const NODES = [
 	["low_hp", "trigger", [["pct", "int", 50]]],
 	["full_hp", "trigger", []],
 	["always", "trigger", []],
+	["tick", "trigger", []],
 	["chance", "cond", [["pct", "int", 25]]],
-	["stat_chance", "cond", [["stat", "stat", "stat_max_hp"], ["pct", "int", 50]]],
+	["stat_chance", "cond", [["base", "int", 0], ["stat", "stat", "stat_max_hp"], ["pct", "int", 50]]],
 	["every", "cond", [["n", "int", 5]]],
 	["cap", "cond", [["n", "int", 3]]],
 	["cooldown", "cond", [["secs", "int", 3]]],
@@ -418,7 +419,7 @@ const NODES = [
 	["damage", "effect", [["stat", "stat", "stat_ranged_damage"], ["pct", "int", 100]]],
 	["explode", "effect", [["stat", "stat", "stat_elemental_damage"], ["pct", "int", 100]]],
 	["hp_dmg", "effect", [["pct", "int", 5]]],
-	["ignite", "effect", [["value", "int", 5]]],
+	["ignite", "effect", [["value", "int", 5], ["secs", "int", 3], ["spread", "int", 0], ["stat", "stat", "stat_elemental_damage"], ["pct", "int", 100]]],
 	["slow", "effect", [["pct", "int", 10]]],
 	["vuln", "effect", [["pct", "int", 10], ["secs", "int", 3]]],
 	["rand_stats", "effect", [["value", "int", 1]]],
@@ -428,7 +429,7 @@ const NODES = [
 	["lose_item", "effect", [["items", "items", []]]],
 	["shop_add", "effect", [["items", "items", []]]],
 	["shop_remove", "effect", [["items", "items", []]]],
-	["charm", "effect", []],
+	["charm", "effect", [["secs", "int", 8]]],
 	["spawn", "effect", [["enemy", "enemy", "baby_alien"], ["n", "int", 1]]],
 	["break", "effect", [["value", "int", 10]]],
 	["grant", "effect", [["ref", "effect", null], ["n", "int", 1], ["mode", "mode:temp|timed|perm", "temp"], ["secs", "int", 5]]],
@@ -439,7 +440,8 @@ const NODES = [
 # 只在某个参数取某值时显示的参数：[节点, 参数] -> [条件参数, 值]
 const PARAM_SHOW_IF = {"grant:secs": ["mode", "timed"]}
 # 伤害类型（条件"伤害类型"：命中 / 击杀的缩放属性）
-const DMG_TYPES = ["stat_melee_damage", "stat_ranged_damage", "stat_elemental_damage", "stat_engineering"]
+# 伤害类型 = 命中的缩放属性：武器 / 道具（外星眼球按最大生命值……）可按任一主要属性缩放
+const DMG_TYPES = STAT_GROUPS[0][1]
 const STATE_TRIGGERS = ["still", "moving", "low_hp", "full_hp", "always"]
 # 状态条件：在状态扳机的路径上持续检查（全部满足时进入，任一不满足时撤销）；其余条件只在进入时检查一次
 const STATE_CONDS = ["hp_below", "hp_above", "wave_min", "wave_max", "diff_min", "diff_max", "stat_min", "stat_max", "if_moving", "if_still", "own_tag", "own_set", "own_item"]
