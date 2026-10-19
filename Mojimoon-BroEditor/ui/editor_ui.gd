@@ -1688,7 +1688,7 @@ func _fill_set_library(m) -> void:
 func _on_set_lib_add(spec: Dictionary, m) -> void:
 	var lv = int(m.get_meta("lv"))
 	var specs = _set_edit_specs()[lv]
-	specs.push_back(spec)
+	specs.push_back(spec.duplicate(true))
 	_set_expanded = str(lv) + ":" + str(specs.size() - 1)
 	m.close()
 	_set_changed()
@@ -3495,7 +3495,7 @@ func _trigger_spec(custom_key: String, key: String, value: int) -> Dictionary:
 
 func _add_spec(spec: Dictionary) -> void:
 	var specs = _edit_specs()
-	specs.push_back(spec)
+	specs.push_back(spec.duplicate(true))
 	_expanded = specs.size() - 1
 	_fill_effect_list()
 	_changed()
