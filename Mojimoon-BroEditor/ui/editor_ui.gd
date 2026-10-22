@@ -1152,13 +1152,13 @@ func _build_page() -> void:
 func _build_overview() -> void:
 	var cols = _page_columns()
 	var left = _left_column(cols)
-	_source_section(left)
 	_basic_section(left)
 	if _look_custom():
 		_look_section(left)
 	_tag_section(left)
 	if _kind == "weapon":
 		_weapon_users_section(left)
+	_source_section(left)
 	_group_section(left)
 	_preview_card(cols)
 
