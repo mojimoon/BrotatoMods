@@ -853,6 +853,7 @@ func test_132_bundle_codes() -> void:
 	p.price = 3
 	m.item_profiles[it.my_id] = p
 	m.profiles[CH] = m.new_profile()
+	m.profiles[CH].stats = {"stat_armor": 1}
 	var single = m.export_code(it.my_id, "item")
 	_check(single.begins_with(m.SHARE_PREFIX), "single prefix")
 	_eq(m.import_code(single, CH, "character"), "", "item code rejected for characters")
@@ -2035,3 +2036,56 @@ func test_135_bundle_dependencies() -> void:
 	m.weapon_sets = {}
 	m.custom_tags = {}
 	dir.remove(m.ICON_DIR + "be_dep_icon.png")
+
+
+# 数据包：单独存储、下载即启用、切换版本、编辑包版本成为自修改版、停用 / 卸载、保存读取；冲突的自定义套装改 id
+func test_136_pack_versions() -> void:
+	var it = _plain_item().my_id
+	var vs = m.family_members("weapon_knife")[0].sets[0].my_id
+	var p = m.new_profile()
+	p.price = 3
+	m.item_profiles[it] = p
+	m.weapon_sets["set_custom_1"] = m.normalize_set({"custom": true, "base": vs, "name": "Mine"})
+	m.save_profiles()
+	_eq(m.own.items[it].price, 3, "own captured")
+	var data = {
+		"items": {it: {"price": 9}},
+		"profiles": {"character_be_pack_1": {"custom": true, "base": CH, "name": "Pack Guy", "effects": [{"from": "set_custom_1#0", "i": 0}]}},
+		"sets": {"set_custom_1": {"custom": true, "base": vs, "name": "Theirs"}},
+	}
+	_eq(m.install_pack({"id": "testpack01", "title": "T"}, m.ALL_PREFIX + m.pack(data)), 2, "pack installed")
+	_eq(m.install_pack({"id": "../bad"}, m.ALL_PREFIX + m.pack(data)), -1, "bad pack id rejected")
+	_eq(m.item_profiles[it].price, 9, "pack version active")
+	_eq(m.own.items[it].price, 3, "own edits kept")
+	_check(m.find_character("character_be_pack_1") != null, "pack custom character registered")
+	_check(m.weapon_sets.has("set_custom_1_testpack01") and m.weapon_sets["set_custom_1"].name == "Mine", "clashing custom set rekeyed")
+	_eq(m.profiles["character_be_pack_1"].effects[0].from, "set_custom_1_testpack01#0", "set refs renamed")
+	_eq(m.unit_versions("item", it), ["vanilla", "self", "testpack01"], "versions")
+	m.set_source("item", it, "self")
+	_eq(m.item_profiles[it].price, 3, "switched to own")
+	m.set_source("item", it, "vanilla")
+	_check(not m.item_profiles.has(it), "switched to vanilla")
+	_eq(m.own.items[it].price, 3, "own kept while vanilla")
+	m.set_pack_enabled("testpack01", true)
+	_eq(m.item_profiles[it].price, 9, "enable all")
+	m.item_profiles[it].price = 12
+	m.capture()
+	_eq(m.own.items[it].price, 12, "edited pack version becomes own")
+	_eq(m.unit_source("item", it), "self", "now uses own")
+	_eq(m.packs.testpack01.data.items[it].price, 9, "pack data untouched")
+	m.set_pack_enabled("testpack01", false)
+	_check(m.find_character("character_be_pack_1") == null, "disable all unregisters pack custom")
+	_check(not m.weapon_sets.has("set_custom_1_testpack01"), "pack set dropped with its users")
+	_eq(m.item_profiles[it].price, 12, "own still active")
+	m.set_pack_enabled("testpack01", true, "character", "character_be_pack_1")
+	_check(not File.new().file_exists(m.CUSTOM_DIR + "character/character_be_pack_1.json"), "pack custom not saved as own")
+	m.load_profiles()
+	m.apply_all()
+	_check(m.packs.has("testpack01") and m.find_character("character_be_pack_1") != null, "pack reloaded, entry still enabled")
+	_eq(m.item_profiles[it].price, 12, "own reloaded")
+	m.uninstall_pack("testpack01")
+	_check(m.find_character("character_be_pack_1") == null and not m.packs.has("testpack01"), "uninstalled")
+	_check(not File.new().file_exists(m.PACK_DIR + "testpack01.json"), "pack file removed")
+	_eq(m.item_profiles[it].price, 12, "own kept after uninstall")
+	m.weapon_sets = {}
+	m.custom_tags = {}

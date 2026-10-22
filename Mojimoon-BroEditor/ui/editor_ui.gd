@@ -69,6 +69,7 @@ const KIND_TABS = [
 	["character", "BE_KIND_CHARACTER", C_ACCENT],
 	["item", "BE_KIND_ITEM", C_ACCENT_3],
 	["weapon", "BE_KIND_WEAPON", C_ACCENT_2],
+	["share", "BE_CLOUD_TITLE", C_CUSTOM],	# 分享站（没有开关；见 cloud.gd）
 ]
 # 道具 / 武器的页签
 const OBJECT_TABS = [
@@ -165,6 +166,12 @@ var _modals: Array = []
 
 var test_clipboard = null
 var test_cloud = null	# 分享站的测试响应（见 cloud.gd 的 test_responses）
+# 第四栏：分享站
+var share_view = null
+var _share_on := false
+var _body: HBoxContainer
+var _left_card: Control
+var _right_panel: Control
 
 
 func _ready() -> void:
@@ -255,6 +262,7 @@ func _build_ui() -> void:
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_constant_override("separation", 12)
 	root.add_child(body)
+	_body = body
 	_build_left(body)
 	_build_right(body)
 
@@ -296,10 +304,6 @@ func _build_header(root: Control) -> void:
 	export_btn.clip_text = false
 	export_btn.connect("selected", self, "_on_export_selected")
 	header.add_child(export_btn)
-	var cloud_btn = _button(tr("BE_CLOUD"), BASE_SMALL)
-	_apply_action_style(cloud_btn, C_ACCENT_3)
-	cloud_btn.connect("pressed", self, "open_cloud")
-	header.add_child(cloud_btn)
 	var close_btn = _button("X", BASE_NORMAL)
 	close_btn.rect_min_size = Vector2(48, 44)
 	_apply_action_style(close_btn, C_DANGER)
@@ -357,7 +361,8 @@ func open_settings() -> void:
 # 帮助：本栏的操作指南。文本分块、三栏共用（BE_HELP_*），各页按本栏的页签顺序；
 # 某栏专用的页说明为 BE_HELP_P_<页>_<栏>。占位符：{kind} 本栏名称、{new} 新建按钮、{tags} 词条 / 标签 / 类别、{dir} 文件夹
 func open_help() -> void:
-	var m = Modal.open(self, tr("BE_HELP_TITLE").replace("{kind}", tr("BE_KIND_" + _kind.to_upper())), C_ACCENT, Vector2(1100, 820))
+	var title = tr("BE_CLOUD_TITLE") if _share_on else tr("BE_HELP_TITLE").replace("{kind}", tr("BE_KIND_" + _kind.to_upper()))
+	var m = Modal.open(self, title, C_ACCENT, Vector2(1100, 820))
 	m.add_button(tr("MENU_BACK"), C_TEXT_DIM, m, "close")
 	var scroll = _scroll()
 	m.body.add_child(scroll)
@@ -370,6 +375,8 @@ func open_help() -> void:
 
 
 func help_text() -> String:
+	if _share_on:
+		return tr("BE_HELP_HUB")
 	var parts = [tr("BE_HELP_BASIC")]
 	if _kind == "weapon":
 		parts.push_back(tr("BE_HELP_TIERS"))
@@ -461,9 +468,10 @@ func _build_kind_tabs(root: Control) -> void:
 		lbl.align = Label.ALIGN_CENTER
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(lbl)
-		var sw = _switch("", _mod.kind_enabled[d[0]])
-		sw.connect("toggled", self, "_on_kind_switch", [d[0]])
-		row.add_child(sw)
+		if d[0] != "share":
+			var sw = _switch("", _mod.kind_enabled[d[0]])
+			sw.connect("toggled", self, "_on_kind_switch", [d[0]])
+			row.add_child(sw)
 		_kind_tabs[d[0]] = [tab, lbl, d[2]]
 	_refresh_kind_tabs()
 
@@ -471,7 +479,7 @@ func _build_kind_tabs(root: Control) -> void:
 func _refresh_kind_tabs() -> void:
 	for k in _kind_tabs:
 		var t = _kind_tabs[k]
-		var on = k == _kind
+		var on = k == ("share" if _share_on else _kind)
 		t[0].add_stylebox_override("panel", _style(t[2].darkened(0.65) if on else C_BG_CHIP, t[2] if on else C_BORDER, 8, 2 if on else 1, 14, 6))
 		t[1].add_color_override("font_color", C_TEXT if on else C_TEXT_DIM)
 
@@ -488,6 +496,18 @@ func _on_kind_switch(pressed: bool, kind: String) -> void:
 
 func set_kind(kind: String) -> void:
 	_commit_focus()
+	if kind == "share":
+		_show_share(true)
+		return
+	if _share_on:
+		_show_share(false)
+		# 分享站里切换版本 / 安装 / 卸载可能改变了对象：重建左栏，当前对象不在了就选第一个
+		if kind == _kind:
+			_fill_left()
+			if _mod.find_target(_kind, _id) == null:
+				_id = _first_listed()
+			_select(_id)
+			return
 	if kind == _kind:
 		return
 	_kind_ids[_kind] = _id
@@ -502,6 +522,23 @@ func set_kind(kind: String) -> void:
 	_select(_id)
 
 
+# 分享站代替左右两栏显示（第一次进入时创建，之后保留状态）
+func _show_share(on: bool) -> void:
+	_share_on = on
+	_left_card.visible = not on
+	_right_panel.visible = not on
+	if on and share_view == null:
+		# 先进入场景树：setup 里就会发请求（HTTPRequest 要在树中）
+		share_view = Cloud.new()
+		_body.add_child(share_view)
+		share_view.setup(self)
+	elif on:
+		share_view.refresh()
+	if share_view != null:
+		share_view.visible = on
+	_refresh_kind_tabs()
+
+
 func _tab_defs() -> Array:
 	return TABS if _kind == "character" else OBJECT_TABS
 
@@ -510,6 +547,7 @@ func _build_left(body: Control) -> void:
 	var card = _card(body)
 	card.size_flags_horizontal = 0
 	card.rect_min_size = Vector2(LEFT_WIDTH, 0)
+	_left_card = card
 	_left_box = VBoxContainer.new()
 	_left_box.add_constant_override("separation", 8)
 	card.add_child(_left_box)
@@ -700,6 +738,7 @@ func _build_right(body: Control) -> void:
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	right.add_constant_override("separation", 10)
 	body.add_child(right)
+	_right_panel = right
 	# 角色头
 	var head_card = _card(right)
 	var head = HBoxContainer.new()
@@ -4358,11 +4397,6 @@ func _on_export_selected(prefix: String) -> void:
 		return
 	_clipboard_set(code)
 	_set_status(tr("BE_EXPORTED"))
-
-
-func open_cloud():
-	_commit_focus()
-	return Cloud.open(self)
 
 
 func _on_import_pressed() -> void:

@@ -246,28 +246,13 @@ func _nodes(n: Node) -> Array:
 	return out
 
 
-# 分享站：勾选全部真实上传（BE_SHOT_CLOUD=upload；其他值只截图），再截浏览 / 上传 / 我的上传页
+# 分享站：浏览（真实网络）、查看、安装第一个包（peek，不计下载数）、管理、上传页
 func _cloud(out: String):
 	var ui = load("res://mods-unpacked/Mojimoon-BroEditor/ui/editor_ui.tscn").instance()
 	root.add_child(ui)
 	yield(self, "idle_frame")
-	var c = ui.open_cloud()
-	c.pick("all")
-	c._on_title(OS.get_environment("BE_SHOT_TITLE") if OS.get_environment("BE_SHOT_TITLE") != "" else "BroEditor sample")
-	c._on_author("Mojimoon")
-	c._desc = "Sample pack: custom character, item and weapon, edited vanilla characters / items / weapons, custom weapon set."
-	c.set_tab("upload")
-	yield(_shot(ui, out + "/cloud_upload.png"), "completed")
-	if OS.get_environment("BE_SHOT_CLOUD") == "upload":
-		var n = c._uploads.packs.size()
-		c.upload()
-		for i in 600:
-			if c._uploads.packs.size() > n or c._status.text.find("(") >= 0:
-				break
-			yield(self, "idle_frame")
-		print("upload status: ", c._status.text, " ", c._uploads.packs.slice(0, 0))
-	c._packs = []
-	c.set_tab("browse")
+	ui.set_kind("share")
+	var c = ui.share_view
 	for i in 600:
 		if not c._busy:
 			break
@@ -276,7 +261,32 @@ func _cloud(out: String):
 		yield(self, "idle_frame")
 	print("browse packs: ", c._packs.size(), " status: ", c._status.text)
 	yield(_shot(ui, out + "/cloud_browse.png"), "completed")
-	c.set_tab("mine")
-	yield(_shot(ui, out + "/cloud_mine.png"), "completed")
+	if c._packs.empty():
+		return
+	var p = c._packs[0]
+	var vm = c.open_view(p)
+	for i in 180:
+		yield(self, "idle_frame")
+	yield(_shot(ui, out + "/cloud_view.png"), "completed")
+	vm.close()
+	c._request("/packs/" + str(p.id) + "?peek", HTTPClient.METHOD_GET, "", [], "_on_code", [p])
+	for i in 600:
+		if c._mod.packs.has(str(p.id)):
+			break
+		yield(self, "idle_frame")
+	print("installed: ", c._mod.packs.has(str(p.id)), " status: ", c._status.text)
+	yield(_shot(ui, out + "/cloud_browse_installed.png"), "completed")
+	c.open_manage(str(p.id))
+	yield(_shot(ui, out + "/cloud_manage.png"), "completed")
+	c._on_preview_version("self")
+	yield(_shot(ui, out + "/cloud_manage_self.png"), "completed")
+	c._left.kind = "weapon"
+	c.open_manage(str(p.id))
+	yield(_shot(ui, out + "/cloud_manage_weapon.png"), "completed")
+	c._left.kind = "character"
+	c.set_page("upload")
+	c.pick("all")
+	c._on_title("Sample")
+	yield(_shot(ui, out + "/cloud_upload.png"), "completed")
 	ui.queue_free()
 	yield(self, "idle_frame")

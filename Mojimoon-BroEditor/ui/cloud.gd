@@ -1,29 +1,29 @@
-extends Node
+extends VBoxContainer
 
-# 分享站（编辑器右上角"上传 / 下载"）：服务端是 mods/tools/broeditor-cloud 的 Cloudflare Worker。挂在一个 Modal 上：
-#   浏览：搜索 / 种类 / 排序，下载后用 import_bundle 导入
-#   上传：勾选对象（依赖由 bundle_data 自动带上），填标题 / 作者 / 简介，选缩略图（默认第一个对象的图标）
-#   我的上传：上传时返回的删除令牌存在 UPLOADS_PATH（只在本机），可删除自己的包
-# test_responses：测试用，"方法 路径" -> [状态码, 正文]，有值时不发网络请求
+# 分享站（编辑器第四栏）：服务端是 mods/tools/broeditor-cloud 的 Cloudflare Worker。
+#   浏览 / 已下载：两栏卡片；查看（详情、复制 ID、包内对象）、下载；已下载的包可卸载、管理
+#   管理：左栏列出包内对象，右栏启用 / 停用、在同 id 对象的各版本（原版、自修改、各数据包）间预览与切换
+#   上传：左栏只列自修改层的对象（依赖由 bundle_data 带上）；我的上传：本机上传的包（删除令牌存 UPLOADS_PATH）
+# 数据见 mod_main 的"数据包与版本"。test_responses：测试用，"方法 路径" -> [状态码, 正文]，有值时不发网络请求
 
 const BEMain = preload("res://mods-unpacked/Mojimoon-BroEditor/mod_main.gd")
 const Modal = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/modal.gd")
 const API = "https://broeditor-6myuzuteg3xe5jtk.mojimoon.top"
 const UPLOADS_PATH = "user://Mojimoon-BroEditor/uploads.json"
 const THUMB_SIZE = 256
-const THUMB_SHOW = 112
+const THUMB_SHOW = 96
+const LEFT_COLUMNS = 5
 # 与 worker.js 的 MAX 一致
 const MAX_TITLE = 60
 const MAX_AUTHOR = 40
 const MAX_DESC = 500
 const MAX_CODE = 512 * 1024
-const TABS = ["browse", "upload", "mine"]
+const PAGES = ["browse", "installed", "upload", "mine"]
 
 var ui = null
-var modal = null
 var test_responses = null
 var _mod = null
-var _tab := "browse"
+var _page := "browse"
 var _tab_btns := {}
 var _content: VBoxContainer
 var _status: Label
@@ -34,11 +34,19 @@ var _sort := "new"
 var _packs := []
 var _more := false
 var _busy := false
-var _list: VBoxContainer
+var _grid: GridContainer
 var _thumbs := {}	# 包 id -> 纹理
+# 左栏（上传 / 管理共用）
+var _left := {"kind": "character", "q": ""}
+var _left_units := []
+var _left_grid: GridContainer
+# 管理
+var _pid := ""
+var _unit := []
+var _preview_src := ""
+var _right: VBoxContainer
 # 上传
 var _sel := []	# [[种类, id]...]
-var _with_disabled := false
 var _thumb: Image = null
 var _title := ""
 var _desc := ""
@@ -47,49 +55,49 @@ var _preview: TextureRect
 var _uploads := {"author": "", "packs": []}
 
 
-static func open(p_ui):
-	var c = load("res://mods-unpacked/Mojimoon-BroEditor/ui/cloud.gd").new()
-	c._build(p_ui)
-	return c
-
-
-func _build(p_ui) -> void:
+func setup(p_ui) -> void:
 	ui = p_ui
 	_mod = ui._mod
 	test_responses = ui.test_cloud
+	size_flags_horizontal = SIZE_EXPAND_FILL
+	size_flags_vertical = SIZE_EXPAND_FILL
+	add_constant_override("separation", 8)
 	_load_uploads()
-	modal = Modal.open(ui, ui.tr("BE_CLOUD_TITLE"), ui.C_ACCENT_2, Vector2(1500, 900))
-	modal.add_child(self)
-	for t in TABS:
+	var row = HBoxContainer.new()
+	row.add_constant_override("separation", 8)
+	add_child(row)
+	for t in PAGES:
 		var b = ui._button(ui.tr("BE_CLOUD_TAB_" + t), ui.FONT_SMALL)
-		b.connect("pressed", self, "set_tab", [t])
-		modal.head.add_child(b)
+		b.rect_min_size = Vector2(150, 0)
+		b.connect("pressed", self, "set_page", [t])
+		row.add_child(b)
 		_tab_btns[t] = b
 	_status = ui._label("", ui.FONT_DESC, ui.C_TEXT_DIM)
-	_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_status.size_flags_horizontal = SIZE_EXPAND_FILL
 	_status.align = Label.ALIGN_RIGHT
 	_status.clip_text = true
-	modal.head.add_child(_status)
+	row.add_child(_status)
 	_content = VBoxContainer.new()
-	_content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_content.size_flags_vertical = SIZE_EXPAND_FILL
 	_content.add_constant_override("separation", 8)
-	modal.body.add_child(_content)
-	modal.add_button(ui.tr("MENU_BACK"), ui.C_TEXT_DIM, modal, "close")
-	# 默认勾选编辑器当前对象（有修改时）
-	var cur = [ui._kind, ui._obj_key()]
-	if cur in _mod.share_entries([ui._kind]):
-		_sel.push_back(cur)
-	set_tab("browse")
+	add_child(_content)
+	set_page("browse")
 
 
-func set_tab(t: String) -> void:
-	_tab = t
+func set_page(t: String) -> void:
+	ui._commit_focus()
+	_page = t
 	for k in _tab_btns:
-		ui._apply_chip_style(_tab_btns[k], k == t, ui.C_ACCENT_2)
+		ui._apply_chip_style(_tab_btns[k], k == t or k == "installed" and t == "manage", ui.C_CUSTOM)
 	for c in _content.get_children():
 		_content.remove_child(c)
 		c.queue_free()
 	call("_build_" + t)
+
+
+# 重新显示当前页（编辑器切回本栏时、数据变化后）
+func refresh() -> void:
+	set_page(_page)
 
 
 func set_status(text: String) -> void:
@@ -146,7 +154,7 @@ static func _mod_version() -> String:
 
 
 # ============================================================
-# 浏览
+# 浏览 / 已下载
 # ============================================================
 func _build_browse() -> void:
 	var row = HBoxContainer.new()
@@ -154,7 +162,7 @@ func _build_browse() -> void:
 	_content.add_child(row)
 	var le = ui._line_edit(ui.tr("BE_SEARCH"))
 	le.text = _q
-	le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	le.size_flags_horizontal = SIZE_EXPAND_FILL
 	le.connect("text_entered", self, "_on_search")
 	row.add_child(le)
 	for k in ["", "character", "item", "weapon"]:
@@ -171,15 +179,22 @@ func _build_browse() -> void:
 	ui._apply_action_style(refresh, ui.C_ACCENT_2)
 	refresh.connect("pressed", self, "fetch", [0])
 	row.add_child(refresh)
+	_grid = _card_grid()
+	_fill_browse()
+	if _packs.empty() and not _busy:
+		fetch(0)
+
+
+func _card_grid() -> GridContainer:
 	var sc = ui._scroll()
 	_content.add_child(sc)
-	_list = VBoxContainer.new()
-	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_list.add_constant_override("separation", 8)
-	sc.add_child(_list)
-	_fill_list()
-	if _packs.empty():
-		fetch(0)
+	var g = GridContainer.new()
+	g.columns = 2
+	g.size_flags_horizontal = SIZE_EXPAND_FILL
+	g.add_constant_override("hseparation", 8)
+	g.add_constant_override("vseparation", 8)
+	sc.add_child(g)
+	return g
 
 
 func _on_search(text: String) -> void:
@@ -188,9 +203,9 @@ func _on_search(text: String) -> void:
 
 
 func _on_browse_filter(key: String, value: String) -> void:
-	set(("_" + key), value)
-	set_tab("browse")
-	fetch(0)
+	set("_" + key, value)
+	_packs = []
+	set_page("browse")
 
 
 func fetch(offset: int) -> void:
@@ -215,52 +230,51 @@ func _on_list(code: int, body: PoolByteArray, offset: int) -> void:
 			_packs.push_back(p)
 	_more = bool(r.get("more", false))
 	set_status("")
-	if _tab == "browse":
-		_fill_list()
+	if _page == "browse" and is_instance_valid(_grid):
+		_fill_browse()
 
 
-func _fill_list() -> void:
-	for c in _list.get_children():
-		_list.remove_child(c)
+func _fill_browse() -> void:
+	for c in _grid.get_children():
+		_grid.remove_child(c)
 		c.queue_free()
 	if _packs.empty() and not _busy:
-		_list.add_child(ui._desc(ui.tr("BE_CLOUD_EMPTY")))
+		_grid.add_child(ui._desc(ui.tr("BE_CLOUD_EMPTY")))
 	for p in _packs:
-		_pack_card(p)
+		_pack_card(_grid, p)
 	if _more:
 		var b = ui._button(ui.tr("BE_CLOUD_MORE"), ui.FONT_SMALL)
 		ui._apply_action_style(b, ui.C_ACCENT_2)
 		b.connect("pressed", self, "fetch", [_packs.size()])
-		_list.add_child(b)
+		_grid.add_child(b)
 
 
-func _pack_card(p: Dictionary) -> void:
+func _build_installed() -> void:
+	_grid = _card_grid()
+	var ids = _mod.pack_ids()
+	ids.invert()
+	if ids.empty():
+		_grid.add_child(ui._desc(ui.tr("BE_CLOUD_EMPTY")))
+	for pid in ids:
+		_pack_card(_grid, _mod.packs[pid].meta)
+
+
+func _pack_card(parent: Control, p: Dictionary) -> void:
+	var id = str(p.get("id", ""))
 	var row = HBoxContainer.new()
 	row.add_constant_override("separation", 12)
-	ui._card(_list).add_child(row)
-	var img = TextureRect.new()
-	img.rect_min_size = Vector2(THUMB_SHOW, THUMB_SHOW)
-	img.expand = true
-	img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	row.add_child(img)
-	if int(p.get("thumb", 0)):
-		_load_thumb(str(p.id), img)
+	ui._card(parent).add_child(row)
+	row.add_child(_thumb_rect(p, THUMB_SHOW))
 	var col = VBoxContainer.new()
-	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.size_flags_horizontal = SIZE_EXPAND_FILL
 	col.add_constant_override("separation", 2)
 	row.add_child(col)
 	var title = ui._label(str(p.get("title", "")), ui.FONT_NORMAL, ui.C_TEXT)
 	title.clip_text = true
 	col.add_child(title)
-	var info = [_date(p.get("created", 0)), ui.tr("BE_CLOUD_DOWNLOADS").replace("{0}", str(int(p.get("downloads", 0))))]
-	if str(p.get("author", "")) != "":
-		info.push_front(str(p.author))
-	var kinds = []
-	for k in str(p.get("kinds", "")).split(",", false):
-		kinds.push_back(ui.tr("BE_KIND_" + k.to_upper()))
-	if not kinds.empty():
-		info.push_back(PoolStringArray(kinds).join(" / "))
-	col.add_child(ui._label(PoolStringArray(info).join("  ·  "), ui.FONT_DESC, ui.C_ACCENT_2))
+	var info = ui._label(_info(p), ui.FONT_DESC, ui.C_ACCENT_2)
+	info.clip_text = true
+	col.add_child(info)
 	if str(p.get("contents", "")) != "":
 		var contents = ui._label(str(p.contents), ui.FONT_DESC, ui.C_CUSTOM)
 		contents.clip_text = true
@@ -268,12 +282,41 @@ func _pack_card(p: Dictionary) -> void:
 	if str(p.get("desc", "")) != "":
 		var d = ui._desc(str(p.desc))
 		d.add_color_override("font_color", ui.C_TEXT)
+		d.max_lines_visible = 2
 		col.add_child(d)
-	var dl = ui._button(ui.tr("BE_CLOUD_DOWNLOAD"), ui.FONT_SMALL)
-	dl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	ui._apply_action_style(dl, ui.C_ACCENT_3)
-	dl.connect("pressed", self, "_on_download_ask", [p])
-	row.add_child(dl)
+	var btns = VBoxContainer.new()
+	btns.add_constant_override("separation", 6)
+	btns.size_flags_vertical = SIZE_SHRINK_CENTER
+	row.add_child(btns)
+	_card_button(btns, "BE_CLOUD_VIEW", ui.C_ACCENT_2, "open_view", [p])
+	if _mod.packs.has(id):
+		_card_button(btns, "BE_CLOUD_MANAGE", ui.C_ACCENT, "open_manage", [id])
+		_card_button(btns, "BE_CLOUD_UNINSTALL", ui.C_DANGER, "_on_uninstall_ask", [id])
+	else:
+		_card_button(btns, "BE_CLOUD_DOWNLOAD", ui.C_ACCENT_3, "download", [p])
+
+
+func _card_button(parent: Control, key: String, accent: Color, method: String, args: Array) -> Button:
+	var b = ui._button(ui.tr(key), ui.FONT_DESC)
+	b.rect_min_size = Vector2(110, 0)
+	ui._apply_action_style(b, accent)
+	b.connect("pressed", self, method, args)
+	parent.add_child(b)
+	return b
+
+
+func _info(p: Dictionary) -> String:
+	var info = []
+	if str(p.get("author", "")) != "":
+		info.push_back(str(p.author))
+	info.push_back(_date(p.get("created", 0)))
+	info.push_back(ui.tr("BE_CLOUD_DOWNLOADS").replace("{0}", str(int(p.get("downloads", 0)))))
+	var kinds = []
+	for k in str(p.get("kinds", "")).split(",", false):
+		kinds.push_back(ui.tr("BE_KIND_" + k.to_upper()))
+	if not kinds.empty():
+		info.push_back(PoolStringArray(kinds).join(" / "))
+	return PoolStringArray(info).join("  ·  ")
 
 
 static func _date(ms) -> String:
@@ -281,119 +324,495 @@ static func _date(ms) -> String:
 	return "%04d-%02d-%02d" % [d.year, d.month, d.day]
 
 
-func _load_thumb(id: String, img: TextureRect) -> void:
+func _thumb_rect(p: Dictionary, size: int) -> TextureRect:
+	var img = TextureRect.new()
+	img.rect_min_size = Vector2(size, size)
+	img.expand = true
+	img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var id = str(p.get("id", ""))
+	var path = BEMain.PACK_DIR + id + ".png"
+	if not _thumbs.has(id) and File.new().file_exists(path):
+		var image = Image.new()
+		if image.load(path) == OK:
+			_thumbs[id] = _texture(image)
 	if _thumbs.has(id):
 		img.texture = _thumbs[id]
-		return
-	_request("/packs/" + id + "/thumb", HTTPClient.METHOD_GET, "", [], "_on_thumb", [id, img])
+	elif int(p.get("thumb", 0)):
+		_request("/packs/" + id + "/thumb", HTTPClient.METHOD_GET, "", [], "_on_thumb", [id, img])
+	return img
+
+
+static func _texture(image: Image) -> ImageTexture:
+	var tex = ImageTexture.new()
+	tex.create_from_image(image)
+	return tex
 
 
 func _on_thumb(code: int, body: PoolByteArray, id: String, img: TextureRect) -> void:
 	var image = Image.new()
 	if code != 200 or image.load_png_from_buffer(body) != OK:
 		return
-	var tex = ImageTexture.new()
-	tex.create_from_image(image)
-	_thumbs[id] = tex
+	_thumbs[id] = _texture(image)
 	if is_instance_valid(img):
-		img.texture = tex
+		img.texture = _thumbs[id]
 
 
-# 导入会覆盖同 id 的档案，先确认
-func _on_download_ask(p: Dictionary) -> void:
-	Modal.confirm(ui, [ui.tr("BE_CLOUD_IMPORT_CONFIRM").replace("{0}", str(p.get("title", "")))], ui.C_ACCENT_3, self, "download", [str(p.id)])
-
-
-func download(id: String) -> void:
+func download(p: Dictionary) -> void:
 	set_status(ui.tr("BE_CLOUD_LOADING"))
-	_request("/packs/" + id, HTTPClient.METHOD_GET, "", [], "_on_code")
+	_request("/packs/" + str(p.id), HTTPClient.METHOD_GET, "", [], "_on_code", [p])
 
 
-func _on_code(code: int, body: PoolByteArray) -> void:
+func _on_code(code: int, body: PoolByteArray, p: Dictionary) -> void:
 	if code != 200:
 		_net_error(code)
 		return
-	var n = _mod.import_bundle(body.get_string_from_utf8())
+	var n = _mod.install_pack(p, body.get_string_from_utf8())
 	if n < 0:
 		set_status(ui.tr("BE_CLOUD_IMPORT_FAILED"))
 		return
-	ui._refresh_char_list()
-	ui._select(ui._id)
-	set_status(ui.tr("BE_IMPORTED_N").replace("{0}", str(n)))
+	var id = str(p.id)
+	if _thumbs.has(id) and _thumbs[id].get_data() != null:
+		_thumbs[id].get_data().save_png(BEMain.PACK_DIR + id + ".png")
+	set_status(ui.tr("BE_CLOUD_INSTALLED").replace("{0}", str(p.get("title", ""))).replace("{1}", str(n)))
+	refresh()
+
+
+func _on_uninstall_ask(pid: String) -> void:
+	Modal.confirm(ui, [ui.tr("BE_CLOUD_UNINSTALL_CONFIRM").replace("{0}", _pack_title(pid))], ui.C_DANGER, self, "uninstall", [pid])
+
+
+func uninstall(pid: String) -> void:
+	var title = _pack_title(pid)
+	_mod.uninstall_pack(pid)
+	Directory.new().remove(BEMain.PACK_DIR + pid + ".png")
+	set_status(ui.tr("BE_CLOUD_UNINSTALLED").replace("{0}", title))
+	set_page("installed" if _page == "manage" else _page)
+
+
+func _pack_title(pid: String) -> String:
+	return str(_mod.packs[pid].meta.get("title", pid)) if _mod.packs.has(pid) else pid
+
+
+# ============================================================
+# 查看（弹窗）
+# ============================================================
+func open_view(p: Dictionary):
+	var id = str(p.get("id", ""))
+	var m = Modal.open(ui, str(p.get("title", "")), ui.C_ACCENT_2, Vector2(1100, 0))
+	var top = HBoxContainer.new()
+	top.add_constant_override("separation", 14)
+	m.body.add_child(top)
+	top.add_child(_thumb_rect(p, 128))
+	var col = VBoxContainer.new()
+	col.size_flags_horizontal = SIZE_EXPAND_FILL
+	top.add_child(col)
+	var id_row = HBoxContainer.new()
+	id_row.add_constant_override("separation", 10)
+	col.add_child(id_row)
+	id_row.add_child(ui._label("ID  " + id, ui.FONT_SMALL, ui.C_TEXT))
+	var copy = ui._button(ui.tr("BE_CLOUD_COPY_ID"), ui.FONT_DESC)
+	ui._apply_action_style(copy, ui.C_ACCENT_2)
+	copy.connect("pressed", self, "_on_copy_id", [id])
+	id_row.add_child(copy)
+	col.add_child(ui._label(_info(p) + ("  ·  v" + str(p.mod_ver) if str(p.get("mod_ver", "")) != "" else ""), ui.FONT_DESC, ui.C_ACCENT_2))
+	if str(p.get("desc", "")) != "":
+		var d = ui._desc(str(p.desc))
+		d.add_color_override("font_color", ui.C_TEXT)
+		col.add_child(d)
+	var sc = ui._scroll()
+	sc.rect_min_size = Vector2(0, 460)
+	m.body.add_child(sc)
+	var list = VBoxContainer.new()
+	list.size_flags_horizontal = SIZE_EXPAND_FILL
+	list.add_constant_override("separation", 6)
+	sc.add_child(list)
+	if _mod.packs.has(id):
+		_fill_contents(list, _mod.packs[id].data)
+		m.add_button(ui.tr("BE_CLOUD_MANAGE"), ui.C_ACCENT, self, "_view_action", [m, "open_manage", id])
+		m.add_button(ui.tr("BE_CLOUD_UNINSTALL"), ui.C_DANGER, self, "_view_action", [m, "_on_uninstall_ask", id])
+	else:
+		list.add_child(ui._desc(ui.tr("BE_CLOUD_LOADING")))
+		_request("/packs/" + id + "?peek", HTTPClient.METHOD_GET, "", [], "_on_peek", [list])
+		m.add_button(ui.tr("BE_CLOUD_DOWNLOAD"), ui.C_ACCENT_3, self, "_view_action", [m, "download", p])
+	m.add_button(ui.tr("MENU_BACK"), ui.C_TEXT_DIM, m, "close")
+	return m
+
+
+func _view_action(m, method: String, arg) -> void:
+	m.close()
+	call(method, arg)
+
+
+func _on_copy_id(id: String) -> void:
+	ui._clipboard_set(id)
+	set_status(ui.tr("BE_CLOUD_ID_COPIED"))
+
+
+func _on_peek(code: int, body: PoolByteArray, list: Control) -> void:
+	if not is_instance_valid(list):
+		return
+	for c in list.get_children():
+		list.remove_child(c)
+		c.queue_free()
+	var raw = _mod.pack_code_data(body.get_string_from_utf8()) if code == 200 else null
+	if raw == null:
+		list.add_child(ui._desc(ui.tr("BE_CLOUD_IMPORT_FAILED") if code == 200 else ui.tr("BE_CLOUD_NET_ERROR").replace("{0}", str(code))))
+		return
+	_fill_contents(list, BEMain.normalize_layer(raw))
+
+
+# 包内对象：按种类列出图标与名称，再列套装 / 标签
+func _fill_contents(list: Control, l: Dictionary) -> void:
+	for kind in BEMain.KINDS:
+		var units = _mod.layer_units(l, [kind])
+		if units.empty():
+			continue
+		list.add_child(ui._label(ui.tr("BE_KIND_" + kind.to_upper()) + "  " + str(units.size()), ui.FONT_SMALL, ui.C_ACCENT_2))
+		var g = GridContainer.new()
+		g.columns = 3
+		g.add_constant_override("hseparation", 16)
+		list.add_child(g)
+		for u in units:
+			var v = _mod.unit_value(l, u[0], u[1])
+			var cell = HBoxContainer.new()
+			cell.rect_min_size = Vector2(320, 0)
+			cell.add_constant_override("separation", 6)
+			g.add_child(cell)
+			cell.add_child(ui._icon_tile(_mod.unit_icon(u[0], u[1], v), ui.C_BORDER, 40))
+			var name = ui._label(_mod.unit_name(u[0], u[1], v), ui.FONT_DESC, ui.C_CUSTOM if _mod._unit_look(u[0], v).custom else ui.C_TEXT)
+			name.size_flags_horizontal = SIZE_EXPAND_FILL
+			name.clip_text = true
+			cell.add_child(name)
+	var extra = [["BE_SEC_WEAPON_SETS", l.sets], ["BE_SEC_ITEM_TAGS", l.tags]]
+	for e in extra:
+		if e[1].empty():
+			continue
+		var names = []
+		for k in e[1]:
+			names.push_back(e[1][k].name if e[1][k] is Dictionary and e[1][k].name != "" else (str(e[1][k]) if e[1][k] is String else k))
+		list.add_child(ui._label(ui.tr(e[0]) + "：" + PoolStringArray(names).join("、"), ui.FONT_DESC, ui.C_TEXT_DIM))
+
+
+# ============================================================
+# 左栏（上传 / 管理）：种类筛选 + 搜索 + 图标格
+# ============================================================
+func _left_panel(parent: Control, units: Array) -> void:
+	var card = ui._card(parent)
+	card.size_flags_horizontal = 0
+	card.rect_min_size = Vector2(ui.LEFT_WIDTH, 0)
+	var box = VBoxContainer.new()
+	box.add_constant_override("separation", 8)
+	card.add_child(box)
+	_left_units = units
+	var chips = GridContainer.new()
+	chips.columns = 3
+	chips.add_constant_override("hseparation", 6)
+	box.add_child(chips)
+	for k in BEMain.KINDS:
+		var n = 0
+		for u in units:
+			n += int(u[0] == k)
+		var b = ui._button(ui.tr("BE_KIND_" + k.to_upper()) + " " + str(n), ui.FONT_DESC)
+		b.size_flags_horizontal = SIZE_EXPAND_FILL
+		ui._apply_chip_style(b, _left.kind == k, ui._kind_tabs[k][2])
+		b.connect("pressed", self, "_on_left_kind", [k])
+		chips.add_child(b)
+	var le = ui._line_edit(ui.tr("BE_SEARCH"))
+	le.text = _left.q
+	le.connect("text_changed", self, "_on_left_search")
+	box.add_child(le)
+	var sc = ui._scroll()
+	box.add_child(sc)
+	_left_grid = GridContainer.new()
+	_left_grid.columns = LEFT_COLUMNS
+	_left_grid.add_constant_override("hseparation", 6)
+	_left_grid.add_constant_override("vseparation", 6)
+	sc.add_child(_left_grid)
+	if _page == "upload":
+		var row = HBoxContainer.new()
+		row.add_constant_override("separation", 8)
+		box.add_child(row)
+		for q in ["all", "none"]:
+			var b = ui._button(ui.tr("BE_CLOUD_PICK_" + q.to_upper()), ui.FONT_SMALL)
+			b.size_flags_horizontal = SIZE_EXPAND_FILL
+			ui._apply_action_style(b, ui.C_ACCENT)
+			b.connect("pressed", self, "pick", [q])
+			row.add_child(b)
+	_fill_left_grid()
+
+
+func _left_layer() -> Dictionary:
+	return _mod.packs[_pid].data if _page == "manage" else _mod.own
+
+
+# 左栏当前种类、匹配搜索的对象
+func _left_shown() -> Array:
+	var out = []
+	var q = _left.q.strip_edges().to_lower()
+	for u in _left_units:
+		if u[0] != _left.kind:
+			continue
+		if q != "" and u[1].find(q) < 0 and _mod.unit_name(u[0], u[1], _mod.unit_value(_left_layer(), u[0], u[1])).to_lower().find(q) < 0:
+			continue
+		out.push_back(u)
+	return out
+
+
+func _fill_left_grid() -> void:
+	if not is_instance_valid(_left_grid):
+		return
+	for c in _left_grid.get_children():
+		_left_grid.remove_child(c)
+		c.queue_free()
+	var l = _left_layer()
+	for u in _left_shown():
+		var v = _mod.unit_value(l, u[0], u[1])
+		var b = ui._icon_button(_mod.unit_icon(u[0], u[1], v), ui.CHAR_ICON)
+		b.hint_tooltip = _mod.unit_name(u[0], u[1], v)
+		b.connect("pressed", self, "_on_left_pressed", [u])
+		_left_grid.add_child(b)
+		var color = ui.C_CUSTOM if _mod._unit_look(u[0], v).custom else ui.C_BORDER
+		var w = 1
+		if _page == "manage":
+			if _mod.unit_source(u[0], u[1]) == _pid:
+				color = ui.C_ACCENT_3
+				w = 2
+			else:
+				b.modulate = Color(1, 1, 1, 0.4)
+			if u == _unit:
+				color = ui.C_ACCENT
+				w = 3
+		elif u in _sel:
+			color = ui.C_ACCENT_3
+			w = 3
+		ui._set_icon_style(b, color, w)
+
+
+func _on_left_kind(k: String) -> void:
+	_left.kind = k
+	refresh()
+
+
+func _on_left_search(text: String) -> void:
+	_left.q = text
+	_fill_left_grid()
+
+
+func _on_left_pressed(u: Array) -> void:
+	if _page == "manage":
+		select_unit(u)
+		return
+	if u in _sel:
+		_sel.erase(u)
+	else:
+		_sel.push_back(u)
+	_fill_left_grid()
+	_refresh_deps()
+	_refresh_preview()
+
+
+# ============================================================
+# 管理
+# ============================================================
+func open_manage(pid: String) -> void:
+	if not _mod.packs.has(pid):
+		return
+	_pid = pid
+	_unit = []
+	set_page("manage")
+
+
+func _build_manage() -> void:
+	var head = HBoxContainer.new()
+	head.add_constant_override("separation", 8)
+	_content.add_child(head)
+	var back = ui._button(ui.tr("MENU_BACK"), ui.FONT_SMALL)
+	ui._apply_action_style(back, ui.C_TEXT_DIM)
+	back.connect("pressed", self, "set_page", ["installed"])
+	head.add_child(back)
+	var title = ui._label(_pack_title(_pid), ui.FONT_NORMAL, ui.C_ACCENT)
+	title.size_flags_horizontal = SIZE_EXPAND_FILL
+	title.clip_text = true
+	head.add_child(title)
+	for d in [["BE_CLOUD_ENABLE_ALL", ui.C_ACCENT_3, true], ["BE_CLOUD_DISABLE_ALL", ui.C_TEXT_DIM, false]]:
+		var b = ui._button(ui.tr(d[0]), ui.FONT_SMALL)
+		ui._apply_action_style(b, d[1])
+		b.connect("pressed", self, "set_all", [d[2]])
+		head.add_child(b)
+	var un = ui._button(ui.tr("BE_CLOUD_UNINSTALL"), ui.FONT_SMALL)
+	ui._apply_action_style(un, ui.C_DANGER)
+	un.connect("pressed", self, "_on_uninstall_ask", [_pid])
+	head.add_child(un)
+	var body = HBoxContainer.new()
+	body.size_flags_vertical = SIZE_EXPAND_FILL
+	body.add_constant_override("separation", 12)
+	_content.add_child(body)
+	var units = _mod.layer_units(_mod.packs[_pid].data)
+	# 选中对象：保留之前的，否则本种类第一个，否则包内第一个
+	if not _unit in units:
+		_unit = units[0] if not units.empty() else []
+		for u in units:
+			if u[0] == _left.kind:
+				_unit = u
+				break
+	if not _unit.empty():
+		_left.kind = _unit[0]
+	_preview_src = _mod.unit_source(_unit[0], _unit[1]) if not _unit.empty() else ""
+	_left_panel(body, units)
+	var card = ui._card(body)
+	card.size_flags_vertical = SIZE_EXPAND_FILL
+	_right = VBoxContainer.new()
+	_right.add_constant_override("separation", 10)
+	card.add_child(_right)
+	_fill_manage_right()
+
+
+func select_unit(u: Array) -> void:
+	_unit = u
+	_preview_src = _mod.unit_source(u[0], u[1])
+	_fill_left_grid()
+	_fill_manage_right()
+
+
+func set_all(on: bool) -> void:
+	_mod.set_pack_enabled(_pid, on)
+	refresh()
+
+
+func _fill_manage_right() -> void:
+	for c in _right.get_children():
+		_right.remove_child(c)
+		c.queue_free()
+	if _unit.empty():
+		return
+	var kind = _unit[0]
+	var id = _unit[1]
+	var cur = _mod.unit_source(kind, id)
+	var head = HBoxContainer.new()
+	head.add_constant_override("separation", 14)
+	_right.add_child(head)
+	var pv = _mod.unit_value(_mod.packs[_pid].data, kind, id)
+	var icon = TextureRect.new()
+	icon.expand = true
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.rect_min_size = Vector2(72, 72)
+	icon.texture = _mod.unit_icon(kind, id, pv)
+	head.add_child(icon)
+	var col = VBoxContainer.new()
+	col.size_flags_horizontal = SIZE_EXPAND_FILL
+	col.alignment = BoxContainer.ALIGN_CENTER
+	head.add_child(col)
+	col.add_child(ui._label(_mod.unit_name(kind, id, pv), ui.FONT_NORMAL, ui.C_TEXT))
+	col.add_child(ui._key_label(id))
+	var sw = ui._switch(ui.tr("BE_CLOUD_ENABLED"), cur == _pid)
+	sw.connect("toggled", self, "_on_unit_toggled")
+	head.add_child(sw)
+	# 版本：点击预览，"使用此版本"切换
+	var vrow = HBoxContainer.new()
+	vrow.add_constant_override("separation", 6)
+	_right.add_child(vrow)
+	vrow.add_child(ui._label(ui.tr("BE_CLOUD_VERSIONS"), ui.FONT_SMALL, ui.C_ACCENT))
+	for v in _mod.unit_versions(kind, id):
+		var b = ui._button(("✓ " if v == cur else "") + _ver_name(v), ui.FONT_DESC)
+		ui._apply_chip_style(b, v == _preview_src, ui.C_ACCENT_2)
+		b.connect("pressed", self, "_on_preview_version", [v])
+		vrow.add_child(b)
+	var spacer = Control.new()
+	spacer.size_flags_horizontal = SIZE_EXPAND_FILL
+	vrow.add_child(spacer)
+	var use = ui._button(ui.tr("BE_CLOUD_USE_VERSION"), ui.FONT_SMALL)
+	ui._apply_action_style(use, ui.C_ACCENT_3)
+	use.disabled = _preview_src == cur
+	use.connect("pressed", self, "use_version")
+	vrow.add_child(use)
+	var sc = ui._scroll()
+	_right.add_child(sc)
+	var box = VBoxContainer.new()
+	box.size_flags_horizontal = SIZE_EXPAND_FILL
+	box.add_constant_override("separation", 4)
+	sc.add_child(box)
+	_version_preview(box, kind, id, _preview_src)
+
+
+func _ver_name(v: String) -> String:
+	match v:
+		"vanilla":
+			return ui.tr("BE_SRC_VANILLA")
+		"self":
+			return ui.tr("BE_CLOUD_VER_SELF")
+	return _pack_title(v)
+
+
+func _on_preview_version(v: String) -> void:
+	_preview_src = v
+	_fill_manage_right()
+
+
+func use_version() -> void:
+	_mod.set_source(_unit[0], _unit[1], _preview_src)
+	_fill_left_grid()
+	_fill_manage_right()
+
+
+func _on_unit_toggled(on: bool) -> void:
+	_mod.set_pack_enabled(_pid, on, _unit[0], _unit[1])
+	_preview_src = _mod.unit_source(_unit[0], _unit[1])
+	_fill_left_grid()
+	_fill_manage_right()
+
+
+# 某个版本的预览：名称 + 效果行（武器按等级）；自定义对象的"原版"= 不存在
+func _version_preview(box: Control, kind: String, id: String, src: String) -> void:
+	var v = _mod.version_value(kind, id, src)
+	if v == null and _mod._unit_res(kind, id) == null:
+		box.add_child(ui._desc(ui.tr("BE_CLOUD_VER_NONE")))
+		return
+	box.add_child(ui._label(_mod.unit_name(kind, id, v), ui.FONT_SMALL, ui.C_TEXT))
+	if kind != "weapon":
+		ui._effect_lines(_mod.build_effects(id, BEMain.normalize_profile(v)), box)
+		return
+	var tiers = {}
+	if v == null:
+		for w in _mod._vanilla_members(id):
+			tiers[w.my_id] = {}
+	else:
+		tiers = v.tiers
+	var ids = tiers.keys()
+	ids.sort()
+	for tid in ids:
+		box.add_child(ui._label(tid, ui.FONT_DESC, ui.C_ACCENT_2))
+		ui._effect_lines(_mod.build_effects(tid, BEMain.normalize_profile(tiers[tid])), box)
 
 
 # ============================================================
 # 上传
 # ============================================================
 func _build_upload() -> void:
+	_mod.capture()
+	var units = _mod.layer_units(_mod.own)
+	var keep = []
+	for u in _sel:
+		if u in units:
+			keep.push_back(u)
+	_sel = keep
 	var cols = HBoxContainer.new()
-	cols.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	cols.size_flags_vertical = SIZE_EXPAND_FILL
 	cols.add_constant_override("separation", 12)
 	_content.add_child(cols)
-	# 左：勾选内容
-	var left = VBoxContainer.new()
-	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	left.add_constant_override("separation", 6)
-	cols.add_child(left)
-	var quick = HBoxContainer.new()
-	quick.add_constant_override("separation", 8)
-	left.add_child(quick)
-	quick.add_child(ui._label(ui.tr("BE_CLOUD_PICK"), ui.FONT_NORMAL, ui.C_ACCENT))
-	for q in ["current", "all", "none"]:
-		var b = ui._button(ui.tr("BE_CLOUD_PICK_" + q.to_upper()), ui.FONT_DESC)
-		ui._apply_action_style(b, ui.C_ACCENT)
-		b.connect("pressed", self, "pick", [q])
-		quick.add_child(b)
-	var sc = ui._scroll()
-	left.add_child(sc)
-	var list = VBoxContainer.new()
-	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	sc.add_child(list)
-	var any = false
-	for kind in BEMain.KINDS:
-		var entries = _entries([kind])
-		if entries.empty():
-			continue
-		any = true
-		var head = HBoxContainer.new()
-		list.add_child(head)
-		var hl = ui._label(ui.tr("BE_KIND_" + kind.to_upper()), ui.FONT_SMALL, ui.C_ACCENT_2)
-		hl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		head.add_child(hl)
-		var kb = ui._button(ui.tr("BE_CLOUD_PICK_KIND"), ui.FONT_DESC)
-		ui._apply_action_style(kb, ui.C_ACCENT_2)
-		kb.connect("pressed", self, "pick", [kind])
-		head.add_child(kb)
-		for e in entries:
-			var cb = ui._checkbox(_entry_name(e), ui.FONT_DESC)
-			cb.pressed = e in _sel
-			if _is_custom_entry(e):
-				for k in ["font_color", "font_color_pressed", "font_color_focus"]:
-					cb.add_color_override(k, ui.C_CUSTOM)
-			cb.connect("toggled", self, "_on_pick_toggled", [e])
-			list.add_child(cb)
-	if not any:
-		list.add_child(ui._desc(ui.tr("BE_CLOUD_NO_ENTRIES")))
-	var dis = ui._checkbox(ui.tr("BE_CLOUD_WITH_DISABLED"), ui.FONT_DESC)
-	dis.pressed = _with_disabled
-	dis.connect("toggled", self, "_on_with_disabled")
-	left.add_child(dis)
-	_deps = ui._desc("")
-	left.add_child(_deps)
-	_refresh_deps()
-	# 右：标题 / 作者 / 简介 / 图片
+	_left_panel(cols, units)
+	var card = ui._card(cols)
+	card.size_flags_vertical = SIZE_EXPAND_FILL
 	var right = VBoxContainer.new()
-	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	right.add_constant_override("separation", 6)
-	cols.add_child(right)
+	card.add_child(right)
 	right.add_child(ui._label(ui.tr("BE_CLOUD_PACK_TITLE"), ui.FONT_SMALL, ui.C_TEXT))
-	var title = ui._line_edit(ui.tr("BE_CLOUD_PACK_TITLE"))
+	var title = ui._line_edit("")
 	title.max_length = MAX_TITLE
 	title.text = _title
 	title.connect("text_changed", self, "_on_title")
 	right.add_child(title)
 	right.add_child(ui._label(ui.tr("BE_CLOUD_AUTHOR"), ui.FONT_SMALL, ui.C_TEXT))
-	var author = ui._line_edit(ui.tr("BE_CLOUD_AUTHOR"))
+	var author = ui._line_edit("")
 	author.max_length = MAX_AUTHOR
 	author.text = str(_uploads.author)
 	author.connect("text_changed", self, "_on_author")
@@ -413,80 +832,35 @@ func _build_upload() -> void:
 	img_row.add_constant_override("separation", 10)
 	right.add_child(img_row)
 	_preview = TextureRect.new()
-	_preview.rect_min_size = Vector2(THUMB_SHOW, THUMB_SHOW)
+	_preview.rect_min_size = Vector2(128, 128)
 	_preview.expand = true
 	_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	img_row.add_child(_preview)
 	var img_col = VBoxContainer.new()
-	img_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	img_col.add_constant_override("separation", 6)
 	img_row.add_child(img_col)
-	var pick_img = ui._button(ui.tr("BE_CLOUD_IMAGE"), ui.FONT_DESC)
-	ui._apply_action_style(pick_img, ui.C_ACCENT_2)
-	pick_img.connect("pressed", self, "_on_pick_image")
-	img_col.add_child(pick_img)
-	var clear_img = ui._button(ui.tr("BE_CLOUD_IMAGE_CLEAR"), ui.FONT_DESC)
-	ui._apply_action_style(clear_img, ui.C_TEXT_DIM)
-	clear_img.connect("pressed", self, "set_thumb", [null])
-	img_col.add_child(clear_img)
-	img_col.add_child(ui._desc(ui.tr("BE_CLOUD_IMAGE_HINT")))
+	_card_button(img_col, "BE_CLOUD_IMAGE", ui.C_ACCENT_2, "_on_pick_image", [])
+	_card_button(img_col, "BE_CLOUD_IMAGE_CLEAR", ui.C_TEXT_DIM, "set_thumb", [null])
 	_refresh_preview()
+	_deps = ui._label("", ui.FONT_DESC, ui.C_TEXT_DIM)
+	right.add_child(_deps)
+	_refresh_deps()
 	var up = ui._button(ui.tr("BE_CLOUD_UPLOAD"), ui.FONT_NORMAL)
 	ui._apply_action_style(up, ui.C_ACCENT_3)
 	up.connect("pressed", self, "upload")
 	right.add_child(up)
 
 
-func _entry_name(e: Array) -> String:
-	if e[0] == "weapon":
-		var ms = _mod.family_members(e[1])
-		return ui.tr(ms[0].name) if not ms.empty() else e[1]
-	var r = _mod.find_target(e[0], e[1])
-	return ui.tr(r.name) if r != null else e[1]
-
-
-# 可分享的对象，自定义对象在前（列表、全选顺序；默认缩略图取第一个）
-func _entries(kinds: Array = BEMain.KINDS) -> Array:
-	var out = []
-	for e in _mod.share_entries(kinds):
-		if _is_custom_entry(e):
-			out.push_back(e)
-	for e in _mod.share_entries(kinds):
-		if not e in out:
-			out.push_back(e)
-	return out
-
-
-func _is_custom_entry(e: Array) -> bool:
-	return _mod.is_custom_family(e[1]) if e[0] == "weapon" else _mod.is_custom(e[1])
-
-
 func pick(what: String) -> void:
-	match what:
-		"current":
-			var cur = [ui._kind, ui._obj_key()]
-			_sel = [cur] if cur in _mod.share_entries([ui._kind]) else []
-		"all":
-			_sel = _entries()
-		"none":
-			_sel = []
-		_:
-			for e in _entries([what]):
-				if not e in _sel:
-					_sel.push_back(e)
-	set_tab("upload")
-
-
-func _on_pick_toggled(on: bool, e: Array) -> void:
-	if on and not e in _sel:
-		_sel.push_back(e)
-	elif not on:
-		_sel.erase(e)
+	if what == "none":
+		_sel = []
+	else:
+		for u in _left_shown():
+			if not u in _sel:
+				_sel.push_back(u)
+	_fill_left_grid()
 	_refresh_deps()
 	_refresh_preview()
-
-
-func _on_with_disabled(on: bool) -> void:
-	_with_disabled = on
 
 
 func _on_title(text: String) -> void:
@@ -502,9 +876,11 @@ func _on_desc(edit: TextEdit) -> void:
 	_desc = edit.text
 
 
-# 附带的依赖：套装、标签、未勾选但被引用到的对象
+# 自动附带的依赖：套装、标签、未勾选但被引用到的自定义对象
 func _refresh_deps() -> void:
-	var data = _mod.bundle_data(_sel)
+	if not is_instance_valid(_deps):
+		return
+	var data = _mod.bundle_data(_sel, _mod.own)
 	var extra = 0
 	for pair in [["character", "profiles"], ["item", "items"], ["weapon", "families"]]:
 		for id in data.get(pair[1], {}):
@@ -533,7 +909,7 @@ func _on_image_file(path: String) -> void:
 	set_thumb(img)
 
 
-# 缩略图：等比缩小到 THUMB_SIZE 以内；null = 用默认（第一个勾选对象的图标）
+# 缩略图：等比缩小到 THUMB_SIZE 以内；null = 用默认（第一个选中对象的图标）
 func set_thumb(img) -> void:
 	_thumb = _fit(img) if img != null else null
 	_refresh_preview()
@@ -553,33 +929,27 @@ static func _fit(img: Image) -> Image:
 func thumb_image():
 	if _thumb != null:
 		return _thumb
-	for e in _sel:
-		var r = _mod.family_members(e[1])[0] if e[0] == "weapon" and not _mod.family_members(e[1]).empty() else _mod.find_target(e[0], e[1])
-		if r != null and r.icon != null and r.icon.get_data() != null:
-			return _fit(r.icon.get_data())
+	for u in _sel:
+		var tex = _mod.unit_icon(u[0], u[1], _mod.unit_value(_mod.own, u[0], u[1]))
+		if tex != null and tex.get_data() != null:
+			return _fit(tex.get_data())
 	return null
 
 
 func _refresh_preview() -> void:
-	if _preview == null or not is_instance_valid(_preview):
+	if not is_instance_valid(_preview):
 		return
 	var img = thumb_image()
-	var tex = null
-	if img != null:
-		tex = ImageTexture.new()
-		tex.create_from_image(img)
-	_preview.texture = tex
+	_preview.texture = _texture(img) if img != null else null
 
 
 # 上传的请求正文；无法上传时返回错误提示的 key
 func upload_body():
-	if _sel.empty() and not _with_disabled:
+	if _sel.empty():
 		return "BE_CLOUD_NEED_PICK"
 	if _title.strip_edges() == "":
 		return "BE_CLOUD_NEED_TITLE"
-	var data = _mod.bundle_data(_sel)
-	if _with_disabled:
-		data.disabled = _mod.disabled.duplicate(true)
+	var data = _mod.bundle_data(_sel, _mod.own)
 	var code = BEMain.ALL_PREFIX + BEMain.pack(data)
 	if code.length() > MAX_CODE:
 		return "BE_CLOUD_TOO_LARGE"
@@ -588,8 +958,8 @@ func upload_body():
 		if data.has(BEMain.BUNDLE_KEYS[k]) or k == "weapon" and data.has("families"):
 			kinds.push_back(k)
 	var names = []
-	for e in _sel:
-		names.push_back(_entry_name(e))
+	for u in _sel:
+		names.push_back(_mod.unit_name(u[0], u[1], _mod.unit_value(_mod.own, u[0], u[1])))
 	var body = {
 		"title": _title.strip_edges(), "author": str(_uploads.author).strip_edges(), "desc": _desc.strip_edges().substr(0, MAX_DESC),
 		"kinds": kinds, "contents": PoolStringArray(names).join(", "), "n": _sel.size(), "mod_ver": _mod_version(), "code": code,
@@ -601,6 +971,7 @@ func upload_body():
 
 
 func upload() -> void:
+	_mod.capture()
 	var body = upload_body()
 	if body is String:
 		set_status(ui.tr(body))
@@ -630,7 +1001,7 @@ func _build_mine() -> void:
 	var sc = ui._scroll()
 	_content.add_child(sc)
 	var list = VBoxContainer.new()
-	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.size_flags_horizontal = SIZE_EXPAND_FILL
 	list.add_constant_override("separation", 6)
 	sc.add_child(list)
 	if _uploads.packs.empty():
@@ -640,14 +1011,12 @@ func _build_mine() -> void:
 		row.add_constant_override("separation", 10)
 		ui._card(list).add_child(row)
 		var t = ui._label(str(p.title), ui.FONT_SMALL, ui.C_TEXT)
-		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		t.size_flags_horizontal = SIZE_EXPAND_FILL
 		t.clip_text = true
 		row.add_child(t)
 		row.add_child(ui._label(_date(float(p.get("created", 0)) * 1000) + "  ·  " + str(p.id), ui.FONT_DESC, ui.C_TEXT_DIM))
-		var del = ui._button(ui.tr("BE_DELETE"), ui.FONT_DESC)
-		ui._apply_action_style(del, ui.C_DANGER)
-		del.connect("pressed", self, "_on_delete_ask", [p])
-		row.add_child(del)
+		_card_button(row, "BE_CLOUD_COPY_ID", ui.C_ACCENT_2, "_on_copy_id", [str(p.id)])
+		_card_button(row, "BE_DELETE", ui.C_DANGER, "_on_delete_ask", [p])
 
 
 func _on_delete_ask(p: Dictionary) -> void:
@@ -667,8 +1036,8 @@ func _on_deleted(code: int, _body: PoolByteArray, p: Dictionary) -> void:
 	_save_uploads()
 	_packs = []
 	set_status(ui.tr("BE_CLOUD_DELETED"))
-	if _tab == "mine":
-		set_tab("mine")
+	if _page == "mine":
+		refresh()
 
 
 func _load_uploads() -> void:

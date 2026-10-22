@@ -469,8 +469,15 @@ func load_profiles() -> void:
 	custom_tags = {}
 	weapon_sets = {}
 	groups = {}
+	sources = {}
 	_load_main_file()
 	_load_custom_files()
+	# 读到的是自修改层；再叠加数据包得出生效层（注册与应用在 _ready / apply_all 里）
+	own = new_layer()
+	for k in LAYER_KEYS:
+		own[k] = eff()[k].duplicate(true)
+	_load_packs()
+	compose(false)
 
 
 func _load_main_file() -> void:
@@ -492,6 +499,10 @@ func _load_main_file() -> void:
 	var kinds = settings.get("kinds", {}) if settings is Dictionary else {}
 	for k in KINDS:
 		kind_enabled[k] = bool(kinds.get(k, true)) if kinds is Dictionary else true
+	var src = parsed.result.get("sources", {})
+	if src is Dictionary:
+		for k in src:
+			sources[str(k)] = str(src[k])
 	var gs = parsed.result.get("groups", {})
 	if gs is Dictionary:
 		for k in gs:
@@ -555,7 +566,26 @@ func custom_entries() -> Array:
 
 
 # profiles.json 只存原版对象的修改与设置；自定义对象各存一个文件（删掉的对象的文件一并删除）
+# 保存自修改层（先把生效层上的编辑写回）
 func save_profiles() -> void:
+	capture()
+	var e = eff()
+	profiles = own.profiles
+	item_profiles = own.items
+	weapon_profiles = own.weapons
+	weapon_families = own.families
+	weapon_sets = own.sets
+	custom_tags = own.tags
+	_write_profiles()
+	profiles = e.profiles
+	item_profiles = e.items
+	weapon_profiles = e.weapons
+	weapon_families = e.families
+	weapon_sets = e.sets
+	custom_tags = e.tags
+
+
+func _write_profiles() -> void:
 	var dir = Directory.new()
 	for kind in KINDS:
 		if not dir.dir_exists(CUSTOM_DIR + kind):
@@ -586,6 +616,7 @@ func save_profiles() -> void:
 	main["tags"] = custom_tags
 	main["sets"] = compact_all(weapon_sets, new_set())
 	main["groups"] = groups
+	main["sources"] = sources
 	var file = File.new()
 	if file.open(SAVE_PATH, File.WRITE) != OK:
 		ModLoaderLog.error("Failed to save profiles", MOD_ID)
@@ -712,21 +743,9 @@ func export_bundle(kind: String) -> String:
 	return prefix + pack(data)
 
 
-# 可分享的对象：有档案的角色 / 道具，有家族档案或等级档案的武器（按家族 weapon_id）。[[种类, id]...]
-func share_entries(kinds: Array = KINDS) -> Array:
-	var out = []
-	for k in kinds:
-		var ids = []
-		if k == "weapon":
-			for tid in weapon_profiles:
-				ids.push_back(weapon_family_of(tid))
-			ids += weapon_families.keys()
-		else:
-			ids = profiles_of(k).keys()
-		for id in ids:
-			if not [k, id] in out:
-				out.push_back([k, id])
-	return out
+# 可分享的对象（默认取生效层）：[[种类, id]...]，武器按家族 weapon_id
+func share_entries(kinds: Array = KINDS, l = null) -> Array:
+	return layer_units(l if l != null else eff(), kinds)
 
 
 # 等级 id -> 家族 weapon_id（未登记的等级按 id 推断：去掉 _broeditor 与末尾等级号）
@@ -738,10 +757,12 @@ func weapon_family_of(tid: String) -> String:
 	return tid.substr(0, tid.find_last("_"))
 
 
-# 选中对象的批量码数据（BEA 格式，导入用 import_bundle），并带上依赖：
+# 选中对象的批量码数据（BEA 格式，导入用 import_bundle / install_pack），l = 取数据的层（默认生效层），并带上依赖：
 #   武器所属的已修改 / 自定义套装，角色 / 道具用到的自定义标签，
 #   档案里引用到的其他自定义对象（效果来源、初始武器 / 道具、融合角色等）与自定义图标（icons：文件名 -> base64 PNG）
-func bundle_data(sel: Array) -> Dictionary:
+func bundle_data(sel: Array, l = null) -> Dictionary:
+	if l == null:
+		l = eff()
 	var data = {"profiles": {}, "items": {}, "weapons": {}, "families": {}, "sets": {}, "tags": {}, "icons": {}}
 	var queue = sel.duplicate()
 	var seen = {}
@@ -755,22 +776,22 @@ func bundle_data(sel: Array) -> Dictionary:
 		var refs = []
 		match kind:
 			"set":
-				if weapon_sets.has(id):
-					data.sets[id] = compact(weapon_sets[id], new_set())
-					refs.push_back(weapon_sets[id])
+				if l.sets.has(id):
+					data.sets[id] = compact(l.sets[id], new_set())
+					refs.push_back(l.sets[id])
 			"weapon":
-				var f = weapon_families.get(id)
+				var f = l.families.get(id)
 				if f != null:
 					data.families[id] = compact(f, new_family())
 					refs.push_back(f)
-				for tid in weapon_profiles:
+				for tid in l.weapons:
 					if weapon_family_of(tid) == id:
-						data.weapons[tid] = compact(weapon_profiles[tid], new_profile())
-						refs.push_back(weapon_profiles[tid])
-				for sid in _family_set_ids(id):
+						data.weapons[tid] = compact(l.weapons[tid], new_profile())
+						refs.push_back(l.weapons[tid])
+				for sid in _family_set_ids(id, l):
 					queue.push_back(["set", sid])
 			_:
-				var ps = profiles_of(kind)
+				var ps = l[BUNDLE_KEYS[kind]]
 				if ps.has(id):
 					data[BUNDLE_KEYS[kind]][id] = compact(ps[id], new_profile())
 					refs.push_back(ps[id])
@@ -778,7 +799,7 @@ func bundle_data(sel: Array) -> Dictionary:
 		for r in refs:
 			_strings_in(r, strs)
 		for s in strs:
-			queue += _ref_entries(s, data)
+			queue += _ref_entries(s, data, l)
 	for k in data.keys():
 		if data[k].empty():
 			data.erase(k)
@@ -786,8 +807,8 @@ func bundle_data(sel: Array) -> Dictionary:
 
 
 # 武器家族的套装：家族档案指定的，否则原版（自定义武器：基底家族）的
-func _family_set_ids(wid: String) -> Array:
-	var f = weapon_families.get(wid)
+func _family_set_ids(wid: String, l: Dictionary) -> Array:
+	var f = l.families.get(wid)
 	if f != null and f.sets is Array:
 		return f.sets
 	var vm = _vanilla_members(f.base if f != null and f.custom else wid)
@@ -811,26 +832,483 @@ static func _strings_in(v, out: Array) -> void:
 
 
 # 档案里的一个字符串指向的依赖：标签 / 图标直接写入 data，对象与套装返回待处理的 [种类, id]
-func _ref_entries(s: String, data: Dictionary) -> Array:
-	if custom_tags.has(s):
-		data.tags[s] = custom_tags[s]
+func _ref_entries(s: String, data: Dictionary, l: Dictionary) -> Array:
+	if l.tags.has(s):
+		data.tags[s] = l.tags[s]
 	elif s.begins_with("file:"):
 		var name = s.substr(5)
 		var file = File.new()
 		if not data.icons.has(name) and file.open(ICON_DIR + name, File.READ) == OK:
 			data.icons[name] = Marshalls.raw_to_base64(file.get_buffer(file.get_len()))
 			file.close()
-	elif weapon_sets.has(s.get_slice(SET_LEVEL_SEP, 0)):
+	elif l.sets.has(s.get_slice(SET_LEVEL_SEP, 0)):
 		return [["set", s.get_slice(SET_LEVEL_SEP, 0)]]
-	elif profiles.has(s) and profiles[s].custom:
+	elif l.profiles.has(s) and l.profiles[s].custom:
 		return [["character", s]]
-	elif item_profiles.has(s) and item_profiles[s].custom:
+	elif l.items.has(s) and l.items[s].custom:
 		return [["item", s]]
-	elif is_custom_family(s):
+	elif l.families.has(s) and l.families[s].custom:
 		return [["weapon", s]]
-	elif weapon_profiles.has(s) and is_custom_family(weapon_family_of(s)):
+	elif l.weapons.has(s) and l.families.has(weapon_family_of(s)) and l.families[weapon_family_of(s)].custom:
 		return [["weapon", weapon_family_of(s)]]
 	return []
+
+
+# ============================================================
+# 数据包与版本
+# ============================================================
+# 三层：自修改层 own（编辑器里的修改，存 profiles.json 与 custom/）、下载的数据包 packs（各存 packs/<id>.json）、
+# 生效层（profiles / item_profiles / weapon_profiles / weapon_families / weapon_sets / custom_tags，游戏与编辑器使用）。
+# 对象（角色 / 道具 / 武器家族）按 sources 选用版本："self" / "vanilla" / 包 id；没有记录时有自修改版用自修改版，否则原版。
+# compose() 由 own + packs + sources 生成生效层；capture() 把生效层上的编辑写回 own：
+#   数据包版本被编辑后，编辑结果成为自修改版（覆盖原有的），并改用自修改版。
+# 套装：自修改层优先，其次是启用中的数据包对象引用到的包内套装（新下载的包优先）；标签同理。
+const PACK_DIR = "user://Mojimoon-BroEditor/packs/"
+const LAYER_KEYS = ["profiles", "items", "weapons", "families", "sets", "tags"]
+var own: Dictionary = new_layer()
+var packs: Dictionary = {}	# 包 id -> {"meta": {id, title, author, desc, kinds, contents, created, installed...}, "data": 层}
+var sources: Dictionary = {}	# "种类:id" -> "self" / "vanilla" / 包 id
+var _set_src: Dictionary = {}	# 生效的包内套装 id -> 包 id（compose 得出）
+var _tag_src: Dictionary = {}	# 生效的包内标签 -> 包 id
+
+
+static func new_layer() -> Dictionary:
+	return {"profiles": {}, "items": {}, "weapons": {}, "families": {}, "sets": {}, "tags": {}}
+
+
+# 生效层（引用当前的字典，不是副本）
+func eff() -> Dictionary:
+	return {"profiles": profiles, "items": item_profiles, "weapons": weapon_profiles, "families": weapon_families, "sets": weapon_sets, "tags": custom_tags}
+
+
+# 分享码 / 包文件里的数据 -> 层（补齐字段）
+static func normalize_layer(d) -> Dictionary:
+	var out = new_layer()
+	if not d is Dictionary:
+		return out
+	for k in ["profiles", "items", "weapons"]:
+		if d.get(k) is Dictionary:
+			for id in d[k]:
+				out[k][str(id)] = normalize_profile(d[k][id])
+	if d.get("families") is Dictionary:
+		for id in d.families:
+			out.families[str(id)] = normalize_family(d.families[id])
+	if d.get("sets") is Dictionary:
+		for id in d.sets:
+			out.sets[str(id)] = normalize_set(d.sets[id])
+	if d.get("tags") is Dictionary:
+		for id in d.tags:
+			out.tags[str(id)] = str(d.tags[id])
+	return out
+
+
+# 层 -> 存储格式（去掉默认字段）
+static func compact_layer(l: Dictionary) -> Dictionary:
+	return {
+		"profiles": compact_all(l.profiles, new_profile()), "items": compact_all(l.items, new_profile()),
+		"weapons": compact_all(l.weapons, new_profile()), "families": compact_all(l.families, new_family()),
+		"sets": compact_all(l.sets, new_set()), "tags": l.tags.duplicate(),
+	}
+
+
+# 层里的对象（有修改的）
+func layer_units(l: Dictionary, kinds: Array = KINDS) -> Array:
+	var out = []
+	var seen = {}
+	for k in kinds:
+		var ids = []
+		if k == "weapon":
+			ids = l.families.keys()
+			for tid in l.weapons:
+				ids.push_back(weapon_family_of(tid))
+		else:
+			ids = l[BUNDLE_KEYS[k]].keys()
+		for id in ids:
+			if not seen.has(k + ":" + id) and unit_value(l, k, id) != null:
+				seen[k + ":" + id] = true
+				out.push_back([k, id])
+	return out
+
+
+# 对象在层里的值（去掉默认字段；没有修改返回 null）。武器：{"family": 家族档案, "tiers": {等级 id: 档案}}
+func unit_value(l: Dictionary, kind: String, id: String):
+	if kind != "weapon":
+		var p = l[BUNDLE_KEYS[kind]].get(id)
+		var c = compact(p, new_profile()) if p is Dictionary else {}
+		return c if not c.empty() else null
+	var f = l.families.get(id)
+	var fc = compact(f, new_family()) if f is Dictionary else {}
+	var tiers = {}
+	for tid in l.weapons:
+		if weapon_family_of(tid) == id:
+			var c = compact(l.weapons[tid], new_profile())
+			# 自定义等级注册时自动建的空档案不算修改
+			if not c.empty() and c.keys() != ["custom"]:
+				tiers[tid] = c
+	if fc.empty() and tiers.empty():
+		return null
+	return {"family": fc, "tiers": tiers}
+
+
+func _set_unit(l: Dictionary, kind: String, id: String, v) -> void:
+	if kind != "weapon":
+		l[BUNDLE_KEYS[kind]].erase(id)
+		if v != null:
+			l[BUNDLE_KEYS[kind]][id] = normalize_profile(v.duplicate(true))
+		return
+	l.families.erase(id)
+	for tid in l.weapons.keys():
+		if weapon_family_of(tid) == id:
+			l.weapons.erase(tid)
+	if v == null:
+		return
+	if not v.family.empty():
+		l.families[id] = normalize_family(v.family.duplicate(true))
+	for tid in v.tiers:
+		l.weapons[tid] = normalize_profile(v.tiers[tid].duplicate(true))
+
+
+static func _same(a, b) -> bool:
+	return JSON.print(a, "", true) == JSON.print(b, "", true)
+
+
+# 对象选用的版本："self" / "vanilla" / 包 id
+func unit_source(kind: String, id: String) -> String:
+	var s = str(sources.get(kind + ":" + id, ""))
+	if s == "vanilla" or packs.has(s) and unit_value(packs[s].data, kind, id) != null:
+		return s
+	return "self" if unit_value(own, kind, id) != null else "vanilla"
+
+
+# 对象的全部版本：原版、自修改版（有时）、含有它的数据包（按下载顺序）
+func unit_versions(kind: String, id: String) -> Array:
+	var out = ["vanilla"]
+	if unit_value(own, kind, id) != null:
+		out.push_back("self")
+	for pid in pack_ids():
+		if unit_value(packs[pid].data, kind, id) != null:
+			out.push_back(pid)
+	return out
+
+
+func version_value(kind: String, id: String, src: String):
+	if src == "self":
+		return unit_value(own, kind, id)
+	return unit_value(packs[src].data, kind, id) if packs.has(src) else null
+
+
+# 已下载的包，按下载顺序
+func pack_ids() -> Array:
+	var ids = packs.keys()
+	ids.sort_custom(self, "_by_installed")
+	return ids
+
+
+func _by_installed(a, b) -> bool:
+	return int(packs[a].meta.get("installed", 0)) < int(packs[b].meta.get("installed", 0))
+
+
+func _all_unit_keys() -> Array:
+	var out = []
+	var seen = {}
+	var layers = [eff(), own]
+	for pid in packs:
+		layers.push_back(packs[pid].data)
+	for l in layers:
+		for u in layer_units(l):
+			if not seen.has(u[0] + ":" + u[1]):
+				seen[u[0] + ":" + u[1]] = true
+				out.push_back(u)
+	return out
+
+
+# 生效层上的编辑写回自修改层（切换版本、保存之前调用）
+func capture() -> void:
+	var e = eff()
+	for u in _all_unit_keys():
+		var key = u[0] + ":" + u[1]
+		var src = unit_source(u[0], u[1])
+		var cur = unit_value(e, u[0], u[1])
+		if packs.has(src):
+			if _same(cur, unit_value(packs[src].data, u[0], u[1])):
+				continue
+			_set_unit(own, u[0], u[1], cur)
+			sources[key] = "self" if cur != null else "vanilla"
+		elif src == "self":
+			_set_unit(own, u[0], u[1], cur)
+			if cur == null:
+				sources.erase(key)
+		elif cur != null:
+			_set_unit(own, u[0], u[1], cur)
+			sources.erase(key)
+	for sid in own.sets.keys():
+		if not e.sets.has(sid):
+			own.sets.erase(sid)
+	for sid in e.sets:
+		var pid = _set_src.get(sid, "")
+		if packs.has(pid) and packs[pid].data.sets.has(sid) and _same(compact(e.sets[sid], new_set()), compact(packs[pid].data.sets[sid], new_set())):
+			continue
+		own.sets[sid] = normalize_set(e.sets[sid])
+	for t in own.tags.keys():
+		if not e.tags.has(t):
+			own.tags.erase(t)
+	for t in e.tags:
+		var pid = _tag_src.get(t, "")
+		if own.tags.has(t) or not packs.has(pid) or packs[pid].data.tags.get(t) != e.tags[t]:
+			own.tags[t] = e.tags[t]
+
+
+# 由 own + packs + sources 生成生效层；apply：同时更新游戏资源（注册 / 注销自定义对象、应用档案）
+func compose(apply: bool = true) -> void:
+	var e = eff()
+	var changed = []
+	for u in _all_unit_keys():
+		var v = version_value(u[0], u[1], unit_source(u[0], u[1]))
+		var old = unit_value(e, u[0], u[1])
+		if _same(v, old):
+			continue
+		# 存档中进行中的一局正在使用的自定义角色保留（同 delete_custom）
+		if v == null and u[0] == "character" and profiles[u[1]].custom and is_in_saved_run(u[1]):
+			continue
+		changed.push_back([u[0], u[1], v])
+	var new_chars = false
+	for c in changed:
+		if apply:
+			_unregister_unit(c[0], c[1])
+		_set_unit(e, c[0], c[1], c[2])
+		new_chars = new_chars or c[0] == "character" and c[2] != null and c[2].get("custom", false)
+	weapon_sets = {}
+	for sid in own.sets:
+		weapon_sets[sid] = normalize_set(own.sets[sid])
+	custom_tags = own.tags.duplicate()
+	_set_src = {}
+	_tag_src = {}
+	var order = pack_ids()
+	order.invert()
+	for pid in order:
+		var d = packs[pid].data
+		for u in layer_units(d):
+			if unit_source(u[0], u[1]) != pid:
+				continue
+			var strs = []
+			_strings_in(unit_value(d, u[0], u[1]), strs)
+			for s in strs:
+				var sid = s.get_slice(SET_LEVEL_SEP, 0)
+				if d.sets.has(sid) and not weapon_sets.has(sid):
+					weapon_sets[sid] = normalize_set(d.sets[sid])
+					_set_src[sid] = pid
+				if d.tags.has(s) and not custom_tags.has(s):
+					custom_tags[s] = d.tags[s]
+					_tag_src[s] = pid
+	if not apply:
+		return
+	_repool = true
+	apply_all()
+	if new_chars:
+		_unlock_new_characters()
+
+
+# 注销对象的游戏资源（自定义角色 / 道具 / 武器等级），之后由 apply_all 按新的档案重新注册
+func _unregister_unit(kind: String, id: String) -> void:
+	var isvc = _isvc()
+	match kind:
+		"character":
+			var c = _customs.get(id)
+			_customs.erase(id)
+			if c != null:
+				isvc.characters.erase(c)
+		"item":
+			var it = _custom_items.get(id)
+			_custom_items.erase(id)
+			if it != null:
+				isvc.items.erase(it)
+				_repool = true
+		"weapon":
+			for w in family_members(id):
+				if _custom_weapons.has(w.my_id):
+					_unregister_weapon(w.my_id)
+			_link_family(id)
+
+
+# 切换对象的版本
+func set_source(kind: String, id: String, src: String) -> void:
+	capture()
+	sources[kind + ":" + id] = src
+	compose()
+	save_profiles()
+
+
+# 启用 / 停用数据包里的一个对象（停用：改回自修改版或原版）；id = "" 时为包内全部对象
+func set_pack_enabled(pid: String, on: bool, kind: String = "", id: String = "") -> void:
+	if not packs.has(pid):
+		return
+	capture()
+	for u in layer_units(packs[pid].data):
+		if id != "" and (u[0] != kind or u[1] != id):
+			continue
+		var key = u[0] + ":" + u[1]
+		if on:
+			sources[key] = pid
+		elif unit_source(u[0], u[1]) == pid:
+			sources.erase(key)
+	compose()
+	save_profiles()
+
+
+# 安装下载的数据包：code = 分享码，meta = 列表里的信息（含 id）。包内对象全部启用；返回对象数，-1 = 无法识别
+func install_pack(meta: Dictionary, code: String) -> int:
+	var raw = pack_code_data(code)
+	var pid = str(meta.get("id", ""))
+	if not raw is Dictionary or pid == "" or clean_suffix(pid) != pid:
+		return -1
+	var d = normalize_layer(raw)
+	_rekey_sets(d, pid)
+	_write_icons(raw.get("icons"))
+	capture()
+	var m = meta.duplicate()
+	m.installed = OS.get_unix_time()
+	for other in packs:
+		if other != pid:
+			m.installed = max(m.installed, int(packs[other].meta.get("installed", 0)) + 1)
+	packs[pid] = {"meta": m, "data": d}
+	var units = layer_units(d)
+	for u in units:
+		sources[u[0] + ":" + u[1]] = pid
+	_save_pack(pid)
+	compose()
+	save_profiles()
+	return units.size()
+
+
+# 批量码的数据（字典）；不是批量码返回 null
+static func pack_code_data(code: String):
+	code = code.strip_edges()
+	for pre in [ALL_PREFIX] + BUNDLE_PREFIX.values():
+		if code.begins_with(pre):
+			var raw = unpack(code.substr(pre.length()))
+			return raw if raw is Dictionary else null
+	return null
+
+
+func uninstall_pack(pid: String) -> void:
+	if not packs.has(pid):
+		return
+	capture()
+	for key in sources.keys():
+		if sources[key] == pid:
+			sources.erase(key)
+	packs.erase(pid)
+	Directory.new().remove(PACK_DIR + pid + ".json")
+	compose()
+	save_profiles()
+
+
+# 包内自定义套装与本地（自修改层 / 其他包）的同 id 套装内容不同时改 id（<id>_<包 id>），引用一并改
+func _rekey_sets(d: Dictionary, pid: String) -> void:
+	for sid in d.sets.keys():
+		if not d.sets[sid].custom:
+			continue
+		var mine = compact(d.sets[sid], new_set())
+		var clash = own.sets.has(sid) and not _same(compact(own.sets[sid], new_set()), mine)
+		for other in packs:
+			if other != pid and packs[other].data.sets.has(sid) and not _same(compact(packs[other].data.sets[sid], new_set()), mine):
+				clash = true
+		if not clash:
+			continue
+		var nid = sid + "_" + pid
+		for k in ["profiles", "items", "weapons", "families"]:
+			d[k] = _rename_refs(d[k], sid, nid)
+		d.sets[nid] = d.sets[sid]
+		d.sets.erase(sid)
+
+
+static func _rename_refs(v, old: String, new: String):
+	if v is String:
+		if v == old:
+			return new
+		return new + v.substr(old.length()) if v.begins_with(old + SET_LEVEL_SEP) else v
+	if v is Array:
+		var out = []
+		for x in v:
+			out.push_back(_rename_refs(x, old, new))
+		return out
+	if v is Dictionary:
+		var out = {}
+		for k in v:
+			out[k] = _rename_refs(v[k], old, new)
+		return out
+	return v
+
+
+# 分享码里的自定义图标写入图标目录（文件名只接受 import_icon 生成的那种；已存在则不改）
+func _write_icons(icons) -> void:
+	if not icons is Dictionary:
+		return
+	var dir = Directory.new()
+	if not dir.dir_exists(ICON_DIR):
+		dir.make_dir_recursive(ICON_DIR)
+	for name in icons:
+		if str(name) != clean_suffix(str(name).get_basename()) + ".png" or dir.file_exists(ICON_DIR + str(name)):
+			continue
+		var file = File.new()
+		if file.open(ICON_DIR + str(name), File.WRITE) == OK:
+			file.store_buffer(Marshalls.base64_to_raw(str(icons[name])))
+			file.close()
+
+
+func _save_pack(pid: String) -> void:
+	var dir = Directory.new()
+	if not dir.dir_exists(PACK_DIR):
+		dir.make_dir_recursive(PACK_DIR)
+	var file = File.new()
+	if file.open(PACK_DIR + pid + ".json", File.WRITE) == OK:
+		file.store_string(JSON.print({"meta": packs[pid].meta, "data": compact_layer(packs[pid].data)}))
+		file.close()
+
+
+func _load_packs() -> void:
+	packs = {}
+	for name in _list_json(PACK_DIR):
+		var file = File.new()
+		if file.open(PACK_DIR + name, File.READ) != OK:
+			continue
+		var parsed = JSON.parse(file.get_as_text())
+		file.close()
+		var r = parsed.result if parsed.error == OK else null
+		if r is Dictionary and r.get("meta") is Dictionary and str(r.meta.get("id", "")) == name.get_basename():
+			packs[name.get_basename()] = {"meta": r.meta, "data": normalize_layer(r.get("data"))}
+
+
+# 对象在某个版本下的名称 / 图标（列表与预览用；不要求对象已注册）
+func unit_name(kind: String, id: String, v = null) -> String:
+	var p = _unit_look(kind, v)
+	if p.name != "":
+		return p.name
+	var r = _unit_res(kind, id)
+	if r != null:
+		return tr(orig_name(r))
+	return tr({"character": "BE_NEW_CHARACTER", "item": "BE_NEW_ITEM", "weapon": "BE_NEW_WEAPON"}[kind]) if p.custom else id
+
+
+func unit_icon(kind: String, id: String, v = null) -> Texture:
+	var p = _unit_look(kind, v)
+	if p.custom:
+		return custom_icon(id, p, kind)
+	var r = _unit_res(kind, id)
+	return r.icon if r != null else null
+
+
+func _unit_look(kind: String, v) -> Dictionary:
+	if kind == "weapon":
+		return normalize_family(v.family if v != null else {})
+	return normalize_profile(v)
+
+
+func _unit_res(kind: String, id: String):
+	if kind == "weapon":
+		var vm = _vanilla_members(id)
+		return vm[0] if not vm.empty() else null
+	return find_target(kind, id) if not (_customs.has(id) or _custom_items.has(id)) else null
 
 
 static func _any_disabled(dis: Dictionary) -> bool:
@@ -867,19 +1345,7 @@ func import_bundle(code: String) -> int:
 	if sets is Dictionary:
 		for k in sets:
 			weapon_sets[str(k)] = normalize_set(sets[k])
-	var icons = parsed.result.get("icons", {})
-	if icons is Dictionary:
-		var dir = Directory.new()
-		if not dir.dir_exists(ICON_DIR):
-			dir.make_dir_recursive(ICON_DIR)
-		for name in icons:
-			# 文件名来自分享码：只接受 import_icon 生成的那种（不含路径）
-			if str(name) != clean_suffix(str(name).get_basename()) + ".png" or dir.file_exists(ICON_DIR + str(name)):
-				continue
-			var file = File.new()
-			if file.open(ICON_DIR + str(name), File.WRITE) == OK:
-				file.store_buffer(Marshalls.base64_to_raw(str(icons[name])))
-				file.close()
+	_write_icons(parsed.result.get("icons"))
 	# 先建好自定义武器 / 补的等级，后面的武器档案才找得到目标
 	if "weapon" in kinds:
 		var fs = parsed.result.get("families", {})

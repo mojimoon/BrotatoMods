@@ -1,6 +1,6 @@
 // BroEditor 分享站 API（游戏内"上传 / 下载"界面使用）
-//   GET    /packs?kind=&q=&sort=new|hot&offset=   列表（每页 PAGE 条，more = 还有下一页）
-//   GET    /packs/<id>                            分享码正文（下载数 +1）
+//   GET    /packs?kind=&q=&sort=new|hot&offset=   列表（每页 PAGE 条，more = 还有下一页；q 也匹配完整 id）
+//   GET    /packs/<id>[?peek]                     分享码正文（不带 peek 时下载数 +1）
 //   GET    /packs/<id>/thumb                      缩略图 PNG
 //   POST   /packs   {title, desc, author, kinds, contents, n, mod_ver, code, thumb(base64 PNG)} -> {id, token}
 //   DELETE /packs/<id>   X-Token: 上传时返回的 token 或 ADMIN_KEY
@@ -44,7 +44,7 @@ async function route(req, env) {
 	} else if (req.method === "GET") {
 		const obj = await env.BUCKET.get(`${thumb ? "thumbs" : "packs"}/${id}`);
 		if (!obj) return json({ error: "not_found" }, 404);
-		if (!thumb) await env.DB.prepare("UPDATE packs SET downloads = downloads + 1 WHERE id = ?").bind(id).run();
+		if (!thumb && !url.searchParams.has("peek")) await env.DB.prepare("UPDATE packs SET downloads = downloads + 1 WHERE id = ?").bind(id).run();
 		return new Response(obj.body, {
 			headers: thumb
 				? { "content-type": "image/png", "cache-control": "public, max-age=86400" }
@@ -67,8 +67,8 @@ async function list(url, env) {
 	const q = str(p.get("q"), 60);
 	if (q) {
 		const like = `%${q.replace(/[\\%_]/g, "\\$&")}%`;
-		where.push("(" + ["title", "descr", "author", "contents"].map((c) => `${c} LIKE ? ESCAPE '\\'`).join(" OR ") + ")");
-		args.push(like, like, like, like);
+		where.push("(id = ? OR " + ["title", "descr", "author", "contents"].map((c) => `${c} LIKE ? ESCAPE '\\'`).join(" OR ") + ")");
+		args.push(q.toLowerCase(), like, like, like, like);
 	}
 	const order = p.get("sort") === "hot" ? "downloads DESC, created DESC" : "created DESC";
 	const offset = Math.max(0, parseInt(p.get("offset")) || 0);

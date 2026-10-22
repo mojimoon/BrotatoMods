@@ -32,6 +32,9 @@ try:
     hit = [p for p in lst["packs"] if p["id"] == pid]
     assert st == 200 and hit and hit[0]["kinds"] == "weapon" and hit[0]["thumb"] == 1, lst
     assert not [p for p in json.loads(call("GET", "/packs?kind=item&q=Smoke")[1])["packs"] if p["id"] == pid], "kind filter"
+    assert [p for p in json.loads(call("GET", "/packs?q=" + pid)[1])["packs"] if p["id"] == pid], "search by id"
+    assert call("GET", "/packs/" + pid + "?peek") == (200, b"BEA:zabc")
+    assert json.loads(call("GET", "/packs?q=" + pid)[1])["packs"][0]["downloads"] == 0, "peek not counted"
     assert call("GET", "/packs/" + pid) == (200, b"BEA:zabc")
     assert call("GET", "/packs/" + pid + "/thumb") == (200, PNG)
     assert call("POST", "/packs", {"title": "x", "code": "nope"})[0] == 400

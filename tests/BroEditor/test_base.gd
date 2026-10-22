@@ -100,6 +100,9 @@ func _reset() -> void:
 	m.profiles = {}
 	m.item_profiles = {}
 	m.weapon_profiles = {}
+	m.own = m.new_layer()
+	m.packs = {}
+	m.sources = {}
 	for k in m.KINDS:
 		m.kind_enabled[k] = true
 	m.apply_all()
