@@ -23,7 +23,7 @@
 - **Create new** characters, items and weapons from any vanilla one, then DIY whatever you want. Choose an icon or import your own.
 - **Disable** characters, items and weapons.
 - **More and more new features**: **Lock groups** (lock characters, items and weapons as groups, or set unlock condition with blueprint), **Convenient starting weapons** (pick which characters can start with a weapon in the weapons tab), **Weapon classes** (edit or create your own classes and their bonuses) ...
-- **Share** with a code (one object, a whole tab, or everything), or by sending the object's file (see below).
+- **Share** with workshop is recommended, but you can also share with a code (one object, a whole tab, or everything), or by sending the object's file (see below).
 - Dependency free, supports all 13 game languages, compatible with all mod objects.
 
 Heartfelt thanks to [BroLab](https://steamcommunity.com/sharedfiles/filedetails/?id=3145676266) and [Modtools](https://steamcommunity.com/sharedfiles/filedetails/?id=3672826836) for the inspiration! This mod is also compatible with their features.
@@ -70,7 +70,7 @@ Files are saved in `%APPDATA%\Brotato\Mojimoon-BroEditor\` (Windows), `~/Library
 [*][b]Create new[/b] characters, items and weapons from any vanilla one, then DIY whatever you want. Choose an icon or import your own.
 [*][b]Disable[/b] characters, items and weapons.
 [*][b]More and more new features[/b]: [b]Lock groups[/b] (lock characters, items and weapons as groups, or set unlock condition with blueprint), [b]Convenient starting weapons[/b] (pick which characters can start with a weapon in the weapons tab), [b]Weapon classes[/b] (edit or create your own classes and their bonuses) ...
-[*][b]Share[/b] with a code (one object, a whole tab, or everything), or by sending the object's file (see below).
+[*][b]Share[/b] with workshop is recommended, but you can also share with a code (one object, a whole tab, or everything), or by sending the object's file (see below).
 [*]Dependency free, supports all 13 game languages, compatible with all mod objects.
 [/list]
 
@@ -146,7 +146,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 - **新建**角色、道具、武器：以任意原版对象为基底，尽情 DIY。可选图标或导入图片。
 - **禁用**角色、道具和武器。
 - **越来越多的新特性**：**分组锁定**（把角色、道具、武器归为一组锁定，用蓝图设置解锁条件）、**便捷初始武器**（在武器页选择哪些角色可以该武器开局，智能判断等级）、**武器类别**（修改或自定义类别及加成）……
-- **分享**：可以导入、导出分享码（当前项目 / 角色 / 道具 / 武器 / 全部），或以文件形式分享（见下）。
+- **分享**：建议使用工坊！但你也可以导入、导出分享码（当前项目 / 角色 / 道具 / 武器 / 全部），或以文件形式分享（见下）。
 - 免依赖，支持全部 13 种语言，兼容所有 mod 内容。
 
 万分感谢 [BroLab](https://steamcommunity.com/sharedfiles/filedetails/?id=3145676266) 和 [Modtools](https://steamcommunity.com/sharedfiles/filedetails/?id=3672826836) 提供的灵感！本 mod 也兼容它们的功能。
@@ -192,7 +192,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 [*][b]新建[/b]角色、道具、武器：以任意原版对象为基底，尽情 DIY。可选图标或导入图片。
 [*][b]禁用[/b]角色、道具和武器。
 [*][b]越来越多的新特性[/b]：[b]分组锁定[/b]（把角色、道具、武器归为一组锁定，用蓝图设置解锁条件）、[b]便捷初始武器[/b]（在武器页选择哪些角色可以该武器开局，智能判断等级）、[b]武器类别[/b]（修改或自定义类别及加成）……
-[*][b]分享[/b]：可以导入、导出分享码（当前项目 / 角色 / 道具 / 武器 / 全部），或以文件形式分享（见下）。
+[*][b]分享[/b]：建议使用工坊！但你也可以导入、导出分享码（当前项目 / 角色 / 道具 / 武器 / 全部），或以文件形式分享（见下）。
 [*]免依赖，支持全部 13 种语言，兼容所有 mod 内容。
 [/list]
 
