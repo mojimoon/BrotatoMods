@@ -1304,6 +1304,54 @@ func _unit_look(kind: String, v) -> Dictionary:
 	return normalize_profile(v)
 
 
+# 悬停预览用的临时资源（原版物品框显示）：复制已注册的对象或基底，换上该版本的名称、图标、效果等
+func preview_res(kind: String, id: String, v):
+	var look = _unit_look(kind, v)
+	if kind == "weapon":
+		var tid = ""
+		if v != null and not v.tiers.empty():
+			var ids = v.tiers.keys()
+			ids.sort()
+			tid = ids[0]
+		var t = find_target("weapon", tid) if tid != "" else null
+		if t == null:
+			var ms = family_members(id)
+			if ms.empty():
+				ms = _vanilla_members(look.base)
+			t = ms[0] if not ms.empty() else null
+		if t == null:
+			return null
+		if tid == "":
+			tid = t.my_id
+		var tp = normalize_profile(v.tiers.get(tid, {}) if v != null else {})
+		var w = t.duplicate()
+		w.name = unit_name(kind, id, v)
+		w.icon = unit_icon(kind, id, v)
+		var stats = weapon_stats_for(t, tp)
+		if stats != null:
+			w.stats = stats
+		w.effects = build_effects(tid, tp)
+		return w
+	var p = normalize_profile(v)
+	var r = find_target(kind, id)
+	if r == null:
+		r = find_target(kind, p.base)
+	if r == null:
+		return null
+	r = r.duplicate()
+	r.name = unit_name(kind, id, v)
+	r.icon = unit_icon(kind, id, v)
+	r.effects = build_effects(id, p)
+	if kind == "character" and p.weapons is Array:
+		r.starting_weapons = _weapons_by_ids(p.weapons)
+	if kind == "item":
+		if p.price >= 0:
+			r.value = p.price
+		if p.tier >= 0:
+			r.tier = p.tier
+	return r
+
+
 func _unit_res(kind: String, id: String):
 	if kind == "weapon":
 		var vm = _vanilla_members(id)

@@ -21,6 +21,10 @@ func _initialize() -> void:
 		yield(_sets(m, out), "completed")
 		quit()
 		return
+	if OS.get_environment("BE_SHOT_CLOUD") == "manage":
+		yield(_cloud_manage(out), "completed")
+		quit()
+		return
 	if OS.get_environment("BE_SHOT_CLOUD") != "":
 		yield(_cloud(out), "completed")
 		quit()
@@ -288,5 +292,34 @@ func _cloud(out: String):
 	c.pick("all")
 	c._on_title("Sample")
 	yield(_shot(ui, out + "/cloud_upload.png"), "completed")
+	ui.queue_free()
+	yield(self, "idle_frame")
+
+
+# 已下载的包：管理页逐个切换种类（打印左栏数量）、悬停预览；上传页悬停预览
+func _cloud_manage(out: String):
+	var ui = load("res://mods-unpacked/Mojimoon-BroEditor/ui/editor_ui.tscn").instance()
+	root.add_child(ui)
+	yield(self, "idle_frame")
+	ui.set_kind("share")
+	var c = ui.share_view
+	c.set_page("installed")
+	var pid = c._mod.pack_ids()[0]
+	c.open_manage(pid)
+	for k in ["character", "item", "weapon"]:
+		c._on_left_kind(k)
+		var n = 0
+		for u in c._left_units:
+			n += int(u[0] == k)
+		print("manage ", k, ": units ", n, " grid ", c._left_grid.get_child_count(), " selected ", c._unit)
+		var b = c._left_grid.get_child(min(3, c._left_grid.get_child_count() - 1))
+		c._on_left_hover(b, c._left_shown()[min(3, c._left_grid.get_child_count() - 1)])
+		yield(_shot(ui, out + "/manage_" + k + ".png"), "completed")
+		ui._hide_preview()
+	c._left.kind = "character"
+	c.set_page("upload")
+	var b2 = c._left_grid.get_child(0)
+	c._on_left_hover(b2, c._left_shown()[0])
+	yield(_shot(ui, out + "/upload_hover.png"), "completed")
 	ui.queue_free()
 	yield(self, "idle_frame")

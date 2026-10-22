@@ -568,8 +568,10 @@ func _fill_left_grid() -> void:
 	for u in _left_shown():
 		var v = _mod.unit_value(l, u[0], u[1])
 		var b = ui._icon_button(_mod.unit_icon(u[0], u[1], v), ui.CHAR_ICON)
-		b.hint_tooltip = _mod.unit_name(u[0], u[1], v)
 		b.connect("pressed", self, "_on_left_pressed", [u])
+		b.connect("mouse_entered", self, "_on_left_hover", [b, u])
+		b.connect("mouse_exited", ui, "_hide_preview")
+		b.connect("tree_exiting", ui, "_hide_preview")
 		_left_grid.add_child(b)
 		var color = ui.C_CUSTOM if _mod._unit_look(u[0], v).custom else ui.C_BORDER
 		var w = 1
@@ -586,6 +588,11 @@ func _fill_left_grid() -> void:
 			color = ui.C_ACCENT_3
 			w = 3
 		ui._set_icon_style(b, color, w)
+
+
+# 悬停预览：原版物品框，显示左栏这一版（管理 = 数据包版本，上传 = 自修改版）
+func _on_left_hover(b: Control, u: Array) -> void:
+	ui._show_preview(b, _mod.preview_res(u[0], u[1], _mod.unit_value(_left_layer(), u[0], u[1])))
 
 
 func _on_left_kind(k: String) -> void:
@@ -619,6 +626,13 @@ func open_manage(pid: String) -> void:
 		return
 	_pid = pid
 	_unit = []
+	# 包里没有左栏当前种类的对象：换到第一个对象的种类
+	var units = _mod.layer_units(_mod.packs[pid].data)
+	var has = false
+	for u in units:
+		has = has or u[0] == _left.kind
+	if not has and not units.empty():
+		_left.kind = units[0][0]
 	set_page("manage")
 
 
@@ -648,15 +662,13 @@ func _build_manage() -> void:
 	body.add_constant_override("separation", 12)
 	_content.add_child(body)
 	var units = _mod.layer_units(_mod.packs[_pid].data)
-	# 选中对象：保留之前的，否则本种类第一个，否则包内第一个
-	if not _unit in units:
-		_unit = units[0] if not units.empty() else []
+	# 选中对象：保留之前的（须是左栏当前种类），否则本种类第一个
+	if not (_unit in units and _unit[0] == _left.kind):
+		_unit = []
 		for u in units:
 			if u[0] == _left.kind:
 				_unit = u
 				break
-	if not _unit.empty():
-		_left.kind = _unit[0]
 	_preview_src = _mod.unit_source(_unit[0], _unit[1]) if not _unit.empty() else ""
 	_left_panel(body, units)
 	var card = ui._card(body)
