@@ -14,7 +14,8 @@
 
 ### Features
 
-- **Three tabs: Characters / Items / Weapons**, each with a master switch to turn all its changes on or off.
+- **Three tabs: Characters / Items / Weapons**, each with a master switch to turn all its changes on or off, plus a fourth tab, **Workshop**.
+- **Workshop**: browse, search and download packs shared by other players in one click, and upload your own edits with a title, description and image. Downloaded packs are stored separately and never overwrite your own edits: enable or disable any entry, and when the same object comes from several sources (vanilla, my edits, pack A, pack B…), pick the one to use, with a hover preview.
 - **Stats**: starting stats and stat modifiers for characters; price, rarity, limit and tags for items; damage, cooldown, crit, range, projectiles, scaling and more for weapons.
 - **Effects**: add any effect from every vanilla character, item and weapon, then tweak its values; drag to reorder.
 - **Blueprint**: build your own effects as *trigger → condition → effect* node graphs — e.g. "own 3 items tagged X", "guarantee an item in the next shop", charm, spawn enemies.
@@ -35,7 +36,7 @@ About the buttons in the top-right corner:
 
 - **Import**: Import a code from the clipboard to load a project, character, item, weapon or everything.
 - **Export**: Export a code for the current object (BE0:), all characters (BEC:), all items (BEI:), all weapons (BEW:) or everything (BEA:). Different types have different formats, and the mod will automatically detect the type when importing from clipboard.
-- **Help**: a how-to guide for the current tab (characters, items or weapons).
+- **Help**: a how-to guide for the current tab (characters, items, weapons or Workshop).
 - **Settings**:
   - **Font Size**: 80–125%, scales the editor's text.
   - **Effect Library Dedup**: effects with the same keys but different values count as one in the Effect Library.
@@ -50,6 +51,8 @@ Files are saved in `%APPDATA%\Brotato\Mojimoon-BroEditor\` (Windows), `~/Library
 - `profiles.json`: changes to vanilla characters, items and weapons, and the editor settings.
 - `custom\character\`, `custom\item\`, `custom\weapon\`: one `<id>.json` file per character, item or weapon you created. To share, send the files or a whole folder; the receiver puts them in the same folder and restarts the game.
 - `icons\`: imported icon images. Send them along with the file if your object uses one.
+- `packs\`: packs downloaded from the Workshop, one `<id>.json` (plus its `<id>.png` thumbnail) each.
+- `uploads.json`: your Workshop uploads from this computer, used to delete them later.
 
 <!-- BBCode
 
@@ -58,7 +61,8 @@ Files are saved in `%APPDATA%\Brotato\Mojimoon-BroEditor\` (Windows), `~/Library
 [h1]Features[/h1]
 
 [list]
-[*][b]Three tabs[/b]: Characters / Items / Weapons, each with a master switch to turn all its changes on or off.
+[*][b]Three tabs[/b]: Characters / Items / Weapons, each with a master switch to turn all its changes on or off, plus a fourth tab, [b]Workshop[/b].
+[*][b]Workshop[/b]: browse, search and download packs shared by other players in one click, and upload your own edits with a title, description and image. Downloaded packs are stored separately and never overwrite your own edits: enable or disable any entry, and when the same object comes from several sources (vanilla, my edits, pack A, pack B…), pick the one to use, with a hover preview.
 [*][b]Stats[/b]: starting stats and stat modifiers for characters; price, rarity, limit and tags for items; damage, cooldown, crit, range, projectiles, scaling and more for weapons.
 [*][b]Effects[/b]: add any effect from every vanilla character, item and weapon, then tweak its values; drag to reorder.
 [*][b]Blueprint[/b]: build your own effects as *trigger → condition → effect* node graphs — e.g. "own 3 items tagged X", "guarantee an item in the next shop", charm, spawn enemies.
@@ -80,7 +84,7 @@ About the buttons in the top-right corner:
 
 [list]
 [*][b]Import / Export[/b]: export a code for the current object (BE0:), all characters (BEC:), all items (BEI:), all weapons (BEW:) or everything (BEA:). Different types have different formats, and the mod will automatically detect the type when importing from clipboard.
-[*][b]Help[/b]: a how-to guide for the current tab (characters, items or weapons).
+[*][b]Help[/b]: a how-to guide for the current tab (characters, items, weapons or Workshop).
 [*][b]Settings[/b]:
 [list]
 [*][b]Font Size[/b]: 80–125%, scales the editor's text.
@@ -99,6 +103,8 @@ Files are saved in [i]%APPDATA%\Brotato\Mojimoon-BroEditor\[/i] (Windows), [i]~/
 [*][i]profiles.json[/i]: changes to vanilla characters, items and weapons, and the editor settings.
 [*][i]custom\character\[/i], [i]custom\item\[/i], [i]custom\weapon\[/i]: one [i]<id>.json[/i] file per character, item or weapon you created. To share, send the files or a whole folder; the receiver puts them in the same folder and restarts the game.
 [*][i]icons\[/i]: imported icon images. Send them along with the file if your object uses one.
+[*][i]packs\[/i]: packs downloaded from the Workshop, one [i]<id>.json[/i] (plus its [i]<id>.png[/i] thumbnail) each.
+[*][i]uploads.json[/i]: your Workshop uploads from this computer, used to delete them later.
 [/list]
 
 [pullquote]If you like this mod, please consider liking, favoriting and sharing it, thank you! Comments and suggestions are also very welcome![/pullquote]
@@ -131,7 +137,8 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 ### 功能
 
-- **分三页：角色 / 道具 / 武器**，每页都有一个总开关，可一键启用或禁用当前页的全部修改。
+- **分三页：角色 / 道具 / 武器**，每页都有一个总开关，可一键启用或禁用当前页的全部修改；第四页是**工坊**。
+- **工坊**：浏览、搜索其他玩家分享的数据包，一键下载；也能把自己的修改连同标题、简介、图片上传分享。下载的数据包单独保存，不会覆盖自己的修改：包内对象可逐个启用或停用；同一对象有多个来源（原版、自修改、数据包 A、数据包 B……）时，可悬停预览并选择使用哪一个。
 - **属性**：角色的初始属性与属性修改%；道具的价格、稀有度、数量限制、标签；武器的伤害、冷却、暴击、范围、投射物、属性加成等……一切都能随心修改。
 - **效果**：从全部原版角色、道具、武器的效果库中任选添加并修改数值和参数，拖动调整顺序。
 - **蓝图**：用"触发 → 条件 → 效果"的节点图，组合出成千上万种效果，如"拥有 3 件某标签道具""下次商店必定出现某道具"、魅惑、生成敌人等。
@@ -151,7 +158,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 关于右上角的按钮：
 
 - **导入 / 导出**：导出当前项目 (BE0:)、角色 (BEC:)、道具 (BEI:)、武器 (BEW:) 或全部 (BEA:) 的分享码。不同类型的格式不同，从剪贴版导入时会自动识别。
-- **帮助**：显示当前栏（角色、道具或武器）的操作指南。
+- **帮助**：显示当前栏（角色、道具、武器或工坊）的操作指南。
 - **设置**：
   - **字体大小**：80–125%，控制 BroEditor 的文字大小。
   - **效果库去重**：效果库中同键名不同数值的效果视为同一条。
@@ -166,6 +173,8 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 - `profiles.json`：对原版角色、道具、武器的修改，以及编辑器设置。
 - `custom\character\`、`custom\item\`、`custom\weapon\`：每个新建的角色、道具、武器各一个 `<id>.json` 文件。分享时发送文件或整个文件夹，对方放进相同的文件夹后重启游戏即可。
 - `icons\`：导入的图标图片。如果对象用了导入的图标，一并发送。
+- `packs\`：从工坊下载的数据包，每个一个 `<id>.json`（及缩略图 `<id>.png`）。
+- `uploads.json`：本机在工坊上传的记录，用于之后删除。
 
 <!-- BBCode
 
@@ -174,7 +183,8 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 [h1]功能[/h1]
 
 [list]
-[*][b]分三页：角色 / 道具 / 武器[/b]，每页都有一个总开关，可一键启用或禁用当前页的全部修改。
+[*][b]分三页：角色 / 道具 / 武器[/b]，每页都有一个总开关，可一键启用或禁用当前页的全部修改；第四页是[b]工坊[/b]。
+[*][b]工坊[/b]：浏览、搜索其他玩家分享的数据包，一键下载；也能把自己的修改连同标题、简介、图片上传分享。下载的数据包单独保存，不会覆盖自己的修改：包内对象可逐个启用或停用；同一对象有多个来源（原版、自修改、数据包 A、数据包 B……）时，可悬停预览并选择使用哪一个。
 [*][b]属性[/b]：角色的初始属性与属性修改%；道具的价格、稀有度、数量限制、标签；武器的伤害、冷却、暴击、范围、投射物、属性加成等……一切都能随心修改。
 [*][b]效果[/b]：从全部原版角色、道具、武器的效果库中任选添加并修改数值和参数，拖动调整顺序。
 [*][b]蓝图[/b]：用"触发 → 条件 → 效果"的节点图，组合出成千上万种效果，如"拥有 3 件某标签道具""下次商店必定出现某道具"、魅惑、生成敌人等。
@@ -194,7 +204,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 [list]
 [*][b]导入 / 导出[/b]：导出当前项目 (BE0:)、角色 (BEC:)、道具 (BEI:)、武器 (BEW:) 或全部 (BEA:) 的分享码。不同类型的格式不同，从剪贴版导入时会自动识别。
-[*][b]帮助[/b]：显示当前栏（角色、道具或武器）的操作指南。
+[*][b]帮助[/b]：显示当前栏（角色、道具、武器或工坊）的操作指南。
 [*][b]设置[/b]：
 [list]
 [*][b]字体大小[/b]：80–125%，控制 BroEditor 的文字大小。
@@ -213,6 +223,8 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 [*][i]profiles.json[/i]：对原版角色、道具、武器的修改，以及编辑器设置。
 [*][i]custom\character\[/i]、[i]custom\item\[/i]、[i]custom\weapon\[/i]：每个新建的角色、道具、武器各一个 [i]<id>.json[/i] 文件。分享时发送文件或整个文件夹，对方放进相同的文件夹后重启游戏即可。
 [*][i]icons\[/i]：导入的图标图片。如果对象用了导入的图标，一并发送。
+[*][i]packs\[/i]：从工坊下载的数据包，每个一个 [i]<id>.json[/i]（及缩略图 [i]<id>.png[/i]）。
+[*][i]uploads.json[/i]：本机在工坊上传的记录，用于之后删除。
 [/list]
 
 [pullquote]如果你喜欢这个 mod，欢迎点赞、收藏、转发，多谢啦！有问题或建议欢迎在评论区留言！[/pullquote]
@@ -266,5 +278,23 @@ BroEditor v2.0 已上线！全新版本带来更多新特性，包括：
 - 自定义武器套装、GMO（角色融合）、更完善的效果库，还有很多！
 
 如果喜欢，别忘了点个赞 :steamthumbsup: 支持一下，谢谢！
+
+BroEditor 2.3 更新：工坊上线，一键分享你的创意！
+▎ - 工坊：编辑器第四栏，浏览、搜索其他玩家分享的数据包，一键下载即可使用。
+▎ - 上传分享：挑选你修改过的角色、道具、武器打包上传，配上标题、简介和图片；用到的武器类别、标签、其他自定义内容和图标会自动一起打包。
+▎ - 互不覆盖：下载的数据包单独保存，不会动你自己的修改；包内内容可以逐个、按种类或整包启用 / 停用，卸载后一切复原。
+▎ - 多来源切换：同一个角色既有你的修改、又有别人的版本？在概览页或管理页选择用原版、自修改还是某个数据包，悬停即可预览。
+▎
+▎ 完整内容见更新日志。快来分享你的作品，看看大家都做了什么！
+欢迎在评论区反馈和提供建议！记得在工坊点赞关注谢谢喵！
+
+BroEditor 2.3: the Workshop is here!
+▎ - Workshop: a new fourth tab to browse, search and download packs shared by other players in one click.
+▎ - Upload: pick the characters, items and weapons you edited and share them with a title, description and image; weapon classes, tags, other custom entries and icons they use are packed automatically.
+▎ - Nothing gets overwritten: downloaded packs are stored separately from your own edits; enable or disable entries one by one, by kind or the whole pack, and uninstall to restore everything.
+▎ - Switch sources: when an object comes from several places, choose vanilla, your edits or any pack on the Overview or Manage page, with a hover preview.
+▎
+▎ See the changelog for details. Share your creations and see what everyone else made!
+If you like this mod, please consider giving a :steamthumbsup: and thank you!
 
 --->
