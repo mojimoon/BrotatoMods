@@ -15,6 +15,7 @@ const SearchSelect = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/search_s
 const DragRow = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/drag_row.gd")
 const Modal = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/modal.gd")
 const EffectDetail = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/effect_detail.gd")
+const Cloud = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/cloud.gd")
 const BASE_TITLE = preload("res://resources/fonts/actual/base/font_32_outline.tres")
 const BASE_NORMAL = preload("res://resources/fonts/actual/base/font_26.tres")
 const BASE_SMALL = preload("res://resources/fonts/actual/base/font_22.tres")
@@ -163,6 +164,7 @@ var _picker_chips: Dictionary = {}
 var _modals: Array = []
 
 var test_clipboard = null
+var test_cloud = null	# 分享站的测试响应（见 cloud.gd 的 test_responses）
 
 
 func _ready() -> void:
@@ -294,6 +296,10 @@ func _build_header(root: Control) -> void:
 	export_btn.clip_text = false
 	export_btn.connect("selected", self, "_on_export_selected")
 	header.add_child(export_btn)
+	var cloud_btn = _button(tr("BE_CLOUD"), BASE_SMALL)
+	_apply_action_style(cloud_btn, C_ACCENT_3)
+	cloud_btn.connect("pressed", self, "open_cloud")
+	header.add_child(cloud_btn)
 	var close_btn = _button("X", BASE_NORMAL)
 	close_btn.rect_min_size = Vector2(48, 44)
 	_apply_action_style(close_btn, C_DANGER)
@@ -4352,6 +4358,11 @@ func _on_export_selected(prefix: String) -> void:
 		return
 	_clipboard_set(code)
 	_set_status(tr("BE_EXPORTED"))
+
+
+func open_cloud():
+	_commit_focus()
+	return Cloud.open(self)
 
 
 func _on_import_pressed() -> void:

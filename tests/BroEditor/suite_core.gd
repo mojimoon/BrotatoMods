@@ -1984,3 +1984,54 @@ func test_179_weapon_kinds_tiers_negatives() -> void:
 
 func Catalog_primary() -> Array:
 	return load(MOD_DIR + "catalog.gd").STAT_GROUPS[0][1]
+
+
+# 分享包的依赖：武器带上套装（自定义 + 改过的原版），角色 / 道具带上自定义标签；引用到的自定义对象与自定义图标一并打包
+func test_135_bundle_dependencies() -> void:
+	var dir = Directory.new()
+	dir.make_dir_recursive(m.ICON_DIR)
+	var png = Image.new()
+	png.create(2, 2, false, Image.FORMAT_RGBA8)
+	png.save_png(m.ICON_DIR + "be_dep_icon.png")
+	var wt = m.create_custom_weapon("weapon_knife", "dep")
+	var wid = m.weapon_family_of(wt)
+	var vs = m.family_members("weapon_knife")[0].sets[0].my_id
+	var cs = m.create_set(vs)
+	m.weapon_sets[vs] = m.normalize_set({"bonuses": m.set_specs(vs).duplicate(true)})
+	m.weapon_families[wid].sets = [vs, cs]
+	m.custom_tags["be_dep_tag"] = "Dep Tag"
+	var iid = m.create_custom_item(_plain_item().my_id, "dep")
+	m.item_profiles[iid].tags = ["be_dep_tag"]
+	m.item_profiles[iid].icon = "file:be_dep_icon.png"
+	var p = m.new_profile()
+	p.wanted_tags = ["be_dep_tag"]
+	p.effects = [{"from": iid, "i": 0}]
+	p.weapons = [wt]
+	m.profiles[CH] = p
+	var d = m.bundle_data([["character", CH]])
+	_check(d.profiles.has(CH), "selected character packed")
+	_check(d.get("items", {}).has(iid), "referenced custom item packed")
+	_check(d.get("families", {}).has(wid) and d.get("weapons", {}).has(wt), "referenced custom weapon packed")
+	_check(d.get("sets", {}).has(cs) and d.sets.has(vs), "weapon sets packed (custom + edited vanilla)")
+	_eq(d.get("tags"), {"be_dep_tag": "Dep Tag"}, "custom tag packed")
+	_check(d.get("icons", {}).has("be_dep_icon.png"), "custom icon packed")
+	var dw = m.bundle_data([["weapon", wid]])
+	_check(dw.get("sets", {}).has(cs) and not dw.has("profiles") and not dw.has("tags"), "weapon pack: its sets only")
+	_check(m.export_bundle("character").begins_with(m.ALL_PREFIX), "cross-kind deps use the all prefix")
+	_check(m.share_entries().has(["weapon", wid]) and m.share_entries(["item"]) == [["item", iid]], "share entries")
+	var code = m.ALL_PREFIX + m.pack(d)
+	_reset()
+	m.weapon_sets = {}
+	m.custom_tags = {}
+	dir.remove(m.ICON_DIR + "be_dep_icon.png")
+	m.disabled.item = ["item_keep"]
+	_check(m.import_bundle(code) > 0, "pack imported")
+	m.apply_all()
+	_check(m.find_target("item", iid) != null and m.find_target("weapon", wt) != null, "custom item / weapon restored")
+	_check(m.weapon_sets.has(cs) and m.weapon_sets.has(vs) and m.custom_tags.has("be_dep_tag"), "sets / tags restored")
+	_check(dir.file_exists(m.ICON_DIR + "be_dep_icon.png"), "icon file restored")
+	_eq(m.disabled.item, ["item_keep"], "pack without disabled lists keeps them")
+	_check(m.import_bundle(m.ALL_PREFIX + m.pack({"icons": {"../be_evil.png": "AAAA"}})) >= 0 and not dir.file_exists("user://Mojimoon-BroEditor/be_evil.png"), "icon names with paths ignored")
+	m.weapon_sets = {}
+	m.custom_tags = {}
+	dir.remove(m.ICON_DIR + "be_dep_icon.png")

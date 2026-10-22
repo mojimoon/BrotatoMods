@@ -1494,3 +1494,43 @@ func _shown_rows(m) -> int:
 		if row[1][0].visible:
 			n += 1
 	return n
+
+
+# 分享站：列表、默认勾选当前对象、上传正文（默认缩略图）、我的上传、下载导入（网络用 test_cloud 模拟）
+func test_195_cloud_panel() -> void:
+	var iid = m.create_custom_item(_plain_item().my_id, "cloud")
+	m.apply_all()
+	var it = isvc.items[3].my_id
+	var ui = yield(_open_ui(CH), "completed")
+	ui.set_kind("item")
+	ui._select(iid)
+	var pack = {"id": "abcdefghij", "title": "T Pack", "author": "me", "kinds": "item", "contents": "X", "n": 1, "thumb": 0, "created": 0, "downloads": 3, "desc": "d"}
+	ui.test_cloud = {
+		"GET /packs?kind=&q=&sort=new&offset=0": [200, JSON.print({"packs": [pack], "more": false})],
+		"GET /packs/abcdefghij": [200, m.ALL_PREFIX + m.pack({"items": {it: {"price": 7}}})],
+		"POST /packs": [200, JSON.print({"id": "newpack222", "token": "tok"})],
+		"DELETE /packs/newpack222": [200, "{}"],
+	}
+	var c = ui.open_cloud()
+	_check(c.modal in ui._modals, "cloud modal open")
+	_check(_tree_has_text(c.modal, "T Pack"), "list shows the pack")
+	_eq(c._sel, [["item", iid]], "current object preselected")
+	c.set_tab("upload")
+	_eq(c.upload_body(), "BE_CLOUD_NEED_TITLE", "title required")
+	c._on_title("My Pack")
+	var body = c.upload_body()
+	_check(body is Dictionary and body.kinds == ["item"] and body.n == 1, "upload body")
+	_check(body is Dictionary and body.has("thumb"), "default thumbnail from the icon")
+	_check(m.unpack(body.code.substr(m.ALL_PREFIX.length())).items.has(iid), "code has the item")
+	c.upload()
+	_eq(c._uploads.packs[0].id, "newpack222", "upload recorded")
+	c.set_tab("mine")
+	_check(_tree_has_text(c.modal, "My Pack"), "my uploads listed")
+	c.delete_pack(c._uploads.packs[0])
+	_eq(c._uploads.packs.size(), 0, "deleted from my uploads")
+	c.pick("none")
+	_eq(c.upload_body(), "BE_CLOUD_NEED_PICK", "nothing picked")
+	c.download("abcdefghij")
+	_eq(m.item_profiles[it].price, 7, "downloaded pack imported")
+	c.modal.close()
+	ui.queue_free()

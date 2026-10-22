@@ -21,6 +21,10 @@ func _initialize() -> void:
 		yield(_sets(m, out), "completed")
 		quit()
 		return
+	if OS.get_environment("BE_SHOT_CLOUD") != "":
+		yield(_cloud(out), "completed")
+		quit()
+		return
 	if OS.get_environment("BE_SHOT_KINDS") != "":
 		yield(_kinds(m, out), "completed")
 		quit()
@@ -240,3 +244,39 @@ func _nodes(n: Node) -> Array:
 		out.push_back(c)
 		out += _nodes(c)
 	return out
+
+
+# 分享站：勾选全部真实上传（BE_SHOT_CLOUD=upload；其他值只截图），再截浏览 / 上传 / 我的上传页
+func _cloud(out: String):
+	var ui = load("res://mods-unpacked/Mojimoon-BroEditor/ui/editor_ui.tscn").instance()
+	root.add_child(ui)
+	yield(self, "idle_frame")
+	var c = ui.open_cloud()
+	c.pick("all")
+	c._on_title(OS.get_environment("BE_SHOT_TITLE") if OS.get_environment("BE_SHOT_TITLE") != "" else "BroEditor sample")
+	c._on_author("Mojimoon")
+	c._desc = "Sample pack: custom character, item and weapon, edited vanilla characters / items / weapons, custom weapon set."
+	c.set_tab("upload")
+	yield(_shot(ui, out + "/cloud_upload.png"), "completed")
+	if OS.get_environment("BE_SHOT_CLOUD") == "upload":
+		var n = c._uploads.packs.size()
+		c.upload()
+		for i in 600:
+			if c._uploads.packs.size() > n or c._status.text.find("(") >= 0:
+				break
+			yield(self, "idle_frame")
+		print("upload status: ", c._status.text, " ", c._uploads.packs.slice(0, 0))
+	c._packs = []
+	c.set_tab("browse")
+	for i in 600:
+		if not c._busy:
+			break
+		yield(self, "idle_frame")
+	for i in 120:
+		yield(self, "idle_frame")
+	print("browse packs: ", c._packs.size(), " status: ", c._status.text)
+	yield(_shot(ui, out + "/cloud_browse.png"), "completed")
+	c.set_tab("mine")
+	yield(_shot(ui, out + "/cloud_mine.png"), "completed")
+	ui.queue_free()
+	yield(self, "idle_frame")

@@ -694,26 +694,143 @@ static func import_graph(code: String):
 	return normalize_profile({"graph": g}).graph
 
 
-# 返回导入后的角色 id；无法识别返回 ""
-# 批量导出：kind = "" 时导出三栏全部
+# 批量导出：kind = "" 时导出三栏全部（含禁用列表与依赖，见 bundle_data）
 func export_bundle(kind: String) -> String:
-	var data = {}
-	var prefix = ALL_PREFIX
-	var kinds = KINDS
-	if kind != "":
-		prefix = BUNDLE_PREFIX[kind]
-		kinds = [kind]
+	var kinds = KINDS if kind == "" else [kind]
 	var dis = {}
 	for k in kinds:
-		data[BUNDLE_KEYS[k]] = compact_all(profiles_of(k), new_profile())
 		dis[k] = disabled[k]
-	if "weapon" in kinds:
-		data["families"] = compact_all(weapon_families, new_family())
+	var data = bundle_data(share_entries(kinds))
+	if data.empty() and not _any_disabled(dis):
+		return ""
+	var prefix = ALL_PREFIX if kind == "" else BUNDLE_PREFIX[kind]
+	# 依赖了其他栏的自定义对象（如角色的初始武器是自定义武器）时用三栏格式，导入时才会一并读取
+	for k in KINDS:
+		if not k in kinds and (data.has(BUNDLE_KEYS[k]) or (k == "weapon" and data.has("families"))):
+			prefix = ALL_PREFIX
 	data["disabled"] = dis
-	var has = _any_disabled(dis)
-	for k in data:
-		has = has or (k != "disabled" and not data[k].empty())
-	return prefix + pack(data) if has else ""
+	return prefix + pack(data)
+
+
+# 可分享的对象：有档案的角色 / 道具，有家族档案或等级档案的武器（按家族 weapon_id）。[[种类, id]...]
+func share_entries(kinds: Array = KINDS) -> Array:
+	var out = []
+	for k in kinds:
+		var ids = []
+		if k == "weapon":
+			for tid in weapon_profiles:
+				ids.push_back(weapon_family_of(tid))
+			ids += weapon_families.keys()
+		else:
+			ids = profiles_of(k).keys()
+		for id in ids:
+			if not [k, id] in out:
+				out.push_back([k, id])
+	return out
+
+
+# 等级 id -> 家族 weapon_id（未登记的等级按 id 推断：去掉 _broeditor 与末尾等级号）
+func weapon_family_of(tid: String) -> String:
+	var r = find_target("weapon", tid)
+	if r != null:
+		return r.weapon_id
+	tid = tid.trim_suffix(TIER_SUFFIX)
+	return tid.substr(0, tid.find_last("_"))
+
+
+# 选中对象的批量码数据（BEA 格式，导入用 import_bundle），并带上依赖：
+#   武器所属的已修改 / 自定义套装，角色 / 道具用到的自定义标签，
+#   档案里引用到的其他自定义对象（效果来源、初始武器 / 道具、融合角色等）与自定义图标（icons：文件名 -> base64 PNG）
+func bundle_data(sel: Array) -> Dictionary:
+	var data = {"profiles": {}, "items": {}, "weapons": {}, "families": {}, "sets": {}, "tags": {}, "icons": {}}
+	var queue = sel.duplicate()
+	var seen = {}
+	while not queue.empty():
+		var e = queue.pop_front()
+		var kind = str(e[0])
+		var id = str(e[1])
+		if seen.has(kind + ":" + id):
+			continue
+		seen[kind + ":" + id] = true
+		var refs = []
+		match kind:
+			"set":
+				if weapon_sets.has(id):
+					data.sets[id] = compact(weapon_sets[id], new_set())
+					refs.push_back(weapon_sets[id])
+			"weapon":
+				var f = weapon_families.get(id)
+				if f != null:
+					data.families[id] = compact(f, new_family())
+					refs.push_back(f)
+				for tid in weapon_profiles:
+					if weapon_family_of(tid) == id:
+						data.weapons[tid] = compact(weapon_profiles[tid], new_profile())
+						refs.push_back(weapon_profiles[tid])
+				for sid in _family_set_ids(id):
+					queue.push_back(["set", sid])
+			_:
+				var ps = profiles_of(kind)
+				if ps.has(id):
+					data[BUNDLE_KEYS[kind]][id] = compact(ps[id], new_profile())
+					refs.push_back(ps[id])
+		var strs = []
+		for r in refs:
+			_strings_in(r, strs)
+		for s in strs:
+			queue += _ref_entries(s, data)
+	for k in data.keys():
+		if data[k].empty():
+			data.erase(k)
+	return data
+
+
+# 武器家族的套装：家族档案指定的，否则原版（自定义武器：基底家族）的
+func _family_set_ids(wid: String) -> Array:
+	var f = weapon_families.get(wid)
+	if f != null and f.sets is Array:
+		return f.sets
+	var vm = _vanilla_members(f.base if f != null and f.custom else wid)
+	var out = []
+	if not vm.empty():
+		for s in vm[0].sets:
+			if s != null:
+				out.push_back(s.my_id)
+	return out
+
+
+static func _strings_in(v, out: Array) -> void:
+	if v is String:
+		out.push_back(v)
+	elif v is Array:
+		for x in v:
+			_strings_in(x, out)
+	elif v is Dictionary:
+		for k in v:
+			_strings_in(v[k], out)
+
+
+# 档案里的一个字符串指向的依赖：标签 / 图标直接写入 data，对象与套装返回待处理的 [种类, id]
+func _ref_entries(s: String, data: Dictionary) -> Array:
+	if custom_tags.has(s):
+		data.tags[s] = custom_tags[s]
+	elif s.begins_with("file:"):
+		var name = s.substr(5)
+		var file = File.new()
+		if not data.icons.has(name) and file.open(ICON_DIR + name, File.READ) == OK:
+			data.icons[name] = Marshalls.raw_to_base64(file.get_buffer(file.get_len()))
+			file.close()
+	elif weapon_sets.has(s.get_slice(SET_LEVEL_SEP, 0)):
+		return [["set", s.get_slice(SET_LEVEL_SEP, 0)]]
+	elif profiles.has(s) and profiles[s].custom:
+		return [["character", s]]
+	elif item_profiles.has(s) and item_profiles[s].custom:
+		return [["item", s]]
+	elif is_custom_family(s):
+		return [["weapon", s]]
+	elif weapon_profiles.has(s) and is_custom_family(weapon_family_of(s)):
+		return [["weapon", weapon_family_of(s)]]
+	return []
 
 
 static func _any_disabled(dis: Dictionary) -> bool:
@@ -741,6 +858,28 @@ func import_bundle(code: String) -> int:
 	if not parsed.result is Dictionary:
 		return -1
 	var n = 0
+	# 依赖：自定义标签、套装、图标（同名覆盖；图标文件已存在则不改）
+	var tags = parsed.result.get("tags", {})
+	if tags is Dictionary:
+		for k in tags:
+			custom_tags[str(k)] = str(tags[k])
+	var sets = parsed.result.get("sets", {})
+	if sets is Dictionary:
+		for k in sets:
+			weapon_sets[str(k)] = normalize_set(sets[k])
+	var icons = parsed.result.get("icons", {})
+	if icons is Dictionary:
+		var dir = Directory.new()
+		if not dir.dir_exists(ICON_DIR):
+			dir.make_dir_recursive(ICON_DIR)
+		for name in icons:
+			# 文件名来自分享码：只接受 import_icon 生成的那种（不含路径）
+			if str(name) != clean_suffix(str(name).get_basename()) + ".png" or dir.file_exists(ICON_DIR + str(name)):
+				continue
+			var file = File.new()
+			if file.open(ICON_DIR + str(name), File.WRITE) == OK:
+				file.store_buffer(Marshalls.base64_to_raw(str(icons[name])))
+				file.close()
 	# 先建好自定义武器 / 补的等级，后面的武器档案才找得到目标
 	if "weapon" in kinds:
 		var fs = parsed.result.get("families", {})
@@ -757,7 +896,7 @@ func import_bundle(code: String) -> int:
 	if parsed.result.get("disabled") is Dictionary:
 		var keep = {}
 		for k in KINDS:
-			keep[k] = disabled[k] if not k in kinds else []
+			keep[k] = [] if k in kinds and parsed.result.disabled.has(k) else disabled[k]
 		disabled = keep
 		_load_extra({"disabled": parsed.result.disabled})
 	for k in kinds:
