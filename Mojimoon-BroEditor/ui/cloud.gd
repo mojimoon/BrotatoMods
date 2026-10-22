@@ -653,6 +653,13 @@ func _build_manage() -> void:
 		ui._apply_action_style(b, d[1])
 		b.connect("pressed", self, "set_all", [d[2]])
 		head.add_child(b)
+	# 左栏当前种类的全部对象
+	var kind_name = ui.tr("BE_KIND_" + _left.kind.to_upper())
+	for d in [["BE_CLOUD_ENABLE_KIND", ui.C_ACCENT_3, true], ["BE_CLOUD_DISABLE_KIND", ui.C_TEXT_DIM, false]]:
+		var b = ui._button(ui.tr(d[0]).replace("{0}", kind_name), ui.FONT_SMALL)
+		ui._apply_action_style(b, d[1])
+		b.connect("pressed", self, "set_kind_enabled", [d[2]])
+		head.add_child(b)
 	var un = ui._button(ui.tr("BE_CLOUD_UNINSTALL"), ui.FONT_SMALL)
 	ui._apply_action_style(un, ui.C_DANGER)
 	un.connect("pressed", self, "_on_uninstall_ask", [_pid])
@@ -688,6 +695,11 @@ func select_unit(u: Array) -> void:
 
 func set_all(on: bool) -> void:
 	_mod.set_pack_enabled(_pid, on)
+	refresh()
+
+
+func set_kind_enabled(on: bool) -> void:
+	_mod.set_pack_enabled(_pid, on, _left.kind)
 	refresh()
 
 

@@ -1138,13 +1138,13 @@ func set_source(kind: String, id: String, src: String) -> void:
 	save_profiles()
 
 
-# 启用 / 停用数据包里的一个对象（停用：改回自修改版或原版）；id = "" 时为包内全部对象
+# 启用 / 停用数据包里的对象（停用：改回自修改版或原版）：kind / id 为空时不限种类 / 对象
 func set_pack_enabled(pid: String, on: bool, kind: String = "", id: String = "") -> void:
 	if not packs.has(pid):
 		return
 	capture()
 	for u in layer_units(packs[pid].data):
-		if id != "" and (u[0] != kind or u[1] != id):
+		if kind != "" and u[0] != kind or id != "" and u[1] != id:
 			continue
 		var key = u[0] + ":" + u[1]
 		if on:
