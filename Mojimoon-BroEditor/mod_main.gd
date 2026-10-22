@@ -1306,6 +1306,9 @@ func _unit_look(kind: String, v) -> Dictionary:
 
 # 悬停预览用的临时资源（原版物品框显示）：复制已注册的对象或基底，换上该版本的名称、图标、效果等
 func preview_res(kind: String, id: String, v):
+	# 自定义对象的"原版"= 不存在
+	if v == null and _unit_res(kind, id) == null:
+		return null
 	var look = _unit_look(kind, v)
 	if kind == "weapon":
 		var tid = ""

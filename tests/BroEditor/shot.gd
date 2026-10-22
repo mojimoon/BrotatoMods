@@ -282,7 +282,7 @@ func _cloud(out: String):
 	yield(_shot(ui, out + "/cloud_browse_installed.png"), "completed")
 	c.open_manage(str(p.id))
 	yield(_shot(ui, out + "/cloud_manage.png"), "completed")
-	c._on_preview_version("self")
+	c.use_source("self")
 	yield(_shot(ui, out + "/cloud_manage_self.png"), "completed")
 	c._left.kind = "weapon"
 	c.open_manage(str(p.id))
@@ -317,6 +317,19 @@ func _cloud_manage(out: String):
 		yield(_shot(ui, out + "/manage_" + k + ".png"), "completed")
 		ui._hide_preview()
 	c._left.kind = "character"
+	c.open_manage(pid)
+	var chips = []
+	for n in _nodes(c._right):
+		if n is Button and n.text.find(c._mod.packs[pid].meta.title) >= 0:
+			chips.push_back(n)
+	ui._on_source_hover(chips[0], "character", c._unit[1], pid)
+	yield(_shot(ui, out + "/manage_source_hover.png"), "completed")
+	ui._hide_preview()
+	ui.set_kind("character")
+	ui._select(c._unit[1])
+	ui._on_tab_pressed("overview")
+	yield(_shot(ui, out + "/overview_source.png"), "completed")
+	ui.set_kind("share")
 	c.set_page("upload")
 	var b2 = c._left_grid.get_child(0)
 	c._on_left_hover(b2, c._left_shown()[0])

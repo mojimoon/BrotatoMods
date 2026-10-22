@@ -69,7 +69,7 @@ const KIND_TABS = [
 	["character", "BE_KIND_CHARACTER", C_ACCENT],
 	["item", "BE_KIND_ITEM", C_ACCENT_3],
 	["weapon", "BE_KIND_WEAPON", C_ACCENT_2],
-	["share", "BE_CLOUD_TITLE", C_CUSTOM],	# 分享站（没有开关；见 cloud.gd）
+	["share", "BE_CLOUD_TITLE", C_CUSTOM],	# 工坊（没有开关；见 cloud.gd）
 ]
 # 道具 / 武器的页签
 const OBJECT_TABS = [
@@ -165,8 +165,8 @@ var _picker_chips: Dictionary = {}
 var _modals: Array = []
 
 var test_clipboard = null
-var test_cloud = null	# 分享站的测试响应（见 cloud.gd 的 test_responses）
-# 第四栏：分享站
+var test_cloud = null	# 工坊的测试响应（见 cloud.gd 的 test_responses）
+# 第四栏：工坊
 var share_view = null
 var _share_on := false
 var _body: HBoxContainer
@@ -501,7 +501,7 @@ func set_kind(kind: String) -> void:
 		return
 	if _share_on:
 		_show_share(false)
-		# 分享站里切换版本 / 安装 / 卸载可能改变了对象：重建左栏，当前对象不在了就选第一个
+		# 工坊里切换来源 / 安装 / 卸载可能改变了对象：重建左栏，当前对象不在了就选第一个
 		if kind == _kind:
 			_fill_left()
 			if _mod.find_target(_kind, _id) == null:
@@ -522,7 +522,7 @@ func set_kind(kind: String) -> void:
 	_select(_id)
 
 
-# 分享站代替左右两栏显示（第一次进入时创建，之后保留状态）
+# 工坊代替左右两栏显示（第一次进入时创建，之后保留状态）
 func _show_share(on: bool) -> void:
 	_share_on = on
 	_left_card.visible = not on
@@ -1152,6 +1152,7 @@ func _build_page() -> void:
 func _build_overview() -> void:
 	var cols = _page_columns()
 	var left = _left_column(cols)
+	_source_section(left)
 	_basic_section(left)
 	if _look_custom():
 		_look_section(left)
@@ -1170,6 +1171,57 @@ func _page_columns() -> HBoxContainer:
 	cols.add_constant_override("separation", 12)
 	_page.add_child(cols)
 	return cols
+
+
+# 来源：对象出现在已下载的数据包里时显示（工坊的管理页用同一行）
+func _source_section(left: Control) -> void:
+	var key = _obj_key()
+	var has_pack = false
+	for v in _mod.unit_versions(_kind, key):
+		has_pack = has_pack or not v in ["vanilla", "self"]
+	if not has_pack:
+		return
+	var box = VBoxContainer.new()
+	_card(left).add_child(box)
+	source_row(box, _kind, key, self, "_on_source_pick")
+
+
+func _on_source_pick(v: String) -> void:
+	_mod.set_source(_kind, _obj_key(), v)
+	_refresh_char_list()
+	if _mod.find_target(_kind, _id) == null:
+		_id = _first_listed()
+	_select(_id)
+
+
+# 来源一行：原版 / 自修改 / 各数据包，✓ 为使用中的；点击切换（target.method(来源)），悬停用原版物品框预览该来源
+func source_row(parent: Control, kind: String, key: String, target: Object, method: String) -> void:
+	var row = HBoxContainer.new()
+	row.add_constant_override("separation", 6)
+	parent.add_child(row)
+	row.add_child(_label(tr("BE_CLOUD_VERSIONS"), FONT_SMALL, C_ACCENT))
+	var cur = _mod.unit_source(kind, key)
+	for v in _mod.unit_versions(kind, key):
+		var b = _button(("✓ " if v == cur else "") + source_name(v), FONT_DESC)
+		_apply_chip_style(b, v == cur, C_ACCENT_2)
+		b.connect("pressed", target, method, [v])
+		b.connect("mouse_entered", self, "_on_source_hover", [b, kind, key, v])
+		b.connect("mouse_exited", self, "_hide_preview")
+		b.connect("tree_exiting", self, "_hide_preview")
+		row.add_child(b)
+
+
+func source_name(v: String) -> String:
+	match v:
+		"vanilla":
+			return tr("BE_SRC_VANILLA")
+		"self":
+			return tr("BE_CLOUD_VER_SELF")
+	return str(_mod.packs[v].meta.get("title", v)) if _mod.packs.has(v) else v
+
+
+func _on_source_hover(b: Control, kind: String, key: String, v: String) -> void:
+	_show_preview(b, _mod.preview_res(kind, key, _mod.version_value(kind, key, v)))
 
 
 func _basic_section(left: Control) -> void:

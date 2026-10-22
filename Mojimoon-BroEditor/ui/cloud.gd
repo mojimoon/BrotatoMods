@@ -1,8 +1,8 @@
 extends VBoxContainer
 
-# 分享站（编辑器第四栏）：服务端是 mods/tools/broeditor-cloud 的 Cloudflare Worker。
+# 工坊（编辑器第四栏）：服务端是 mods/tools/broeditor-cloud 的 Cloudflare Worker。
 #   浏览 / 已下载：两栏卡片；查看（详情、复制 ID、包内对象）、下载；已下载的包可卸载、管理
-#   管理：左栏列出包内对象，右栏启用 / 停用、在同 id 对象的各版本（原版、自修改、各数据包）间预览与切换
+#   管理：左栏列出包内对象，右栏启用 / 停用、切换来源（原版、自修改、各数据包；同编辑器概览页的来源行）
 #   上传：左栏只列自修改层的对象（依赖由 bundle_data 带上）；我的上传：本机上传的包（删除令牌存 UPLOADS_PATH）
 # 数据见 mod_main 的"数据包与版本"。test_responses：测试用，"方法 路径" -> [状态码, 正文]，有值时不发网络请求
 
@@ -43,7 +43,6 @@ var _left_grid: GridContainer
 # 管理
 var _pid := ""
 var _unit := []
-var _preview_src := ""
 var _right: VBoxContainer
 # 上传
 var _sel := []	# [[种类, id]...]
@@ -676,7 +675,6 @@ func _build_manage() -> void:
 			if u[0] == _left.kind:
 				_unit = u
 				break
-	_preview_src = _mod.unit_source(_unit[0], _unit[1]) if not _unit.empty() else ""
 	_left_panel(body, units)
 	var card = ui._card(body)
 	card.size_flags_vertical = SIZE_EXPAND_FILL
@@ -688,7 +686,6 @@ func _build_manage() -> void:
 
 func select_unit(u: Array) -> void:
 	_unit = u
-	_preview_src = _mod.unit_source(u[0], u[1])
 	_fill_left_grid()
 	_fill_manage_right()
 
@@ -731,61 +728,29 @@ func _fill_manage_right() -> void:
 	var sw = ui._switch(ui.tr("BE_CLOUD_ENABLED"), cur == _pid)
 	sw.connect("toggled", self, "_on_unit_toggled")
 	head.add_child(sw)
-	# 版本：点击预览，"使用此版本"切换
-	var vrow = HBoxContainer.new()
-	vrow.add_constant_override("separation", 6)
-	_right.add_child(vrow)
-	vrow.add_child(ui._label(ui.tr("BE_CLOUD_VERSIONS"), ui.FONT_SMALL, ui.C_ACCENT))
-	for v in _mod.unit_versions(kind, id):
-		var b = ui._button(("✓ " if v == cur else "") + _ver_name(v), ui.FONT_DESC)
-		ui._apply_chip_style(b, v == _preview_src, ui.C_ACCENT_2)
-		b.connect("pressed", self, "_on_preview_version", [v])
-		vrow.add_child(b)
-	var spacer = Control.new()
-	spacer.size_flags_horizontal = SIZE_EXPAND_FILL
-	vrow.add_child(spacer)
-	var use = ui._button(ui.tr("BE_CLOUD_USE_VERSION"), ui.FONT_SMALL)
-	ui._apply_action_style(use, ui.C_ACCENT_3)
-	use.disabled = _preview_src == cur
-	use.connect("pressed", self, "use_version")
-	vrow.add_child(use)
+	ui.source_row(_right, kind, id, self, "use_source")
 	var sc = ui._scroll()
 	_right.add_child(sc)
 	var box = VBoxContainer.new()
 	box.size_flags_horizontal = SIZE_EXPAND_FILL
 	box.add_constant_override("separation", 4)
 	sc.add_child(box)
-	_version_preview(box, kind, id, _preview_src)
+	_version_preview(box, kind, id, cur)
 
 
-func _ver_name(v: String) -> String:
-	match v:
-		"vanilla":
-			return ui.tr("BE_SRC_VANILLA")
-		"self":
-			return ui.tr("BE_CLOUD_VER_SELF")
-	return _pack_title(v)
-
-
-func _on_preview_version(v: String) -> void:
-	_preview_src = v
-	_fill_manage_right()
-
-
-func use_version() -> void:
-	_mod.set_source(_unit[0], _unit[1], _preview_src)
+func use_source(v: String) -> void:
+	_mod.set_source(_unit[0], _unit[1], v)
 	_fill_left_grid()
 	_fill_manage_right()
 
 
 func _on_unit_toggled(on: bool) -> void:
 	_mod.set_pack_enabled(_pid, on, _unit[0], _unit[1])
-	_preview_src = _mod.unit_source(_unit[0], _unit[1])
 	_fill_left_grid()
 	_fill_manage_right()
 
 
-# 某个版本的预览：名称 + 效果行（武器按等级）；自定义对象的"原版"= 不存在
+# 某个来源的内容：名称 + 效果行（武器按等级）；自定义对象的"原版"= 不存在
 func _version_preview(box: Control, kind: String, id: String, src: String) -> void:
 	var v = _mod.version_value(kind, id, src)
 	if v == null and _mod._unit_res(kind, id) == null:
