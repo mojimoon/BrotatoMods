@@ -45,7 +45,7 @@ About the buttons in the top-right corner:
 
 ### Files
 
-Files are saved in `%APPDATA%\Brotato\Mojimoon-BroEditor\` (Windows), `~/Library/Application Support/Brotato/Mojimoon-BroEditor/` (Mac) or `~/.local/share/Brotato/Mojimoon-BroEditor/` (Linux):
+Files are saved in `%APPDATA%\Brotato\Mojimoon-BroEditor\` (Windows), `~/Library/Application Support/Brotato/Mojimoon-BroEditor/` (Mac) ,  `~/.local/share/Brotato/Mojimoon-BroEditor/` (Linux), or `/data/data/org.godotengine.brotato/files/Mojimoon-BroEditor/custom/` (Android):
 
 - `profiles.json`: changes to vanilla characters, items and weapons, and the editor settings.
 - `custom\character\`, `custom\item\`, `custom\weapon\`: one `<id>.json` file per character, item or weapon you created. To share, send the files or a whole folder; the receiver puts them in the same folder and restarts the game.
@@ -93,7 +93,7 @@ About the buttons in the top-right corner:
 
 [h1]Files[/h1]
 
-Files are saved in [i]%APPDATA%\Brotato\Mojimoon-BroEditor\[/i] (Windows), [i]~/Library/Application Support/Brotato/Mojimoon-BroEditor/[/i] (Mac) or [i]~/.local/share/Brotato/Mojimoon-BroEditor/[/i] (Linux):
+Files are saved in [i]%APPDATA%\Brotato\Mojimoon-BroEditor\[/i] (Windows), [i]~/Library/Application Support/Brotato/Mojimoon-BroEditor/[/i] (Mac) ,  [i]~/.local/share/Brotato/Mojimoon-BroEditor/[/i] (Linux), or [i]/data/data/org.godotengine.brotato/files/Mojimoon-BroEditor/custom/[/i] (Android):
 
 [list]
 [*][i]profiles.json[/i]: changes to vanilla characters, items and weapons, and the editor settings.
@@ -161,7 +161,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 ### 文件
 
-文件保存在 `%APPDATA%\Brotato\Mojimoon-BroEditor\` (Windows)、`~/Library/Application Support/Brotato/Mojimoon-BroEditor/` (Mac) 或 `~/.local/share/Brotato/Mojimoon-BroEditor/` (Linux)：
+文件保存在 `%APPDATA%\Brotato\Mojimoon-BroEditor\` (Windows)、`~/Library/Application Support/Brotato/Mojimoon-BroEditor/` (Mac) 、 `~/.local/share/Brotato/Mojimoon-BroEditor/` (Linux) 或 `/data/data/org.godotengine.brotato/files/Mojimoon-BroEditor/custom/` (Android)：
 
 - `profiles.json`：对原版角色、道具、武器的修改，以及编辑器设置。
 - `custom\character\`、`custom\item\`、`custom\weapon\`：每个新建的角色、道具、武器各一个 `<id>.json` 文件。分享时发送文件或整个文件夹，对方放进相同的文件夹后重启游戏即可。
@@ -207,7 +207,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 [h1]文件[/h1]
 
-文件保存在 [i]%APPDATA%\Brotato\Mojimoon-BroEditor\[/i] (Windows)、[i]~/Library/Application Support/Brotato/Mojimoon-BroEditor/[/i] (Mac) 或 [i]~/.local/share/Brotato/Mojimoon-BroEditor/[/i] (Linux)：
+文件保存在 [i]%APPDATA%\Brotato\Mojimoon-BroEditor\[/i] (Windows)、[i]~/Library/Application Support/Brotato/Mojimoon-BroEditor/[/i] (Mac) 、 [i]~/.local/share/Brotato/Mojimoon-BroEditor/[/i] (Linux) 或 [i]/data/data/org.godotengine.brotato/files/Mojimoon-BroEditor/custom/[/i] (Android)：
 
 [list]
 [*][i]profiles.json[/i]：对原版角色、道具、武器的修改，以及编辑器设置。
