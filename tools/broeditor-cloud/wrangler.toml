@@ -1,0 +1,17 @@
+# BroEditor 分享站：Worker + D1（索引）+ R2（分享码 / 缩略图）
+# 部署：pnpx wrangler@4 deploy（在本目录）；表结构：pnpx wrangler@4 d1 execute broeditor --remote --file schema.sql
+# 管理员密钥：pnpx wrangler@4 secret put ADMIN_KEY（DELETE 时放在 X-Token 头里可删除任意包）
+name = "broeditor-share"
+main = "worker.js"
+compatibility_date = "2026-09-01"
+workers_dev = false
+routes = [{ pattern = "broeditor-6myuzuteg3xe5jtk.mojimoon.top", custom_domain = true }]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "broeditor"
+database_id = "c1439c85-39fd-4c33-9e7f-c1336be42743"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "broeditor"
