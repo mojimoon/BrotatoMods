@@ -1496,7 +1496,7 @@ func _shown_rows(m) -> int:
 	return n
 
 
-# 分享站（第四栏）：列表、查看、下载并启用、管理（停用 / 切换版本）、上传只列自修改、我的上传、卸载（网络用 test_cloud 模拟）
+# 工坊（第四栏）：列表、查看、下载并启用、管理（停用 / 切换来源 / 覆盖自修改版）、上传只列自修改、我的上传（修改 / 删除）、卸载（网络用 test_cloud 模拟）
 func test_195_share_tab() -> void:
 	var iid = m.create_custom_item(_plain_item().my_id, "cloud")
 	m.apply_all()
@@ -1555,6 +1555,22 @@ func test_195_share_tab() -> void:
 	_eq(c._uploads.packs[0].id, "newpack222", "upload recorded")
 	c.set_page("mine")
 	_check(_tree_has_text(c, "My Pack"), "my uploads listed")
+	ui.test_cloud["GET /packs?q=newpack222"] = [200, JSON.print({"packs": [{"id": "newpack222", "title": "My Pack", "desc": "old d", "author": "au"}]})]
+	ui.test_cloud["GET /packs/newpack222?peek"] = [200, body.code]
+	ui.test_cloud["PUT /packs/newpack222"] = [200, JSON.print({"ok": true})]
+	c.open_edit(c._uploads.packs[0])
+	_check(c._page == "upload" and c._desc == "old d" and c._author() == "au", "edit loads the server info")
+	_eq(c._sel, [["item", iid]], "edit preselects the pack entries")
+	var eb = c.upload_body()
+	_check(eb is Dictionary and not eb.has("code") and not eb.has("thumb") and eb.desc == "old d", "unchanged contents / image not sent")
+	c.pick("none")
+	c.set_thumb(null)
+	eb = c.upload_body()
+	_check(eb is Dictionary and not eb.has("code") and eb.has("thumb"), "nothing picked keeps contents, image reset")
+	c._on_title("Renamed")
+	c.upload()
+	_check(c._page == "mine" and c._edit.empty() and c._uploads.packs[0].title == "Renamed", "edit saved")
+	_eq(c._title, "My Pack", "upload draft restored after editing")
 	c.delete_pack(c._uploads.packs[0])
 	_eq(c._uploads.packs.size(), 0, "deleted from my uploads")
 	ui.set_kind("item")
@@ -1571,8 +1587,13 @@ func test_195_share_tab() -> void:
 	ui._select(iid)
 	_check(not _tree_has_text(ui._page, tr("BE_CLOUD_VERSIONS")), "no source row without packs")
 	ui.set_kind("share")
+	c.open_manage("abcdefghij")
+	var row = c._right.get_child(1)
+	_check(row.get_child(row.get_child_count() - 1).text == tr("BE_CLOUD_ADOPT"), "source row offers copying to own edits")
+	c._on_adopt_ask()
+	_check(m.unit_source("item", it) == "self" and m.own.items[it].price == 7, "pack version copied to own edits")
 	c.uninstall("abcdefghij")
-	_check(not m.packs.has("abcdefghij") and not m.item_profiles.has(it), "uninstalled")
+	_check(not m.packs.has("abcdefghij") and m.item_profiles[it].price == 7, "uninstalled, copied version kept")
 	ui.set_kind("item")
 	_check(ui._left_card.visible and not c.visible, "back to the editor")
 	ui.queue_free()

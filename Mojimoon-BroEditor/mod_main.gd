@@ -1138,6 +1138,26 @@ func set_source(kind: String, id: String, src: String) -> void:
 	save_profiles()
 
 
+# 把某个来源（数据包）的版本复制为自修改版并改用它；包内被引用的套装 / 标签一并复制（自修改层已有的不改）
+func adopt_version(kind: String, id: String, src: String) -> void:
+	capture()
+	var v = version_value(kind, id, src)
+	_set_unit(own, kind, id, v)
+	if packs.has(src):
+		var d = packs[src].data
+		var strs = []
+		_strings_in(v, strs)
+		for s in strs:
+			var sid = s.get_slice(SET_LEVEL_SEP, 0)
+			if d.sets.has(sid) and not own.sets.has(sid):
+				own.sets[sid] = normalize_set(d.sets[sid])
+			if d.tags.has(s) and not own.tags.has(s):
+				own.tags[s] = d.tags[s]
+	sources[kind + ":" + id] = "self" if v != null else "vanilla"
+	compose()
+	save_profiles()
+
+
 # 启用 / 停用数据包里的对象（停用：改回自修改版或原版）：kind / id 为空时不限种类 / 对象
 func set_pack_enabled(pid: String, on: bool, kind: String = "", id: String = "") -> void:
 	if not packs.has(pid):

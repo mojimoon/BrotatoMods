@@ -3,7 +3,8 @@ extends VBoxContainer
 # 工坊（编辑器第四栏）：服务端是 mods/tools/broeditor-cloud 的 Cloudflare Worker。
 #   浏览 / 已下载：两栏卡片；查看（详情、复制 ID、包内对象）、下载；已下载的包可卸载、管理
 #   管理：左栏列出包内对象，右栏启用 / 停用、切换来源（原版、自修改、各数据包；同编辑器概览页的来源行）
-#   上传：左栏只列自修改层的对象（依赖由 bundle_data 带上）；我的上传：本机上传的包（删除令牌存 UPLOADS_PATH）
+#   上传：左栏只列自修改层的对象（依赖由 bundle_data 带上）；我的上传：本机上传的包（令牌存 UPLOADS_PATH），可修改 / 删除
+#   修改：复用上传页（_edit 非空），没选对象或内容没变时只改信息
 # 数据见 mod_main 的"数据包与版本"。test_responses：测试用，"方法 路径" -> [状态码, 正文]，有值时不发网络请求
 
 const BEMain = preload("res://mods-unpacked/Mojimoon-BroEditor/mod_main.gd")
@@ -52,6 +53,12 @@ var _desc := ""
 var _deps: Label
 var _preview: TextureRect
 var _uploads := {"author": "", "packs": []}
+# 修改已上传的包：_edit = uploads 里的记录；_keep_thumb = 沿用服务端缩略图；_draft = 进入修改前的上传草稿
+var _edit := {}
+var _edit_author := ""
+var _edit_code := ""
+var _keep_thumb := false
+var _draft := {}
 
 
 func setup(p_ui) -> void:
@@ -68,7 +75,7 @@ func setup(p_ui) -> void:
 	for t in PAGES:
 		var b = ui._button(ui.tr("BE_CLOUD_TAB_" + t), ui.FONT_SMALL)
 		b.rect_min_size = Vector2(150, 0)
-		b.connect("pressed", self, "set_page", [t])
+		b.connect("pressed", self, "_on_tab", [t])
 		row.add_child(b)
 		_tab_btns[t] = b
 	_status = ui._label("", ui.FONT_DESC, ui.C_TEXT_DIM)
@@ -83,11 +90,17 @@ func setup(p_ui) -> void:
 	set_page("browse")
 
 
+func _on_tab(t: String) -> void:
+	_leave_edit()
+	set_page(t)
+
+
 func set_page(t: String) -> void:
 	ui._commit_focus()
 	_page = t
 	for k in _tab_btns:
-		ui._apply_chip_style(_tab_btns[k], k == t or k == "installed" and t == "manage", ui.C_CUSTOM)
+		var on = k == t and _edit.empty() or k == "installed" and t == "manage" or k == "mine" and not _edit.empty()
+		ui._apply_chip_style(_tab_btns[k], on, ui.C_CUSTOM)
 	for c in _content.get_children():
 		_content.remove_child(c)
 		c.queue_free()
@@ -126,6 +139,8 @@ static func _method_name(method: int) -> String:
 			return "POST"
 		HTTPClient.METHOD_DELETE:
 			return "DELETE"
+		HTTPClient.METHOD_PUT:
+			return "PUT"
 	return "GET"
 
 
@@ -728,7 +743,12 @@ func _fill_manage_right() -> void:
 	var sw = ui._switch(ui.tr("BE_CLOUD_ENABLED"), cur == _pid)
 	sw.connect("toggled", self, "_on_unit_toggled")
 	head.add_child(sw)
-	ui.source_row(_right, kind, id, self, "use_source")
+	var row = ui.source_row(_right, kind, id, self, "use_source")
+	if _mod.packs.has(cur):
+		var sp = Control.new()
+		sp.size_flags_horizontal = SIZE_EXPAND_FILL
+		row.add_child(sp)
+		_card_button(row, "BE_CLOUD_ADOPT", ui.C_ACCENT, "_on_adopt_ask", [])
 	var sc = ui._scroll()
 	_right.add_child(sc)
 	var box = VBoxContainer.new()
@@ -740,6 +760,20 @@ func _fill_manage_right() -> void:
 
 func use_source(v: String) -> void:
 	_mod.set_source(_unit[0], _unit[1], v)
+	_fill_left_grid()
+	_fill_manage_right()
+
+
+func _on_adopt_ask() -> void:
+	if _mod.version_value(_unit[0], _unit[1], "self") == null:
+		adopt()
+		return
+	Modal.confirm(ui, [ui.tr("BE_CLOUD_ADOPT_CONFIRM").replace("{0}", ui.source_name(_mod.unit_source(_unit[0], _unit[1])))], ui.C_DANGER, self, "adopt", [])
+
+
+# 当前来源（数据包）的版本复制为自修改版
+func adopt() -> void:
+	_mod.adopt_version(_unit[0], _unit[1], _mod.unit_source(_unit[0], _unit[1]))
 	_fill_left_grid()
 	_fill_manage_right()
 
@@ -784,6 +818,15 @@ func _build_upload() -> void:
 		if u in units:
 			keep.push_back(u)
 	_sel = keep
+	if not _edit.empty():
+		var head = HBoxContainer.new()
+		head.add_constant_override("separation", 8)
+		_content.add_child(head)
+		var back = ui._button(ui.tr("MENU_BACK"), ui.FONT_SMALL)
+		ui._apply_action_style(back, ui.C_TEXT_DIM)
+		back.connect("pressed", self, "_on_tab", ["mine"])
+		head.add_child(back)
+		head.add_child(ui._label(ui.tr("BE_CLOUD_EDITING").replace("{0}", str(_edit.title)) + "  ·  " + str(_edit.id), ui.FONT_NORMAL, ui.C_ACCENT))
 	var cols = HBoxContainer.new()
 	cols.size_flags_vertical = SIZE_EXPAND_FILL
 	cols.add_constant_override("separation", 12)
@@ -803,7 +846,7 @@ func _build_upload() -> void:
 	right.add_child(ui._label(ui.tr("BE_CLOUD_AUTHOR"), ui.FONT_SMALL, ui.C_TEXT))
 	var author = ui._line_edit("")
 	author.max_length = MAX_AUTHOR
-	author.text = str(_uploads.author)
+	author.text = _author()
 	author.connect("text_changed", self, "_on_author")
 	right.add_child(author)
 	right.add_child(ui._label(ui.tr("BE_CLOUD_DESC"), ui.FONT_SMALL, ui.C_TEXT))
@@ -834,7 +877,7 @@ func _build_upload() -> void:
 	_deps = ui._label("", ui.FONT_DESC, ui.C_TEXT_DIM)
 	right.add_child(_deps)
 	_refresh_deps()
-	var up = ui._button(ui.tr("BE_CLOUD_UPLOAD"), ui.FONT_NORMAL)
+	var up = ui._button(ui.tr("BE_CLOUD_UPLOAD" if _edit.empty() else "BE_CLOUD_SAVE_EDIT"), ui.FONT_NORMAL)
 	ui._apply_action_style(up, ui.C_ACCENT_3)
 	up.connect("pressed", self, "upload")
 	right.add_child(up)
@@ -857,8 +900,15 @@ func _on_title(text: String) -> void:
 
 
 func _on_author(text: String) -> void:
+	if not _edit.empty():
+		_edit_author = text
+		return
 	_uploads.author = text
 	_save_uploads()
+
+
+func _author() -> String:
+	return _edit_author if not _edit.empty() else str(_uploads.author)
 
 
 func _on_desc(edit: TextEdit) -> void:
@@ -901,6 +951,7 @@ func _on_image_file(path: String) -> void:
 # 缩略图：等比缩小到 THUMB_SIZE 以内；null = 用默认（第一个选中对象的图标）
 func set_thumb(img) -> void:
 	_thumb = _fit(img) if img != null else null
+	_keep_thumb = false
 	_refresh_preview()
 
 
@@ -928,16 +979,31 @@ func thumb_image():
 func _refresh_preview() -> void:
 	if not is_instance_valid(_preview):
 		return
+	if _keep_thumb:
+		var id = str(_edit.id)
+		_preview.texture = _thumbs.get(id)
+		if not _thumbs.has(id):
+			_request("/packs/" + id + "/thumb", HTTPClient.METHOD_GET, "", [], "_on_thumb", [id, _preview])
+		return
 	var img = thumb_image()
 	_preview.texture = _texture(img) if img != null else null
 
 
-# 上传的请求正文；无法上传时返回错误提示的 key
+# 上传 / 修改的请求正文；无法上传时返回错误提示的 key。修改时：没选对象或内容没变 = 不改内容，_keep_thumb = 不改图片
 func upload_body():
-	if _sel.empty():
+	if _sel.empty() and _edit.empty():
 		return "BE_CLOUD_NEED_PICK"
 	if _title.strip_edges() == "":
 		return "BE_CLOUD_NEED_TITLE"
+	var body = {"title": _title.strip_edges(), "author": _author().strip_edges(), "desc": _desc.strip_edges().substr(0, MAX_DESC), "mod_ver": _mod_version()}
+	if not _keep_thumb:
+		var img = thumb_image()
+		if img != null:
+			body.thumb = Marshalls.raw_to_base64(img.save_png_to_buffer())
+		elif not _edit.empty():
+			body.thumb = ""
+	if _sel.empty():
+		return body
 	var data = _mod.bundle_data(_sel, _mod.own)
 	var code = BEMain.ALL_PREFIX + BEMain.pack(data)
 	if code.length() > MAX_CODE:
@@ -949,13 +1015,11 @@ func upload_body():
 	var names = []
 	for u in _sel:
 		names.push_back(_mod.unit_name(u[0], u[1], _mod.unit_value(_mod.own, u[0], u[1])))
-	var body = {
-		"title": _title.strip_edges(), "author": str(_uploads.author).strip_edges(), "desc": _desc.strip_edges().substr(0, MAX_DESC),
-		"kinds": kinds, "contents": PoolStringArray(names).join(", "), "n": _sel.size(), "mod_ver": _mod_version(), "code": code,
-	}
-	var img = thumb_image()
-	if img != null:
-		body.thumb = Marshalls.raw_to_base64(img.save_png_to_buffer())
+	if code != _edit_code:
+		body.code = code
+		body.kinds = kinds
+		body.contents = PoolStringArray(names).join(", ")
+		body.n = _sel.size()
 	return body
 
 
@@ -966,6 +1030,9 @@ func upload() -> void:
 		set_status(ui.tr(body))
 		return
 	set_status(ui.tr("BE_CLOUD_UPLOADING"))
+	if not _edit.empty():
+		_request("/packs/" + str(_edit.id), HTTPClient.METHOD_PUT, JSON.print(body), ["Content-Type: application/json", "X-Token: " + str(_edit.token)], "_on_edited", [_edit, body.title])
+		return
 	_request("/packs", HTTPClient.METHOD_POST, JSON.print(body), ["Content-Type: application/json"], "_on_uploaded", [body.title])
 
 
@@ -981,6 +1048,82 @@ func _on_uploaded(code: int, body: PoolByteArray, title: String) -> void:
 	_save_uploads()
 	_packs = []
 	set_status(ui.tr("BE_CLOUD_UPLOADED").replace("{0}", title))
+
+
+# ============================================================
+# 修改已上传的包
+# ============================================================
+func open_edit(p: Dictionary) -> void:
+	if _edit.empty():
+		_draft = {"title": _title, "desc": _desc, "sel": _sel, "thumb": _thumb}
+	_edit = p
+	_title = str(p.title)
+	_desc = ""
+	_edit_author = str(_uploads.author)
+	_edit_code = ""
+	_sel = []
+	_thumb = null
+	_keep_thumb = true
+	set_page("upload")
+	var id = str(p.id)
+	_request("/packs?q=" + id, HTTPClient.METHOD_GET, "", [], "_on_edit_meta", [p])
+	_request("/packs/" + id + "?peek", HTTPClient.METHOD_GET, "", [], "_on_edit_code", [p])
+
+
+func _leave_edit() -> void:
+	if _edit.empty():
+		return
+	_edit = {}
+	_keep_thumb = false
+	_title = _draft.get("title", "")
+	_desc = _draft.get("desc", "")
+	_sel = _draft.get("sel", [])
+	_thumb = _draft.get("thumb")
+	_draft = {}
+
+
+# 服务端的标题 / 作者 / 简介
+func _on_edit_meta(code: int, body: PoolByteArray, p: Dictionary) -> void:
+	if code != 200 or _edit != p:
+		return
+	for m in _json(body).get("packs", []):
+		if m is Dictionary and str(m.get("id")) == str(p.id):
+			_title = str(m.get("title", _title))
+			_desc = str(m.get("desc", ""))
+			_edit_author = str(m.get("author", _edit_author))
+			if _page == "upload":
+				refresh()
+
+
+# 包内对象中仍在自修改层的预先选中
+func _on_edit_code(code: int, body: PoolByteArray, p: Dictionary) -> void:
+	if code != 200 or _edit != p:
+		return
+	_edit_code = body.get_string_from_utf8().strip_edges()
+	var own_units = _mod.layer_units(_mod.own)
+	_sel = []
+	for u in _mod.layer_units(BEMain.normalize_layer(BEMain.pack_code_data(_edit_code))):
+		if u in own_units:
+			_sel.push_back(u)
+	if _page == "upload":
+		refresh()
+
+
+func _on_edited(code: int, _body: PoolByteArray, p: Dictionary, title: String) -> void:
+	if code == 429:
+		set_status(ui.tr("BE_CLOUD_RATE_LIMITED"))
+		return
+	if code != 200:
+		_net_error(code)
+		return
+	p.title = title
+	_save_uploads()
+	_thumbs.erase(str(p.id))
+	_packs = []
+	set_status(ui.tr("BE_CLOUD_SAVED").replace("{0}", title))
+	if _edit == p:
+		_leave_edit()
+		set_page("mine")
 
 
 # ============================================================
@@ -1005,6 +1148,7 @@ func _build_mine() -> void:
 		row.add_child(t)
 		row.add_child(ui._label(_date(float(p.get("created", 0)) * 1000) + "  ·  " + str(p.id), ui.FONT_DESC, ui.C_TEXT_DIM))
 		_card_button(row, "BE_CLOUD_COPY_ID", ui.C_ACCENT_2, "_on_copy_id", [str(p.id)])
+		_card_button(row, "BE_CLOUD_EDIT", ui.C_ACCENT, "open_edit", [p])
 		_card_button(row, "BE_DELETE", ui.C_DANGER, "_on_delete_ask", [p])
 
 

@@ -1195,7 +1195,7 @@ func _on_source_pick(v: String) -> void:
 
 
 # 来源一行：原版 / 自修改 / 各数据包，✓ 为使用中的；点击切换（target.method(来源)），悬停用原版物品框预览该来源
-func source_row(parent: Control, kind: String, key: String, target: Object, method: String) -> void:
+func source_row(parent: Control, kind: String, key: String, target: Object, method: String) -> HBoxContainer:
 	var row = HBoxContainer.new()
 	row.add_constant_override("separation", 6)
 	parent.add_child(row)
@@ -1209,6 +1209,7 @@ func source_row(parent: Control, kind: String, key: String, target: Object, meth
 		b.connect("mouse_exited", self, "_hide_preview")
 		b.connect("tree_exiting", self, "_hide_preview")
 		row.add_child(b)
+	return row
 
 
 func source_name(v: String) -> String:

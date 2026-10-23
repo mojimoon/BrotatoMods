@@ -1,4 +1,4 @@
-"""分享站冒烟测试：上传 -> 列表 / 搜索 -> 下载 -> 缩略图 -> 错误令牌删除失败 -> 删除。
+"""工坊冒烟测试：上传 -> 列表 / 搜索 -> 下载 -> 缩略图 -> 修改 -> 错误令牌失败 -> 删除。
 用法：python mods/tools/broeditor-cloud/smoke_test.py [base_url]
 """
 import base64
@@ -39,6 +39,18 @@ try:
     assert call("GET", "/packs/" + pid + "/thumb") == (200, PNG)
     assert call("POST", "/packs", {"title": "x", "code": "nope"})[0] == 400
     assert call("DELETE", "/packs/" + pid, headers={"x-token": "wrong"})[0] == 403
+    assert call("PUT", "/packs/" + pid, {"title": "x"}, headers={"x-token": "wrong"})[0] == 403
+    assert call("PUT", "/packs/" + pid, {"title": " "}, headers={"x-token": up["token"]})[0] == 400
+    st, raw = call("PUT", "/packs/" + pid, {"title": "smoke edited", "desc": "d2", "thumb": ""}, headers={"x-token": up["token"]})
+    assert st == 200, (st, raw)
+    p = json.loads(call("GET", "/packs?q=" + pid)[1])["packs"][0]
+    assert (p["title"], p["desc"], p["contents"], p["thumb"]) == ("smoke edited", "d2", "Smoke Crossbow", 0) and p["updated"] >= p["created"], p
+    assert call("GET", "/packs/" + pid + "/thumb")[0] == 404
+    st, raw = call("PUT", "/packs/" + pid, {"code": "BEA:zdef", "kinds": ["item"], "contents": "Smoke Item", "n": 2}, headers={"x-token": up["token"]})
+    assert st == 200, (st, raw)
+    assert call("GET", "/packs/" + pid + "?peek") == (200, b"BEA:zdef")
+    p = json.loads(call("GET", "/packs?q=" + pid)[1])["packs"][0]
+    assert (p["kinds"], p["contents"], p["n"], p["title"]) == ("item", "Smoke Item", 2, "smoke edited"), p
 finally:
     st, raw = call("DELETE", "/packs/" + pid, headers={"x-token": up["token"]})
 assert st == 200, (st, raw)

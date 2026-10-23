@@ -334,5 +334,11 @@ func _cloud_manage(out: String):
 	var b2 = c._left_grid.get_child(0)
 	c._on_left_hover(b2, c._left_shown()[0])
 	yield(_shot(ui, out + "/upload_hover.png"), "completed")
+	ui._hide_preview()
+	if not c._uploads.packs.empty():
+		c.open_edit(c._uploads.packs[0])
+		for i in 180:
+			yield(self, "idle_frame")
+		yield(_shot(ui, out + "/upload_edit.png"), "completed")
 	ui.queue_free()
 	yield(self, "idle_frame")

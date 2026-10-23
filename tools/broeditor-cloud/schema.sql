@@ -10,10 +10,15 @@ CREATE TABLE IF NOT EXISTS packs (
 	thumb INTEGER NOT NULL DEFAULT 0,
 	mod_ver TEXT NOT NULL DEFAULT '',
 	created INTEGER NOT NULL,
+	updated INTEGER NOT NULL DEFAULT 0,	-- 最后修改时间（创建时 = created）
 	downloads INTEGER NOT NULL DEFAULT 0,
 	token TEXT NOT NULL,			-- sha256(删除令牌)
-	ip TEXT NOT NULL			-- sha256(IP + 盐)，只用于限流
+	ip TEXT NOT NULL			-- sha256(IP + 盐)，创建者
 );
 CREATE INDEX IF NOT EXISTS packs_created ON packs (created);
 CREATE INDEX IF NOT EXISTS packs_hot ON packs (downloads, created);
 CREATE INDEX IF NOT EXISTS packs_ip ON packs (ip, created);
+-- 限流记录（创建 / 修改），只保留 24 小时
+CREATE TABLE IF NOT EXISTS hits (ip TEXT NOT NULL, act TEXT NOT NULL, at INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS hits_ip ON hits (ip, act, at);
+-- 旧库加列（只需执行一次）：ALTER TABLE packs ADD COLUMN updated INTEGER NOT NULL DEFAULT 0;
