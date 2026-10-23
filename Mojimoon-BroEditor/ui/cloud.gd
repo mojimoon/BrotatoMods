@@ -37,6 +37,8 @@ var _more := false
 var _busy := false
 var _grid: GridContainer
 var _thumbs := {}	# 包 id -> 纹理
+var _remote := {}	# 包 id -> 服务端的信息（列表、已下载页的更新检查），用于判断已下载的包是否有更新
+var _checked := false	# 本次打开"已下载"页已检查过更新
 # 左栏（上传 / 管理共用）
 var _left := {"kind": "character", "q": ""}
 var _left_units := []
@@ -51,6 +53,7 @@ var _thumb: Image = null
 var _title := ""
 var _desc := ""
 var _deps: Label
+var _sel_list: VBoxContainer	# 右栏：将要上传的内容（同查看弹窗）
 var _preview: TextureRect
 var _uploads := {"author": "", "packs": []}
 # 修改已上传的包：_edit = uploads 里的记录；_keep_thumb = 沿用服务端缩略图；_draft = 进入修改前的上传草稿
@@ -92,6 +95,7 @@ func setup(p_ui) -> void:
 
 func _on_tab(t: String) -> void:
 	_leave_edit()
+	_checked = false
 	set_page(t)
 
 
@@ -242,6 +246,7 @@ func _on_list(code: int, body: PoolByteArray, offset: int) -> void:
 	for p in r.get("packs", []):
 		if p is Dictionary:
 			_packs.push_back(p)
+			_remote[str(p.get("id"))] = p
 	_more = bool(r.get("more", false))
 	set_status("")
 	if _page == "browse" and is_instance_valid(_grid):
@@ -265,12 +270,40 @@ func _fill_browse() -> void:
 
 func _build_installed() -> void:
 	_grid = _card_grid()
+	_fill_installed()
+	if not _checked and not _mod.packs.empty():
+		_checked = true
+		_request("/packs?ids=" + PoolStringArray(_mod.packs.keys()).join(","), HTTPClient.METHOD_GET, "", [], "_on_check")
+
+
+func _fill_installed() -> void:
+	for c in _grid.get_children():
+		_grid.remove_child(c)
+		c.queue_free()
 	var ids = _mod.pack_ids()
 	ids.invert()
 	if ids.empty():
 		_grid.add_child(ui._desc(ui.tr("BE_CLOUD_EMPTY")))
 	for pid in ids:
 		_pack_card(_grid, _mod.packs[pid].meta)
+
+
+func _on_check(code: int, body: PoolByteArray) -> void:
+	if code != 200:
+		return
+	for p in _json(body).get("packs", []):
+		if p is Dictionary:
+			_remote[str(p.get("id"))] = p
+	if _page == "installed" and is_instance_valid(_grid):
+		_fill_installed()
+
+
+# 已下载的包在服务端被作者修改过（旧版本下载的没有 updated，用 created 比较）
+func outdated(id: String) -> bool:
+	if not _mod.packs.has(id) or not _remote.has(id):
+		return false
+	var local = _mod.packs[id].meta
+	return float(_remote[id].get("updated", 0)) > float(local.get("updated", local.get("created", 0)))
 
 
 func _pack_card(parent: Control, p: Dictionary) -> void:
@@ -304,6 +337,8 @@ func _pack_card(parent: Control, p: Dictionary) -> void:
 	row.add_child(btns)
 	_card_button(btns, "BE_CLOUD_VIEW", ui.C_ACCENT_2, "open_view", [p])
 	if _mod.packs.has(id):
+		if outdated(id):
+			_card_button(btns, "BE_CLOUD_UPDATE", ui.C_ACCENT_3, "update_pack", [id])
 		_card_button(btns, "BE_CLOUD_MANAGE", ui.C_ACCENT, "open_manage", [id])
 		_card_button(btns, "BE_CLOUD_UNINSTALL", ui.C_DANGER, "_on_uninstall_ask", [id])
 	else:
@@ -367,6 +402,8 @@ func _on_thumb(code: int, body: PoolByteArray, id: String, img: TextureRect) -> 
 	if code != 200 or image.load_png_from_buffer(body) != OK:
 		return
 	_thumbs[id] = _texture(image)
+	if _mod.packs.has(id) and not File.new().file_exists(BEMain.PACK_DIR + id + ".png"):
+		image.save_png(BEMain.PACK_DIR + id + ".png")
 	if is_instance_valid(img):
 		img.texture = _thumbs[id]
 
@@ -376,16 +413,26 @@ func download(p: Dictionary) -> void:
 	_request("/packs/" + str(p.id), HTTPClient.METHOD_GET, "", [], "_on_code", [p])
 
 
+# 更新已下载的包：重新下载，缩略图也重新获取
+func update_pack(id: String) -> void:
+	if _remote.has(id):
+		download(_remote[id])
+
+
 func _on_code(code: int, body: PoolByteArray, p: Dictionary) -> void:
 	if code != 200:
 		_net_error(code)
 		return
+	var id = str(p.id)
+	var updating = _mod.packs.has(id)
 	var n = _mod.install_pack(p, body.get_string_from_utf8())
 	if n < 0:
 		set_status(ui.tr("BE_CLOUD_IMPORT_FAILED"))
 		return
-	var id = str(p.id)
-	if _thumbs.has(id) and _thumbs[id].get_data() != null:
+	if updating:
+		_thumbs.erase(id)
+		Directory.new().remove(BEMain.PACK_DIR + id + ".png")
+	elif _thumbs.has(id) and _thumbs[id].get_data() != null:
 		_thumbs[id].get_data().save_png(BEMain.PACK_DIR + id + ".png")
 	set_status(ui.tr("BE_CLOUD_INSTALLED").replace("{0}", str(p.get("title", ""))).replace("{1}", str(n)))
 	refresh()
@@ -442,6 +489,8 @@ func open_view(p: Dictionary):
 	sc.add_child(list)
 	if _mod.packs.has(id):
 		_fill_contents(list, _mod.packs[id].data)
+		if outdated(id):
+			m.add_button(ui.tr("BE_CLOUD_UPDATE"), ui.C_ACCENT_3, self, "_view_action", [m, "update_pack", id])
 		m.add_button(ui.tr("BE_CLOUD_MANAGE"), ui.C_ACCENT, self, "_view_action", [m, "open_manage", id])
 		m.add_button(ui.tr("BE_CLOUD_UNINSTALL"), ui.C_DANGER, self, "_view_action", [m, "_on_uninstall_ask", id])
 	else:
@@ -476,14 +525,14 @@ func _on_peek(code: int, body: PoolByteArray, list: Control) -> void:
 
 
 # 包内对象：按种类列出图标与名称，再列套装 / 标签
-func _fill_contents(list: Control, l: Dictionary) -> void:
+func _fill_contents(list: Control, l: Dictionary, columns: int = 3) -> void:
 	for kind in BEMain.KINDS:
 		var units = _mod.layer_units(l, [kind])
 		if units.empty():
 			continue
 		list.add_child(ui._label(ui.tr("BE_KIND_" + kind.to_upper()) + "  " + str(units.size()), ui.FONT_SMALL, ui.C_ACCENT_2))
 		var g = GridContainer.new()
-		g.columns = 3
+		g.columns = columns
 		g.add_constant_override("hseparation", 16)
 		list.add_child(g)
 		for u in units:
@@ -876,16 +925,23 @@ func _build_upload() -> void:
 	_refresh_preview()
 	_deps = ui._label("", ui.FONT_DESC, ui.C_TEXT_DIM)
 	right.add_child(_deps)
-	_refresh_deps()
 	var up = ui._button(ui.tr("BE_CLOUD_UPLOAD" if _edit.empty() else "BE_CLOUD_SAVE_EDIT"), ui.FONT_NORMAL)
 	ui._apply_action_style(up, ui.C_ACCENT_3)
 	up.connect("pressed", self, "upload")
 	right.add_child(up)
+	var sc = ui._scroll()
+	right.add_child(sc)
+	_sel_list = VBoxContainer.new()
+	_sel_list.size_flags_horizontal = SIZE_EXPAND_FILL
+	_sel_list.add_constant_override("separation", 6)
+	sc.add_child(_sel_list)
+	_refresh_deps()
 
 
 func pick(what: String) -> void:
 	if what == "none":
-		_sel = []
+		for u in _left_shown():
+			_sel.erase(u)
 	else:
 		for u in _left_shown():
 			if not u in _sel:
@@ -915,11 +971,16 @@ func _on_desc(edit: TextEdit) -> void:
 	_desc = edit.text
 
 
-# 自动附带的依赖：套装、标签、未勾选但被引用到的自定义对象
+# 自动附带的依赖：套装、标签、未勾选但被引用到的自定义对象；右栏列出将要上传的全部内容
 func _refresh_deps() -> void:
 	if not is_instance_valid(_deps):
 		return
 	var data = _mod.bundle_data(_sel, _mod.own)
+	if is_instance_valid(_sel_list):
+		for c in _sel_list.get_children():
+			_sel_list.remove_child(c)
+			c.queue_free()
+		_fill_contents(_sel_list, BEMain.normalize_layer(data), 2)
 	var extra = 0
 	for pair in [["character", "profiles"], ["item", "items"], ["weapon", "families"]]:
 		for id in data.get(pair[1], {}):

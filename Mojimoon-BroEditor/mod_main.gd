@@ -1176,6 +1176,7 @@ func set_pack_enabled(pid: String, on: bool, kind: String = "", id: String = "")
 
 
 # 安装下载的数据包：code = 分享码，meta = 列表里的信息（含 id）。包内对象全部启用；返回对象数，-1 = 无法识别
+# 已安装时 = 更新：保留下载顺序与各对象的启用状态，只启用新增的对象
 func install_pack(meta: Dictionary, code: String) -> int:
 	var raw = pack_code_data(code)
 	var pid = str(meta.get("id", ""))
@@ -1185,15 +1186,19 @@ func install_pack(meta: Dictionary, code: String) -> int:
 	_rekey_sets(d, pid)
 	_write_icons(raw.get("icons"))
 	capture()
+	var old = packs[pid].data if packs.has(pid) else null
 	var m = meta.duplicate()
 	m.installed = OS.get_unix_time()
 	for other in packs:
 		if other != pid:
 			m.installed = max(m.installed, int(packs[other].meta.get("installed", 0)) + 1)
+	if old != null:
+		m.installed = packs[pid].meta.get("installed", m.installed)
 	packs[pid] = {"meta": m, "data": d}
 	var units = layer_units(d)
 	for u in units:
-		sources[u[0] + ":" + u[1]] = pid
+		if old == null or unit_value(old, u[0], u[1]) == null:
+			sources[u[0] + ":" + u[1]] = pid
 	_save_pack(pid)
 	compose()
 	save_profiles()

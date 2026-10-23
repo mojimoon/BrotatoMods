@@ -1546,6 +1546,11 @@ func test_195_share_tab() -> void:
 	c.set_page("upload")
 	_eq(c._left_units, [["item", iid]], "upload lists own edits only")
 	c._on_left_pressed(["item", iid])
+	_check(c._sel_list.get_child_count() > 0, "right side previews the upload contents")
+	c._left.kind = "character"
+	c.pick("none")
+	_eq(c._sel, [["item", iid]], "clear only affects the current kind")
+	c._left.kind = "item"
 	_eq(c.upload_body(), "BE_CLOUD_NEED_TITLE", "title required")
 	c._on_title("My Pack")
 	var body = c.upload_body()
@@ -1586,14 +1591,29 @@ func test_195_share_tab() -> void:
 	_eq(m.item_profiles[it].price, 7, "overview switches back to the pack")
 	ui._select(iid)
 	_check(not _tree_has_text(ui._page, tr("BE_CLOUD_VERSIONS")), "no source row without packs")
+	var it2 = isvc.items[4].my_id
+	var pack2 = pack.duplicate()
+	pack2.updated = 99
+	m.set_pack_enabled("abcdefghij", false)
+	ui.test_cloud["GET /packs?ids=abcdefghij"] = [200, JSON.print({"packs": [pack2]})]
+	ui.test_cloud["GET /packs/abcdefghij"] = [200, m.ALL_PREFIX + m.pack({"items": {it: {"price": 9}, it2: {"price": 5}}})]
 	ui.set_kind("share")
+	c._on_tab("installed")
+	_check(c.outdated("abcdefghij"), "author's edit detected")
+	c.update_pack("abcdefghij")
+	_check(not c.outdated("abcdefghij"), "pack updated")
+	_check(not m.item_profiles.has(it) and m.item_profiles[it2].price == 5, "update keeps disabled entries, enables new ones")
+	m.set_pack_enabled("abcdefghij", true)
+	_eq(m.item_profiles[it].price, 9, "updated content used")
+	c._left.kind = "item"
 	c.open_manage("abcdefghij")
+	c.select_unit(["item", it])
 	var row = c._right.get_child(1)
 	_check(row.get_child(row.get_child_count() - 1).text == tr("BE_CLOUD_ADOPT"), "source row offers copying to own edits")
 	c._on_adopt_ask()
-	_check(m.unit_source("item", it) == "self" and m.own.items[it].price == 7, "pack version copied to own edits")
+	_check(m.unit_source("item", it) == "self" and m.own.items[it].price == 9, "pack version copied to own edits")
 	c.uninstall("abcdefghij")
-	_check(not m.packs.has("abcdefghij") and m.item_profiles[it].price == 7, "uninstalled, copied version kept")
+	_check(not m.packs.has("abcdefghij") and m.item_profiles[it].price == 9 and not m.item_profiles.has(it2), "uninstalled, copied version kept")
 	ui.set_kind("item")
 	_check(ui._left_card.visible and not c.visible, "back to the editor")
 	ui.queue_free()

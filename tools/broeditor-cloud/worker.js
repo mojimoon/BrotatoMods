@@ -1,5 +1,5 @@
 // BroEditor 分享站 API（游戏内"上传 / 下载"界面使用）
-//   GET    /packs?kind=&q=&sort=new|hot&offset=   列表（每页 PAGE 条，more = 还有下一页；q 也匹配完整 id）
+//   GET    /packs?kind=&q=&sort=new|hot&offset=&ids=   列表（每页 PAGE 条，more = 还有下一页；q 也匹配完整 id；ids = 逗号分隔的 id）
 //   GET    /packs/<id>[?peek]                     分享码正文（不带 peek 时下载数 +1）
 //   GET    /packs/<id>/thumb                      缩略图 PNG
 //   POST   /packs   {title, desc, author, kinds, contents, n, mod_ver, code, thumb(base64 PNG)} -> {id, token}
@@ -68,6 +68,12 @@ async function list(url, env) {
 		where.push("(',' || kinds || ',') LIKE ?");
 		args.push(`%,${p.get("kind")},%`);
 	}
+	// ids=a,b,c：按 id 取（已下载的包检查更新）
+	const ids = (p.get("ids") || "").split(",").filter((x) => new RegExp(`^${ID_RE}$`).test(x)).slice(0, 100);
+	if (ids.length) {
+		where.push(`id IN (${ids.map(() => "?").join(",")})`);
+		args.push(...ids);
+	}
 	const q = str(p.get("q"), 60);
 	if (q) {
 		const like = `%${q.replace(/[\\%_]/g, "\\$&")}%`;
@@ -79,9 +85,10 @@ async function list(url, env) {
 	const sql =
 		"SELECT id, title, descr AS desc, author, kinds, contents, n, thumb, mod_ver, created, updated, downloads FROM packs" +
 		(where.length ? " WHERE " + where.join(" AND ") : "") +
-		` ORDER BY ${order} LIMIT ${PAGE + 1} OFFSET ${offset}`;
+		` ORDER BY ${order} LIMIT ${Math.max(PAGE, ids.length) + 1} OFFSET ${offset}`;
 	const { results } = await env.DB.prepare(sql).bind(...args).all();
-	return json({ packs: results.slice(0, PAGE), more: results.length > PAGE });
+	const n = Math.max(PAGE, ids.length);
+	return json({ packs: results.slice(0, n), more: results.length > n });
 }
 
 // IP 只存加盐哈希；超出当天限额返回 false，否则记一次

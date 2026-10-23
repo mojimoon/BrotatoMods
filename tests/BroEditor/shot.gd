@@ -304,6 +304,9 @@ func _cloud_manage(out: String):
 	ui.set_kind("share")
 	var c = ui.share_view
 	c.set_page("installed")
+	for i in 120:
+		yield(self, "idle_frame")
+	yield(_shot(ui, out + "/installed.png"), "completed")
 	var pid = c._mod.pack_ids()[0]
 	c.open_manage(pid)
 	for k in ["character", "item", "weapon"]:
@@ -331,6 +334,8 @@ func _cloud_manage(out: String):
 	yield(_shot(ui, out + "/overview_source.png"), "completed")
 	ui.set_kind("share")
 	c.set_page("upload")
+	for u in c._left_shown().slice(0, 1):
+		c._on_left_pressed(u)
 	var b2 = c._left_grid.get_child(0)
 	c._on_left_hover(b2, c._left_shown()[0])
 	yield(_shot(ui, out + "/upload_hover.png"), "completed")
