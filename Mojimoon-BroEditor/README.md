@@ -129,6 +129,10 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 ![](../img/BroEditor/be-en-5.jpg)
 
+![](../img/BroEditor/be-en-9.jpg)
+
+![](../img/BroEditor/be-en-10.jpg)
+
 ---
 
 ## 中文
@@ -248,6 +252,10 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 ![](../img/BroEditor/be-zh-6.jpg)
 
 ![](../img/BroEditor/be-zh-5.jpg)
+
+![](../img/BroEditor/be-zh-9.jpg)
+
+![](../img/BroEditor/be-zh-10.jpg)
 
 <!--
 
