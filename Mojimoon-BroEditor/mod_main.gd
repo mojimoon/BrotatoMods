@@ -3203,6 +3203,9 @@ func _good_dir(key: String) -> int:
 func _effect_goodness(n: Dictionary) -> int:
 	var kind = str(n.get("kind", ""))
 	var params = n.get("params", {})
+	# 变量不受诅咒（路径上的"每 N 次"也不变）
+	if kind == "var_set":
+		return 0
 	if kind == "grant":
 		var ge = make_effect(params.ref) if params.get("ref") is Dictionary else null
 		if ge == null:
@@ -3237,6 +3240,11 @@ func curse_graph(g: Dictionary, modifier: float) -> Dictionary:
 		for id in path.slice(0, path.size() - 2):
 			if Catalog.CURSE_TARGETS.has(by_id[id].kind):
 				target = by_id[id]
+				break
+		# 经过变量的路径：计数不变（变量与"每 N 次"都不诅咒），改效果的数值
+		for id in path:
+			if by_id[id].kind in ["var_set", "var_cmp"]:
+				target = null
 				break
 		if target != null:
 			var tp = Catalog.CURSE_TARGETS[target.kind]

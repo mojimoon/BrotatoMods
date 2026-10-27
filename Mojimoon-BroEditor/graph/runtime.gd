@@ -2,7 +2,8 @@ extends Node
 
 # 蓝图运行时：常驻在 mod 节点下。战斗开始时 start_wave(main)，波次结束时 end_wave()。
 # 原版事件（击杀 / 受击 / 升级 / 拾取 / 商店刷新……）经脚本扩展转发到 fire()，
-# 从对应扳机节点出发沿路径走：条件节点决定是否继续，效果节点执行。
+# 从对应扳机节点出发沿路径走：条件节点决定是否继续，效果节点执行后继续沿出线走；
+# 一个节点的多条出线按目标节点的纵坐标从上到下依次走（GraphEffect.outgoing）。
 # 状态扳机（静止 / 移动 / 低血 / 满血）每 0.2 秒轮询：进入状态时执行，离开时撤销本次加的本波属性与本波获得的效果。
 # 载荷实现参考 AutoAnthony 的 aa/runtime.gd。
 
@@ -142,7 +143,7 @@ func _every_n_steps(en: Dictionary, n: Dictionary) -> bool:
 func _walk(en: Dictionary, from_id: int, p: int, ctx: Dictionary, depth: int) -> void:
 	if depth > MAX_DEPTH:
 		return
-	for to in GraphEffect.outgoing(en.g, from_id):
+	for to in _outgoing(en, from_id):
 		var n = en.by_id.get(to)
 		if n == null:
 			continue
@@ -152,6 +153,16 @@ func _walk(en: Dictionary, from_id: int, p: int, ctx: Dictionary, depth: int) ->
 					_walk(en, to, p, ctx, depth + 1)
 			"effect":
 				_execute(en, n, p, ctx)
+				_walk(en, to, p, ctx, depth + 1)
+
+
+# 出线目标（按执行顺序，缓存在条目里）
+func _outgoing(en: Dictionary, id: int) -> Array:
+	if not en.has("out"):
+		en.out = {}
+	if not en.out.has(id):
+		en.out[id] = GraphEffect.outgoing(en.g, id, en.by_id)
+	return en.out[id]
 
 
 func _param(n: Dictionary, k: String, default = 0):
@@ -234,6 +245,8 @@ func _pass(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> bool:
 				if w.weapon_id == oid or w.my_id == oid:
 					c += 1
 			return _cmp(n, c)
+		"var_cmp":
+			return _cmp(n, GraphEffect.get_var(p, str(_param(n, "var", ""))))
 		"weapon_kinds":
 			var kinds = {}
 			for w in RunData.get_player_weapons(p):
@@ -355,7 +368,28 @@ func _execute(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> void:
 		"group_unlock", "group_lock":
 			if mod != null:
 				mod.set_group_locked(str(_param(n, "group", "")), n.kind == "group_lock")
+		"var_set":
+			_var_set(n, p, v)
 	_sync_lost_max_hp(p, hp_before)
+
+
+# 修改变量（不随状态扳机撤销；除以 0 时不变）
+func _var_set(n: Dictionary, p: int, v: int) -> void:
+	var name = str(_param(n, "var", ""))
+	var cur = GraphEffect.get_var(p, name)
+	match str(_param(n, "op", "add")):
+		"set":
+			cur = v
+		"sub":
+			cur -= v
+		"mul":
+			cur *= v
+		"div":
+			if v != 0:
+				cur = cur / v
+		_:
+			cur += v
+	GraphEffect.set_var(p, name, cur)
 
 
 # 道具变为：持有者是道具时，换成列表中随机一件；列表为空时移除它（原版 remove_item 换成"移除后变成"的道具）
@@ -798,6 +832,9 @@ func poll_state(en: Dictionary, trig: Dictionary, p: int, pl) -> void:
 		var ok = true
 		for i in range(1, path.size() - 1):
 			var c = en.by_id[path[i]]
+			# 经过的效果由它自己的路径执行
+			if Catalog.node_type(c.kind) != "cond":
+				continue
 			if not c.kind in Catalog.STATE_CONDS and not _pass(en, c, p, ctx):
 				ok = false
 				break

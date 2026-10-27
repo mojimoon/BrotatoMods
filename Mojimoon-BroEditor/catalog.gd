@@ -356,6 +356,8 @@ class FieldSorter:
 #   transform（道具变为）：只对道具上的蓝图有效；gain_item / lose_item（获得 / 失去道具）同样等到敌袭结束再执行
 #   shop_add / shop_remove：本局商店（及箱子）中可以出现 / 不再出现某些道具（可解除"禁用"），随一局存档保存
 #   charm：魅惑目标敌人（同浪漫之人）；spawn：生成敌人；break：持有者是武器时损坏（同砖块）
+#   var_set / var_cmp：整数变量（按名称在玩家的全部蓝图间共享，初始为 0，整局保留、随存档保存；不受诅咒）
+#   效果节点之后可以继续连接；一个节点的多条出线按目标节点在画布上的纵坐标从上到下执行
 # ============================================================
 const NODES = [
 	["wave_start", "trigger", []],
@@ -411,6 +413,7 @@ const NODES = [
 	["own_item", "cond", [["id", "owned", ""], ["cmp", "mode:at_least|at_most|exactly", "at_least"], ["n", "int", 1]]],
 	["own_set", "cond", [["set", "set", ""], ["cmp", "mode:at_least|at_most|exactly", "at_least"], ["n", "int", 2]]],
 	["weapon_kinds", "cond", [["cmp", "mode:at_least|at_most|exactly", "at_least"], ["n", "int", 3]]],
+	["var_cmp", "cond", [["var", "var", "x"], ["cmp", "mode:at_least|at_most|exactly", "at_least"], ["n", "int", 2]]],
 	["temp_stat", "effect", [["stat", "stat", "stat_percent_damage"], ["value", "int", 5]]],
 	["perm_stat", "effect", [["stat", "stat", "stat_max_hp"], ["value", "int", 1]]],
 	["timed_stat", "effect", [["stat", "stat", "stat_attack_speed"], ["value", "int", 20], ["secs", "int", 3]]],
@@ -437,12 +440,13 @@ const NODES = [
 	["shop_force", "effect", [["items", "goods", []]]],
 	["group_unlock", "effect", [["group", "group", ""]]],
 	["group_lock", "effect", [["group", "group", ""]]],
+	["var_set", "effect", [["var", "var", "x"], ["op", "mode:add|sub|set|mul|div", "add"], ["value", "int", 1]]],
 ]
 # 只在某个参数取某值时显示的参数：[节点, 参数] -> [条件参数, 值]
 const PARAM_SHOW_IF = {"grant:secs": ["mode", "timed"]}
 const STATE_TRIGGERS = ["still", "moving", "low_hp", "full_hp", "always"]
 # 状态条件：在状态扳机的路径上持续检查（全部满足时进入，任一不满足时撤销）；其余条件只在进入时检查一次
-const STATE_CONDS = ["hp_below", "hp_above", "wave_min", "wave_max", "diff_min", "diff_max", "stat_min", "stat_max", "if_moving", "if_still", "own_tag", "own_set", "own_item", "weapon_kinds"]
+const STATE_CONDS = ["hp_below", "hp_above", "wave_min", "wave_max", "diff_min", "diff_max", "stat_min", "stat_max", "if_moving", "if_still", "own_tag", "own_set", "own_item", "weapon_kinds", "var_cmp"]
 const SHOP_TRIGGERS = ["reroll", "buy"]
 
 # 不是普通 Effect 脚本、但也可以拆解的扳机（徒步旅行者的步数在 value2；浪漫之人 / 长笛的魅惑由 split_native 单独处理）

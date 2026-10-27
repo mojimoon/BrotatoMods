@@ -2,7 +2,8 @@ extends Reference
 
 # 编辑器的"蓝图"页：原版 GraphEdit 节点图。
 #   顶部：添加扳机 / 条件 / 效果节点的下拉菜单、清空；右侧：路径文本预览
-#   节点之间拖线连接（扳机 → 条件 → 效果），不检查合法性；节点右上角 X 删除，可拖动、Ctrl+滚轮缩放
+#   节点之间拖线连接（扳机 → 条件 → 效果，效果之后可以继续连），不检查合法性；节点右上角 X 删除，可拖动、Ctrl+滚轮缩放
+#   一个节点的多条出线按目标节点的纵坐标从上到下执行（拖动节点即可调整顺序）
 # 修改直接写入当前角色档案的 graph 字段。
 
 const Catalog = preload("res://mods-unpacked/Mojimoon-BroEditor/catalog.gd")
@@ -180,7 +181,7 @@ func _make_node(n: Dictionary) -> GraphNode:
 	gn.connect("dragged", self, "_on_dragged", [int(n.id)])
 	var head = ui._label(ui.tr("BE_TYPE_" + t.to_upper()), ui.FONT_DESC, ui.C_TEXT_DIM)
 	gn.add_child(head)
-	gn.set_slot(0, t != "trigger", PORT_TYPE, color, t != "effect", PORT_TYPE, color)
+	gn.set_slot(0, t != "trigger", PORT_TYPE, color, true, PORT_TYPE, color)
 	var d = Catalog.node_def(n.kind)
 	# 不认识的节点（来自更新的版本）：只显示名称，保留在图里、不生效
 	if d == null:
@@ -216,6 +217,8 @@ func _param_control(n: Dictionary, p: Array) -> Control:
 		sb.rect_min_size = Vector2(130, 0)
 		sb.connect("value_changed", self, "_on_param", [int(n.id), p[0]])
 		return sb
+	if ptype == "var":
+		return _var_control(n, p[0], str(cur))
 	if ptype == "stat":
 		var opt = ui._stat_option(str(cur), Catalog.graph_stat_keys())
 		opt.rect_min_size = Vector2(170, 0)
@@ -276,6 +279,56 @@ func _param_control(n: Dictionary, p: Array) -> Control:
 	det.connect("pressed", self, "_on_ref_details", [int(n.id)])
 	box.add_child(det)
 	return box
+
+
+# 变量名：输入框 + "..."（从全部蓝图里用过的变量名中选）
+func _var_control(n: Dictionary, key: String, cur: String) -> Control:
+	var box = HBoxContainer.new()
+	box.add_constant_override("separation", 4)
+	var le = ui._line_edit(ui.tr("BE_P_VAR"))
+	le.text = cur
+	le.rect_min_size = Vector2(130, 0)
+	le.connect("text_changed", self, "_on_var_text", [int(n.id), key])
+	box.add_child(le)
+	var items = []
+	for name in _known_vars():
+		items.push_back([name, name])
+	var pick = ui._search_select(items, null)
+	pick.fixed_text = "..."
+	pick._refresh_text()
+	pick.rect_min_size = Vector2(40, 0)
+	pick.connect("selected", self, "_on_var_picked", [int(n.id), key])
+	box.add_child(pick)
+	return box
+
+
+func _known_vars() -> Array:
+	var graphs = [_graph()]
+	for d in [ui._mod.profiles, ui._mod.item_profiles, ui._mod.weapon_profiles]:
+		for k in d:
+			if d[k] is Dictionary and d[k].get("graph") is Dictionary:
+				graphs.push_back(d[k].graph)
+	var seen = {}
+	for g in graphs:
+		for n in g.get("nodes", []):
+			var name = str(n.get("params", {}).get("var", "")).strip_edges() if n.get("kind") in ["var_set", "var_cmp"] else ""
+			if name != "":
+				seen[name] = true
+	var out = seen.keys()
+	out.sort()
+	return out
+
+
+func _on_var_text(text: String, id: int, key: String) -> void:
+	var n = _find(_edit_graph(), id)
+	if n != null:
+		n.params[key] = text.strip_edges()
+		_changed()
+
+
+func _on_var_picked(value, id: int, key: String) -> void:
+	_on_var_text(str(value), id, key)
+	call_deferred("rebuild")
 
 
 # 道具列表：每行一件（可换 / 删除），最后一个"+ 道具"
@@ -377,7 +430,8 @@ func _on_dragged(_from: Vector2, to: Vector2, id: int) -> void:
 	var n = _find(_edit_graph(), id)
 	if n != null:
 		n.pos = [to.x, to.y]
-		ui._changed()
+		# 位置决定执行顺序：刷新路径预览
+		_changed()
 
 
 func _on_param(value, id: int, key: String) -> void:

@@ -1617,3 +1617,35 @@ func test_195_share_tab() -> void:
 	ui.set_kind("item")
 	_check(ui._left_card.visible and not c.visible, "back to the editor")
 	ui.queue_free()
+
+
+# 变量节点：名称输入框写入参数、"..."列出全部蓝图里用过的名称；效果节点也有输出口；拖动刷新顺序
+func test_169_variable_nodes_ui() -> void:
+	var ui = yield(_open_ui(CH), "completed")
+	ui._on_tab_pressed("blueprint")
+	yield(tree, "idle_frame")
+	var bp = ui.blueprint
+	bp.add_node_kind("var_set")
+	bp.add_node_kind("var_cmp")
+	yield(tree, "idle_frame")
+	var g = m.profiles[CH].graph
+	_eq(g.nodes.size(), 2, "variable nodes added")
+	var gn = bp.ge.get_node("n" + str(g.nodes[0].id))
+	_check(gn.is_slot_enabled_right(0), "effect node has an output port")
+	var le = null
+	for nd in _all_nodes(gn):
+		if nd is LineEdit and nd.placeholder_text == tr("BE_P_VAR"):
+			le = nd
+	_check(le != null and le.text == "x", "name box shows the default")
+	if le != null:
+		le.text = " hits "
+		le.emit_signal("text_changed", le.text)
+		_eq(g.nodes[0].params["var"], "hits", "typed name saved (trimmed)")
+	_check("hits" in bp._known_vars() and "x" in bp._known_vars(), "known names: %s" % [bp._known_vars()])
+	bp._on_var_picked("hits", int(g.nodes[1].id), "var")
+	_eq(g.nodes[1].params["var"], "hits", "picked name saved")
+	bp._on_dragged(Vector2.ZERO, Vector2(5, 7), int(g.nodes[0].id))
+	_eq(g.nodes[0].pos, [5.0, 7.0], "drag saves the position")
+	ui.queue_free()
+	yield(tree, "idle_frame")
+	m.reset_profile(CH)

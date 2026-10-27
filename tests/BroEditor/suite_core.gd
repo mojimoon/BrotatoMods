@@ -2093,3 +2093,82 @@ func test_136_pack_versions() -> void:
 	_eq(m.item_profiles[it].price, 12, "own kept after uninstall")
 	m.weapon_sets = {}
 	m.custom_tags = {}
+
+
+# 变量：修改 / 比较；效果之后继续连接；多条出线按纵坐标执行；跨波保留、随存档保存；不受诅咒
+func test_206_variables_and_order() -> void:
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	# 敌袭结束 → x 加 1 → x 至少 2 → 获得优惠券（上）/ x 设为 0（下）：每 2 波一次
+	var we = GE.add_node(g, "wave_end", Vector2(0, 0))
+	var inc = GE.add_node(g, "var_set", Vector2(300, 0), {"var": "x", "op": "add", "value": 1})
+	var cmp = GE.add_node(g, "var_cmp", Vector2(600, 0), {"var": "x", "cmp": "at_least", "n": 2})
+	var reset = GE.add_node(g, "var_set", Vector2(900, 100), {"var": "x", "op": "set", "value": 0})
+	var gain = GE.add_node(g, "gain_item", Vector2(900, 0), {"items": ["item_coupon"]})
+	GE.add_link(g, we, inc)
+	GE.add_link(g, inc, cmp)
+	GE.add_link(g, cmp, reset)
+	GE.add_link(g, cmp, gain)
+	# 击杀 → 乘以 2（上）/ 设为 5（下）
+	var k = GE.add_node(g, "kill", Vector2(0, 400))
+	var mul = GE.add_node(g, "var_set", Vector2(300, 400), {"var": "o", "op": "mul", "value": 2})
+	var set5 = GE.add_node(g, "var_set", Vector2(300, 500), {"var": "o", "op": "set", "value": 5})
+	GE.add_link(g, k, set5)
+	GE.add_link(g, k, mul)
+	_eq(GE.outgoing(g, cmp), [gain, reset], "outgoing ordered by y")
+	_eq(GE.paths(g).size(), 5, "effects in the middle end their own path too")
+	var text = GE.graph_text(g, false)
+	_check(text.find("BE_") < 0 and text.find("x") >= 0, "variable text: " + text)
+	_eq(text.split("\n")[0], GE.path_text(GE.nodes_by_id(g), [we, inc], false), "first effect first")
+	_graph_char(g)
+	var coupon = m.find_target("item", "item_coupon")
+	var n0 = rd.get_player_items_ref(0).count(coupon)
+	m.runtime.fire("wave_end", 0)
+	m.runtime.end_wave()
+	_eq(GE.get_var(0, "x"), 1, "x counted across the wave end")
+	_eq(rd.get_player_items_ref(0).count(coupon), n0, "no item after 1 wave")
+	m.runtime.start_wave(null)
+	m.runtime.fire("wave_end", 0)
+	m.runtime.end_wave()
+	_eq(rd.get_player_items_ref(0).count(coupon), n0 + 1, "item after 2 waves")
+	_eq(GE.get_var(0, "x"), 0, "reset after the item")
+	m.runtime.start_wave(null)
+	m.runtime.fire("kill", 0)
+	_eq(GE.get_var(0, "o"), 5, "upper branch first: 0 x 2, then set 5")
+	m.runtime.fire("kill", 0)
+	_eq(GE.get_var(0, "o"), 5, "10 then set 5")
+	# 存档往返
+	GE.set_var(0, "x", 7)
+	var pd = rd.players_data[0]
+	var saved = JSON.parse(JSON.print(pd._serialize_effects(pd.effects))).result
+	var loaded = Utils.convert_dictionary_to_hash(pd._deserialize_effects(saved, {}), true)
+	var vt = loaded.get(Keys.generate_hash(GE.VARS_KEY), {})
+	_eq(int(vt.get(GE.var_hash("x"), -1)), 7, "variable survives save / load")
+	m.runtime.end_wave()
+	# 除以 0 不变；比较可以作为状态条件
+	var g2 = GE.new_graph()
+	var lv = GE.add_node(g2, "level_up", Vector2.ZERO)
+	GE.add_link(g2, lv, GE.add_node(g2, "var_set", Vector2.ZERO, {"var": "d", "op": "div", "value": 0}))
+	_graph_char(g2)
+	GE.set_var(0, "d", 9)
+	m.runtime.fire("level_up", 0)
+	_eq(GE.get_var(0, "d"), 9, "divide by zero ignored")
+	m.runtime.end_wave()
+	_check("var_cmp" in m.Catalog.STATE_CONDS, "var_cmp is a state condition")
+	# 不受诅咒：数值与路径上的"每 N 次"都不变
+	var g3 = GE.new_graph()
+	var kl = GE.add_node(g3, "kill", Vector2.ZERO)
+	var ev = GE.add_node(g3, "every", Vector2.ZERO, {"n": 6})
+	var vs = GE.add_node(g3, "var_set", Vector2.ZERO, {"var": "c", "op": "add", "value": 3})
+	var vc = GE.add_node(g3, "var_cmp", Vector2.ZERO, {"var": "c", "n": 4})
+	GE.add_link(g3, kl, ev)
+	GE.add_link(g3, ev, vs)
+	GE.add_link(g3, vs, vc)
+	GE.add_link(g3, vc, GE.add_node(g3, "heal_hp", Vector2.ZERO, {"value": 3}))
+	var heal = vc + 1
+	var by = GE.nodes_by_id(m.curse_graph(g3, CURSE_M))
+	_eq(int(by[vs].params.value), 3, "variable value not cursed")
+	_eq(int(by[vc].params.n), 4, "variable compare not cursed")
+	_eq(int(by[ev].params.n), 6, "every before a variable not cursed")
+	var has_dlc = tree.root.get_node("ProgressData").get_dlc_data("abyssal_terrors") != null
+	_eq(int(by[heal].params.value), _good(3) if has_dlc else 3, "effect after a variable cursed as usual")

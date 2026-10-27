@@ -13,6 +13,9 @@ const ONCE_KEY = "broeditor_once"
 # 诅咒探针：value 固定为 CURSE_PROBE、效果符号为"正面"。原版诅咒把它当作普通正面效果放大为
 # ceil(CURSE_PROBE × (1 + 诅咒系数))，据此还原诅咒系数，再按系数诅咒图里的数值（mod_main.curse_graph）
 const CURSE_PROBE = 1000
+# 变量（节点"修改变量" / "变量比较"）：玩家效果表里的 {名称的哈希: 整数}，按名称在该玩家的全部蓝图间共享，初始为 0，
+# 随一局存档保存（原版读档会把效果表里的字符串换成哈希，所以直接用哈希作键）
+const VARS_KEY = "broeditor_vars"
 
 var graph: Dictionary = {}
 var _cursed: Dictionary = {}	# 诅咒系数 -> 诅咒后的图（缓存）
@@ -84,6 +87,33 @@ static func once_list(player_index: int):
 	return effects[h]
 
 
+# 玩家效果表里的变量表（没有时创建）
+static func var_table(player_index: int):
+	if player_index < 0 or player_index >= RunData.players_data.size():
+		return null
+	var effects = RunData.get_player_effects(player_index)
+	var h = Keys.generate_hash(VARS_KEY)
+	if not effects.get(h) is Dictionary:
+		effects[h] = {}
+	return effects[h]
+
+
+static func var_hash(name: String) -> int:
+	name = name.strip_edges()
+	return Keys.generate_hash(name) if name != "" and not name.is_valid_integer() else int(name)
+
+
+static func get_var(player_index: int, name: String) -> int:
+	var t = var_table(player_index)
+	return int(t.get(var_hash(name), 0)) if t != null else 0
+
+
+static func set_var(player_index: int, name: String, v: int) -> void:
+	var t = var_table(player_index)
+	if t != null:
+		t[var_hash(name)] = v
+
+
 static func take_once(tokens: Array, t: int) -> bool:
 	for i in tokens.size():
 		if int(tokens[i]) == t:
@@ -145,15 +175,34 @@ static func nodes_by_id(g: Dictionary) -> Dictionary:
 	return out
 
 
-static func outgoing(g: Dictionary, id: int) -> Array:
+# 一个节点的出线目标，按目标节点在画布上的纵坐标从上到下（同高时从左到右、再按 id）：即执行顺序
+static func outgoing(g: Dictionary, id: int, by_id = null) -> Array:
+	if by_id == null:
+		by_id = nodes_by_id(g)
 	var out = []
 	for l in g.get("links", []):
-		if int(l[0]) == id:
-			out.push_back(int(l[1]))
+		if int(l[0]) != id:
+			continue
+		var to = int(l[1])
+		var i = out.size()
+		while i > 0 and _before(by_id.get(to), to, by_id.get(out[i - 1]), out[i - 1]):
+			i -= 1
+		out.insert(i, to)
 	return out
 
 
-# 从扳机出发、终止于效果的全部路径（节点 id 列表；遇到环停止）
+static func _before(a, a_id: int, b, b_id: int) -> bool:
+	var pa = a.get("pos", [0, 0]) if a is Dictionary else [0, 0]
+	var pb = b.get("pos", [0, 0]) if b is Dictionary else [0, 0]
+	if float(pa[1]) != float(pb[1]):
+		return float(pa[1]) < float(pb[1])
+	if float(pa[0]) != float(pb[0]):
+		return float(pa[0]) < float(pb[0])
+	return a_id < b_id
+
+
+# 从扳机出发、终止于效果的全部路径（节点 id 列表；遇到环停止）。效果之后还可以继续连接：
+# 经过的效果也各是一条路径的终点，按执行顺序排列
 static func paths(g: Dictionary) -> Array:
 	var by_id = nodes_by_id(g)
 	var out = []
@@ -166,13 +215,13 @@ static func paths(g: Dictionary) -> Array:
 static func _walk_paths(g: Dictionary, by_id: Dictionary, path: Array, out: Array) -> void:
 	if out.size() >= MAX_PATHS:
 		return
-	for to in outgoing(g, path[-1]):
+	for to in outgoing(g, path[-1], by_id):
 		if to in path or not by_id.has(to):
 			continue
 		var t = Catalog.node_type(by_id[to].kind)
 		if t == "effect":
 			out.push_back(path + [to])
-		elif t == "cond":
+		if t == "effect" or t == "cond":
 			_walk_paths(g, by_id, path + [to], out)
 
 
@@ -215,6 +264,9 @@ static func path_text(by_id: Dictionary, path: Array, colored: bool = true) -> S
 	var suffix = ""
 	for i in range(1, path.size() - 1):
 		var n = by_id[path[i]]
+		# 经过的效果（先执行的效果）有自己的路径文本
+		if Catalog.node_type(n.kind) == "effect":
+			continue
 		match n.kind:
 			"chance":
 				chance *= float(_p(n, "pct", 100)) / 100.0
@@ -265,6 +317,8 @@ static func _cond_text(n: Dictionary) -> String:
 	for k in ["n", "pct", "secs"]:
 		t = t.replace("{" + k + "}", str(int(_p(n, k, 0))))
 	var m = _mod()
+	if n.kind == "var_cmp":
+		t = t.replace("{0}", _var_name(n)).replace("{cmp}", _tr("BE_CMP_" + str(_p(n, "cmp", "at_least")).to_upper()))
 	if n.kind == "weapon_kinds":
 		t = t.replace("{cmp}", _tr("BE_CMP_" + str(_p(n, "cmp", "at_least")).to_upper()))
 	if n.kind in ["own_tag", "own_set", "own_item"] and m != null:
@@ -359,6 +413,8 @@ static func _payload_text(n: Dictionary, trigger_kind: String, colored: bool) ->
 			return _tr("BE_PX_SPAWN").replace("{0}", _col(str(int(_p(n, "n", 1))), false, colored)).replace("{1}", m.enemy_name(en) if m != null else en)
 		"break":
 			return _tr("BE_PX_BREAK").replace("{0}", str(v))
+		"var_set":
+			return _tr("BE_PX_VAR_" + str(_p(n, "op", "add")).to_upper()).replace("{0}", _var_name(n)).replace("{1}", str(v))
 		"grant":
 			var inner = _grant_text(n, colored)
 			var mode = str(_p(n, "mode", "temp"))
@@ -384,6 +440,11 @@ static func _grant_text(n: Dictionary, colored: bool) -> String:
 		return TranslationServer.translate("BE_GRANT_NONE")
 	e.value = e.value * int(n.params.get("n", 1))
 	return m.effect_text(e, colored)
+
+
+static func _var_name(n: Dictionary) -> String:
+	var name = str(_p(n, "var", "")).strip_edges()
+	return name if name != "" else "-"
 
 
 static func _item_names(ids: Array) -> String:
