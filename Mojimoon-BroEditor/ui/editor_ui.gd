@@ -311,10 +311,11 @@ func _build_header(root: Control) -> void:
 	header.add_child(close_btn)
 
 
-# 设置弹窗：字体大小、效果库去重、隐藏编号、显示键名、更详细键名（各带简要说明）；用原版字体，大小不随字体设置变化
+# 设置弹窗：字体大小、效果库去重、隐藏编号、蓝图节点说明、显示键名、更详细键名（有 _DESC 文本的带简要说明）；用原版字体，大小不随字体设置变化
 const SETTINGS = [
 	["library_dedup", "BE_LIBRARY_DEDUP", "_on_library_dedup_toggled"],
 	["hide_numbers", "BE_HIDE_NUMBERS", "_on_hide_numbers_toggled"],
+	["blueprint_notes", "BE_BLUEPRINT_NOTES", "_on_blueprint_notes_toggled"],
 	["debug", "BE_DEBUG", "_on_debug_toggled"],
 	["debug_detail", "BE_DEBUG_DETAIL", "_on_debug_detail_toggled"],
 ]
@@ -352,6 +353,8 @@ func open_settings() -> void:
 		if d[0] == "debug_detail":
 			_detail_switch = sw
 			sw.disabled = not _mod.debug
+		if tr(d[1] + "_DESC") == d[1] + "_DESC":
+			continue
 		var desc = _label(tr(d[1] + "_DESC"), BASE_DESC, C_TEXT_DIM)
 		desc.autowrap = true
 		desc.rect_min_size = Vector2(780, 0)
@@ -4309,6 +4312,11 @@ func _on_hide_numbers_toggled(pressed: bool) -> void:
 
 func _on_library_dedup_toggled(pressed: bool) -> void:
 	_mod.set_library_dedup(pressed)
+	_build_page()
+
+
+func _on_blueprint_notes_toggled(pressed: bool) -> void:
+	_mod.blueprint_notes = pressed
 	_build_page()
 
 

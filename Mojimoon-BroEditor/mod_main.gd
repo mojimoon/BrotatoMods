@@ -84,6 +84,8 @@ var custom_tags: Dictionary = {}	# 自定义标签：键名 -> 名称（所有�
 var library_dedup := false
 # 更详细的键名（只在显示键名时生效）：效果显示全部键名、编辑时显示字段名
 var debug_detail := false
+# 蓝图节点上显示说明文本（BE_NN_*）
+var blueprint_notes := true
 # 编辑器字体大小 80–125%（标题行与设置弹窗不缩放）
 var font_scale: int = 100
 
@@ -495,6 +497,7 @@ func _load_main_file() -> void:
 	hide_numbers = bool(settings.get("hide_numbers", false)) if settings is Dictionary else false
 	library_dedup = bool(settings.get("library_dedup", false)) if settings is Dictionary else false
 	debug_detail = bool(settings.get("debug_detail", false)) if settings is Dictionary else false
+	blueprint_notes = bool(settings.get("blueprint_notes", true)) if settings is Dictionary else true
 	font_scale = int(clamp(int(settings.get("font_scale", 100)), 80, 125)) if settings is Dictionary else 100
 	var kinds = settings.get("kinds", {}) if settings is Dictionary else {}
 	for k in KINDS:
@@ -611,7 +614,7 @@ func _write_profiles() -> void:
 			main.families[wid] = compact(weapon_families[wid], new_family())
 	main["version"] = 1
 	main["next_id"] = next_id
-	main["settings"] = {"debug": debug, "debug_detail": debug_detail, "font_scale": font_scale, "hide_numbers": hide_numbers, "library_dedup": library_dedup, "kinds": kind_enabled}
+	main["settings"] = {"debug": debug, "debug_detail": debug_detail, "blueprint_notes": blueprint_notes, "font_scale": font_scale, "hide_numbers": hide_numbers, "library_dedup": library_dedup, "kinds": kind_enabled}
 	main["disabled"] = disabled
 	main["tags"] = custom_tags
 	main["sets"] = compact_all(weapon_sets, new_set())
@@ -3261,6 +3264,13 @@ func curse_graph(g: Dictionary, modifier: float) -> Dictionary:
 			var k = str(eff.id) + ":" + pname
 			if not dirs.has(k):
 				dirs[k] = e_sign * Catalog.curse_sign(eff.kind, pname)
+	# 详细信息里的额外属性加成随百分比一起放大
+	for k in dirs:
+		var parts = k.split(":")
+		var n = by_id.get(int(parts[0]), by_id.get(parts[0]))
+		if parts[1] == "pct" and n != null and n.params.get("scaling_stats") is Array and dirs[k] > 0:
+			for row in n.params.scaling_stats:
+				row[1] = float(row[1]) * (1.0 + modifier)
 	var proxies = []
 	for k in dirs:
 		var parts = k.split(":")

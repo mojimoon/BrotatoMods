@@ -2172,3 +2172,36 @@ func test_206_variables_and_order() -> void:
 	_eq(int(by[ev].params.n), 6, "every before a variable not cursed")
 	var has_dlc = tree.root.get_node("ProgressData").get_dlc_data("abyssal_terrors") != null
 	_eq(int(by[heal].params.value), _good(3) if has_dlc else 3, "effect after a variable cursed as usual")
+
+
+# 节点详细信息：基础伤害与额外属性加成进入伤害计算、路径文本，并随诅咒放大；没有详细信息的旧节点不变
+func test_197_node_details() -> void:
+	var GE = load(GraphEffectScript)
+	_setup_player(CH)
+	rd.players_data[0].items = []
+	rd.add_character(m.find_character(CH), 0)
+	var fx = rd.get_player_effects(0)
+	fx[Keys.stat_armor_hash] = 10
+	fx[Keys.stat_luck_hash] = 20
+	fx[Keys.stat_percent_damage_hash] = 0
+	m.runtime._refresh(0)
+	var old = {"params": {"stat": "stat_armor", "pct": 50}}
+	_eq(m.runtime._scaled_damage(old, 0), 5, "no details: same as before")
+	var n = {"kind": "explode", "params": {"stat": "stat_armor", "pct": 50, "damage": 7, "scaling_stats": [["stat_luck", 0.5]]}}
+	_eq(m.runtime._scaled_damage(n, 0), 22, "percent + flat + extra scaling")
+	var neg = {"params": {"stat": "stat_armor", "pct": 50, "damage": -500}}
+	_eq(m.runtime._scaled_damage(neg, 0), 1, "at least 1 damage")
+	var text = GE._payload_text(n, "", false)
+	_check(text.find(" + 50% ") >= 0 and text.find(" + 7") >= 0, "details in the path text: " + text)
+	_eq(GE._payload_text({"kind": "explode", "params": {"stat": "stat_armor", "pct": 50}}, "", false).find(" + "), -1, "no details: text unchanged")
+	var ig = {"kind": "ignite", "params": {"value": 5, "secs": 3, "stat": "stat_armor", "pct": 100, "damage": 9, "scaling_stats": [["stat_luck", 1.0]]}}
+	var ig_text = GE._payload_text(ig, "", false)
+	_check(ig_text.find(" + 100% ") >= 0 and ig_text.find(" + 9") < 0, "ignite text: extra scaling only: " + ig_text)
+	var g = GE.new_graph()
+	var ex = GE.add_node(g, "explode", Vector2.ZERO, {"stat": "stat_armor", "pct": 100, "damage": 10, "scaling_stats": [["stat_luck", 0.5]]})
+	GE.add_link(g, GE.add_node(g, "kill", Vector2.ZERO), ex)
+	var cursed = GE.nodes_by_id(m.curse_graph(g, CURSE_M))[ex].params
+	var has_dlc = tree.root.get_node("ProgressData").get_dlc_data("abyssal_terrors") != null
+	_eq(int(cursed.damage), _good(10) if has_dlc else 10, "flat damage cursed")
+	_check(abs(cursed.scaling_stats[0][1] - (0.5 * (1.0 + CURSE_M) if has_dlc else 0.5)) < 0.001, "extra scaling cursed: %s" % cursed.scaling_stats[0][1])
+	_eq(g.nodes[0].params.scaling_stats[0][1], 0.5, "curse keeps the source graph")

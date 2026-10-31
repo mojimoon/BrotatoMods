@@ -190,7 +190,7 @@ func _make_node(n: Dictionary) -> GraphNode:
 		return gn
 	# 备注：提供 / 需要的上下文与注意事项（没有备注的节点不显示）
 	var note = ui.tr("BE_NN_" + n.kind.to_upper())
-	if note != "BE_NN_" + n.kind.to_upper():
+	if ui._mod.blueprint_notes and note != "BE_NN_" + n.kind.to_upper():
 		var nl = ui._desc(note)
 		nl.rect_min_size = Vector2(240, 0)
 		gn.add_child(nl)
@@ -205,6 +205,11 @@ func _make_node(n: Dictionary) -> GraphNode:
 		lbl.rect_min_size = Vector2(70, 0)
 		row.add_child(lbl)
 		row.add_child(_param_control(n, p))
+	if Catalog.NODE_DETAILS.has(n.kind):
+		var det = ui._button(ui.tr("BE_EFFECT_DETAILS"), ui.FONT_DESC)
+		ui._apply_action_style(det, ui.C_CUSTOM)
+		det.connect("pressed", self, "_on_node_details", [int(n.id)])
+		gn.add_child(det)
 	return gn
 
 
@@ -585,6 +590,12 @@ func _on_ref_details(id: int) -> void:
 	var ref = n.get("params", {}).get("ref") if n != null else null
 	if ref is Dictionary:
 		ui.EffectDetail.open(ui, ref, true, self, "_on_ref_detail_changed")
+
+
+func _on_node_details(id: int) -> void:
+	var n = _find(_edit_graph(), id)
+	if n != null:
+		ui.EffectDetail.open_node(ui, n, self, "_changed")
 
 
 func _on_ref_detail_changed() -> void:

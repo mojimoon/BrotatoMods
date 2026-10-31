@@ -93,6 +93,22 @@ func test_85_battle_graph() -> void:
 		var _k = enemy.take_damage(999999, TakeDamageArgs.new(0))
 		yield(_frames(3), "completed")
 		_check(rd.players_data[0].gold - gold0 >= 1000, "kill fired")
+		# 爆炸节点的详细信息：范围、暴击、基础伤害真实生效，不改共用的原版爆炸
+		var fx_scale = ex.scale
+		var en_x = {"params": {"stat": "stat_armor", "pct": 0, "damage": 40, "scale": 2.0, "crit_chance": 30, "crit_damage": 3.0, "accuracy": 50}}
+		m.runtime._explode(en_x, 0, player.global_position)
+		yield(_frames(2), "completed")
+		var want = max(0.1, 2.0 * (1.0 + Utils.get_stat(Keys.explosion_size_hash, 0) / 100.0))
+		var inst = null
+		for c in main._explosions.get_children():
+			if c.player_index == 0 and abs(c.scale.x - want) < 0.001:
+				inst = c
+		_check(inst != null, "explosion with the scale from details")
+		if inst != null:
+			_eq(inst._hitbox.crit_damage, 3.0, "crit damage from details")
+			_check(abs(inst._hitbox.accuracy - 0.5) < 0.001, "accuracy from details")
+			_check(inst._hitbox.damage >= 40, "base damage from details: %s" % inst._hitbox.damage)
+		_eq(ex.scale, fx_scale, "shared vanilla explosion untouched")
 	main._on_WaveTimer_timeout()
 	yield(_frames(2), "completed")
 	_check(m.runtime.wave_over, "wave end stops runtime")

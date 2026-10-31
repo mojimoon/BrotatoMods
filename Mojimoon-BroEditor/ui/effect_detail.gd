@@ -6,8 +6,10 @@ extends Reference
 # 每次修改后调用 target.method()。
 
 const Catalog = preload("res://mods-unpacked/Mojimoon-BroEditor/catalog.gd")
+const GraphEffect = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/graph_effect.gd")
 
 var ui = null
+var node = null	# 编辑蓝图节点时：节点本身，spec 是它的 params
 var spec: Dictionary
 var with_top := false
 var target: Object = null
@@ -32,7 +34,36 @@ static func has_details(e, p_with_top: bool = false) -> bool:
 	return e != null and (not Catalog.sub_fields(e).empty() or (p_with_top and not Catalog.editable_fields(e).empty()))
 
 
-func _build() -> void:
+# 蓝图节点的详细信息（Catalog.NODE_DETAILS）：修改直接写入节点的 params
+static func open_node(p_ui, p_node: Dictionary, p_target: Object, p_method: String):
+	var d = load("res://mods-unpacked/Mojimoon-BroEditor/ui/effect_detail.gd").new()
+	d.ui = p_ui
+	d.node = p_node
+	d.spec = p_node.params
+	d.target = p_target
+	d.method = p_method
+	d._build_node()
+	return d
+
+
+func _build_node() -> void:
+	var col = _frame(_preview_control(null))
+	var box = ui._section(col, "BE_EFFECT_DETAILS_SELF", ui.C_ACCENT)
+	var grid = _grid(box)
+	for f in Catalog.NODE_DETAILS[node.kind]:
+		_field(grid, {"name": f[0], "type": f[1]}, spec.get(f[0], f[2]), "", "param")
+	var rows = spec.get("scaling_stats", [])
+	_scaling_editor(box, "", rows if rows is Array else [])
+	_refresh_preview()
+
+
+func _preview_control(e) -> Control:
+	_preview = ui._rich("")
+	return ui._with_key(_preview, e) if e != null else _preview
+
+
+# 弹窗框架：标题栏的返回按钮、顶部预览，返回滚动区里的内容列
+func _frame(preview_control: Control) -> VBoxContainer:
 	modal = ui.Modal.open(ui, ui.tr("BE_EFFECT_DETAILS"), ui.C_CUSTOM, Vector2(1100, 820))
 	# 弹窗关闭前本对象（Reference）由弹窗持有
 	modal.set_meta("detail", self)
@@ -40,14 +71,18 @@ func _build() -> void:
 	ui._apply_action_style(back, ui.C_TEXT_DIM)
 	back.connect("pressed", modal, "close")
 	modal.head.add_child(back)
-	_preview = ui._rich("")
-	modal.body.add_child(ui._with_key(_preview, ui._mod.make_effect(spec)))
+	modal.body.add_child(preview_control)
 	var scroll = ui._scroll()
 	modal.body.add_child(scroll)
 	var col = VBoxContainer.new()
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.add_constant_override("separation", 10)
 	scroll.add_child(col)
+	return col
+
+
+func _build() -> void:
+	var col = _frame(_preview_control(ui._mod.make_effect(spec)))
 	var e = ui._mod.make_effect(spec)
 	if e == null:
 		return
@@ -131,6 +166,8 @@ func _on_value(value, where: String, sub: String, field: String, type: int) -> v
 
 
 func _sub(field: String) -> Dictionary:
+	if node != null:
+		return spec
 	if not spec.has("sub") or not spec.sub is Dictionary:
 		spec["sub"] = {}
 	if not spec.sub.has(field) or not spec.sub[field] is Dictionary:
@@ -215,5 +252,8 @@ func _notify() -> void:
 
 
 func _refresh_preview() -> void:
+	if node != null:
+		_preview.bbcode_text = GraphEffect._payload_text(node, "", true)
+		return
 	var e = ui._mod.make_effect(spec)
 	_preview.bbcode_text = ui._mod.effect_text(e) if e != null else ""

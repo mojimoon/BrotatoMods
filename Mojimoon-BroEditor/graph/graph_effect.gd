@@ -360,13 +360,13 @@ static func _payload_text(n: Dictionary, trigger_kind: String, colored: bool) ->
 			return _tr("BE_PX_XP").replace("{0}", _col(str(v), good, colored))
 		"damage", "explode":
 			var pct = str(int(_p(n, "pct", 100))) + "%"
-			return _tr("BE_PX_" + n.kind.to_upper()).replace("{0}", _col(pct, true, colored)).replace("{1}", stat)
+			return _tr("BE_PX_" + n.kind.to_upper()).replace("{0}", _col(pct, true, colored)).replace("{1}", stat + _extra_text(n, true))
 		"hp_dmg":
 			var pct = int(_p(n, "pct", 1))
 			return _tr("BE_PX_HP_DMG").replace("{0}", _col(str(pct) + "%", true, colored)).replace("{1}", str(stepify(pct / 10.0, 0.1)).trim_suffix(".0") + "%")
 		"ignite":
 			var t = _tr("BE_PX_IGNITE").replace("{0}", _col(str(v), true, colored)).replace("{1}", str(int(_p(n, "secs", 3))))
-			t = t.replace("{2}", str(int(_p(n, "pct", 100))) + "%").replace("{3}", _stat_name(str(_p(n, "stat", "stat_elemental_damage"))))
+			t = t.replace("{2}", str(int(_p(n, "pct", 100))) + "%").replace("{3}", _stat_name(str(_p(n, "stat", "stat_elemental_damage"))) + _extra_text(n, false))
 			var spread = int(_p(n, "spread", 0))
 			return t + (_tr("BE_PX_IGNITE_SPREAD").replace("{0}", _col(str(spread), true, colored)) if spread > 0 else "")
 		"vuln":
@@ -421,6 +421,19 @@ static func _payload_text(n: Dictionary, trigger_kind: String, colored: bool) ->
 			var k = {"perm": "BE_PX_GRANT_PERM", "timed": "BE_PX_GRANT_TIMED"}.get(mode, "BE_PX_GRANT_STATE" if state else "BE_PX_GRANT_TEMP")
 			return _tr(k).replace("{0}", inner).replace("{1}", str(int(_p(n, "secs", 5))))
 	return ""
+
+
+# 详细信息接在属性名后面：" + 50% 最大生命值 + 5"
+static func _extra_text(n: Dictionary, with_flat: bool) -> String:
+	var out = ""
+	var rows = _p(n, "scaling_stats", [])
+	for row in rows if rows is Array else []:
+		var pct = stepify(float(row[1]) * 100.0, 0.1)
+		out += (" + " if pct >= 0 else " - ") + str(abs(pct)) + "% " + _stat_name(str(row[0]))
+	var flat = int(_p(n, "damage", 0)) if with_flat else 0
+	if flat != 0:
+		out += (" + " if flat > 0 else " - ") + str(abs(flat))
+	return out
 
 
 # 道具变化在敌袭中触发时等到敌袭结束才执行（商店扳机、敌袭结束时扳机不需要说明）

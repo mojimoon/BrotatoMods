@@ -610,8 +610,18 @@ func _sync_lost_max_hp(p: int, before: int) -> void:
 
 func _scaled_damage(n: Dictionary, p: int) -> int:
 	var stat_val = Utils.get_stat(Keys.generate_hash(str(_param(n, "stat", ""))), p)
-	var base = max(1.0, floor(float(_param(n, "pct", 100)) / 100.0 * stat_val))
+	var extra = float(_param(n, "damage", 0)) + WeaponService.sum_scaling_stat_values(_extra_scaling(n), p)
+	var base = max(1.0, floor(float(_param(n, "pct", 100)) / 100.0 * stat_val + extra))
 	return int(max(1.0, round(base * (1.0 + Utils.get_stat(Keys.stat_percent_damage_hash, p) / 100.0))))
+
+
+# 详细信息里的额外属性加成：[[属性哈希, 系数]...]
+func _extra_scaling(n: Dictionary) -> Array:
+	var out = []
+	var rows = _param(n, "scaling_stats", [])
+	for row in rows if rows is Array else []:
+		out.push_back([Keys.generate_hash(str(row[0])), float(row[1])])
+	return out
 
 
 func _deal_damage(n: Dictionary, p: int) -> void:
@@ -640,15 +650,21 @@ func _explode(n: Dictionary, p: int, pos) -> void:
 	var args = WeaponServiceExplodeArgs.new()
 	args.pos = pos
 	args.damage = dmg
-	args.accuracy = 1.0
-	args.crit_chance = Utils.get_capped_stat(Keys.stat_crit_chance_hash, p) / 100.0
-	args.crit_damage = 1.5
+	args.accuracy = float(_param(n, "accuracy", 100)) / 100.0
+	args.crit_chance = float(_param(n, "crit_chance", 0)) / 100.0 + Utils.get_capped_stat(Keys.stat_crit_chance_hash, p) / 100.0
+	args.crit_damage = float(_param(n, "crit_damage", 1.5))
 	args.burning_data = BurningData.new()
 	args.scaling_stats = []
 	args.from_player_index = p
 	args.damage_tracking_key_hash = Keys.empty_hash
 	args.set_meta("be_bp", true)
-	WeaponService.call_deferred("explode", _explosion_effect, args)
+	# 范围写在效果上；共用的原版爆炸不能改，改过范围的节点用副本
+	var fx = _explosion_effect
+	var scale = float(_param(n, "scale", fx.scale))
+	if scale != fx.scale:
+		fx = fx.duplicate()
+		fx.scale = scale
+	WeaponService.call_deferred("explode", fx, args)
 
 
 # 使目标敌人受到的伤害提高 X%，持续 N 秒（敌人身上的效果行为；同一节点不叠层，取较大值并刷新时间）
@@ -679,7 +695,7 @@ func _ignite(n: Dictionary, p: int, target) -> void:
 	base.damage = int(max(1, int(_param(n, "value", 1))))
 	base.duration = int(max(1, int(_param(n, "secs", 3))))
 	base.spread = int(max(0, int(_param(n, "spread", 0))))
-	base.scaling_stats = [[Keys.generate_hash(str(_param(n, "stat", "stat_elemental_damage"))), float(_param(n, "pct", 100)) / 100.0]]
+	base.scaling_stats = [[Keys.generate_hash(str(_param(n, "stat", "stat_elemental_damage"))), float(_param(n, "pct", 100)) / 100.0]] + _extra_scaling(n)
 	var bd = WeaponService.init_burning_data(base, p)
 	bd.from = _player(p)
 	target.apply_burning(bd)

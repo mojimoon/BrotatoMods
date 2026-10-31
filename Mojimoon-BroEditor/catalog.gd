@@ -274,7 +274,7 @@ const CURSE_TARGETS = {"every": "n", "steps": "n"}
 # 效果节点里被诅咒的数值参数（grant 引用的效果按原版对该类效果的规则诅咒，次数不变）
 const CURSE_EFFECT_PARAMS = {
 	"temp_stat": ["value"], "perm_stat": ["value"], "timed_stat": ["value", "secs"],
-	"heal_hp": ["value"], "add_gold": ["value"], "xp": ["value"], "damage": ["pct"], "explode": ["pct"],
+	"heal_hp": ["value"], "add_gold": ["value"], "xp": ["value"], "damage": ["pct", "damage"], "explode": ["pct", "damage"],
 	"hp_dmg": ["pct"], "ignite": ["value"], "slow": ["pct"], "rand_stats": ["value"], "fruit": ["value"],
 	"vuln": ["pct", "secs"],
 }
@@ -442,6 +442,14 @@ const NODES = [
 	["group_lock", "effect", [["group", "group", ""]]],
 	["var_set", "effect", [["var", "var", "x"], ["op", "mode:add|sub|set|mul|div", "add"], ["value", "int", 1]]],
 ]
+# 节点的详细信息（弹窗编辑，存在节点 params 里；没有时用默认值）：[参数, 类型, 默认值]。
+# 这些节点还可以添加额外的属性加成（params.scaling_stats：[[属性, 系数]...]）。
+# 爆炸的默认值同运行时使用的原版爆炸（撕裂者）：缩放 0.65、暴击倍率 1.5
+const NODE_DETAILS = {
+	"explode": [["damage", TYPE_INT, 0], ["scale", TYPE_REAL, 0.65], ["crit_chance", TYPE_INT, 0], ["crit_damage", TYPE_REAL, 1.5], ["accuracy", TYPE_INT, 100]],
+	"damage": [["damage", TYPE_INT, 0]],
+	"ignite": [],
+}
 # 只在某个参数取某值时显示的参数：[节点, 参数] -> [条件参数, 值]
 const PARAM_SHOW_IF = {"grant:secs": ["mode", "timed"]}
 const STATE_TRIGGERS = ["still", "moving", "low_hp", "full_hp", "always"]

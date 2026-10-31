@@ -1649,3 +1649,87 @@ func test_169_variable_nodes_ui() -> void:
 	ui.queue_free()
 	yield(tree, "idle_frame")
 	m.reset_profile(CH)
+
+
+# 爆炸 / 造成伤害 / 点燃的详细信息弹窗；"显示蓝图详细说明"开关（默认开，保存）
+func test_198_node_details_and_notes_setting() -> void:
+	var ui = yield(_open_ui(CH), "completed")
+	ui._on_tab_pressed("blueprint")
+	yield(tree, "idle_frame")
+	var bp = ui.blueprint
+	for k in ["explode", "damage", "ignite", "heal_hp"]:
+		bp.add_node_kind(k)
+	yield(tree, "idle_frame")
+	var g = m.profiles[CH].graph
+	var det_text = tr("BE_EFFECT_DETAILS")
+	for i in 4:
+		var has_btn = false
+		for nd in _all_nodes(bp.ge.get_node("n" + str(g.nodes[i].id))):
+			if nd is Button and nd.text == det_text:
+				has_btn = true
+		_eq(has_btn, i < 3, "details button on " + g.nodes[i].kind)
+	var n = g.nodes[0]
+	bp._on_node_details(int(n.id))
+	yield(tree, "idle_frame")
+	var md = ui._modals[-1]
+	var d = md.get_meta("detail")
+	var spins = 0
+	for nd in _all_nodes(md):
+		if nd is SpinBox:
+			spins += 1
+	_eq(spins, m.Catalog.NODE_DETAILS.explode.size(), "one field per detail")
+	d._on_value(2.5, "param", "", "scale", TYPE_REAL)
+	d._on_value(12.0, "param", "", "damage", TYPE_INT)
+	_eq(n.params.scale, 2.5, "real field stored on the node")
+	_check(typeof(n.params.damage) == TYPE_INT and n.params.damage == 12, "int field stored on the node")
+	d._on_scaling_add("")
+	_eq(n.params.scaling_stats.size(), 1, "extra scaling stored on the node")
+	d._on_scaling_stat("stat_luck", "", 0)
+	_check(d._preview.bbcode_text.find(" + 12") >= 0, "preview follows the edit: " + d._preview.bbcode_text)
+	_check(not n.params.has("sub") and not n.params.has("set"), "no effect spec fields on the node")
+	md.close()
+	yield(tree, "idle_frame")
+	var round_trip = m.import_graph(m.export_graph(g))
+	_eq(round_trip.nodes[0].params.scale, 2.5, "details survive the share code")
+	# 说明文本开关
+	_check(m.blueprint_notes, "notes on by default")
+	var note = tr("BE_NN_EXPLODE")
+	ui.open_settings()
+	yield(tree, "idle_frame")
+	var settings = ui._modals[-1]
+	var found_switch = false
+	var found_desc = false
+	for nd in _all_nodes(settings):
+		if nd is Button and nd.text == tr("BE_BLUEPRINT_NOTES"):
+			found_switch = true
+		if nd is Label and nd.text.find("BE_BLUEPRINT_NOTES") >= 0:
+			found_desc = true
+	_check(found_switch, "switch in settings")
+	_check(not found_desc, "no description row")
+	settings.close()
+	yield(tree, "idle_frame")
+	bp = ui.blueprint
+	_check(_node_note_count(bp, n, note) == 1, "note shown when on")
+	ui._on_blueprint_notes_toggled(false)
+	yield(tree, "idle_frame")
+	bp = ui.blueprint
+	_check(_node_note_count(bp, n, note) == 0, "note hidden when off")
+	m.save_profiles()
+	m.blueprint_notes = true
+	m.load_profiles()
+	_check(not m.blueprint_notes, "setting saved")
+	m.blueprint_notes = true
+	m.save_profiles()
+	ui.queue_free()
+	yield(tree, "idle_frame")
+	m.reset_profile(CH)
+
+
+func _node_note_count(bp, n: Dictionary, note: String) -> int:
+	var c = 0
+	for nd in _all_nodes(bp.ge.get_node("n" + str(n.id))):
+		if nd is Label and nd.text == note:
+			c += 1
+		elif nd is RichTextLabel and nd.text == note:
+			c += 1
+	return c
