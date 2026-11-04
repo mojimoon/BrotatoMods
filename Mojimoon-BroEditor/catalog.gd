@@ -45,7 +45,7 @@ const STAT_GROUPS = [
 		"map_size", "number_of_enemies", "enemy_health", "enemy_damage", "enemy_speed", "boss_strength",
 		"stronger_elites_on_kill", "loot_alien_chance", "extra_loot_aliens", "loot_alien_speed",
 		"stronger_loot_aliens_on_kill", "enemy_fruit_drops", "trees", "trees_start_wave", "hp_start_wave",
-		"hp_start_next_wave", "dig_sites", "more_horde",
+		"hp_start_next_wave", "dig_sites",
 	]],
 	["BE_GRP_CAPS", ["hp_cap", "speed_cap", "dodge_cap", "crit_chance_cap"]],
 	# 规则开关：填 1 开启
@@ -54,7 +54,7 @@ const STAT_GROUPS = [
 		"structures_can_crit", "instant_gold_attracting", "hp_shop", "no_heal", "pacifist", "torture",
 		"materials_as_health", "damage_taken_on_materials", "no_level_upgrades", "effect_no_weapon_in_shop",
 		"effect_crate_give_weapon", "no_cure_between_wave", "no_fruit_attracted_end_of_wave", "fog_of_war_permanent",
-		"effect_mixing_up_wave", "burning_stacks", "has_plastic_boots",
+		"effect_mixing_up_wave", "more_horde", "burning_stacks", "has_plastic_boots",
 	]],
 	# 特殊规则：规则类、但数值不是开关（稀有度 / 件数 / 设定值）
 	["BE_GRP_SPECIAL_RULES", [

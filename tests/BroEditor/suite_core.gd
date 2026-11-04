@@ -1679,9 +1679,9 @@ func test_203_fusion() -> void:
 		found = found or (nd is Label and nd.text == tr(other.name))
 	_check(found, "fused character listed on the gear tab")
 	ui._open_picker("fuse")
-	_eq(ui._picker_sel, [other.my_id], "picker preselects")
-	ui._picker_sel = []
-	ui._on_picker_confirm()
+	_eq(ui._picker.sel, [other.my_id], "picker preselects")
+	ui._picker.sel = []
+	ui._picker.confirm()
 	_eq(m.profiles[cid].fuse, [], "picker clears")
 	ui.queue_free()
 	yield(tree, "idle_frame")
@@ -2456,14 +2456,44 @@ func test_306_stat_groups_and_icons() -> void:
 		_check(ui._stat_icon(k) != null, k + " has an icon")
 	_eq(ui._stat_icon("structure_range"), m._find_any("item_rusty_antenna").icon, "rusty antenna icon")
 	# 过长的原版名称换成本模组的短名称
-	for k in ["fog_of_war_permanent", "effect_mixing_up_wave", "more_horde"]:
+	for k in ["fog_of_war_permanent", "effect_mixing_up_wave"]:
 		_check(m.stat_name(k) == tr("BE_K_" + k.to_upper()) and m.stat_name(k).length() < 30, k + " short name")
-	# 禁用页：属性禁用不再占满页面，道具 / 武器列表有高度
+	# 每10个波次+2敌群：开关（固定 +2），保留原版名称
+	_check("more_horde" in groups.BE_GRP_RULES and m.stat_name("more_horde") == tr("MORE_HORDE"), "more horde is a rule toggle")
+	# 禁用页：只显示已禁用的；编辑用选择器（词条 / 类别筛选）
 	ui._on_tab_pressed("bans")
-	for i in 3:
-		yield(tree, "idle_frame")
-	for kind in ["items", "weapons"]:
-		_check(ui._ban_grids[kind][0].get_parent().rect_size.y > 150, kind + " ban list visible")
+	yield(tree, "idle_frame")
+	_eq(ui._ban_grids["items"][0].get_child_count(), 1, "nothing banned: only the empty hint")
+	ui._open_picker("ban_weapons")
+	var tag = ""
+	for r in ui._picker.res:
+		if not r.sets.empty():
+			tag = r.sets[0].my_id
+			break
+	ui._picker.on_chip(tag, "tag")
+	var shown = []
+	for r in ui._picker.res:
+		if ui._picker.shown(r):
+			shown.push_back(r)
+			_check(ui._tags_of(r).size() > 0, "shown weapon has the class")
+	_check(not shown.empty() and shown.size() < ui._picker.res.size(), "class filter narrows")
+	ui._picker.on_shown(true)
+	ui._picker.confirm()
+	_eq(m.profiles[CH].ban_weapons.size(), shown.size(), "banned the shown families")
+	_eq(ui._ban_grids["weapons"][0].get_child_count(), shown.size(), "page lists the banned")
+	ui._open_picker("start_items")
+	var itag = ""
+	for r in ui._picker.res:
+		if not r.tags.empty():
+			itag = r.tags[0]
+			break
+	ui._picker.on_chip(itag, "tag")
+	var ok = true
+	for r in ui._picker.res:
+		if ui._picker.shown(r):
+			ok = ok and itag in r.tags
+	_check(ok, "item tag filter")
+	ui._close_picker()
 	ui.queue_free()
 	yield(tree, "idle_frame")
 

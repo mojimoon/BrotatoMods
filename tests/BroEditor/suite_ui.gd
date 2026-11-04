@@ -57,13 +57,13 @@ func test_51_ui_edits() -> void:
 	# 初始装备：选择器
 	ui._on_tab_pressed("gear")
 	ui._open_picker("start_items")
-	ui._on_picker_toggle(isvc.items[1].my_id)
-	ui._on_picker_confirm()
+	ui._picker.toggle(isvc.items[1].my_id)
+	ui._picker.confirm()
 	_eq(m.profiles[CH].start_items.size(), 1, "start item added via picker")
 	ui._open_picker("start_weapons")
-	ui._on_picker_clear()
-	ui._on_picker_toggle(isvc.weapons[0].my_id)
-	ui._on_picker_confirm()
+	ui._picker.clear()
+	ui._picker.toggle(isvc.weapons[0].my_id)
+	ui._picker.confirm()
 	_eq(m.profiles[CH].weapons, [isvc.weapons[0].my_id], "starting weapons via picker")
 	# 概览
 	ui._on_tab_pressed("overview")
@@ -89,7 +89,7 @@ func test_52_ui_custom_create_delete() -> void:
 	var id = ui._id
 	_check(m.is_custom(id), "selected the new custom")
 	ui._open_picker("icon")
-	ui._on_picker_toggle(isvc.items[2].my_id)
+	ui._picker.toggle(isvc.items[2].my_id)
 	_eq(m.profiles[id].icon, isvc.items[2].my_id, "single picker applies immediately")
 	_eq(ui._picker, null, "single picker closed")
 	ui._on_delete_custom()
@@ -169,16 +169,16 @@ func test_104_tier_weapons_and_reset_button() -> void:
 		if w.tier == 0:
 			t1.push_back(w.my_id)
 	ui._open_picker("start_weapons")
-	ui._on_picker_chip("tier", 0)
-	ui._on_picker_shown(true)
-	ui._on_picker_confirm()
+	ui._picker.on_chip(0, "tier")
+	ui._picker.on_shown(true)
+	ui._picker.confirm()
 	for id in t1:
 		_check(id in m.profiles[CH].weapons, "T1 added " + id)
 	_check(not ui._reset_btn.disabled, "reset enabled after change")
 	ui._open_picker("start_weapons")
-	ui._on_picker_chip("tier", 0)
-	ui._on_picker_shown(false)
-	ui._on_picker_confirm()
+	ui._picker.on_chip(0, "tier")
+	ui._picker.on_shown(false)
+	ui._picker.confirm()
 	for id in t1:
 		_check(not id in m.profiles[CH].weapons, "T1 removed " + id)
 	ui.queue_free()
@@ -745,19 +745,19 @@ func test_158_modals_reset_and_blueprint_codes() -> void:
 	_check(ui._modals.empty(), "table closed")
 	# 武器弹窗：近 / 远战与来源筛选、重置全部
 	ui._open_picker("start_weapons")
-	ui._on_picker_chip("type", 1)
-	ui._on_picker_chip("src", "vanilla")
-	var ok = ui._picker_grid.get_child_count() > 0
-	for r in ui._picker_res:
-		if ui._picker_shown(r):
+	ui._picker.on_chip(1, "type")
+	ui._picker.on_chip("vanilla", "src")
+	var ok = ui._picker.grid.get_child_count() > 0
+	for r in ui._picker.res:
+		if ui._picker.shown(r):
 			ok = ok and r.type == 1 and ui._source(r) == "vanilla"
 	_check(ok, "ranged + vanilla filter")
-	ui._on_picker_reset()
+	ui._picker.reset()
 	var orig = []
 	for w in m.backup_value(m.find_character(CH), "starting_weapons"):
 		if not w.my_id in orig:
 			orig.push_back(w.my_id)
-	_eq(ui._picker_sel, orig, "reset all = original starting weapons")
+	_eq(ui._picker.sel, orig, "reset all = original starting weapons")
 	ui._close_picker()
 	# 全部重置：先勾选内容，再最终确认；只重置自定义内容时保留修改与禁用，编号重新开始
 	ui.set_kind("item")
@@ -1439,9 +1439,9 @@ func test_168_weapon_users() -> void:
 	ui._on_tab_pressed("overview")
 	yield(tree, "idle_frame")
 	ui._open_picker("weapon_chars")
-	_check("character_knight" in ui._picker_sel, "picker preselects the users")
-	ui._picker_sel.erase("character_knight")
-	ui._on_picker_confirm()
+	_check("character_knight" in ui._picker.sel, "picker preselects the users")
+	ui._picker.sel.erase("character_knight")
+	ui._picker.confirm()
 	_check(not "character_knight" in m.weapon_users(wid), "removed from the knight")
 	_check(not m.weapon_profiles.has(knife.my_id), "no weapon profile created")
 	ui._open_weapon_users_copy()

@@ -1721,7 +1721,7 @@ func stat_text_key(key: String) -> String:
 # time_shift_on_hit：原版标签是一句话（"受伤时可以扭曲时间"），数值其实是敌人减速的百分比
 # 原版名称过长（整句描述）或带固定数值的 key 也用本模组的名称
 const OWN_LABEL_KEYS = [
-	"number_of_enemies", "item_box_gold", "time_shift_on_hit", "fog_of_war_permanent", "effect_mixing_up_wave", "more_horde",
+	"number_of_enemies", "item_box_gold", "time_shift_on_hit", "fog_of_war_permanent", "effect_mixing_up_wave",
 	"no_fruit_attracted_end_of_wave", "effect_mutate_end_of_wave", "no_cure_between_wave",
 ]
 # 原版效果文本不含数值（"同时仅能装备1种武器"）的 key：不借用该文本

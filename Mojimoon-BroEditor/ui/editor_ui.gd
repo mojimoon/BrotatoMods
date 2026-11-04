@@ -15,6 +15,7 @@ const SearchSelect = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/search_s
 const DragRow = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/drag_row.gd")
 const Modal = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/modal.gd")
 const EffectDetail = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/effect_detail.gd")
+const ObjectPicker = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/object_picker.gd")
 const Cloud = preload("res://mods-unpacked/Mojimoon-BroEditor/ui/cloud.gd")
 const BASE_TITLE = preload("res://resources/fonts/actual/base/font_32_outline.tres")
 const BASE_NORMAL = preload("res://resources/fonts/actual/base/font_26.tres")
@@ -148,20 +149,10 @@ var _lib_list: VBoxContainer
 var _lib_count: Label
 var blueprint = null
 # 禁用页
-var _ban_filter := ""
 var _ban_grids: Dictionary = {}
 # 选择器
-var _picker: Control = null
+var _picker = null	# ObjectPicker（ui/object_picker.gd）
 var _picker_mode := ""
-var _picker_sel: Array = []
-var _picker_res: Array = []
-var _picker_grid: GridContainer
-var _picker_filter := ""
-var _picker_count: Label
-var _picker_multi := true
-# 武器选择弹窗的筛选：稀有度（-1 = 全部）、近 / 远战（-1 = 全部）、来源
-var _picker_f := {"tier": -1, "type": -1, "src": "all"}
-var _picker_chips: Dictionary = {}
 # 打开中的弹窗（Modal），Esc 关闭最上面的一个
 var _modals: Array = []
 
@@ -589,7 +580,7 @@ func _fill_left() -> void:
 		var row = HBoxContainer.new()
 		row.add_constant_override("separation", 6)
 		box.add_child(row)
-		var tags = [[tr("BE_FILTER_ALL_TAGS"), ""]]
+		var tags = [[tr("BE_FILTER_ALL_SETS" if _kind == "weapon" else "BE_FILTER_ALL_TAGS"), ""]]
 		for t in _list_tags():
 			tags.push_back(t)
 		var tag_sel = _search_select(tags, f.tag)
@@ -3936,17 +3927,9 @@ func _on_start_item_delete(i: int) -> void:
 
 
 # ---------------- 禁用 ----------------
+# 页面只列出已禁用的道具 / 武器系列（点击图标解除），"编辑"打开选择器（搜索 + 筛选）
 func _build_bans() -> void:
-	var head = HBoxContainer.new()
-	head.add_constant_override("separation", 8)
-	_page.add_child(head)
-	var d = _desc(tr("BE_BANS_DESC"))
-	head.add_child(d)
-	var search = _line_edit(tr("BE_SEARCH"))
-	search.rect_min_size = Vector2(260, 0)
-	search.text = _ban_filter
-	search.connect("text_changed", self, "_on_ban_search")
-	head.add_child(search)
+	_page.add_child(_desc(tr("BE_BANS_DESC")))
 	var cols = _page_columns()
 	for kind in ["items", "weapons"]:
 		var card = _card(cols)
@@ -3959,6 +3942,10 @@ func _build_bans() -> void:
 		var title = _label("", FONT_NORMAL, C_DANGER)
 		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(title)
+		var edit = _button(tr("BE_BANS_EDIT"), FONT_DESC)
+		_apply_action_style(edit, C_DANGER)
+		edit.connect("pressed", self, "_open_picker", ["ban_" + kind])
+		row.add_child(edit)
 		var clear = _button(tr("BE_BANS_CLEAR"), FONT_DESC)
 		_apply_action_style(clear, C_DANGER)
 		clear.connect("pressed", self, "_on_bans_clear", [kind])
@@ -4097,21 +4084,16 @@ func _fill_bans() -> void:
 			c.queue_free()
 		var banned = _ban_list(kind)
 		for r in _ban_candidates(kind):
-			if _ban_filter != "" and tr(r.name).to_lower().find(_ban_filter) < 0 and r.my_id.find(_ban_filter) < 0:
-				continue
 			var id = r.my_id if kind == "items" else r.weapon_id
+			if not id in banned:
+				continue
 			var b = _res_button(r)
-			var on = id in banned
-			_set_icon_style(b, C_DANGER if on else ItemService.get_color_from_tier(r.tier).darkened(0.4), 3 if on else 1)
-			b.modulate = Color(1, 0.55, 0.55) if on else Color.white
+			_set_icon_style(b, C_DANGER, 2)
 			b.connect("pressed", self, "_on_ban_toggle", [kind, id])
 			grid.add_child(b)
+		if banned.empty():
+			grid.add_child(_desc(tr("BE_BANS_NONE")))
 		_ban_grids[kind][1].text = tr("BE_BAN_ITEMS" if kind == "items" else "BE_BAN_WEAPONS").replace("{0}", str(banned.size()))
-
-
-func _on_ban_search(text: String) -> void:
-	_ban_filter = text.strip_edges().to_lower()
-	_fill_bans()
 
 
 func _on_ban_toggle(kind: String, id: String) -> void:
@@ -4139,154 +4121,85 @@ func _on_bans_clear(kind: String) -> void:
 # 选择器（武器 / 道具 / 角色），点击切换，确认后写回
 # ============================================================
 func _open_picker(mode: String) -> void:
+	_close_picker()
 	_picker_mode = mode
-	_picker_filter = ""
-	_picker_multi = mode in ["start_weapons", "start_items", "start_items_w", "fuse", "weapon_chars"]
-	_picker_sel = []
 	var v = _view()
+	var opts = {"multi": mode in MULTI_PICKERS, "sel": [], "filters": [], "color": C_ACCENT_2}
 	match mode:
 		"start_weapons":
-			_picker_res = _isvc().weapons.duplicate()
-			if v.weapons is Array:
-				_picker_sel = v.weapons.duplicate()
-			else:
-				for w in _character().starting_weapons:
-					_picker_sel.push_back(w.my_id)
+			opts.res = _isvc().weapons.duplicate()
+			opts.sel = _start_weapon_ids()
+			opts.filters = ["tier", "type", "src", "tag"]
+			opts.shown_buttons = true
+			opts.reset = [self, "_original_weapon_ids"]
 		"start_items":
-			_picker_res = _isvc().items.duplicate()
+			opts.res = _isvc().items.duplicate()
+			opts.filters = ["tier", "src", "tag"]
 		"start_items_w":
-			_picker_res = _isvc().weapons.duplicate()
+			opts.res = _isvc().weapons.duplicate()
+			opts.filters = ["tier", "type", "src", "tag"]
+		"ban_items":
+			opts.res = _ban_candidates("items")
+			opts.sel = v.ban_items.duplicate()
+			opts.filters = ["tier", "src", "tag"]
+			opts.shown_buttons = true
+			opts.color = C_DANGER
+		"ban_weapons":
+			# 武器按系列（weapon_id）禁用，每个系列显示最低稀有度的那一把
+			opts.res = _ban_candidates("weapons")
+			opts.sel = v.ban_weapons.duplicate()
+			opts.key = "weapon_id"
+			opts.filters = ["tier", "type", "src", "tag"]
+			opts.shown_buttons = true
+			opts.color = C_DANGER
 		"fuse":
-			_picker_res = []
+			opts.res = []
 			for c in _isvc().characters:
 				if c.my_id != _id:
-					_picker_res.push_back(c)
-			_picker_sel = v.fuse.duplicate()
+					opts.res.push_back(c)
+			opts.sel = v.fuse.duplicate()
+			opts.filters = ["src"]
 		"weapon_chars":
-			_picker_res = _isvc().characters.duplicate()
-			_picker_sel = _mod.weapon_users(_obj_key())
+			opts.res = _isvc().characters.duplicate()
+			opts.sel = _mod.weapon_users(_obj_key())
+			opts.filters = ["src"]
+			opts.shown_buttons = true
 		"base":
 			match _kind:
 				"character":
-					_picker_res = _native_characters()
+					opts.res = _native_characters()
 				"item":
-					_picker_res = _native_items()
+					opts.res = _native_items()
+					opts.filters = ["tier", "src", "tag"]
 				"weapon":
-					_picker_res = _family_heads()
-			_picker_sel = [_look_view().base]
+					opts.res = _family_heads()
+					opts.filters = ["tier", "type", "src", "tag"]
+			opts.sel = [_look_view().base]
 		"icon":
-			_picker_res = _native_characters() + _native_items() + _family_heads()
-			_picker_sel = [_look_view().icon]
-	_picker_res.sort_custom(self, "_sort_by_tier_name")
-
-	var title = tr("BE_PICKER_" + mode.to_upper() + ("_" + _kind.to_upper() if mode == "base" and _kind != "character" else ""))
-	_picker = Modal.open(self, title, C_ACCENT_2, Vector2(1240, 820))
-	_picker.connect("closed", self, "_on_picker_closed")
-	_picker_count = _label("", FONT_SMALL, C_TEXT_DIM)
-	_picker.head.add_child(_picker_count)
-	var box = _picker.body
-	var search = _line_edit(tr("BE_SEARCH"))
-	search.connect("text_changed", self, "_on_picker_search")
-	box.add_child(search)
-	_picker_f = {"tier": -1, "type": -1, "src": "all"}
-	_picker_chips = {}
-	if _picker_weapons():
-		var tiers = [[-1, "BE_FILTER_ALL"]]
-		for t in 4:
-			tiers.push_back([t, "T" + str(t + 1)])
-		var frow = HBoxContainer.new()
-		frow.add_constant_override("separation", 16)
-		box.add_child(frow)
-		_picker_chip_row(frow, "tier", tiers)
-		_picker_chip_row(frow, "type", [[-1, "BE_FILTER_ALL"], [0, "MELEE"], [1, "RANGED"]])
-		_picker_chip_row(frow, "src", SOURCES)
-	elif mode == "weapon_chars":
-		var frow = HBoxContainer.new()
-		box.add_child(frow)
-		_picker_chip_row(frow, "src", SOURCES)
-	var scroll = _scroll()
-	box.add_child(scroll)
-	_picker_grid = _icon_grid(16)
-	scroll.add_child(_picker_grid)
-	var hint = _desc(tr("BE_PICKER_MULTI_DESC" if _picker_multi else "BE_PICKER_SINGLE_DESC"))
-	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_picker.foot.add_child(hint)
-	if mode in ["start_weapons", "weapon_chars"]:
-		_picker.add_button(tr("BE_PICKER_SELECT_SHOWN"), C_ACCENT_3, self, "_on_picker_shown", [true])
-		_picker.add_button(tr("BE_PICKER_DESELECT_SHOWN"), C_TEXT_DIM, self, "_on_picker_shown", [false])
-	if mode == "start_weapons":
-		_picker.add_button(tr("BE_PICKER_RESET_ALL"), C_DANGER, self, "_on_picker_reset")
-	elif _picker_multi:
-		_picker.add_button(tr("BE_PICKER_CLEAR"), C_DANGER, self, "_on_picker_clear")
-	_picker.add_button(tr("BE_CANCEL"), C_TEXT_DIM, self, "_close_picker")
-	_picker.add_button(tr("BE_CONFIRM"), C_ACCENT_3, self, "_on_picker_confirm")
-	_fill_picker()
-	search.call_deferred("grab_focus")
+			opts.res = _native_characters() + _native_items() + _family_heads()
+			opts.sel = [_look_view().icon]
+			opts.filters = ["src"]
+	if not mode in ["ban_items", "ban_weapons"]:
+		opts.res.sort_custom(self, "_sort_by_tier_name")
+	opts.title = tr("BE_PICKER_" + mode.to_upper() + ("_" + _kind.to_upper() if mode == "base" and _kind != "character" else ""))
+	_picker = ObjectPicker.open(self, opts, self, "_on_picker_done")
+	_picker.modal.connect("closed", self, "_on_picker_closed")
 
 
-func _picker_weapons() -> bool:
-	return _picker_mode in ["start_weapons", "start_items_w"]
+const MULTI_PICKERS = ["start_weapons", "start_items", "start_items_w", "fuse", "weapon_chars", "ban_items", "ban_weapons"]
 
 
-# 一组筛选按钮（稀有度 / 近远战 / 来源）
-func _picker_chip_row(parent: Control, key: String, defs: Array) -> void:
-	var row = HBoxContainer.new()
-	row.add_constant_override("separation", 4)
-	parent.add_child(row)
-	_picker_chips[key] = []
-	for d in defs:
-		var b = _button(tr(d[1]), FONT_DESC)
-		b.rect_min_size = Vector2(56, 0)
-		b.connect("pressed", self, "_on_picker_chip", [key, d[0]])
-		row.add_child(b)
-		_picker_chips[key].push_back([b, d[0]])
-	_style_picker_chips(key)
-
-
-func _style_picker_chips(key: String) -> void:
-	for bv in _picker_chips[key]:
-		_apply_chip_style(bv[0], bv[1] == _picker_f[key], C_ACCENT_2)
-
-
-func _on_picker_chip(key: String, value) -> void:
-	_picker_f[key] = value
-	_style_picker_chips(key)
-	_fill_picker()
-
-
-func _picker_shown(r) -> bool:
-	if _picker_filter != "" and tr(r.name).to_lower().find(_picker_filter) < 0 and r.my_id.find(_picker_filter) < 0:
-		return false
-	if _picker_mode == "weapon_chars":
-		return _picker_f.src == "all" or _source(r) == _picker_f.src
-	if not _picker_weapons():
-		return true
-	return (_picker_f.tier < 0 or r.tier == _picker_f.tier) and (_picker_f.type < 0 or r.type == _picker_f.type) and (_picker_f.src == "all" or _source(r) == _picker_f.src)
-
-
-# 选中 / 取消当前筛选出的全部
-func _on_picker_shown(on: bool) -> void:
-	for r in _picker_res:
-		if not _picker_shown(r):
-			continue
-		if on and not r.my_id in _picker_sel:
-			_picker_sel.push_back(r.my_id)
-		elif not on:
-			_picker_sel.erase(r.my_id)
-	_fill_picker()
-
-
-# 重置全部：恢复为原版初始武器（自定义角色取基底角色的）
-func _on_picker_reset() -> void:
+# 重置全部：原版初始武器（自定义角色取基底角色的）
+func _original_weapon_ids() -> Array:
 	var c = _character()
 	if _mod.is_custom(_id):
 		c = _mod.find_character(_view().base)
-	_picker_sel = []
+	var out = []
 	if c != null:
 		for w in _mod.backup_value(c, "starting_weapons"):
-			if not w.my_id in _picker_sel:
-				_picker_sel.push_back(w.my_id)
-	_fill_picker()
+			if not w.my_id in out:
+				out.push_back(w.my_id)
+	return out
 
 
 func _on_picker_closed() -> void:
@@ -4317,63 +4230,30 @@ func _sort_by_tier_name(a, b) -> bool:
 	return _en_name(a) < _en_name(b)
 
 
-func _fill_picker() -> void:
-	for c in _picker_grid.get_children():
-		_picker_grid.remove_child(c)
-		c.queue_free()
-	for r in _picker_res:
-		if not _picker_shown(r):
-			continue
-		var b = _res_button(r)
-		var on = r.my_id in _picker_sel
-		_set_icon_style(b, C_ACCENT_3 if on else ItemService.get_color_from_tier(r.tier).darkened(0.3), 3 if on else 1)
-		b.connect("pressed", self, "_on_picker_toggle", [r.my_id])
-		_picker_grid.add_child(b)
-	_picker_count.text = tr("BE_PICKER_COUNT").replace("{0}", str(_picker_sel.size())) if _picker_multi else ""
-
-
-func _on_picker_search(text: String) -> void:
-	_picker_filter = text.strip_edges().to_lower()
-	_fill_picker()
-
-
-func _on_picker_toggle(id: String) -> void:
-	if not _picker_multi:
-		_picker_sel = [id]
-		_on_picker_confirm()
-		return
-	if id in _picker_sel:
-		_picker_sel.erase(id)
-	else:
-		_picker_sel.push_back(id)
-	_fill_picker()
-
-
-func _on_picker_clear() -> void:
-	_picker_sel = []
-	_fill_picker()
-
-
-func _on_picker_confirm() -> void:
+func _on_picker_done(sel: Array) -> void:
+	_picker = null
 	# 选择使用者改的是角色档案，不给当前武器建档案
 	var p = _p() if _picker_mode != "weapon_chars" else null
 	match _picker_mode:
 		"start_weapons":
-			p.weapons = _picker_sel.duplicate()
+			p.weapons = sel.duplicate()
 		"start_items", "start_items_w":
-			for id in _picker_sel:
+			for id in sel:
 				p.start_items.push_back({"id": id, "n": 1, "cursed": false})
+		"ban_items":
+			p.ban_items = sel.duplicate()
+		"ban_weapons":
+			p.ban_weapons = sel.duplicate()
 		"fuse":
-			p.fuse = _picker_sel.duplicate()
+			p.fuse = sel.duplicate()
 		"weapon_chars":
-			_mod.set_weapon_users(_obj_key(), _picker_sel)
+			_mod.set_weapon_users(_obj_key(), sel)
 		"base":
-			if not _picker_sel.empty():
-				_look_p().base = _kind_base(_picker_sel[0])
+			if not sel.empty():
+				_look_p().base = _kind_base(sel[0])
 		"icon":
-			if not _picker_sel.empty():
-				_look_p().icon = _picker_sel[0]
-	_close_picker()
+			if not sel.empty():
+				_look_p().icon = sel[0]
 	if _look_custom():
 		_reregister()
 		_refresh_char_list()
@@ -4390,7 +4270,7 @@ func _kind_base(id: String) -> String:
 
 
 func _close_picker() -> void:
-	if _picker != null and is_instance_valid(_picker):
+	if _picker != null:
 		_picker.close()
 	_picker = null
 
