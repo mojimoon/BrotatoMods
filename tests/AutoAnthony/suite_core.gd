@@ -3283,3 +3283,30 @@ func test_311_dlc2_trigger_pieces() -> void:
 		_check(seen.has("2/in_puddle"), "puddle trigger in the jungle")
 		_check(seen.has("0/cond/evolved"), "evolved condition generated")
 	_check(seen.has("payload/slow_time"), "slow_time payload generated")
+
+
+# 预览：化石显示"化石：<原名>"，进化路线道具标出路线（否则混在普通道具里认不出来）
+func test_51d_preview_fossils_and_path_items() -> void:
+	var m = tree.root.get_node("ModLoader/Mojimoon-AutoAnthony")
+	var ui = load(MOD_DIR + "ui/settings_ui.tscn").instance()
+	tree.root.add_child(ui)
+	var pl = m.preview_plan(917609517, "items")
+	var shown = {}
+	for t in 4:
+		for it in ui._preview_entries(pl, t):
+			shown[it.my_id] = it
+	var fossils = 0
+	for id in shown:
+		if pl.items[id].get("fossil", false):
+			fossils += 1
+			_eq(ui._item_name(shown[id], pl.items[id]), tr("AA_FOSSIL_NAME_FMT").replace("{0}", tr(shown[id].name)), id + " previewed with the fossil name")
+	if "primal_dread" in tree.root.get_node("ProgressData").active_update_data:
+		_check(fossils > 0, "preview shows fossils (%d)" % fossils)
+		for id in Catalog.PATH_ITEMS:
+			_check(shown.has(id), id + " shown in the preview")
+			if shown.has(id):
+				var card = ui._item_card(shown[id], pl.items[id], 400)
+				var key = "MUTANT_ITEMS" if Catalog.PATH_ITEMS[id] == -1 else "MECA_ITEMS"
+				_check(card.get_child(0).get_child(1).get_child(0).get_child(1).text.find(tr(key)) >= 0, id + " card marks its path")
+				card.free()
+	ui.queue_free()

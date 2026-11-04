@@ -606,6 +606,9 @@ func _preview_entries(plan: Dictionary, tier: int, kind: String = "items") -> Ar
 
 func _item_name(item, p: Dictionary) -> String:
 	var nm = tr(item.name)
+	# 与开局时 mod_main 的命名一致：化石固定为"化石：<原名>"
+	if p.get("fossil", false):
+		return tr("AA_FOSSIL_NAME_FMT").replace("{0}", nm)
 	if _mod.cfg_rename:
 		nm = tr("AA_NAME_FMT").replace("{0}", tr(p.adj)).replace("{1}", nm)
 	return nm
@@ -664,6 +667,10 @@ func _item_card(item, p: Dictionary, width: float) -> Control:
 	var color = ItemService.get_color_from_tier(int(p.get("tier", item.tier)))
 	var col = _card_shell(p.get("icon", item.icon), color, width)
 	var price = str(_item_price(item, p))
+	# 进化路线道具不掉落，只在进化值达到 ±3 时进商店：标出路线，免得混在普通道具里认不出来
+	var side = AAMain.Catalog.PATH_ITEMS.get(item.my_id, null)
+	if side != null:
+		price = (tr("MECA_ITEMS") if side == 1 else tr("MUTANT_ITEMS") if side == -1 else tr("MECA_ITEMS") + " / " + tr("MUTANT_ITEMS")) + "  " + price
 	if p.get("unique", false):
 		price = tr("AA_UI_UNIQUE") + "  " + price
 	elif int(p.get("limit", 0)) > 1:
