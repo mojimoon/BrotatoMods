@@ -51,6 +51,9 @@ func _on_enemy_died(enemy: Enemy, args: Entity.DieArgs) -> void:
 			killers.push_back(player.player_index)
 	# 致命一击的伤害类型：燃烧致死算元素，否则取最后一次命中的伤害缩放属性；暴击击杀见 _on_enemy_took_damage
 	var kill_info = {"stats": ["stat_elemental_damage"] if args.is_burning else [], "burning": burning, "cursed": _aa_is_cursed(enemy),
+		"evolved": is_instance_valid(enemy) and "_is_meca" in enemy and (enemy._is_meca or enemy._is_mutant),
+		"meca": is_instance_valid(enemy) and "_is_meca" in enemy and enemy._is_meca,
+		"mutant": is_instance_valid(enemy) and "_is_mutant" in enemy and enemy._is_mutant,
 		"crit": is_instance_valid(enemy) and enemy.has_meta("aa_crit_kill") and enemy.get_meta("aa_crit_kill")}
 	if is_instance_valid(enemy):
 		enemy.set_meta("aa_crit_kill", false)

@@ -6,12 +6,12 @@
 
 | 处理 | 含义 | 估值 |
 | --- | --- | --- |
-| `trigger`（40 种） | 拆解为 (扳机, 载荷) 先验，由通用触发条款重新表达 | 单位价值 × 每波频率（见 README 第 4 节） |
+| `trigger`（45 种） | 拆解为 (扳机, 载荷) 先验，由通用触发条款重新表达 | 单位价值 × 每波频率（见 README 第 4 节） |
 | `scaling`（28 种） | 计数 × 属性自由搭配重新生成（原版 GainStatForEveryStatEffect） | 目标属性权重 × 数值 × 计数期望 / 每 N；计数期望由原版道具校准 |
 | `next_wave`（1 种） | 下一波（芹菜茶 / 孔雀）：一次性，下一波开始时生效；约一半附带同一行为下的负面行（敌人属性或自身属性降低） | 一波的价值 = 整局价值 / 剩余波数（≈ 2 × 永久累积倍率 − 1）；孔雀校准吻合 |
 | `gain_mod`（3 种） | 属性修改 ±XX% 重新生成（原版 StatGainsModificationEffect） | 属性权重 × 属性期望总量 × XX% |
-| `scalar`（44 种） | 原样搬运，并按预算缩放数值（1 单位 .. 原版 1.5 倍） | 来源道具剩余价值按数值比例折算 |
-| `mechanic`（58 种） | 原样搬运（炮台、宠物、爆炸、武器类加成……） | 道具：来源道具 (预算 − 属性行价值) / 机制数；角色：(角色总价值 − 可估值部分) / 机制数，限制 30–80 |
+| `scalar`（42 种） | 原样搬运，并按预算缩放数值（1 单位 .. 原版 1.5 倍） | 来源道具剩余价值按数值比例折算 |
+| `mechanic`（55 种） | 原样搬运（炮台、宠物、爆炸、武器类加成……） | 道具：来源道具 (预算 − 属性行价值) / 机制数；角色：(角色总价值 − 可估值部分) / 机制数，限制 30–80 |
 | `downside`（15 种） | 作为代价搬运 | 来源道具因它多拿到的正面预算（至少 3） |
 | `weapon_counter`（4 种） | 武器数量计数（常规池）："每把 [不同 / 所有 / IV 级 / I 级] 武器 +X [属性]"，属性与数值重新生成 | 属性权重 × 数值 × 计数期望（不同武器 3.5 / 武器 5 / IV 级 1 / I 级 1.2） |
 | `char_component`（5 种） | 角色效果（常规池）：武器类型加成、对燃烧目标额外伤害、和平主义者、+武器栏 | 按原版角色数值与对应属性 / 材料估值 |
@@ -44,6 +44,7 @@
 | `enemy_percent_damage_taken` | 2 | item | ice_cube Enemies take 10% more damage for 3 seconds when first hit by / smelly_rafflesia Attacks have a 25% chance to make enemies take 25% more dama |
 | `explode_on_consumable` | 2 | item,char | spicy_sauce Consumables have a 50% chance to explode for 15 ([color=whit / c:glutton Consumables have a 100% chance to explode for 10 ([color=whi |
 | `explode_on_death` | 1 | item | rip_and_tear Enemies have a 20% chance to explode for 10 (+5 |
+| `explode_on_evolved_death` | 1 | item | exothermic_reaction Evolved (mecha and mutated) enemies have a 33% chance to exp |
 | `explode_on_hit` | 2 | item,char | krakens_eye You have a 50% chance to explode for 10 (+500%[ / c:bull You explode for 30 (+300%[img=15x15]res |
 | `gain_random_primary_stats_on_go_to_next_wave` | 1 | item | candy_bag Each wave grants 8 points randomly split between your primar |
 | `gain_stat_for_equipped_item_with_stat` | 1 | item | snowball +1 Elemental Damage every time you get an item that increase |
@@ -56,9 +57,12 @@
 | `heal_on_crit_kill` | 1 | item | tentacle +20% chance to heal 1 HP when killing an enemy with a critic |
 | `heal_on_dodge` | 1 | item | adrenaline 50% chance to heal 5 HP when dodging an attack |
 | `heal_on_kill` | 1 | item | goblet +15% chance to heal 1 HP when killing an enemy |
+| `heal_on_mutant_kill` | 1 | item | eldritch_figurine +50% chance to heal 1 HP when killing a mutated enemy |
 | `heal_when_pickup_gold` | 1 | item | cute_monkey +8% chance to heal 1 HP when picking up a material |
 | `item_box_gold` | 1 | item | bag +15 materials when you pick up a crate |
+| `material_on_evolved_enemy_kill` | 1 | item | flare +1 material when you kill evolved (mecha and mutated) enemie |
 | `remove_speed` | 1 | item | ugly_tooth Hitting an enemy removes 5% of their speed. Max 20% |
+| `slow_time_when_below_hp` | 1 | item | pocket_watch Once per wave, enemies and their projectiles are slowed by 7 |
 | `stats_below_half_health` | 2 | char | c:golem +40 % Attack Speed when you have less than 50% health / c:golem +20 % Speed when you have less than 50% health |
 | `stats_end_of_wave` | 18 | item,char | celery_tea +5 % XP Gain at the end of a wave / grinds_magical_leaf +3 Max HP at the end of a wave |
 | `stats_on_fruit` | 1 | char | c:druid 33% chance to get +1 Luck when you pick up a fruit |
@@ -67,6 +71,7 @@
 | `temp_stats_on_dodge` | 1 | char | c:cryptid +3 % Attack Speed until the end of the wave when you dodge a |
 | `temp_stats_on_hit` | 3 | item,char,weapon | triangle_of_power -2 % Damage when you take damage until the end of the wave / c:masochist +5 % Damage when you take damage until the end of the wave |
 | `temp_stats_per_interval` | 4 | item,weapon | medikit +2 HP Regeneration every 5 seconds until the end of the wave / wisdom +5 % Damage every 5 seconds until the end of the wave |
+| `temp_stats_while_being_in_puddle` | 1 | item | mud_lover 60 % Damage while being in a puddle |
 | `temp_stats_while_moving` | 2 | char | c:streamer +40 % Damage while moving / c:streamer +40 % Attack Speed while moving |
 | `temp_stats_while_not_moving` | 10 | item,char,weapon | barricade +8 Armor while standing still / chameleon +20 % Dodge while standing still |
 
@@ -138,7 +143,6 @@
 | `gain_pct_gold_start_wave` | 1 | item | piggy_bank +20% of your materials at the start of waves (stops working  |
 | `gold_drops` | 2 | item,char | evil_hat +70% materials dropped / c:jack +200% materials dropped |
 | `harvesting_growth` | 2 | item,char | crown Harvesting increases by an additional 8% at the end of a wav / c:farmer Harvesting increases by an additional 3% at the end of a wav |
-| `heal_on_mutant_kill` | 1 | item | eldritch_figurine +50% chance to heal 1 HP when killing a mutated enemy |
 | `hit_protection` | 1 | item | tardigrade Nullifies the damage of one hit taken every wave |
 | `increase_material_value` | 1 | char | c:buccaneer Picked up materials have +100% value |
 | `instant_gold_attracting` | 2 | item | baby_gecko +25% chance to instantly attract a material when it��s droppe / sifds_relic +100% chance to instantly attract a material when it��s dropp |
@@ -149,7 +153,6 @@
 | `level_upgrades_modifications` | 1 | item | barnacle +35% stats gained from level upgrades |
 | `loot_alien_chance` | 1 | item | whistle +50% chance for loot aliens to appear |
 | `loot_alien_speed` | 1 | item | whistle +20% movement speed for loot aliens |
-| `material_on_evolved_enemy_kill` | 1 | item | flare +1 material when you kill evolved (mecha and mutated) enemie |
 | `mutate_into_better_tier_chance` | 2 | item,char | wildfire_mutation 25% chance that a mutating item is replaced by a mutated ite / c:variant 50% chance that a mutating item is replaced by a mutated ite |
 | `mutation_fruit_chance` | 1 | item | boosted_mitosis +50% chance for mutated enemies to drop a mutation fruit |
 | `number_of_enemies` | 6 | item,char | gentle_alien +5% Enemies / mouse +10% Enemies |
@@ -202,7 +205,6 @@
 | `dodge_cap` | 4 | item,char | ghost_outfit Dodge is capped at 70% / c:ghost Dodge is capped at 90% |
 | `duplicate_item` | 1 | item | mirror Duplicates the next item you get from the shop (item limits  |
 | `explode_on_consumable_burning` | 1 | char | c:chef Consumables explode for 5x1 (+100%[img= |
-| `explode_on_evolved_death` | 1 | item | exothermic_reaction Evolved (mecha and mutated) enemies have a 33% chance to exp |
 | `explode_on_overkill` | 1 | char | c:ogre Enemies taking double their max health as damage explode for |
 | `explode_when_below_hp` | 1 | item | sunken_bell Once per wave, you explode for 100 (+500%[/colo |
 | `extra_item_in_crate` | 2 | item | pearl +3% chance of finding an extra Pearl in a crate / treasure_map +20% chance of finding an extra item in a crate |
@@ -220,11 +222,9 @@
 | `projectiles_on_death` | 1 | item | baby_with_a_beard One bullet dealing 1 (+100%[img=15x15]r |
 | `reload_when_pickup_gold` | 1 | char | c:buccaneer Picking up a material resets the cooldown of all your weapon |
 | `slow_meca_on_hit` | 1 | item | jamming_backpack Hitting mecha enemies slows them by 50% for 2 seconds |
-| `slow_time_when_below_hp` | 1 | item | pocket_watch Once per wave, enemies and their projectiles are slowed by 7 |
 | `spines_on_hit` | 1 | item | infected_skin 33% chance to shoot 8 spines around you dealing 5 ([color=wh |
 | `structures_can_crit` | 1 | item | pile_of_books Your structures can crit |
 | `structures_cooldown_reduction` | 1 | item | improved_tools Increases the attack speed of your structures by 0% ([color= |
-| `temp_stats_while_being_in_puddle` | 1 | item | mud_lover 60 % Damage while being in a puddle |
 | `upgrade_random_weapon` | 1 | item | anvil A random weapon is upgraded when entering a shop. If you hav |
 | `wandering_bot` | 1 | item | wandering_bot Spawns a little bot that slows down nearby enemies |
 | `weapon_scaling_stats` | 2 | item | frozen_heart Weapon and pet damage additionally scales with 10% Elemental / nail Weapon and pet damage additionally scales with 20% Engineeri |

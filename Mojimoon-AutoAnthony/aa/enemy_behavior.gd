@@ -55,6 +55,9 @@ func on_hurt(hitbox: Hitbox) -> void:
 	var info = {
 		"hp_pct": 100.0 * _parent.current_stats.health / max(1.0, float(_parent.max_stats.health)),
 		"first_any": false, "first_stats": [], "stats": [],
+		"evolved": "_is_meca" in _parent and (_parent._is_meca or _parent._is_mutant),
+		"meca": "_is_meca" in _parent and _parent._is_meca,
+		"mutant": "_is_mutant" in _parent and _parent._is_mutant,
 	}
 	if not _first_done.has(p):
 		_first_done[p] = true

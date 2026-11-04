@@ -129,6 +129,9 @@ func test_14_sliders() -> void:
 # 原版触发组合都能被通用系统重新表达：对每一种原版组合，生成器都能产出同类条款
 func test_15_every_native_combo_is_reachable() -> void:
 	var seen = {}
+	# 水坑扳机只在丛林地图生成
+	var zone_before = rd.current_zone
+	rd.current_zone = 2
 	# 扳机较多（含低权重的实验性扳机）：加大抽样
 	for s in range(1, 60):
 		var gen = Generator.new(_cfg(), s)
@@ -138,6 +141,7 @@ func test_15_every_native_combo_is_reachable() -> void:
 			var c = gen.gen_clause(30.0, 6.0, false)
 			if not c.empty():
 				seen[c.trigger + "/" + c.payload] = true
+	rd.current_zone = zone_before
 	for k in Catalog.NATIVE_TRIGGER_MAP:
 		var pair = Catalog.NATIVE_TRIGGER_MAP[k]
 		_check(seen.has(pair[0] + "/" + pair[1]), "native combo reachable: %s -> %s/%s" % [k, pair[0], pair[1]])
@@ -3032,7 +3036,8 @@ func test_306_path_items_reassembled() -> void:
 		print("  (primal dread unavailable, skipped)")
 		return
 	var n_mech = 0
-	for sd in [3, 17, 91]:
+	var n_clause = 0
+	for sd in [3, 17, 91, 5, 8, 13]:
 		var gen = Generator.new(_cfg(), sd)
 		var plan = gen.generate(m.run_native(isvc.items), m.run_native(isvc.characters), [], [])
 		for id in Catalog.PATH_ITEMS:
@@ -3057,6 +3062,10 @@ func test_306_path_items_reassembled() -> void:
 					var ms = int(Catalog.PATH_MECHANICS[k])
 					if side == 0 or ms == 0 or ms == side:
 						side_ok = true
+				# 或者带本路线敌人条件的触发条款
+				if e is TriggerEffect and Catalog.SIDE_CONDS.get(e.cond, 0) == side and side != 0:
+					side_ok = true
+					n_clause += 1
 			_eq(str(evo), str(native_evo), id + " keeps its evolution line")
 			_check(side_ok, "%s carries a path mechanic: %s" % [id, _texts(p.effects)])
 		for t in 4:
@@ -3064,6 +3073,7 @@ func test_306_path_items_reassembled() -> void:
 				if Catalog.PATH_ITEMS.has(mech.source):
 					n_mech += 1
 	_check(n_mech >= 6, "path items are mechanic sources (%d)" % n_mech)
+	_check(n_clause > 0, "some path items carry a side clause instead of a path mechanic (%d)" % n_clause)
 
 
 # 单边效果（只对机械或异变有意义）：只在同路线的路线道具上；本局角色锁定路线时也可以出现在普通道具上
@@ -3079,6 +3089,10 @@ func test_307_side_mechanics() -> void:
 				var side = int(Catalog.PATH_ITEMS.get(id, 0))
 				for e in plan.items[id].effects:
 					var k = e.custom_key if e.custom_key != "" else e.key
+					if e is TriggerEffect and Catalog.SIDE_CONDS.has(e.cond):
+						k = e.cond
+						_check(Catalog.SIDE_CONDS[k] == side or Catalog.SIDE_CONDS[k] in sides, "%s (side %d, run %s) carries a %s clause" % [id, side, str(sides), k])
+						continue
 					if not Catalog.SIDE_MECHANICS.has(k):
 						continue
 					var s = int(Catalog.SIDE_MECHANICS[k])
@@ -3209,3 +3223,63 @@ func test_310_no_dlc_effects_without_dlc() -> void:
 				if not primal:
 					_check(not k in ["stat_evolution", "fossil_count"] and not Catalog.SIDE_MECHANICS.has(k) and (k == "weapon_slot" or not Catalog.PATH_MECHANICS.has(k)), "%s: no primal dread effect (%s)" % [id, k])
 	_check(n > 0, "items generated")
+
+
+# 1.2 新增：进化敌人条件、水坑扳机（只在丛林地图）、时间变慢载荷
+func test_311_dlc2_trigger_pieces() -> void:
+	# 运行时：击杀进化敌人才给材料；时间变慢写入原版的敌人时间系数
+	var gold0 = rd.get_player_gold(0)
+	var rt = _make_runtime([
+		{"trigger": "kill", "cond": "evolved", "payload": "gold", "value": 2},
+		{"trigger": "hit", "payload": "slow_time", "value": 50, "value2": 3},
+	])
+	rt.fire("kill", 0, null, -1, null, {"evolved": false})
+	_eq(rd.get_player_gold(0), gold0, "normal kill gives nothing")
+	rt.fire("kill", 0, null, -1, null, {"evolved": true})
+	_eq(rd.get_player_gold(0), gold0 + 2, "evolved kill gives gold")
+	rt.queue_free()
+	rt = _make_runtime([
+		{"trigger": "kill", "cond": "mutant", "payload": "gold", "value": 3},
+		{"trigger": "hit", "payload": "slow_time", "value": 50, "value2": 3},
+	])
+	var gold1 = rd.get_player_gold(0)
+	rt.fire("kill", 0, null, -1, null, {"evolved": false, "meca": true, "mutant": false})
+	_eq(rd.get_player_gold(0), gold1, "mecha kill does not count as mutant")
+	rt.fire("kill", 0, null, -1, null, {"evolved": false, "meca": false, "mutant": true})
+	_eq(rd.get_player_gold(0), gold1 + 3, "mutant kill gives gold")
+	EntityService.stop_enemy_time_slow()
+	rt.fire("hit", 0)
+	_check(abs(EntityService.enemy_time_factor - 0.5) < 0.01, "slow_time slows enemy time (%.2f)" % EntityService.enemy_time_factor)
+	EntityService.stop_enemy_time_slow()
+	rt.queue_free()
+	# 文本
+	for c in [{"trigger": "kill", "cond": "evolved", "payload": "gold", "value": 1}, {"trigger": "hit_enemy", "cond": "evolved", "param": 5, "payload": "heal", "value": 1},
+			{"trigger": "in_puddle", "payload": "temp_stat", "stat": "stat_percent_damage", "value": 20}, {"trigger": "dodge", "payload": "slow_time", "value": 30, "value2": 4},
+			{"trigger": "kill", "cond": "meca", "param": 3, "payload": "gold", "value": 1}, {"trigger": "hit_enemy", "cond": "mutant", "payload": "heal", "value": 1}]:
+		var txt = TriggerEffect.make(c).get_text(0, false)
+		_check(txt.find("AA_") == -1 and txt.find("{") == -1, "text: " + txt)
+	# 估值：怀表（每波一次 75% × 5 秒）约等于它的预算
+	var v = Valuation.clause_value({"trigger": "hit", "cond": "low_hp", "payload": "slow_time", "value": 75, "value2": 5, "cap": 1}, 4.0)
+	_check(v > 15.0 and v < 40.0, "pocket watch valuation %.1f" % v)
+	# 生成：水坑扳机只在丛林地图；进化条件只在启用史前惧兽时
+	var zone_before = rd.current_zone
+	var seen = {}
+	for zone in [0, 2]:
+		rd.current_zone = zone
+		for sd in range(1, 25):
+			var gen = Generator.new(_cfg(), sd)
+			gen._collect_priors(m.run_native(isvc.items), m.run_native(isvc.characters), [])
+			gen.rng.seed = sd
+			for i in 60:
+				var c = gen.gen_clause(30.0, 4.0, false)
+				if c.empty():
+					continue
+				seen[str(zone) + "/" + c.trigger] = true
+				seen[str(zone) + "/cond/" + c.cond] = true
+				seen["payload/" + c.payload] = true
+	rd.current_zone = zone_before
+	_check(not seen.has("0/in_puddle"), "no puddle trigger outside the jungle")
+	if "primal_dread" in tree.root.get_node("ProgressData").active_update_data:
+		_check(seen.has("2/in_puddle"), "puddle trigger in the jungle")
+		_check(seen.has("0/cond/evolved"), "evolved condition generated")
+	_check(seen.has("payload/slow_time"), "slow_time payload generated")

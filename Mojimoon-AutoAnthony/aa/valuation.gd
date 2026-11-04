@@ -112,6 +112,8 @@ static func main_value(c: Dictionary, perm_mult: float) -> float:
 			return Catalog.DMG_W * Catalog.IGNITE_TICKS * tick * fires_per_wave(c)
 		"slow":
 			return Catalog.SLOW_W * v * fires_per_wave(c)
+		"slow_time":
+			return Catalog.SLOW_TIME_W * v * min(fires_per_wave(c) * v2, Catalog.WAVE_SECONDS)
 		"fruit":
 			return Catalog.FRUIT_W * v * fires_per_wave(c)
 		"hp_dmg":

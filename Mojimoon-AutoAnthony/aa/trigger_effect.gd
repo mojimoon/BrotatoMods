@@ -193,6 +193,8 @@ func _payload_text(colored: bool) -> String:
 		"ignite":
 			var sc = _scaling_text("stat_elemental_damage", 100, colored, true)
 			return tr("AA_P_IGNITE").replace("{0}", _col(str(value), good, colored)).replace("{1}", str(Catalog.IGNITE_TICKS)).replace("{2}", sc)
+		"slow_time":
+			return tr("AA_P_SLOW_TIME").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", str(value2))
 		"slow":
 			return tr("AA_P_SLOW").replace("{0}", _col(str(value) + "%", good, colored)).replace("{1}", str(int(min(90, value * 4))) + "%")
 		"fruit":

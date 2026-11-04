@@ -160,7 +160,7 @@ static func info_ok(e, info) -> bool:
 	if info == null:
 		return false
 	match e.cond:
-		"crit", "burning", "cursed":
+		"crit", "burning", "cursed", "evolved", "meca", "mutant":
 			return info.get(e.cond, false)
 		"dmg_type":
 			return e.dmg_type in info.get("first_stats" if e.trigger == "first_hit" else "stats", [])
@@ -250,6 +250,8 @@ func _state_holds(trigger: String, player) -> bool:
 			return player.current_stats.health < player.max_stats.health / 2.0
 		"full_hp":
 			return player.current_stats.health >= player.max_stats.health
+		"in_puddle":
+			return ("petrol_in_puddle" in player and player.petrol_in_puddle) or ("acid_in_puddle" in player and player.acid_in_puddle)
 	return false
 
 
@@ -341,6 +343,8 @@ func _execute_inner(e, player_index: int, pos, show: bool, en, target) -> void:
 			_ignite(e, player_index, target)
 		"slow":
 			_slow(e, target)
+		"slow_time":
+			EntityService.slow_enemy_time(1.0 - clamp(e.value, 0, 95) / 100.0, max(0.1, e.value2))
 		"fruit":
 			call_deferred("_drop_fruit", e.value, pos if pos != null else _player_pos(player_index))
 		"rand_stats":

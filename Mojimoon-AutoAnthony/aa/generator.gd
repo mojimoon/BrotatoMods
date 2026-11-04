@@ -1117,6 +1117,8 @@ func generate_item(item, core_stat: String = "") -> Dictionary:
 
 # 进化路线道具：普通重组（进化值行由 _preserved_lines 保留）+ 第一个特殊行固定为一条本路线的机制
 var forced_mech = null
+# 路线道具第一个特殊行改为带本路线敌人条件的触发条款（失败时退回 forced_mech）
+var forced_cond := ""
 # 本局角色锁定的路线（1 机械 / -1 异变，双路线两者都有），由 mod_main 按本局角色设置；当前生成的路线道具所属路线（0 = 无）
 var run_sides: Array = []
 var cur_path_side := 0
@@ -1152,14 +1154,17 @@ func _generate_path_item(item) -> Dictionary:
 				cands.push_back(m)
 	if cands.empty() and cheapest != null:
 		cands.push_back(cheapest)
-	if cands.empty():
+	if side != 0 and rng.randf() < Catalog.PATH_CLAUSE_CHANCE:
+		forced_cond = "meca" if side > 0 else "mutant"
+	if cands.empty() and forced_cond == "":
 		var r0 = _generate_item_once(item, false)
 		cur_path_side = 0
 		return r0
-	forced_mech = cands[rng.randi() % cands.size()]
+	forced_mech = cands[rng.randi() % cands.size()] if not cands.empty() else null
 	var r = _generate_item_once(item, true)
 	cur_path_side = 0
 	forced_mech = null
+	forced_cond = ""
 	r["path"] = side
 	return r
 
@@ -1401,12 +1406,26 @@ func _generate_item_once(item, force_special: bool) -> Dictionary:
 	if rng.randf() < p_special - 1.0:
 		slots += 1
 	for _slot in slots:
-		if budget <= 4.0 and not (forced_mech != null and _slot == 0):
+		var forced = _slot == 0 and (forced_mech != null or forced_cond != "")
+		if budget <= 4.0 and not forced:
 			break
 		var share = rng.randf_range(0.4, 0.8) if slots == 1 else rng.randf_range(0.3, 0.5)
 		var kind = _pick_weighted(Catalog.SPECIAL_KIND_WEIGHTS)
 		var done = false
-		if forced_mech != null and _slot == 0:
+		if forced and forced_cond != "":
+			var fc = gen_clause(budget * share, perm_mult, false, "", "", forced_cond)
+			if not fc.empty():
+				var fcv = Valuation.clause_value(fc, perm_mult)
+				effects.push_back(TriggerEffect.make(fc))
+				_note_clause(fc)
+				budget -= fcv
+				done = true
+				main_line = {"value": fcv, "adj": _adj(Catalog.adj_options(fc))}
+				if fc.get("stat", "") != "":
+					used_stats.push_back(fc.stat)
+		if done:
+			pass
+		elif forced and forced_mech != null:
 			var fe = _mechanic_copy(forced_mech, budget * share, item.my_id)
 			var fv = fe.get_meta("aa_value")
 			effects.push_back(fe)
@@ -2851,7 +2870,7 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 	if trigger == null:
 		var tw = {}
 		for t in Catalog.TRIGGERS:
-			if t in banned_triggers:
+			if t in banned_triggers or (t == "in_puddle" and not puddles_active()):
 				continue
 			if fixed_cond != "" and not fixed_cond in Catalog.conds_for(t):
 				continue
@@ -2951,6 +2970,9 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 			c.value = 1
 		"slow":
 			c.value = 1
+		"slow_time":
+			c.value = Catalog.SLOW_TIME_STEP
+			c.value2 = Catalog.SLOW_TIME_SECONDS[rng.randi() % Catalog.SLOW_TIME_SECONDS.size()]
 		"fruit":
 			c.value = 1
 		"rand_stats":
@@ -2987,6 +3009,8 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 			c.value = int(min(c.value * k, Catalog.HP_DMG_MAX))
 		elif payload == "slow":
 			c.value = int(min(c.value * k, Catalog.SLOW_MAX))
+		elif payload == "slow_time":
+			c.value = int(min(c.value * k, Catalog.SLOW_TIME_MAX))
 		else:
 			c.value = int(c.value * k)
 	else:
@@ -3020,6 +3044,11 @@ func curse_active() -> bool:
 	return "abyssal_terrors" in ProgressData.active_update_data
 
 
+# 本局地图会出现酸液 / 汽油水坑（丛林地图的敌人留下）
+func puddles_active() -> bool:
+	return "primal_dread" in ProgressData.active_update_data and ZoneService.get_zone_data(RunData.current_zone).dlc_id == "primal_dread"
+
+
 func _pick_cond(c: Dictionary, fixed_cond: String) -> void:
 	var options = []
 	for k in Catalog.conds_for(c.trigger):
@@ -3028,9 +3057,14 @@ func _pick_cond(c: Dictionary, fixed_cond: String) -> void:
 	# 用某类伤害命中敌人（潜水员）：只在"更多角色效果"开启时出现
 	if c.trigger == "hit_enemy" and not cfg.get("char_effects", false):
 		options.erase("dmg_type")
-	# 被诅咒的敌人只在启用深渊恐惧时出现
+	# 被诅咒的敌人只在启用深渊恐惧时出现；进化敌人只在启用史前惧兽时出现
 	if not curse_active():
 		options.erase("cursed")
+	if not "primal_dread" in ProgressData.active_update_data:
+		options.erase("evolved")
+	for k in Catalog.SIDE_CONDS:
+		if not "primal_dread" in ProgressData.active_update_data or not (Catalog.SIDE_CONDS[k] == cur_path_side or Catalog.SIDE_CONDS[k] in run_sides):
+			options.erase(k)
 	if fixed_cond != "":
 		if not fixed_cond in options:
 			return
@@ -3133,6 +3167,8 @@ func _amount_cap(c: Dictionary, trigger: String) -> int:
 			return 10 if rate <= 3 else 4
 		"slow":
 			return Catalog.SLOW_MAX
+		"slow_time":
+			return int(Catalog.SLOW_TIME_MAX / Catalog.SLOW_TIME_STEP)
 		"fruit":
 			return 3 if rate <= 3 else 1
 		"timed_stat":

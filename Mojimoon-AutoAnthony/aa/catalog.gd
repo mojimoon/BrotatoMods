@@ -156,6 +156,9 @@ const TRIGGERS = {
 	"tree_kill": {"kind": "event", "e": 3.0, "timing": 0.5, "gate": "every", "w": 0.1},
 	# 获得提升 [属性] 的道具（雪球）：商店阶段，条件属性 = 效果属性；每波约 0.5 件
 	"buy_stat": {"kind": "shop", "e": 0.5, "timing": 0.0, "gate": "none", "w": 0.03},
+	# 站在水坑里（泥巴爱好者）：酸液 / 汽油水坑只由丛林地图（史前惧兽）的敌人留下，只在本局地图是丛林时生成；
+	# 在场率按泥巴爱好者反推（IV 级价格 80、唯一效果 +60% 伤害）约 0.3
+	"in_puddle": {"kind": "state", "e": 0.3, "timing": 1.0, "gate": "none", "w": 0.5},
 }
 
 # 实验性扳机（低权重）
@@ -181,6 +184,13 @@ const CONDS = {
 	"crit": {"on": ["kill"], "f": 0.5, "w": 0.7},
 	"burning": {"on": ["kill"], "f": 0.3, "w": 0.3},
 	"cursed": {"on": ["kill"], "f": 0.25, "w": 0.05},
+	# 进化敌人（机械或异变，史前惧兽；照明弹、放热反应）：敌人进化成玩家所在的一边，与路线无关；只在启用史前惧兽时出现。
+	# 满足率按照明弹反推（每击杀一个进化敌人 +1 材料）约 0.15
+	"evolved": {"on": ["kill", "hit_enemy"], "f": 0.15, "w": 0.15},
+	# 机械 / 异变敌人：单边条件（见 SIDE_CONDS），只在同路线的路线道具上、或本局角色锁定了该路线时出现；
+	# 路线道具只在进化值超过 ±2 时出现，此时进化敌人都在玩家这一边，满足率同"进化敌人"
+	"meca": {"on": ["kill", "hit_enemy"], "f": 0.15, "w": 0.15},
+	"mutant": {"on": ["kill", "hit_enemy"], "f": 0.15, "w": 0.15},
 	"dmg_type": {"on": ["kill", "first_hit", "hit_enemy"], "f": 1.0, "w": 0.3},
 	"enemy_hp_above": {"on": ["hit_enemy"], "args": {50: 0.75, 75: 0.6, 90: 0.5}, "w": 0.5},
 	"enemy_hp_below": {"on": ["hit_enemy"], "args": {50: 0.35}, "w": 0.2},
@@ -199,6 +209,8 @@ const COND_PAYLOAD_EXCLUDED = {"full_hp": ["heal"]}
 # 机制条件与扳机合写成一句的文本（其余机制条件写成后缀 AA_C_X）
 const COND_TEXT = {
 	"kill/crit": "AA_T_CRIT_KILL", "kill/burning": "AA_T_BURNING_KILL", "kill/cursed": "AA_T_CURSED_KILL",
+	"kill/evolved": "AA_T_EVOLVED_KILL", "hit_enemy/evolved": "AA_T_HIT_EVOLVED",
+	"kill/meca": "AA_T_MECA_KILL", "hit_enemy/meca": "AA_T_HIT_MECA", "kill/mutant": "AA_T_MUTANT_KILL", "hit_enemy/mutant": "AA_T_HIT_MUTANT",
 	"kill/dmg_type": "AA_T_KILL_TYPED", "first_hit/dmg_type": "AA_T_FIRST_HIT_TYPED", "hit_enemy/dmg_type": "AA_T_HIT_TYPED",
 	"hit_enemy/enemy_hp_above": "AA_T_HIT_ABOVE", "hit_enemy/enemy_hp_below": "AA_T_HIT_BELOW",
 }
@@ -227,6 +239,12 @@ const IGNITE_TICKS = 3
 const SLOW_W = 0.017
 const SLOW_MAX = 10
 const FRUIT_W = 2.0
+# 时间变慢（怀表 / 时间扭曲者）：敌人与敌方投射物减速 X%，持续 N 秒；同时只取最强的一次（原版 slow_enemy_time）。
+# 价值 = 每 1% × 每秒 × 每波被减速的秒数（不超过波长）：怀表（III 级价格 60，每波一次 75% × 5 秒）反推每 %·秒约 0.07
+const SLOW_TIME_W = 0.07
+const SLOW_TIME_STEP = 10
+const SLOW_TIME_MAX = 75
+const SLOW_TIME_SECONDS = [2, 3, 4, 5]
 # 击杀被诅咒的敌人：带这个扳机的道具附带原版黑旗式的 +X 诅咒（不计价值；诅咒让被诅咒的敌人出现）
 const CURSED_KILL_CURSE = 5
 
@@ -260,6 +278,8 @@ const PAYLOADS = {
 	"ignite": {"w": 0.4},
 	# 降低该敌人速度 X%，最多 4X%（丑牙）
 	"slow": {"w": 0.4},
+	# 敌人与敌方投射物减速 X%，持续 N 秒（怀表 / 时间扭曲者）
+	"slow_time": {"w": 0.3},
 	# 掉落 X 个水果（果篮）
 	"fruit": {"w": 0.2},
 }
@@ -269,23 +289,24 @@ const PAYLOADS = {
 # 拾取材料可以挂材料（直接加到材料数，不生成掉落物，不会循环；原版金属探测器）；波末 / 波初没有敌人和伤害意义的载荷被排除。
 const LEGAL = {
 	"kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "fruit"],
-	"hit": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode"],
-	"dodge": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode"],
-	"consumable": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats"],
+	"hit": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "slow_time"],
+	"dodge": ["temp_stat", "timed_stat", "heal", "gold", "damage", "explode", "slow_time"],
+	"consumable": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "rand_stats", "slow_time"],
 	"gold": ["temp_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode"],
 	"heal": ["temp_stat", "timed_stat", "gold", "damage", "explode"],
-	"level_up": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "damage", "explode", "rand_stats"],
+	"level_up": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "damage", "explode", "rand_stats", "slow_time"],
 	# 每波开始时"本波 +X 属性 / 本波获得"= 整波持有，与直接写在道具上无异：不生成
 	"wave_start": ["perm_stat", "gold", "rand_stats"],
 	"wave_end": ["perm_stat", "gold", "xp", "rand_stats"],
-	"interval": ["temp_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode"],
+	"interval": ["temp_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "slow_time"],
 	"still": ["temp_stat"],
+	"in_puddle": ["temp_stat"],
 	"moving": ["temp_stat"],
 	"low_hp": ["temp_stat"],
 	"full_hp": ["temp_stat"],
 	"reroll": ["perm_stat", "gold", "rand_stats"],
 	"steps": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "rand_stats"],
-	"half_wave": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "rand_stats"],
+	"half_wave": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "rand_stats", "slow_time"],
 	"crate": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "rand_stats"],
 	"explode": ["temp_stat", "timed_stat", "heal", "gold", "damage"],
 	"crit": ["temp_stat", "timed_stat", "heal", "gold", "damage", "vuln", "hp_dmg", "ignite", "slow", "fruit"],
@@ -304,22 +325,23 @@ const LEGAL = {
 # ============================================================
 const FREE_LEGAL = {
 	"kill": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "fruit"],
-	"hit": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
-	"dodge": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
-	"consumable": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
+	"hit": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "slow_time"],
+	"dodge": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "slow_time"],
+	"consumable": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "slow_time"],
 	"gold": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
 	"heal": ["temp_stat", "perm_stat", "timed_stat", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
-	"level_up": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "damage", "explode", "grant", "rand_stats"],
+	"level_up": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "damage", "explode", "grant", "rand_stats", "slow_time"],
 	"wave_start": ["perm_stat", "timed_stat", "gold", "xp", "grant", "rand_stats"],
 	"wave_end": ["perm_stat", "gold", "xp", "grant", "rand_stats"],
-	"interval": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
+	"interval": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "slow_time"],
 	"still": ["temp_stat", "grant"],
+	"in_puddle": ["temp_stat", "grant"],
 	"moving": ["temp_stat", "grant"],
 	"low_hp": ["temp_stat", "grant"],
 	"full_hp": ["temp_stat", "grant"],
 	"reroll": ["perm_stat", "gold", "grant", "rand_stats"],
 	"steps": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
-	"half_wave": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
+	"half_wave": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats", "slow_time"],
 	"crate": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "explode", "grant", "rand_stats"],
 	# 爆炸不挂爆炸（自激循环）；暴击不挂爆炸（爆炸可以暴击，形成循环）
 	"explode": ["temp_stat", "perm_stat", "timed_stat", "heal", "gold", "xp", "damage", "grant", "rand_stats"],
@@ -394,6 +416,12 @@ const NATIVE_TRIGGER_MAP = {
 	"gain_stat_for_equipped_item_with_stat": ["buy_stat", "perm_stat"],
 	# 冰块：首次被元素伤害命中时受伤加成（只认道具来源；潜水员的同类效果是角色身份）
 	"enemy_percent_damage_taken": ["first_hit", "vuln", "dmg_type"],
+	# 史前惧兽：泥巴爱好者（站在水坑里）、照明弹 / 放热反应（击杀进化敌人时材料 / 爆炸）、怀表（低血受伤时时间变慢，每波一次）
+	"temp_stats_while_being_in_puddle": ["in_puddle", "temp_stat"],
+	"material_on_evolved_enemy_kill": ["kill", "gold", "evolved"],
+	"heal_on_mutant_kill": ["kill", "heal", "mutant"],
+	"explode_on_evolved_death": ["kill", "explode", "evolved"],
+	"slow_time_when_below_hp": ["hit", "slow_time", "low_hp"],
 }
 # 原版先验在组合权重中的强度
 const NATIVE_PRIOR_STRENGTH = 0.6
@@ -444,6 +472,9 @@ const PATH_MECHANICS = {
 # 只对一边有意义的效果（机械敌人、拆卸 / 异变敌人、异变本身）：-> 路线（1 机械 / -1 异变）。
 # 道具是开局固定的，玩家走哪条路线要到局中才知道：这些效果只出现在同路线的路线道具上，
 # 或者本局有角色锁定了路线（机械土豆只能机械、变异体只能异变、疯狂科学家双路线）时出现在普通道具上
+const SIDE_CONDS = {"meca": 1, "mutant": -1}
+# 路线道具的"路线行"取触发条款（带本路线的敌人条件）而不是路线机制的概率
+const PATH_CLAUSE_CHANCE = 0.5
 const SIDE_MECHANICS = {
 	"slow_meca_on_hit": 1, "dismantle_price": 1,
 	"heal_on_mutant_kill": -1, "mutation_fruit_chance": -1, "mutate_into_better_tier_chance": -1, "effect_mutate_end_of_wave": -1,
@@ -574,7 +605,7 @@ const ADJ_BY_TRIGGER = {
 	"wave_end": ["AA_ADJ_PATIENT", "AA_ADJ_DUSK"], "interval": ["AA_ADJ_TICKING", "AA_ADJ_RHYTHMIC"],
 	"still": ["AA_ADJ_ROOTED", "AA_ADJ_CALM"], "moving": ["AA_ADJ_RESTLESS", "AA_ADJ_WANDERING"],
 	"low_hp": ["AA_ADJ_DESPERATE", "AA_ADJ_CORNERED"], "full_hp": ["AA_ADJ_PROUD", "AA_ADJ_PRISTINE"],
-	"reroll": ["AA_ADJ_FICKLE", "AA_ADJ_GAMBLING"],
+	"reroll": ["AA_ADJ_FICKLE", "AA_ADJ_GAMBLING"], "in_puddle": ["AA_ADJ_ROOTED", "AA_ADJ_VERDANT"],
 	"crate": ["AA_ADJ_GREEDY", "AA_ADJ_CURIOUS"], "explode": ["AA_ADJ_BLAZING", "AA_ADJ_FIERCE"],
 	"crit": ["AA_ADJ_DEADLY", "AA_ADJ_KEEN"], "ignite": ["AA_ADJ_BLAZING", "AA_ADJ_SCORCHING"],
 	"first_hit": ["AA_ADJ_EAGER", "AA_ADJ_KEEN"], "hit_enemy": ["AA_ADJ_FIERCE", "AA_ADJ_KEEN"],
@@ -583,7 +614,8 @@ const ADJ_BY_TRIGGER = {
 # 带机制条件时按条件取形容词
 const ADJ_BY_COND = {
 	"crit": ["AA_ADJ_DEADLY", "AA_ADJ_EXECUTING"], "burning": ["AA_ADJ_BLAZING", "AA_ADJ_SCORCHING"],
-	"cursed": ["AA_ADJ_HUNTING", "AA_ADJ_DEADLY"], "dmg_type": ["AA_ADJ_FIERCE", "AA_ADJ_KEEN"],
+	"cursed": ["AA_ADJ_HUNTING", "AA_ADJ_DEADLY"], "evolved": ["AA_ADJ_HUNTING", "AA_ADJ_PREDATORY"],
+	"meca": ["AA_ADJ_MECHANICAL", "AA_ADJ_HUNTING"], "mutant": ["AA_ADJ_HUNTING", "AA_ADJ_PREDATORY"], "dmg_type": ["AA_ADJ_FIERCE", "AA_ADJ_KEEN"],
 	"enemy_hp_above": ["AA_ADJ_PREDATORY", "AA_ADJ_EAGER"], "enemy_hp_below": ["AA_ADJ_EXECUTING", "AA_ADJ_DEADLY"],
 	"still": ["AA_ADJ_ROOTED", "AA_ADJ_CALM"], "moving": ["AA_ADJ_RESTLESS", "AA_ADJ_WANDERING"],
 	"low_hp": ["AA_ADJ_DESPERATE", "AA_ADJ_CORNERED"], "full_hp": ["AA_ADJ_PROUD", "AA_ADJ_PRISTINE"],
@@ -712,7 +744,7 @@ const STAT_CATEGORY = {
 	"consumable_heal": "S", "stat_speed": "S",
 	"stat_luck": "E", "stat_harvesting": "E", "xp_gain": "E", "pickup_range": "E",
 }
-const PAYLOAD_CATEGORY = {"heal": "S", "gold": "E", "xp": "E", "damage": "A", "explode": "A", "vuln": "A", "hp_dmg": "A", "ignite": "A", "slow": "S", "fruit": "S"}
+const PAYLOAD_CATEGORY = {"heal": "S", "gold": "E", "xp": "E", "damage": "A", "explode": "A", "vuln": "A", "hp_dmg": "A", "ignite": "A", "slow": "S", "fruit": "S", "slow_time": "S"}
 const CATEGORY_CLASSES = ["AA", "AS", "AE", "A-", "SA", "SS", "SE", "S-", "EA", "ES", "EE", "E-"]
 
 # 原版的非属性词条（角色的"想要词条"会用到）
@@ -1030,7 +1062,8 @@ const BETA_POSITIVE_WEIGHTS = {
 	# 史前惧兽（时间旅行者）：受伤时时间变慢（敌人减速 75%，持续几秒）
 	"time_shift": 0.04,
 }
-const TIME_SHIFT_VALUE = 14.0
+# 受伤时（实际每波约 7 次）75% × 3 秒，按时间变慢的单价估值
+const TIME_SHIFT_VALUE = SLOW_TIME_W * 75.0 * 3.0 * REAL_HITS_PER_WAVE
 # 升级属性 ±X%（船长 / 藤壶；正面已在常规机制池）：每波约 1.3 次升级，每次升级约值 8 材料
 const LEVELS_PER_WAVE = 1.3
 const LEVEL_UPGRADE_VALUE = 8.0

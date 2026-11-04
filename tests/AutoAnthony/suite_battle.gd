@@ -173,6 +173,13 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 	for en in rt.entries[0]:
 		if en.active:
 			seen_state[en.effect.trigger] = true
+	# 站在水坑里（原版酸液 / 汽油水坑的标记）
+	player.acid_in_puddle = true
+	yield(tree.create_timer(0.5), "timeout")
+	for en in rt.entries[0]:
+		if en.active:
+			seen_state[en.effect.trigger] = true
+	player.acid_in_puddle = false
 	# 回血（原版的回血信号）
 	RunData.emit_signal("healing_effect", 3, 0, Keys.empty_hash)
 	yield(_wait_frames(2), "completed")
@@ -412,6 +419,8 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 			var tb = AAEB.find_on(tgt) if tgt != null and is_instance_valid(tgt) else null
 			var vuln_before = tb._vuln_total if tb != null else 0
 			var speed_before = tgt.current_stats.speed if tgt != null and is_instance_valid(tgt) else 0
+			if e.payload == "slow_time":
+				EntityService.stop_enemy_time_slow()
 			rt.execute(e, 0, tgt.global_position if tgt != null and is_instance_valid(tgt) else null, false, null, tgt if tgt != null and is_instance_valid(tgt) else null)
 			# 爆炸由 WeaponService 延迟生成，命中需要几帧
 			# 爆炸由 WeaponService 延迟生成，命中需要几帧；燃烧第一跳约 1 秒
@@ -424,6 +433,12 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 			elif e.payload == "slow":
 				if tgt != null and is_instance_valid(tgt) and (tgt.dead or tgt.current_stats.speed < speed_before):
 					changed = true
+					break
+			elif e.payload == "slow_time":
+				if EntityService.enemy_time_factor < 1.0:
+					changed = true
+				EntityService.stop_enemy_time_slow()
+				if changed:
 					break
 			elif e.payload in ["damage", "explode", "hp_dmg", "ignite"]:
 				if _any_enemy_hurt(main, hp_before):
