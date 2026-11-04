@@ -22,10 +22,11 @@ const STAT_GROUPS = [
 		"item_box_gold", "heal_when_pickup_gold", "burning_cooldown_increase", "hit_protection", "lose_hp_per_second",
 		"bonus_crit_damage", "fire_puddle_size", "time_shift_on_hit",
 	]],
-	# 史前惧兽（DLC2）：进化（正 = 机械、负 = 异变）与相关机制
+	# 史前惧兽（DLC2）：进化（正 = 机械、负 = 异变）与相关机制；最后是进化相关的规则开关（EVOLUTION_RULES）
 	["BE_GRP_EVOLUTION", [
 		"stat_evolution", "enemy_evolution_chance", "mutation_fruit_chance", "mutate_into_better_tier_chance",
 		"meca_parts_on_level_up", "dismantle_price", "material_on_evolved_enemy_kill", "heal_on_mutant_kill",
+		"meca_only", "mutant_only", "dual_evolution", "effect_mutate_end_of_wave",
 	]],
 	["BE_GRP_GAIN", [
 		"gain_stat_max_hp", "gain_stat_hp_regeneration", "gain_stat_lifesteal", "gain_stat_percent_damage",
@@ -47,16 +48,22 @@ const STAT_GROUPS = [
 		"hp_start_next_wave", "dig_sites", "more_horde",
 	]],
 	["BE_GRP_CAPS", ["hp_cap", "speed_cap", "dodge_cap", "crit_chance_cap"]],
+	# 规则开关：填 1 开启
 	["BE_GRP_RULES", [
-		"no_melee_weapons", "no_ranged_weapons", "no_duplicate_weapons", "min_weapon_tier", "max_weapon_tier",
-		"max_melee_weapons", "max_ranged_weapons", "can_attack_while_moving", "one_shot_trees", "double_boss",
+		"no_melee_weapons", "no_ranged_weapons", "no_duplicate_weapons", "one_shot_trees", "double_boss",
 		"structures_can_crit", "instant_gold_attracting", "hp_shop", "no_heal", "pacifist", "torture",
-		"meca_only", "mutant_only", "dual_evolution", "effect_mutate_end_of_wave", "materials_as_health",
-		"damage_taken_on_materials", "no_level_upgrades", "effect_no_weapon_in_shop", "effect_crate_give_weapon",
-		"no_cure_between_wave", "no_fruit_attracted_end_of_wave", "fog_of_war_permanent", "effect_mixing_up_wave",
-		"burning_stacks", "has_plastic_boots", "weapon_set_bonus",
+		"materials_as_health", "damage_taken_on_materials", "no_level_upgrades", "effect_no_weapon_in_shop",
+		"effect_crate_give_weapon", "no_cure_between_wave", "no_fruit_attracted_end_of_wave", "fog_of_war_permanent",
+		"effect_mixing_up_wave", "burning_stacks", "has_plastic_boots",
+	]],
+	# 特殊规则：规则类、但数值不是开关（稀有度 / 件数 / 设定值）
+	["BE_GRP_SPECIAL_RULES", [
+		"min_weapon_tier", "max_weapon_tier", "max_melee_weapons", "max_ranged_weapons", "can_attack_while_moving",
+		"weapon_set_bonus",
 	]],
 ]
+# 规则（蓝图不可用）：规则 / 特殊规则分组的全部，以及进化分组里的规则开关
+const EVOLUTION_RULES = ["meca_only", "mutant_only", "dual_evolution", "effect_mutate_end_of_wave"]
 
 # 扳机（蓝图编辑器）：[custom_key, 名称 key]。"" = 永久属性（无扳机）。
 # 只列出"属性 = key、数值 = value"的扳机；模板在原版效果里找不到的扳机不会出现在列表里。
@@ -67,6 +74,7 @@ const TRIGGERS = [
 	["stats_next_wave", "BE_TRIG_NEXT_WAVE"],
 	["temp_stats_while_not_moving", "BE_TRIG_STILL"],
 	["temp_stats_while_moving", "BE_TRIG_MOVING"],
+	["temp_stats_while_being_in_puddle", "BE_TRIG_PUDDLE"],
 	["stats_below_half_health", "BE_TRIG_LOW_HP"],
 	["temp_stats_on_hit", "BE_TRIG_HIT"],
 	["temp_stats_on_dodge", "BE_TRIG_DODGE"],
@@ -141,8 +149,10 @@ static func scaling_keys() -> Array:
 static func graph_stat_keys() -> Array:
 	var out = []
 	for g in STAT_GROUPS:
-		if g[0] != "BE_GRP_RULES":
-			out += g[1]
+		if not g[0] in ["BE_GRP_RULES", "BE_GRP_SPECIAL_RULES"]:
+			for k in g[1]:
+				if not k in EVOLUTION_RULES:
+					out.push_back(k)
 	return out
 
 
@@ -307,16 +317,32 @@ const PET_KEYS = ["beast_master_effect"]
 const SUB_HIDDEN = ["sound_db_mod", "is_healing"]
 
 
-# 效果里可在详细信息里编辑的子资源字段：带脚本的 Resource（燃烧数据、武器属性等；效果、场景、音效除外）
-static func sub_fields(e) -> Array:
+# 效果里可在详细信息里编辑的子资源字段：带脚本的 Resource（燃烧数据、武器属性等；场景、音效除外）。
+# 子资源是效果时（撬棍生成的炮塔）列出它的子资源，字段名为 "效果字段.子资源字段"（只展开一层）
+static func sub_fields(e, nested: bool = true) -> Array:
 	var out = []
 	for p in e.get_property_list():
 		if not p.usage & PROPERTY_USAGE_SCRIPT_VARIABLE or not p.usage & PROPERTY_USAGE_STORAGE or p.type != TYPE_OBJECT:
 			continue
 		var r = e.get(p.name)
-		if r is Resource and r.get_script() != null and not "key_hash" in r and (not sub_child_fields(r).empty() or "scaling_stats" in r):
+		if not r is Resource or r.get_script() == null:
+			continue
+		if "key_hash" in r:
+			if nested:
+				for f in sub_fields(r, false):
+					out.push_back(p.name + "." + f)
+		elif not sub_child_fields(r).empty() or "scaling_stats" in r:
 			out.push_back(p.name)
 	return out
+
+
+# 按 sub_fields 的字段名取子资源
+static func sub_get(e, field: String):
+	for part in field.split("."):
+		if e == null or not part in e:
+			return null
+		e = e.get(part)
+	return e
 
 
 # 子资源的标量字段
@@ -332,6 +358,12 @@ static func sub_child_fields(r) -> Array:
 	return out
 
 
+# 字段的编辑值：Vector2 取 x（等比缩放）
+static func field_value(obj, name: String):
+	var v = obj.get(name)
+	return v.x if v is Vector2 else v
+
+
 static func editable_fields(e) -> Array:
 	var out = []
 	for p in e.get_property_list():
@@ -341,6 +373,9 @@ static func editable_fields(e) -> Array:
 			continue
 		if p.type in [TYPE_INT, TYPE_REAL, TYPE_BOOL, TYPE_STRING] or (p.type == TYPE_ARRAY and p.name in ARRAY_FIELDS):
 			out.push_back({"name": p.name, "type": p.type})
+		elif p.type == TYPE_VECTOR2:
+			# 二维缩放（火焰池大小等）按等比的一个数编辑
+			out.push_back({"name": p.name, "type": TYPE_REAL})
 	# key / value 放最前，文本 / 好坏 / 计算方式放最后
 	out.sort_custom(FieldSorter, "by_field")
 	return out
@@ -411,6 +446,7 @@ const NODES = [
 	["moving", "trigger", []],
 	["low_hp", "trigger", [["pct", "int", 50]]],
 	["full_hp", "trigger", []],
+	["in_puddle", "trigger", []],
 	["always", "trigger", []],
 	["tick", "trigger", []],
 	["chance", "cond", [["pct", "int", 25]]],
@@ -480,7 +516,7 @@ const NODE_DETAILS = {
 }
 # 只在某个参数取某值时显示的参数：[节点, 参数] -> [条件参数, 值]
 const PARAM_SHOW_IF = {"grant:secs": ["mode", "timed"]}
-const STATE_TRIGGERS = ["still", "moving", "low_hp", "full_hp", "always"]
+const STATE_TRIGGERS = ["still", "moving", "low_hp", "full_hp", "in_puddle", "always"]
 # 状态条件：在状态扳机的路径上持续检查（全部满足时进入，任一不满足时撤销）；其余条件只在进入时检查一次
 const STATE_CONDS = ["hp_below", "hp_above", "wave_min", "wave_max", "diff_min", "diff_max", "stat_min", "stat_max", "if_moving", "if_still", "own_tag", "own_set", "own_item", "weapon_kinds", "var_cmp", "evo_camp"]
 # 不在敌袭中触发的扳机（商店、波次结束后的异变、升级界面的机械化）
@@ -491,15 +527,22 @@ const SPLIT_ANY_SCRIPT = ["gain_stat_for_every_step_after_equip", "charm_on_hit"
 
 
 # 由 graph_effect._special_chain 拆解的原版效果（狩猎奖杯、肾上腺素、反击、巫妖、赛博球、小象、医疗箱……）
-const SPLIT_SPECIAL = ["charm_on_hit", "gold_on_crit_kill", "heal_on_dodge", "dmg_on_dodge", "dmg_when_heal", "dmg_when_death", "dmg_when_pickup_gold", "temp_stats_per_interval"]
+const SPLIT_SPECIAL = ["charm_on_hit", "gold_on_crit_kill", "heal_on_dodge", "dmg_on_dodge", "dmg_when_heal", "dmg_when_death", "dmg_when_pickup_gold", "temp_stats_per_interval", "enemy_percent_damage_taken"]
+# 同上，按 key 识别（没有 custom_key 的史前惧兽效果：病毒、干扰背包、怀表）
+const SPLIT_SPECIAL_KEYS = ["charm_evolved_on_hit", "slow_meca_on_hit", "slow_time_when_below_hp"]
 
 
 static func can_split(e) -> bool:
 	if e == null or not "custom_key" in e:
 		return false
+	if e.custom_key == "" and e.key in SPLIT_SPECIAL_KEYS:
+		return true
 	if e.custom_key in SPLIT_SPECIAL:
 		# 造成伤害的效果需要缩放属性；受击后重置的间隔效果不拆
 		if e.custom_key.begins_with("dmg_") and e.key == "":
+			return false
+		# 同 custom_key 的炮塔命中效果（血腥炮塔）没有几率与持续时间
+		if e.custom_key == "enemy_percent_damage_taken" and not ("chance" in e and "duration_secs" in e):
 			return false
 		return not ("reset_on_hit" in e and e.reset_on_hit)
 	return NATIVE_SPLIT.has(e.custom_key) and (is_plain_effect(e) or e.custom_key in SPLIT_ANY_SCRIPT)
@@ -515,6 +558,7 @@ const NATIVE_SPLIT = {
 	"stats_next_wave": ["wave_start", [["once", {}]], "temp_stat"],
 	"temp_stats_while_not_moving": ["still", [], "temp_stat"],
 	"temp_stats_while_moving": ["moving", [], "temp_stat"],
+	"temp_stats_while_being_in_puddle": ["in_puddle", [], "temp_stat"],
 	"stats_below_half_health": ["low_hp", [], "temp_stat"],
 	"gain_stats_on_reroll": ["reroll", [], "perm_stat"],
 	"stats_on_fruit": ["consumable", [], "perm_stat"],
@@ -589,8 +633,8 @@ const STAT_ICON_PATHS = {
 	"burning_cooldown_reduction": ["item_campfire"],
 	"burning_cooldown_increase": ["item_frozen_heart"],
 	"structure_attack_speed": ["item_improved_tools"],
-	"structure_percent_damage": ["item_heavy_bullets"],
-	"structure_range": ["weapon_wrench_1"],
+	"structure_percent_damage": ["character_builder"],
+	"structure_range": ["item_rusty_antenna", "character_builder"],
 	"accuracy": ["item_eyepatch"],
 	"weapon_slot": ["weapon_pistol_1"],
 	"minimum_weapons_in_shop": ["weapon_pistol_1"],
@@ -652,6 +696,27 @@ const STAT_ICON_PATHS = {
 	"fog_of_war_permanent": ["character_caveman"],
 	"no_cure_between_wave": ["character_veteran"],
 	"no_fruit_attracted_end_of_wave": ["character_veteran"],
+	# 其余次要属性与规则：带有它的原版角色 / 道具 / 武器
+	"harvesting_growth": ["character_farmer", "item_crown"],
+	"fire_puddle_size": ["weapon_molotov_1"],
+	"time_shift_on_hit": ["character_time_shifter"],
+	"weapons_price": ["character_arms_dealer"],
+	"no_melee_weapons": ["character_ranger"],
+	"no_ranged_weapons": ["character_gladiator"],
+	"no_duplicate_weapons": ["character_vagabond"],
+	"one_shot_trees": ["item_lumberjack_shirt"],
+	"double_boss": ["res://ui/icons/misc/elite_icon.png"],
+	"structures_can_crit": ["item_pile_of_books"],
+	"instant_gold_attracting": ["item_baby_gecko"],
+	"hp_shop": ["character_demon"],
+	"no_heal": ["character_golem"],
+	"pacifist": ["character_pacifist"],
+	"torture": ["item_torture"],
+	"min_weapon_tier": ["character_knight"],
+	"max_weapon_tier": ["character_wildling"],
+	"max_melee_weapons": ["character_generalist"],
+	"max_ranged_weapons": ["character_generalist"],
+	"can_attack_while_moving": ["character_soldier"],
 }
 
 

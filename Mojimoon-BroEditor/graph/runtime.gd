@@ -927,6 +927,9 @@ func _state_holds(n: Dictionary, pl) -> bool:
 			return pl.current_stats.health < pl.max_stats.health * float(_param(n, "pct", 50)) / 100.0
 		"full_hp":
 			return pl.current_stats.health >= pl.max_stats.health
+		"in_puddle":
+			# 站在汽油 / 酸液泥潭里（史前惧兽，同泥巴爱好者）
+			return ("petrol_in_puddle" in pl and pl.petrol_in_puddle) or ("acid_in_puddle" in pl and pl.acid_in_puddle)
 		"always":
 			return true
 	return false

@@ -2767,7 +2767,7 @@ func _build_stat_tables(col: Control, v: Dictionary) -> void:
 				table.add_child(_label(tr(k.substr(1)), FONT_SMALL, C_ACCENT_3))
 			else:
 				table.add_child(_stat_row(k, v) if k != "" else Control.new())
-	for g in ["BE_GRP_SHOP", "BE_GRP_MAP", "BE_GRP_EVOLUTION", "BE_GRP_RULES"]:
+	for g in ["BE_GRP_SHOP", "BE_GRP_MAP", "BE_GRP_EVOLUTION", "BE_GRP_RULES", "BE_GRP_SPECIAL_RULES"]:
 		# 进化（史前惧兽）：没有这个 DLC 时不显示
 		if g == "BE_GRP_EVOLUTION" and not ProgressData.is_dlc_available("primal_dread"):
 			continue
@@ -3372,7 +3372,7 @@ func _effect_field_rows(grid: GridContainer, e, method: String, binds: Array) ->
 		if lbl_text == name_key:
 			lbl_text = f.name
 		grid.add_child(_field_label(lbl_text, f.name))
-		var cur = e.get(f.name)
+		var cur = Catalog.field_value(e, f.name)
 		var fb = binds + [f.name]
 		var special = field_control(f.name, cur, self, method, fb)
 		if special != null:
@@ -3972,16 +3972,20 @@ func _build_bans() -> void:
 	_fill_bans()
 
 
-# 属性禁用：升级时不出现的属性（原版 banned_upgrades）、机械化选项里不出现的属性（史前惧兽，banned_meca_stats）
+# 属性禁用：升级时不出现的属性（原版 banned_upgrades）、机械化选项里不出现的属性（史前惧兽，banned_meca_stats）。
+# 两份列表左右并排，小图标按钮（同属性页的紧凑行），不挤占上面的道具 / 武器列表
 func _build_stat_bans() -> void:
-	var card = _card(_page)
-	var box = VBoxContainer.new()
-	box.add_constant_override("separation", 6)
-	card.add_child(box)
+	var cols = HBoxContainer.new()
+	cols.add_constant_override("separation", 12)
+	_page.add_child(cols)
 	for entry in [["ban_upgrades", "banned_upgrades", "BE_BAN_UPGRADES", _mod.upgrade_ban_options()], ["ban_meca", "banned_meca_stats", "BE_BAN_MECA", _mod.meca_ban_options()]]:
 		var opts: Array = entry[3]
 		if opts.empty():
 			continue
+		var card = _card(cols)
+		var box = VBoxContainer.new()
+		box.add_constant_override("separation", 6)
+		card.add_child(box)
 		var cur = _stat_ban_list(entry[0], entry[1])
 		var row = HBoxContainer.new()
 		box.add_child(row)
@@ -3993,16 +3997,17 @@ func _build_stat_bans() -> void:
 		clear.connect("pressed", self, "_on_stat_ban_set", [entry[0], entry[1], []])
 		row.add_child(clear)
 		var grid = GridContainer.new()
-		grid.columns = 6
-		grid.add_constant_override("hseparation", 6)
-		grid.add_constant_override("vseparation", 6)
+		grid.columns = 3
+		grid.add_constant_override("hseparation", 4)
+		grid.add_constant_override("vseparation", 4)
 		box.add_child(grid)
 		for o in opts:
 			var id = o[0] if o is Array else o
 			var stat = o[1] if o is Array else o
 			var c = _chip(stat_name(stat), id, id in cur, C_DANGER)
 			c.icon = _stat_icon(stat)
-			c.expand_icon = false
+			c.expand_icon = true
+			c.align = Button.ALIGN_LEFT
 			c.connect("pressed", self, "_on_stat_ban_toggle", [entry[0], entry[1], id])
 			grid.add_child(c)
 
@@ -4619,6 +4624,8 @@ func _scroll() -> ScrollContainer:
 	s.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	s.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	s.scroll_horizontal_enabled = false
+	# 加宽滚动条：悬停预览时滚轮滚动的是原版物品详情（原版行为），拖动滚动条更容易滚动列表
+	s.get_v_scrollbar().rect_min_size.x = 16
 	return s
 
 

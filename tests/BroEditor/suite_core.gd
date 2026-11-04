@@ -2430,3 +2430,115 @@ func test_305_other_mods_content() -> void:
 	isvc.items.erase(b)
 	isvc.invalidate_items_cache()
 	_check(not b in isvc.items, "directly removed content stays removed")
+
+
+# 属性分组：特殊规则单独分组，进化相关规则在进化分组；蓝图不可用规则；次要属性与规则的来源图标
+func test_306_stat_groups_and_icons() -> void:
+	var Catalog = load(MOD_DIR + "catalog.gd")
+	var groups = {}
+	for g in Catalog.STAT_GROUPS:
+		groups[g[0]] = g[1]
+	for k in ["min_weapon_tier", "max_weapon_tier", "max_melee_weapons", "max_ranged_weapons", "can_attack_while_moving", "weapon_set_bonus"]:
+		_check(k in groups.BE_GRP_SPECIAL_RULES and not k in groups.BE_GRP_RULES, k + " is a special rule")
+		_check(not k in Catalog.graph_stat_keys(), k + " not a blueprint stat")
+	for k in Catalog.EVOLUTION_RULES:
+		_check(k in groups.BE_GRP_EVOLUTION and not k in groups.BE_GRP_RULES, k + " in evolution")
+		_check(not k in Catalog.graph_stat_keys(), k + " not a blueprint stat")
+	_check("stat_evolution" in Catalog.graph_stat_keys(), "evolution still a blueprint stat")
+	var seen = {}
+	for k in Catalog.stat_keys():
+		_check(not seen.has(k), k + " listed once")
+		seen[k] = true
+	_eq(Catalog.STAT_ICON_PATHS.structure_range, ["item_rusty_antenna", "character_builder"], "structure range icon")
+	_eq(Catalog.STAT_ICON_PATHS.structure_percent_damage, ["character_builder"], "structure damage icon")
+	var ui = yield(_open_ui(CH), "completed")
+	for k in ["time_shift_on_hit", "min_weapon_tier", "max_weapon_tier", "harvesting_growth", "weapons_price", "no_heal", "torture", "fire_puddle_size", "can_attack_while_moving"]:
+		_check(ui._stat_icon(k) != null, k + " has an icon")
+	_eq(ui._stat_icon("structure_range"), m._find_any("item_rusty_antenna").icon, "rusty antenna icon")
+	# 过长的原版名称换成本模组的短名称
+	for k in ["fog_of_war_permanent", "effect_mixing_up_wave", "more_horde"]:
+		_check(m.stat_name(k) == tr("BE_K_" + k.to_upper()) and m.stat_name(k).length() < 30, k + " short name")
+	# 禁用页：属性禁用不再占满页面，道具 / 武器列表有高度
+	ui._on_tab_pressed("bans")
+	for i in 3:
+		yield(tree, "idle_frame")
+	for kind in ["items", "weapons"]:
+		_check(ui._ban_grids[kind][0].get_parent().rect_size.y > 150, kind + " ban list visible")
+	ui.queue_free()
+	yield(tree, "idle_frame")
+
+
+# 火焰池（莫洛托夫鸡尾酒）：缩放按一个数编辑；火焰池持续时间与燃烧持续时间分开
+func test_307_fire_puddle_fields() -> void:
+	var Catalog = load(MOD_DIR + "catalog.gd")
+	var idx = -1
+	var effects = m.orig_effects("weapon_molotov_1")
+	for i in effects.size():
+		if "puddle_scale" in effects[i]:
+			idx = i
+	if idx < 0:
+		return
+	var names = []
+	for f in Catalog.editable_fields(effects[idx]):
+		names.push_back(f.name)
+	_check("puddle_scale" in names and "puddle_lifetime" in names, "puddle fields editable")
+	_check(abs(Catalog.field_value(effects[idx], "puddle_scale") - 1.4) < 0.001, "scale read as a number")
+	var e = m.make_effect({"from": "weapon_molotov_1", "i": idx, "set": {"puddle_scale": 2.0, "puddle_lifetime": 6.0}, "sub": {"burning_data": {"duration": 7}}})
+	_eq(e.puddle_scale, Vector2(2, 2), "scale written as Vector2")
+	_eq([e.puddle_lifetime, e.burning_data.duration], [6.0, 7], "puddle and burning durations separate")
+	_eq(effects[idx].burning_data.duration, 4, "template untouched")
+	_check("burning_data" in Catalog.sub_fields(e), "burning data in details")
+
+
+# 撬棍：生成的炮塔的数值（嵌套在子效果里）可以在详细信息里修改
+func test_308_nested_structure_details() -> void:
+	var Catalog = load(MOD_DIR + "catalog.gd")
+	var effects = m.orig_effects("weapon_crowbar_1")
+	if effects.empty():
+		return
+	_check("structure_effect.stats" in Catalog.sub_fields(effects[0]), "crowbar turret stats listed")
+	var orig_dmg = effects[0].structure_effect.stats.damage
+	var e = m.make_effect({"from": "weapon_crowbar_1", "i": 0, "sub": {"structure_effect.stats": {"damage": 99, "scaling_stats": [["stat_engineering", 2.0]]}}})
+	_eq(e.structure_effect.stats.damage, 99, "nested damage applied")
+	_eq(e.structure_effect.stats.scaling_stats.size(), 1, "nested scaling applied")
+	_eq(effects[0].structure_effect.stats.damage, orig_dmg, "template untouched")
+	_check(m.effect_text(e).find("99") >= 0, "text shows new damage")
+	var spec = m._effect_to_spec({"from": "weapon_crowbar_1", "i": 0}, e)
+	_eq(int(spec.sub["structure_effect.stats"].damage), 99, "spec round trip")
+
+
+# 史前惧兽效果拆解：病毒、干扰背包、怀表、臭臭大王花、泥潭爱好者（新状态扳机）
+func test_309_dlc2_splits() -> void:
+	var GE = load(GraphEffectScript)
+	var Catalog = load(MOD_DIR + "catalog.gd")
+	var cases = [
+		["item_virus", "charm_evolved_on_hit", ["enemy_hit", "target_evolved", "enemy_hp_below", "chance", "charm"]],
+		["item_jamming_backpack", "slow_meca_on_hit", ["enemy_hit", "target_evolved", "slow"]],
+		["item_pocket_watch", "slow_time_when_below_hp", ["hit", "hp_below", "cap", "slow_time"]],
+		["item_smelly_rafflesia", "enemy_percent_damage_taken", ["enemy_hit", "chance", "vuln"]],
+		["item_mud_lover", "temp_stats_while_being_in_puddle", ["in_puddle", "temp_stat"]],
+	]
+	for c in cases:
+		var e = null
+		for x in m.orig_effects(c[0]):
+			if x.custom_key == c[1] or (x.custom_key == "" and x.key == c[1]):
+				e = x
+		if e == null:
+			continue
+		_check(Catalog.can_split(e), c[0] + " splittable")
+		var g = GE.new_graph()
+		GE.split_native(g, e, Vector2.ZERO)
+		var kinds = []
+		for n in g.nodes:
+			kinds.push_back(n.kind)
+		_eq(kinds, c[2], c[0] + " nodes")
+		_eq(g.links.size(), c[2].size() - 1, c[0] + " linked")
+		_check(GE.graph_text(g, false) != "", c[0] + " has text")
+	_check("in_puddle" in Catalog.STATE_TRIGGERS, "puddle is a state trigger")
+	var s = GDScript.new()
+	s.source_code = "extends Reference\nvar petrol_in_puddle = false\nvar acid_in_puddle = true\n"
+	s.reload()
+	var pl = s.new()
+	_check(m.runtime._state_holds({"kind": "in_puddle", "params": {}}, pl), "in puddle holds")
+	pl.acid_in_puddle = false
+	_check(not m.runtime._state_holds({"kind": "in_puddle", "params": {}}, pl), "out of puddle")

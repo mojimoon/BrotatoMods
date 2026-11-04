@@ -568,7 +568,20 @@ static func remove_node(g: Dictionary, id: int) -> void:
 # 结构不是"key = 属性、value = 数值"的原版扳机效果：直接给出节点链 [[类型, 参数]...]；不认识的返回 []
 static func _special_chain(e) -> Array:
 	var chance = [["chance", {"pct": int(e.chance)}]] if "chance" in e and int(e.chance) < 100 else []
+	match e.key if e.custom_key == "" else "":
+		"charm_evolved_on_hit":
+			# 病毒：命中进化敌人 → 敌人生命低于 value2% → value% 几率魅惑
+			return [["enemy_hit", {}], ["target_evolved", {"camp": "any"}], ["enemy_hp_below", {"pct": int(e.value2)}], ["chance", {"pct": int(e.value)}], ["charm", {}]]
+		"slow_meca_on_hit":
+			# 干扰背包：命中机械敌人 → 减速 value% value2 秒
+			return [["enemy_hit", {}], ["target_evolved", {"camp": "meca"}], ["slow", {"pct": int(e.value), "secs": int(e.value2)}]]
+		"slow_time_when_below_hp":
+			# 怀表：受伤后生命低于 hp_threshold%（每波一次）→ 减缓时间 value% duration_secs 秒
+			return [["hit", {}], ["hp_below", {"pct": int(e.hp_threshold)}], ["cap", {"n": 1}], ["slow_time", {"pct": int(e.value), "secs": int(round(e.duration_secs))}]]
 	match e.custom_key:
+		"enemy_percent_damage_taken":
+			# 臭臭大王花：命中敌人 → chance% 几率 → 敌人受到的伤害 +value%，持续 duration_secs 秒
+			return [["enemy_hit", {}], ["chance", {"pct": int(e.chance)}], ["vuln", {"pct": int(e.value), "secs": int(e.duration_secs)}]]
 		"charm_on_hit":
 			# 魅惑（浪漫之人 / 长笛）：命中敌人 → 敌人生命低于 value2% → 几率（浪漫之人按属性缩放）→ 魅惑
 			var ch = ["stat_chance", {"stat": e.key, "pct": int(e.value)}] if e.key != "" else ["chance", {"pct": int(e.value)}]

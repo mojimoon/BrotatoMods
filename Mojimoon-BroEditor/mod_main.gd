@@ -1648,9 +1648,17 @@ func make_effect(spec: Dictionary):
 	var subs = spec.get("sub", {})
 	if subs is Dictionary:
 		for f in subs:
-			var r = e.get(f) if f in e else null
+			var r = Catalog.sub_get(e, f)
 			if not r is Resource or not subs[f] is Dictionary:
 				continue
+			# 嵌套在子效果里的（"效果字段.子资源字段"）：先复制外层效果
+			var owner = e
+			var field = f
+			if f.find(".") >= 0:
+				var outer = f.get_slice(".", 0)
+				field = f.get_slice(".", 1)
+				owner = e.get(outer).duplicate()
+				e.set(outer, owner)
 			r = r.duplicate()
 			var vals = subs[f].duplicate()
 			if vals.get("scaling_stats") is Array and "scaling_stats" in r:
@@ -1661,7 +1669,7 @@ func make_effect(spec: Dictionary):
 				r.scaling_stats = Utils.convert_to_hash_array(sc)
 			vals.erase("scaling_stats")
 			_set_typed(r, vals)
-			e.set(f, r)
+			owner.set(field, r)
 	e._generate_hashes()
 	return e
 
@@ -1683,6 +1691,8 @@ static func _set_typed(obj, sets) -> void:
 				obj.set(k, bool(sets[k]))
 			TYPE_STRING:
 				obj.set(k, str(sets[k]))
+			TYPE_VECTOR2:
+				obj.set(k, Vector2(float(sets[k]), float(sets[k])))
 			TYPE_ARRAY:
 				if sets[k] is Array:
 					var arr = []
@@ -1709,7 +1719,11 @@ func stat_text_key(key: String) -> String:
 # 原版标签含义不清（NUMBER_OF_ENEMIES = "敌人"）的 key：用本 mod 的标签
 # item_box_gold：原版标签"箱子里的材料"不如袋子的说法清楚，用本 mod 的标签
 # time_shift_on_hit：原版标签是一句话（"受伤时可以扭曲时间"），数值其实是敌人减速的百分比
-const OWN_LABEL_KEYS = ["number_of_enemies", "item_box_gold", "time_shift_on_hit"]
+# 原版名称过长（整句描述）或带固定数值的 key 也用本模组的名称
+const OWN_LABEL_KEYS = [
+	"number_of_enemies", "item_box_gold", "time_shift_on_hit", "fog_of_war_permanent", "effect_mixing_up_wave", "more_horde",
+	"no_fruit_attracted_end_of_wave", "effect_mutate_end_of_wave", "no_cure_between_wave",
+]
 # 原版效果文本不含数值（"同时仅能装备1种武器"）的 key：不借用该文本
 const NO_LIBRARY_TEXT = ["weapon_slot"]
 const TEXT_FORMAT_LIKE = {"effect_bounce_damage": "effect_piercing_damage"}
@@ -3533,9 +3547,9 @@ func _effect_to_spec(spec: Dictionary, e) -> Dictionary:
 		out["set"] = {}
 	for f in Catalog.editable_fields(e):
 		if f.type in [TYPE_INT, TYPE_REAL]:
-			out.set[f.name] = e.get(f.name)
+			out.set[f.name] = Catalog.field_value(e, f.name)
 	for f in Catalog.sub_fields(e):
-		var r = e.get(f)
+		var r = Catalog.sub_get(e, f)
 		var vals = {}
 		for cf in Catalog.sub_child_fields(r):
 			vals[cf.name] = r.get(cf.name)

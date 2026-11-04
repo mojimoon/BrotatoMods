@@ -90,9 +90,9 @@ func _build() -> void:
 		var box = ui._section(col, "BE_EFFECT_DETAILS_SELF", ui.C_ACCENT)
 		var grid = _grid(box)
 		for f in Catalog.editable_fields(e):
-			_field(grid, f, e.get(f.name), "", "set")
+			_field(grid, f, Catalog.field_value(e, f.name), "", "set")
 	for f in Catalog.sub_fields(e):
-		var r = e.get(f)
+		var r = Catalog.sub_get(e, f)
 		var box = ui._section(col, _field_name(f), ui.C_ACCENT_3)
 		if ui._detail_keys():
 			box.add_child(ui._key_label(f + "  ·  " + (r.get_script().resource_path.get_file() if r.get_script() != null else r.get_class())))
@@ -114,6 +114,12 @@ func _grid(parent: Control) -> GridContainer:
 
 
 func _field_name(name: String) -> String:
+	# 嵌套字段（"效果字段.子资源字段"）：各级名称用 · 连接
+	if name.find(".") >= 0:
+		var parts = []
+		for p in name.split("."):
+			parts.push_back(_field_name(p))
+		return PoolStringArray(parts).join(" · ")
 	for k in ["BE_FIELD_" + name.to_upper(), "BE_WS_" + name.to_upper()]:
 		if ui.tr(k) != k:
 			return ui.tr(k)
