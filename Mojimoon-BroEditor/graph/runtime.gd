@@ -10,7 +10,7 @@ extends Node
 const Catalog = preload("res://mods-unpacked/Mojimoon-BroEditor/catalog.gd")
 const GraphEffect = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/graph_effect.gd")
 const EnemyBehavior = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/enemy_behavior.gd")
-const EXPLOSION_EFFECT_PATH = "res://items/all/rip_and_tear/rip_and_tear_effect_1.tres"
+const EXPLOSION_EFFECT_PATH = "res://items/all/00_base_game/rip_and_tear/rip_and_tear_effect_1.tres"
 const MAX_DEPTH = 24
 
 var mod = null
@@ -227,6 +227,18 @@ func _pass(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> bool:
 			return hp != null and hp < float(_param(n, "pct", 50))
 		"dmg_type":
 			return str(_param(n, "stat", "")) in ctx.info.get("stats", [])
+		"target_evolved":
+			var t = ctx.target
+			if t == null or not is_instance_valid(t) or not "_is_meca" in t:
+				return false
+			match str(_param(n, "camp", "any")):
+				"meca":
+					return t._is_meca
+				"mutant":
+					return t._is_mutant
+			return t._is_meca or t._is_mutant
+		"evo_camp":
+			return _on_camp(p, str(_param(n, "camp", "meca")))
 		"own_tag":
 			var tag = str(_param(n, "tag", ""))
 			var c = 0
@@ -264,6 +276,17 @@ func _pass(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> bool:
 			var tokens = GraphEffect.once_list(p)
 			return tokens != null and GraphEffect.take_once(tokens, en.effect.once_token(int(n.id)))
 	return true
+
+
+# 玩家的进化方向（史前惧兽）：机械 = 进化值为正（或只能机械进化），异变 = 为负（或只能异变）；
+# 双进化（疯狂科学家）进化值不为 0 时两边都算
+func _on_camp(p: int, camp: String) -> bool:
+	var evo = RunData.get_player_effect(Keys.stat_evolution_hash, p)
+	if RunData.is_dual_evolution(p):
+		return evo != 0
+	if camp == "mutant":
+		return RunData.is_mutant_only(p) or (evo < 0 and not RunData.is_meca_only(p))
+	return RunData.is_meca_only(p) or (evo > 0 and not RunData.is_mutant_only(p))
 
 
 # 数量比较：至少 / 至多 / 恰好 n
@@ -370,6 +393,18 @@ func _execute(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> void:
 				mod.set_group_locked(str(_param(n, "group", "")), n.kind == "group_lock")
 		"var_set":
 			_var_set(n, p, v)
+		"meca_parts":
+			if v < 0:
+				RunData.remove_meca_parts(-v, p)
+			else:
+				RunData.add_meca_parts(v, p)
+		"mutate":
+			# 同原版异变果：本波结束时结算（需要史前惧兽启用、进化值为负 / 双进化，见 RunData.mutate_random_item）
+			RunData.players_data[p].pending_mutations += max(0, int(_param(n, "n", 1)))
+		"slow_time":
+			if not wave_over:
+				var pct = clamp(float(_param(n, "pct", 50)), 0.0, 95.0)
+				EntityService.slow_enemy_time(1.0 - pct / 100.0, max(0.1, float(_param(n, "secs", 3))))
 	_sync_lost_max_hp(p, hp_before)
 
 
@@ -468,7 +503,7 @@ func _flush_transforms() -> void:
 
 
 # 魅惑（同浪漫之人：原版魅惑行为，每名玩家最多同时 5 个）；敌人身上没有魅惑行为时补上
-const CHARM_SCENE = "res://dlcs/dlc_1/effect_behaviors/enemy/charm_enemy_effect_behavior.tscn"
+const CHARM_SCENE = "res://effect_behaviors/enemies/charm_enemy_effect_behavior.tscn"
 
 
 func _charm(p: int, target, secs: float = Utils.CHARM_DURATION) -> void:
@@ -505,7 +540,9 @@ func _spawn(n: Dictionary, p: int) -> void:
 	if scene == null:
 		return
 	for _i in clamp(int(_param(n, "n", 1)), 0, 50):
-		main._entity_spawner.spawn_entity_birth(EntityType.ENEMY, scene, ZoneService.get_rand_pos(), null, p)
+		var req = SpawnRequest.new(EntityType.ENEMY, scene, ZoneService.get_rand_pos())
+		req.player_index = p
+		main._entity_spawner.spawn_entity_birth(req)
 
 
 # 损坏：持有者是武器时，这把武器损坏并掉落材料（同原版砖块）

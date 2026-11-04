@@ -52,7 +52,8 @@ func _entry_with_key(key: String):
 
 func test_01_mods_loaded() -> void:
 	_check(_brolab() != null, "BroLab loaded")
-	_check(tree.root.get_node_or_null("ModLoader/" + MODTOOLS) != null, "Modtools loaded")
+	if MODTOOLS in OS.get_environment("BE_COMPAT_MODS").split(" "):
+		_check(tree.root.get_node_or_null("ModLoader/" + MODTOOLS) != null, "Modtools loaded")
 	_check(m != null, "BroEditor loaded")
 
 

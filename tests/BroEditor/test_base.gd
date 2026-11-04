@@ -237,3 +237,25 @@ func _family_from(min_tier: int, type: int):
 		if ms[0].tier == min_tier and ms[0].type == type and ms[-1].tier == 3:
 			return ms
 	return null
+
+
+# 1.2：模拟未拥有某个 DLC（拥有情况只记录在 ProgressData.available_dlc_ids），返回还原用的列表
+func _drop_dlc(id: String) -> Array:
+	var pd = tree.root.get_node("ProgressData")
+	var saved = pd.available_dlc_ids.duplicate()
+	pd.available_dlc_ids.erase(id)
+	pd.refresh_active_update_data()
+	m._lists_changed()
+	return saved
+
+
+func _restore_dlcs(saved: Array) -> void:
+	var pd = tree.root.get_node("ProgressData")
+	pd.available_dlc_ids = saved.duplicate()
+	pd.refresh_active_update_data()
+	m._lists_changed()
+
+
+# 已拥有且启用的 DLC 数据（否则 null；原版 get_dlc_data_by_id 不检查拥有情况）
+func _dlc(id: String):
+	return isvc.get_dlc_data_by_id(id) if m.set_active(id) else null

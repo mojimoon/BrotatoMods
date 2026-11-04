@@ -75,7 +75,7 @@ func test_85_battle_graph() -> void:
 		if beb != null:
 			m.runtime.fire("enemy_hit", 0, enemy.global_position, enemy, {"hp_pct": 100.0, "stats": []})
 			_eq(beb.get_bonus_damage(null, 0), 25, "vuln on the hit enemy")
-		var ex = load("res://items/all/rip_and_tear/rip_and_tear_effect_1.tres")
+		var ex = load("res://items/all/00_base_game/rip_and_tear/rip_and_tear_effect_1.tres")
 		var args = WeaponServiceExplodeArgs.new()
 		args.pos = player.global_position
 		args.damage = 1

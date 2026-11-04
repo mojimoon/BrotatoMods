@@ -18,7 +18,7 @@ const CURSE_PROBE = 1000
 const VARS_KEY = "broeditor_vars"
 
 var graph: Dictionary = {}
-var _cursed: Dictionary = {}	# 诅咒系数 -> 诅咒后的图（缓存）
+var _cursed: Dictionary = {}	# 诅咒系数 / 异变强度 -> 调整后的图（缓存）
 
 
 static func get_id() -> String:
@@ -37,13 +37,27 @@ static func make(g: Dictionary) -> Effect:
 	return e
 
 
-# 诅咒系数（未诅咒为 0；旧存档里 value = 0 也视为未诅咒）
+# 诅咒系数（未诅咒为 0；旧存档里 value = 0 也视为未诅咒）。异变复制出的蓝图不会被诅咒（原版不诅咒异变物品）
 func curse_modifier() -> float:
+	if added_by_mutation:
+		return 0.0
 	return max(0.0, float(value) / CURSE_PROBE - 1.0) if value > CURSE_PROBE else 0.0
 
 
-# 实际生效的图：未诅咒为原图；诅咒后为数值按系数调整后的图
+# 异变复制到肿瘤上的蓝图的强度：原版把 value 按异变强度缩放、合并时相加（见 mod_main.scale_graph）
+func mutation_strength() -> float:
+	return float(value) / CURSE_PROBE if added_by_mutation and value > 0 else 1.0
+
+
+# 实际生效的图：未诅咒为原图；诅咒后为数值按系数调整后的图；异变复制的为按强度缩放后的图
 func live_graph() -> Dictionary:
+	var f = mutation_strength()
+	if abs(f - 1.0) > 0.0001:
+		var k = "mut:" + str(f)
+		if not _cursed.has(k):
+			var mod = _mod()
+			_cursed[k] = mod.scale_graph(graph, f) if mod != null else graph
+		return _cursed[k]
 	var m = curse_modifier()
 	if m <= 0.0:
 		return graph
@@ -62,7 +76,9 @@ static func _mod():
 
 func apply(player_index: int) -> void:
 	var tokens = once_list(player_index)
-	if tokens != null:
+	var mod = _mod()
+	# 异变（史前惧兽）：持有者被移除后立刻换成异变后的副本（同一张图），沿用原来剩下的令牌，不重新发放
+	if tokens != null and not (mod != null and mod.take_mutation_tokens(player_index, once_tokens())):
 		for t in once_tokens():
 			tokens.push_back(t)
 	_mark_dirty()
@@ -70,7 +86,8 @@ func apply(player_index: int) -> void:
 
 func unapply(player_index: int) -> void:
 	var tokens = once_list(player_index)
-	if tokens != null:
+	var mod = _mod()
+	if tokens != null and not (mod != null and mod.keep_mutation_tokens(player_index, once_tokens())):
 		for t in once_tokens():
 			take_once(tokens, t)
 	_mark_dirty()
@@ -321,6 +338,8 @@ static func _cond_text(n: Dictionary) -> String:
 		t = t.replace("{0}", _var_name(n)).replace("{cmp}", _tr("BE_CMP_" + str(_p(n, "cmp", "at_least")).to_upper()))
 	if n.kind == "weapon_kinds":
 		t = t.replace("{cmp}", _tr("BE_CMP_" + str(_p(n, "cmp", "at_least")).to_upper()))
+	if n.kind in ["target_evolved", "evo_camp"]:
+		t = t.replace("{camp}", _tr("BE_CAMP_" + str(_p(n, "camp", "any")).to_upper()))
 	if n.kind in ["own_tag", "own_set", "own_item"] and m != null:
 		var what = ""
 		match n.kind:
@@ -415,6 +434,15 @@ static func _payload_text(n: Dictionary, trigger_kind: String, colored: bool) ->
 			return _tr("BE_PX_BREAK").replace("{0}", str(v))
 		"var_set":
 			return _tr("BE_PX_VAR_" + str(_p(n, "op", "add")).to_upper()).replace("{0}", _var_name(n)).replace("{1}", str(v))
+		"meca_parts":
+			if v < 0:
+				return _tr("BE_PX_LOSE_MECA_PARTS").replace("{0}", _col(str(-v), false, colored))
+			return _tr("BE_PX_MECA_PARTS").replace("{0}", _col(str(v), true, colored))
+		"mutate":
+			return _tr("BE_PX_MUTATE").replace("{0}", _col(str(int(_p(n, "n", 1))), true, colored))
+		"slow_time":
+			var pct = int(_p(n, "pct", 50))
+			return _tr("BE_PX_SLOW_TIME").replace("{0}", _col(str(pct) + "%", true, colored)).replace("{1}", str(int(_p(n, "secs", 3))))
 		"grant":
 			var inner = _grant_text(n, colored)
 			var mode = str(_p(n, "mode", "temp"))

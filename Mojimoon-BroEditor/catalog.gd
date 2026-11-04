@@ -20,6 +20,12 @@ const STAT_GROUPS = [
 		"burning_spread", "burning_cooldown_reduction", "structure_attack_speed", "structure_percent_damage",
 		"structure_range", "accuracy", "harvesting_growth", "weapon_slot", "stat_curse", "chance_double_gold",
 		"item_box_gold", "heal_when_pickup_gold", "burning_cooldown_increase", "hit_protection", "lose_hp_per_second",
+		"bonus_crit_damage", "fire_puddle_size", "time_shift_on_hit",
+	]],
+	# 史前惧兽（DLC2）：进化（正 = 机械、负 = 异变）与相关机制
+	["BE_GRP_EVOLUTION", [
+		"stat_evolution", "enemy_evolution_chance", "mutation_fruit_chance", "mutate_into_better_tier_chance",
+		"meca_parts_on_level_up", "dismantle_price", "material_on_evolved_enemy_kill", "heal_on_mutant_kill",
 	]],
 	["BE_GRP_GAIN", [
 		"gain_stat_max_hp", "gain_stat_hp_regeneration", "gain_stat_lifesteal", "gain_stat_percent_damage",
@@ -31,19 +37,24 @@ const STAT_GROUPS = [
 	["BE_GRP_SHOP", [
 		"items_price", "weapons_price", "reroll_price", "free_rerolls", "gold_drops", "enemy_gold_drops",
 		"neutral_gold_drops", "increase_material_value", "gain_pct_gold_start_wave", "recycling_gains", "crate_chance",
-		"minimum_weapons_in_shop", "item_steals", "next_level_xp_needed",
+		"minimum_weapons_in_shop", "item_steals", "next_level_xp_needed", "item_box_recycling_gains",
+		"extra_starting_weapon_choices",
 	]],
 	["BE_GRP_MAP", [
 		"map_size", "number_of_enemies", "enemy_health", "enemy_damage", "enemy_speed", "boss_strength",
 		"stronger_elites_on_kill", "loot_alien_chance", "extra_loot_aliens", "loot_alien_speed",
 		"stronger_loot_aliens_on_kill", "enemy_fruit_drops", "trees", "trees_start_wave", "hp_start_wave",
-		"hp_start_next_wave",
+		"hp_start_next_wave", "dig_sites", "more_horde",
 	]],
 	["BE_GRP_CAPS", ["hp_cap", "speed_cap", "dodge_cap", "crit_chance_cap"]],
 	["BE_GRP_RULES", [
 		"no_melee_weapons", "no_ranged_weapons", "no_duplicate_weapons", "min_weapon_tier", "max_weapon_tier",
 		"max_melee_weapons", "max_ranged_weapons", "can_attack_while_moving", "one_shot_trees", "double_boss",
 		"structures_can_crit", "instant_gold_attracting", "hp_shop", "no_heal", "pacifist", "torture",
+		"meca_only", "mutant_only", "dual_evolution", "effect_mutate_end_of_wave", "materials_as_health",
+		"damage_taken_on_materials", "no_level_upgrades", "effect_no_weapon_in_shop", "effect_crate_give_weapon",
+		"no_cure_between_wave", "no_fruit_attracted_end_of_wave", "fog_of_war_permanent", "effect_mixing_up_wave",
+		"burning_stacks", "has_plastic_boots", "weapon_set_bonus",
 	]],
 ]
 
@@ -82,6 +93,7 @@ const CATEGORIES = [
 	["weapon", "BE_CAT_WEAPON"],
 	["structure", "BE_CAT_STRUCTURE"],
 	["pet", "BE_CAT_PET"],
+	["evolution", "BE_CAT_EVOLUTION"],
 	["start", "BE_CAT_START"],
 	["other", "BE_CAT_OTHER"],
 ]
@@ -97,7 +109,9 @@ const PLAIN_STAT_KEYS = [
 # 有 custom_key 时不看 key（key 常是"属性"本身，例如"闪避时造成近战伤害"的 key 是近战伤害）
 # ponytail: 词表覆盖原版；mod 的新机制按同样的词归类，匹配不到落到"其他"
 const CATEGORY_WORDS = [
-	["pet", ["pet"]],
+	["pet", ["pet", "mosquitor", "dinosaur", "ammosaurus"]],
+	# 史前惧兽：进化（机械 / 异变）相关
+	["evolution", ["evolution", "evolved", "meca", "mecha", "mutant", "mutation", "mutate", "mutated", "dismantle", "fossil"]],
 	["structure", ["turret", "turrets", "structure", "structures", "landmine", "landmines", "builder", "garden", "bot", "tyler"]],
 	["combat", ["dmg", "heal", "explode", "explosion", "projectile", "projectiles", "eyes"]],
 	["weapon", ["weapon", "weapons", "melee", "ranged", "tier", "unarmed", "lock"]],
@@ -277,9 +291,10 @@ const CURSE_EFFECT_PARAMS = {
 	"heal_hp": ["value"], "add_gold": ["value"], "xp": ["value"], "damage": ["pct", "damage"], "explode": ["pct", "damage"],
 	"hp_dmg": ["pct"], "ignite": ["value"], "slow": ["pct"], "rand_stats": ["value"], "fruit": ["value"],
 	"vuln": ["pct", "secs"],
+	"meca_parts": ["value"], "slow_time": ["pct", "secs"],
 }
 # 百分比参数的上限
-const CURSE_MAX = {"chance": {"pct": 100}, "hp_below": {"pct": 100}}
+const CURSE_MAX = {"chance": {"pct": 100}, "hp_below": {"pct": 100}, "slow_time": {"pct": 95}}
 
 
 static func curse_sign(kind: String, param: String) -> int:
@@ -358,6 +373,9 @@ class FieldSorter:
 #   charm：魅惑目标敌人（同浪漫之人）；spawn：生成敌人；break：持有者是武器时损坏（同砖块）
 #   var_set / var_cmp：整数变量（按名称在玩家的全部蓝图间共享，初始为 0，整局保留、随存档保存；不受诅咒）
 #   效果节点之后可以继续连接；一个节点的多条出线按目标节点在画布上的纵坐标从上到下执行
+#   史前惧兽（DLC2）：evolved_kill / meca_kill / mutant_kill（杀死进化敌人）、mutated（自己的道具异变后，波次结束时）、
+#   meca_upgrade（机械化武器后，商店 / 升级界面）；evo_camp（自己的进化方向）、target_evolved（目标是进化敌人）；
+#   meca_parts（机械部件）、mutate（本波结束时多异变 n 次）、slow_time（敌人与敌方投射物减速，同怀表 / 时间扭曲者）
 # ============================================================
 const NODES = [
 	["wave_start", "trigger", []],
@@ -374,6 +392,9 @@ const NODES = [
 	["on_explode", "trigger", []],
 	["burning_kill", "trigger", []],
 	["cursed_kill", "trigger", []],
+	["evolved_kill", "trigger", []],
+	["meca_kill", "trigger", []],
+	["mutant_kill", "trigger", []],
 	["tree_kill", "trigger", []],
 	["hit", "trigger", []],
 	["dodge", "trigger", []],
@@ -384,6 +405,8 @@ const NODES = [
 	["steps", "trigger", [["n", "int", 1]]],
 	["reroll", "trigger", []],
 	["buy", "trigger", []],
+	["mutated", "trigger", []],
+	["meca_upgrade", "trigger", []],
 	["still", "trigger", []],
 	["moving", "trigger", []],
 	["low_hp", "trigger", [["pct", "int", 50]]],
@@ -408,6 +431,8 @@ const NODES = [
 	["enemy_hp_above", "cond", [["pct", "int", 50]]],
 	["enemy_hp_below", "cond", [["pct", "int", 50]]],
 	["dmg_type", "cond", [["stat", "stat", "stat_melee_damage"]]],
+	["target_evolved", "cond", [["camp", "mode:any|meca|mutant", "any"]]],
+	["evo_camp", "cond", [["camp", "mode:meca|mutant", "meca"]]],
 	["once", "cond", []],
 	["own_tag", "cond", [["tag", "tag", ""], ["cmp", "mode:at_least|at_most|exactly", "at_least"], ["n", "int", 2]]],
 	["own_item", "cond", [["id", "owned", ""], ["cmp", "mode:at_least|at_most|exactly", "at_least"], ["n", "int", 1]]],
@@ -441,6 +466,9 @@ const NODES = [
 	["group_unlock", "effect", [["group", "group", ""]]],
 	["group_lock", "effect", [["group", "group", ""]]],
 	["var_set", "effect", [["var", "var", "x"], ["op", "mode:add|sub|set|mul|div", "add"], ["value", "int", 1]]],
+	["meca_parts", "effect", [["value", "int", 1]]],
+	["mutate", "effect", [["n", "int", 1]]],
+	["slow_time", "effect", [["pct", "int", 50], ["secs", "int", 3]]],
 ]
 # 节点的详细信息（弹窗编辑，存在节点 params 里；没有时用默认值）：[参数, 类型, 默认值]。
 # 这些节点还可以添加额外的属性加成（params.scaling_stats：[[属性, 系数]...]）。
@@ -454,8 +482,9 @@ const NODE_DETAILS = {
 const PARAM_SHOW_IF = {"grant:secs": ["mode", "timed"]}
 const STATE_TRIGGERS = ["still", "moving", "low_hp", "full_hp", "always"]
 # 状态条件：在状态扳机的路径上持续检查（全部满足时进入，任一不满足时撤销）；其余条件只在进入时检查一次
-const STATE_CONDS = ["hp_below", "hp_above", "wave_min", "wave_max", "diff_min", "diff_max", "stat_min", "stat_max", "if_moving", "if_still", "own_tag", "own_set", "own_item", "weapon_kinds", "var_cmp"]
-const SHOP_TRIGGERS = ["reroll", "buy"]
+const STATE_CONDS = ["hp_below", "hp_above", "wave_min", "wave_max", "diff_min", "diff_max", "stat_min", "stat_max", "if_moving", "if_still", "own_tag", "own_set", "own_item", "weapon_kinds", "var_cmp", "evo_camp"]
+# 不在敌袭中触发的扳机（商店、波次结束后的异变、升级界面的机械化）
+const SHOP_TRIGGERS = ["reroll", "buy", "mutated", "meca_upgrade"]
 
 # 不是普通 Effect 脚本、但也可以拆解的扳机（徒步旅行者的步数在 value2；浪漫之人 / 长笛的魅惑由 split_native 单独处理）
 const SPLIT_ANY_SCRIPT = ["gain_stat_for_every_step_after_equip", "charm_on_hit"]
@@ -538,64 +567,91 @@ const STAT_ICON_ALIASES = {
 	"next_level_xp_needed": "xp_gain", "hp_start_wave": "stat_max_hp", "hp_start_next_wave": "stat_max_hp",
 	"boss_strength": "stat_percent_damage", "gain_pct_gold_start_wave": "stat_materials", "enemy_fruit_drops": "stat_max_hp",
 }
-# 属性图标：key -> 候选贴图（取第一个存在的；DLC 贴图在未安装 DLC 时跳过）。
+# 属性图标：key -> 候选（取第一个找得到的）：原版角色 / 道具 / 武器的 id（用它的图标，1.2 起路径不再固定）或贴图路径。
 # 大部分取自 Yoko-Optimize 的次要属性图标（对应回原版贴图），其余按道具效果选择
-const ITEM_ICON = "res://items/all/%s/%s_icon.png"
 const STAT_ICON_PATHS = {
-	"xp_gain": ["res://items/all/celery_tea/celery_tea_icon.png"],
-	"next_level_xp_needed": ["res://items/all/celery_tea/celery_tea_icon.png"],
-	"pickup_range": ["res://items/all/alien_tongue/alien_tongue_icon.png"],
-	"knockback": ["res://items/all/boxing_glove/boxing_glove_icon.png"],
+	"xp_gain": ["item_celery_tea"],
+	"next_level_xp_needed": ["item_celery_tea"],
+	"pickup_range": ["item_alien_tongue"],
+	"knockback": ["item_boxing_glove"],
 	"consumable_heal": ["res://items/consumables/fruit/fruit.png"],
 	"enemy_fruit_drops": ["res://items/consumables/fruit/fruit.png"],
-	"heal_when_pickup_gold": ["res://items/all/cute_monkey/cute_monkey_icon.png"],
-	"explosion_damage": ["res://items/all/dynamite/dynamite_icon.png"],
-	"explosion_size": ["res://items/all/explosive_shells/explosive_shells_icon.png"],
-	"piercing": ["res://items/all/sharp_bullet/sharp_bullet_icon.png"],
-	"piercing_damage": ["res://items/all/sharp_bullet/sharp_bullet_icon.png"],
-	"bounce": ["res://items/all/ricochet/ricochet_icon.png"],
-	"bounce_damage": ["res://items/all/ricochet/ricochet_icon.png"],
-	"projectiles": ["res://dlcs/dlc_1/items/seashell/seashell_icon.png", "res://weapons/ranged/double_barrel_shotgun/double_barrel_shotgun_icon.png"],
-	"damage_against_bosses": ["res://items/all/silver_bullet/silver_bullet_icon.png"],
-	"burning_spread": ["res://items/all/snake/snake_icon.png"],
-	"burning_cooldown_reduction": ["res://items/all/campfire/campfire_icon.png"],
-	"burning_cooldown_increase": ["res://items/all/frozen_heart/frozen_heart_icon.png"],
-	"structure_attack_speed": ["res://items/all/improved_tools/improved_tools_icon.png"],
-	"structure_percent_damage": ["res://items/all/heavy_bullets/heavy_bullets_icon.png"],
-	"structure_range": ["res://weapons/melee/wrench/wrench_icon.png"],
-	"accuracy": ["res://dlcs/dlc_1/items/eyepatch/eyepatch_icon.png"],
-	"weapon_slot": ["res://weapons/ranged/pistol/pistol_icon.png"],
-	"minimum_weapons_in_shop": ["res://weapons/ranged/pistol/pistol_icon.png"],
+	"heal_when_pickup_gold": ["item_cute_monkey"],
+	"explosion_damage": ["item_dynamite"],
+	"explosion_size": ["item_explosive_shells"],
+	"piercing": ["item_sharp_bullet"],
+	"piercing_damage": ["item_sharp_bullet"],
+	"bounce": ["item_ricochet"],
+	"bounce_damage": ["item_ricochet"],
+	"projectiles": ["item_seashell", "weapon_double_barrel_shotgun_1"],
+	"damage_against_bosses": ["item_silver_bullet"],
+	"burning_spread": ["item_snake"],
+	"burning_cooldown_reduction": ["item_campfire"],
+	"burning_cooldown_increase": ["item_frozen_heart"],
+	"structure_attack_speed": ["item_improved_tools"],
+	"structure_percent_damage": ["item_heavy_bullets"],
+	"structure_range": ["weapon_wrench_1"],
+	"accuracy": ["item_eyepatch"],
+	"weapon_slot": ["weapon_pistol_1"],
+	"minimum_weapons_in_shop": ["weapon_pistol_1"],
 	"chance_double_gold": ["res://items/materials/material_bag_icon.png"],
-	"item_box_gold": ["res://items/all/bag/bag_icon.png"],
-	"hit_protection": ["res://items/all/tardigrade/tardigrade_icon.png"],
-	"lose_hp_per_second": ["res://items/all/blood_donation/blood_donation_icon.png"],
-	"items_price": ["res://items/all/coupon/coupon_icon.png"],
-	"reroll_price": ["res://dlcs/dlc_1/items/spyglass/spyglass_icon.png"],
-	"free_rerolls": ["res://items/all/dangerous_bunny/dangerous_bunny_icon.png"],
-	"gold_drops": ["res://items/all/evil_hat/evil_hat_icon.png"],
-	"enemy_gold_drops": ["res://items/all/evil_hat/evil_hat_icon.png"],
-	"neutral_gold_drops": ["res://items/all/evil_hat/evil_hat_icon.png"],
-	"increase_material_value": ["res://items/all/crown/crown_icon.png"],
-	"gain_pct_gold_start_wave": ["res://items/all/piggy_bank/piggy_bank_icon.png"],
-	"recycling_gains": ["res://items/all/recycling_machine/recycling_machine_icon.png"],
+	"item_box_gold": ["item_bag"],
+	"hit_protection": ["item_tardigrade"],
+	"lose_hp_per_second": ["item_blood_donation"],
+	"items_price": ["item_coupon"],
+	"reroll_price": ["item_spyglass"],
+	"free_rerolls": ["item_dangerous_bunny"],
+	"gold_drops": ["item_evil_hat"],
+	"enemy_gold_drops": ["item_evil_hat"],
+	"neutral_gold_drops": ["item_evil_hat"],
+	"increase_material_value": ["item_crown"],
+	"gain_pct_gold_start_wave": ["item_piggy_bank"],
+	"recycling_gains": ["item_recycling_machine"],
 	"crate_chance": ["res://items/consumables/item_box/item_box.png"],
-	"item_steals": ["res://dlcs/dlc_1/characters/gangster/gangster_icon.png"],
-	"map_size": ["res://dlcs/dlc_1/items/treasure_map/treasure_map_icon.png"],
-	"number_of_enemies": ["res://items/all/gentle_alien/gentle_alien_icon.png"],
-	"enemy_health": ["res://items/all/alien_baby/alien_baby_icon.png"],
-	"enemy_damage": ["res://items/all/tentacle/tentacle_icon.png"],
-	"enemy_speed": ["res://items/all/snail/snail_icon.png"],
+	"item_steals": ["character_gangster"],
+	"map_size": ["item_treasure_map"],
+	"number_of_enemies": ["item_gentle_alien"],
+	"enemy_health": ["item_alien_baby"],
+	"enemy_damage": ["item_tentacle"],
+	"enemy_speed": ["item_snail"],
 	"boss_strength": ["res://ui/icons/misc/elite_icon.png"],
 	"stronger_elites_on_kill": ["res://ui/icons/misc/elite_icon.png"],
-	"loot_alien_chance": ["res://entities/units/enemies/looter/looter_icon.png"],
-	"extra_loot_aliens": ["res://entities/units/enemies/looter/looter_icon.png"],
-	"loot_alien_speed": ["res://entities/units/enemies/looter/looter_icon.png"],
-	"stronger_loot_aliens_on_kill": ["res://entities/units/enemies/looter/looter_icon.png"],
-	"trees": ["res://items/all/tree/tree_icon.png"],
-	"trees_start_wave": ["res://items/all/tree/tree_icon.png"],
-	"hp_start_wave": ["res://items/all/sad_tomato/sad_tomato_icon.png"],
-	"hp_start_next_wave": ["res://items/all/weird_ghost/weird_ghost_icon.png"],
+	"loot_alien_chance": ["res://entities/units/enemies/crash_zone/basic/looter/looter_icon.png"],
+	"extra_loot_aliens": ["res://entities/units/enemies/crash_zone/basic/looter/looter_icon.png"],
+	"loot_alien_speed": ["res://entities/units/enemies/crash_zone/basic/looter/looter_icon.png"],
+	"stronger_loot_aliens_on_kill": ["res://entities/units/enemies/crash_zone/basic/looter/looter_icon.png"],
+	"trees": ["item_tree"],
+	"trees_start_wave": ["item_tree"],
+	"hp_start_wave": ["item_sad_tomato"],
+	"hp_start_next_wave": ["item_weird_ghost"],
+	"bonus_crit_damage": ["item_raptor_eye"],
+	"dismantle_price": ["item_titanium_excess"],
+	"item_box_recycling_gains": ["character_archaeologist", "item_dig_site"],
+	"dig_sites": ["item_dig_site"],
+	"mutation_fruit_chance": ["item_boosted_mitosis"],
+	"enemy_evolution_chance": ["item_shaving_foam_can_meca"],
+	"mutate_into_better_tier_chance": ["item_wildfire_mutation"],
+	"meca_parts_on_level_up": ["character_droid"],
+	"material_on_evolved_enemy_kill": ["item_flare"],
+	"heal_on_mutant_kill": ["item_eldritch_figurine"],
+	"extra_starting_weapon_choices": ["character_survivor"],
+	"weapon_set_bonus": ["character_one_arm"],
+	"burning_stacks": ["item_pyromaniac"],
+	"has_plastic_boots": ["item_plastic_boots"],
+	"more_horde": ["character_veteran"],
+	"meca_only": ["character_droid"],
+	"mutant_only": ["character_variant"],
+	"dual_evolution": ["character_mad_scientist"],
+	"materials_as_health": ["character_droid"],
+	"damage_taken_on_materials": ["item_failsafe_core"],
+	"no_level_upgrades": ["character_droid"],
+	"effect_no_weapon_in_shop": ["character_survivor"],
+	"effect_crate_give_weapon": ["character_survivor"],
+	"effect_mutate_end_of_wave": ["character_variant"],
+	"effect_mixing_up_wave": ["character_time_shifter"],
+	"fog_of_war_permanent": ["character_caveman"],
+	"no_cure_between_wave": ["character_veteran"],
+	"no_fruit_attracted_end_of_wave": ["character_veteran"],
 }
 
 

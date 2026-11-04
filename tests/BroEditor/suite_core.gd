@@ -1221,7 +1221,7 @@ func _beast_effect():
 
 # 诅咒（DLC）后的效果：属性、子资源、蓝图都照常生效
 func test_181_cursed_effects() -> void:
-	var dlc = tree.root.get_node("ProgressData").get_dlc_data("abyssal_terrors")
+	var dlc = _dlc("abyssal_terrors")
 	_check(dlc != null, "DLC data available")
 	if dlc == null:
 		return
@@ -1302,7 +1302,7 @@ static func _bad(v: int) -> int:
 
 # 自定义道具挂上蓝图后诅咒（系数固定 0.5），返回 [诅咒后的道具, 蓝图效果, 道具 id]
 func _cursed_graph_item(g: Dictionary, suffix: String) -> Array:
-	var dlc = tree.root.get_node("ProgressData").get_dlc_data("abyssal_terrors")
+	var dlc = _dlc("abyssal_terrors")
 	var iid = m.create_custom_item(_plain_item().my_id, suffix)
 	m.item_profiles[iid].effects = []
 	m.item_profiles[iid].graph = g
@@ -1468,10 +1468,8 @@ func test_191_cursed_blueprint_runtime() -> void:
 
 # 没有 DLC（未拥有或停用）时：诅咒相关的代码不报错、不改变数值；诅咒的初始装备改为普通的
 func test_192_without_dlc() -> void:
-	var pd = tree.root.get_node("ProgressData")
-	var saved = pd.available_dlcs.duplicate()
-	pd.available_dlcs = []
-	_check(pd.get_dlc_data("abyssal_terrors") == null and not pd.is_dlc_available_and_active("abyssal_terrors"), "DLC unavailable")
+	var saved = _drop_dlc("abyssal_terrors")
+	_check(_dlc("abyssal_terrors") == null and not m.set_active("abyssal_terrors"), "DLC unavailable")
 	var GE = load(GraphEffectScript)
 	var g = GE.new_graph()
 	var ev = GE.add_node(g, "every", Vector2.ZERO, {"n": 6})
@@ -1526,8 +1524,8 @@ func test_192_without_dlc() -> void:
 	ui.queue_free()
 	yield(tree, "idle_frame")
 	m.delete_custom_item(iid)
-	pd.available_dlcs = saved
-	_check(pd.get_dlc_data("abyssal_terrors") != null, "DLC restored")
+	_restore_dlcs(saved)
+	_check(_dlc("abyssal_terrors") != null, "DLC restored")
 
 
 func _all_nodes(n: Node) -> Array:
@@ -1553,10 +1551,8 @@ func test_200_library_dlc_and_names() -> void:
 		dup = dup or seen.has(k)
 		seen[k] = true
 	_check(not dup, "scaling effects merged by text_key")
-	var pd = tree.root.get_node("ProgressData")
-	var dlc = pd.get_dlc_data("abyssal_terrors")
-	if dlc != null:
-		dlc.remove_resources()
+	if _dlc("abyssal_terrors") != null:
+		var saved = _drop_dlc("abyssal_terrors")
 		m.set_library_dedup(m.library_dedup)
 		var from_dlc = false
 		for entry in m.library():
@@ -1568,7 +1564,7 @@ func test_200_library_dlc_and_names() -> void:
 				t = entry
 				break
 		_check(t != null and m.make_effect({"from": t.from, "i": t.i}) != null, "inactive DLC effect usable as template")
-		dlc.add_resources()
+		_restore_dlcs(saved)
 	m.set_library_dedup(dedup0)
 	var iid = m.create_custom_item(_plain_item().my_id, "knife")
 	m.item_profiles[iid].name = "Blade X"
@@ -1944,7 +1940,7 @@ func test_178_burn_chance_scaling_and_dmg_types() -> void:
 	_eq(JSON.print(g.scaling_stats), old, "removing the effect restores the scaling")
 	var Catalog = load(MOD_DIR + "catalog.gd")
 	_check("stat_max_hp" in Catalog.graph_stat_keys() and "xp_gain" in Catalog.graph_stat_keys() and Catalog.node_def("dmg_type")[2][0][1] == "stat", "damage type lists every stat")
-	var eyes = load("res://items/all/alien_eyes/alien_eyes_stats.tres")
+	var eyes = load("res://items/all/00_base_game/alien_eyes/alien_eyes_stats.tres")
 	_check("stat_max_hp" in load(MOD_DIR + "graph/enemy_behavior.gd").stat_names(eyes.scaling_stats), "alien eyes hit counts as max HP damage")
 
 
@@ -2170,7 +2166,7 @@ func test_206_variables_and_order() -> void:
 	_eq(int(by[vs].params.value), 3, "variable value not cursed")
 	_eq(int(by[vc].params.n), 4, "variable compare not cursed")
 	_eq(int(by[ev].params.n), 6, "every before a variable not cursed")
-	var has_dlc = tree.root.get_node("ProgressData").get_dlc_data("abyssal_terrors") != null
+	var has_dlc = _dlc("abyssal_terrors") != null
 	_eq(int(by[heal].params.value), _good(3) if has_dlc else 3, "effect after a variable cursed as usual")
 
 
@@ -2201,7 +2197,236 @@ func test_197_node_details() -> void:
 	var ex = GE.add_node(g, "explode", Vector2.ZERO, {"stat": "stat_armor", "pct": 100, "damage": 10, "scaling_stats": [["stat_luck", 0.5]]})
 	GE.add_link(g, GE.add_node(g, "kill", Vector2.ZERO), ex)
 	var cursed = GE.nodes_by_id(m.curse_graph(g, CURSE_M))[ex].params
-	var has_dlc = tree.root.get_node("ProgressData").get_dlc_data("abyssal_terrors") != null
+	var has_dlc = _dlc("abyssal_terrors") != null
 	_eq(int(cursed.damage), _good(10) if has_dlc else 10, "flat damage cursed")
 	_check(abs(cursed.scaling_stats[0][1] - (0.5 * (1.0 + CURSE_M) if has_dlc else 0.5)) < 0.001, "extra scaling cursed: %s" % cursed.scaling_stats[0][1])
 	_eq(g.nodes[0].params.scaling_stats[0][1], 0.5, "curse keeps the source graph")
+
+
+# ============================================================
+# 3.0.0：土豆兄弟 1.2（物品套组、史前惧兽）
+# ============================================================
+# 原版列表是按套组重建的缓存：自定义对象在重建后仍在列表与商店池里；DLC 角色没有被提前缓存掉
+func test_300_lists_and_pool() -> void:
+	for id in ["character_veteran", "character_variant", "character_romantic"]:
+		_check(m.find_character(id) != null, "DLC character listed: " + id)
+	var iid = m.create_custom_item(_plain_item().my_id, "pooltest")
+	var fam = _family_from(1, WeaponType.MELEE)
+	_check(fam != null, "vanilla family starting at tier 2")
+	var low = m.add_weapon_tier(fam[0].weapon_id, 0) if fam != null else ""
+	m.apply_all()
+	_unlock_everything()
+	isvc.invalidate_items_cache()
+	isvc.invalidate_weapons_cache()
+	var it = m.find_target("item", iid)
+	_check(it != null and it in isvc.items, "custom item survives a list rebuild")
+	_check(low != "" and m.find_target("weapon", low) in isvc.weapons, "lower tier survives a list rebuild")
+	isvc.init_unlocked_pool()
+	_check(it in isvc.get_pool(it.tier, isvc.TierData.ITEMS), "custom item in the shop pool")
+	var w = m.find_target("weapon", low) if low != "" else null
+	_check(w != null and w in isvc.get_pool(0, isvc.TierData.WEAPONS), "lower tier in the shop pool")
+	# 原版商店池重建（重开一局 / 选难度）后仍在
+	rd.reset()
+	_check(it in isvc.get_pool(it.tier, isvc.TierData.ITEMS), "custom item in the pool after RunData.reset")
+	m.delete_custom_item(iid)
+	if low != "":
+		m.delete_weapon_tier(low)
+	m.apply_all()
+	_check(m.find_target("item", iid) == null and not it in isvc.items, "deleted custom item leaves the list")
+
+
+# 来源：DLC2 的内容不在 res://dlcs/ 下，按物品套组判断
+func test_301_sources() -> void:
+	var BE = load(MOD_DIR + "mod_main.gd")
+	_eq(BE.source_of(m.find_character("character_veteran")), "dlc2", "DLC2 character")
+	_eq(BE.source_of(m.find_target("item", "item_fossil_skull")), "dlc2", "DLC2 item")
+	_eq(BE.source_of(m.find_target("item", "item_cybernetic_arm")), "dlc2", "DLC2 mecha item")
+	_eq(BE.source_of(m.find_target("weapon", "weapon_whip_1")), "dlc2", "DLC2 weapon")
+	_eq(BE.source_of(m.find_character("character_romantic")), "dlc1", "DLC1 character")
+	_eq(BE.source_of(m.find_target("item", "item_evil_hat")), "vanilla", "free update item")
+	_eq(BE.source_of(m.find_character("character_well_rounded")), "vanilla", "base character")
+	var ui = yield(_open_ui(CH), "completed")
+	_check(ui._stat_icon("loot_alien_chance") != null and ui._stat_icon("xp_gain") != null and ui._stat_icon("bonus_crit_damage") != null, "stat icons resolve through object ids")
+	ui.queue_free()
+	yield(tree, "idle_frame")
+
+
+# 禁用页：升级 / 机械化禁用的属性；自定义角色沿用基底（含需要的物品套组）
+func test_302_stat_bans() -> void:
+	var c = m.find_character(CH)
+	var orig = c.banned_upgrades.duplicate()
+	var p = m.new_profile()
+	p.ban_upgrades = ["upgrade_speed", "upgrade_luck"]
+	p.ban_meca = ["stat_luck"]
+	m.profiles[CH] = p
+	m.apply_all()
+	_eq(c.banned_upgrades, ["upgrade_speed", "upgrade_luck"], "upgrade bans applied")
+	_eq(c.banned_meca_stats, ["stat_luck"], "mecha bans applied")
+	_check(not m.upgrade_ban_options().empty() and "stat_luck" in m.meca_ban_options(), "ban options listed")
+	m.profiles.erase(CH)
+	m.apply_all()
+	_eq(c.banned_upgrades, orig, "upgrade bans restored")
+	var wid = m.create_custom("character_wounded", "bantest")
+	_eq(m.find_character(wid).banned_upgrades, m.find_character("character_wounded").banned_upgrades, "custom character keeps the base upgrade bans")
+	var vid = m.create_custom("character_variant", "settest")
+	_eq(m.find_character(vid).required_item_set, "primal_dread", "custom character needs the base item set")
+	var did = m.create_custom("character_droid", "mecatest")
+	_check("stat_max_hp" in m.find_character(did).banned_meca_stats, "custom character keeps the base mecha bans")
+	# 编辑器禁用页
+	var ui = yield(_open_ui(wid), "completed")
+	ui._on_tab_pressed("bans")
+	yield(tree, "idle_frame")
+	_check(_tree_has_text(ui._page, tr("BE_BAN_UPGRADES").replace("{0}", str(m.find_character(wid).banned_upgrades.size()))), "upgrade ban card shown")
+	ui._on_stat_ban_toggle("ban_upgrades", "banned_upgrades", "upgrade_speed")
+	_check("upgrade_speed" in m.profiles[wid].ban_upgrades, "toggle adds a ban")
+	ui.queue_free()
+	yield(tree, "idle_frame")
+	for id in [wid, vid, did]:
+		m.delete_custom(id)
+
+
+# 异变：蓝图被复制到肿瘤上时按异变强度缩放，合并时相加；不当作诅咒；异变不重新发放"仅一次"令牌
+func test_303_mutation_and_blueprints() -> void:
+	var GE = load(GraphEffectScript)
+	var dlc = isvc.get_dlc_data_by_id("primal_dread")
+	var g = GE.new_graph()
+	var once = GE.add_node(g, "once", Vector2.ZERO)
+	GE.add_link(g, GE.add_node(g, "wave_start", Vector2.ZERO), once)
+	var ps = GE.add_node(g, "perm_stat", Vector2.ZERO, {"stat": "stat_armor", "value": 4})
+	GE.add_link(g, once, ps)
+	var ge = GE.make(g)
+	_check(dlc.can_effect_be_copied_by_mutation(ge, -1), "blueprint can be copied by a mutation")
+	var copy = ge.duplicate()
+	copy.added_by_mutation = true
+	copy.value = 500
+	_eq(copy.curse_modifier(), 0.0, "mutated copy is not cursed")
+	_eq(int(GE.nodes_by_id(copy.live_graph())[ps].params.value), 2, "half-strength copy halves the value")
+	var tumor = []
+	dlc.add_effect_to_tumor_effects(tumor, copy)
+	var copy2 = copy.duplicate()
+	dlc.add_effect_to_tumor_effects(tumor, copy2)
+	_eq(tumor.size(), 1, "identical blueprints merge on the tumor")
+	_eq(int(tumor[0].value), 1000, "merged strength adds up")
+	_eq(int(GE.nodes_by_id(tumor[0].live_graph())[ps].params.value), 4, "merged copies at full strength")
+	var tiny = ge.duplicate()
+	tiny.added_by_mutation = true
+	tiny.value = 100
+	_eq(int(GE.nodes_by_id(tiny.live_graph())[ps].params.value), 1, "weak copy keeps at least 1")
+	# 真实异变：道具上的蓝图跟着异变后的副本走，令牌数不变
+	var iid = m.create_custom_item(_plain_item().my_id, "mutgraph")
+	m.item_profiles[iid].effects = []
+	m.item_profiles[iid].graph = g
+	m.apply_all()
+	_setup_player(CH)
+	rd.players_data[0].items = []
+	rd.add_character(m.find_character(CH), 0)
+	rd.add_item(m.find_target("item", iid), 0)
+	rd.get_player_effects(0)[Keys.stat_evolution_hash] = -20
+	var n0 = GE.once_list(0).size() - _graph_count(rd.players_data[0].items, GE)
+	var mutated = rd.mutate_random_item(0)
+	_check(mutated != null and mutated.is_mutant, "item mutated")
+	_check(_graph_count(rd.players_data[0].items, GE) >= 1, "blueprint still owned after the mutation")
+	_eq(GE.once_list(0).size() - n0, _graph_count(rd.players_data[0].items, GE), "one once token per owned blueprint after the mutation")
+	m.delete_custom_item(iid)
+
+
+func _graph_count(items: Array, GE) -> int:
+	var c = 0
+	for it in items:
+		for e in it.effects:
+			if e is GE:
+				c += 1
+	return c
+
+
+# 史前惧兽的蓝图节点：进化敌人扳机、道具异变扳机、进化方向 / 目标条件、机械部件 / 异变 / 减缓时间效果
+func test_304_dlc2_nodes() -> void:
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	GE.add_link(g, GE.add_node(g, "evolved_kill", Vector2.ZERO), GE.add_node(g, "add_gold", Vector2.ZERO, {"value": 1}))
+	GE.add_link(g, GE.add_node(g, "meca_kill", Vector2.ZERO), GE.add_node(g, "meca_parts", Vector2.ZERO, {"value": 2}))
+	var camp = GE.add_node(g, "evo_camp", Vector2.ZERO, {"camp": "mutant"})
+	GE.add_link(g, GE.add_node(g, "mutant_kill", Vector2.ZERO), camp)
+	GE.add_link(g, camp, GE.add_node(g, "mutate", Vector2.ZERO, {"n": 1}))
+	var tev = GE.add_node(g, "target_evolved", Vector2.ZERO, {"camp": "meca"})
+	GE.add_link(g, GE.add_node(g, "enemy_hit", Vector2.ZERO), tev)
+	GE.add_link(g, tev, GE.add_node(g, "slow_time", Vector2.ZERO, {"pct": 60, "secs": 2}))
+	GE.add_link(g, GE.add_node(g, "mutated", Vector2.ZERO), GE.add_node(g, "perm_stat", Vector2.ZERO, {"stat": "stat_luck", "value": 1}))
+	_graph_char(g)
+	var g0 = rd.players_data[0].gold
+	m.runtime.fire("evolved_kill", 0)
+	_eq(rd.players_data[0].gold - g0, 1, "evolved kill")
+	var parts0 = rd.get_player_meca_parts(0)
+	m.runtime.fire("meca_kill", 0)
+	_eq(rd.get_player_meca_parts(0) - parts0, 2, "mecha parts gained")
+	rd.get_player_effects(0)[Keys.stat_evolution_hash] = 5
+	var pend0 = rd.players_data[0].pending_mutations
+	m.runtime.fire("mutant_kill", 0)
+	_eq(rd.players_data[0].pending_mutations, pend0, "evolution side: not mutant")
+	rd.get_player_effects(0)[Keys.stat_evolution_hash] = -5
+	m.runtime.fire("mutant_kill", 0)
+	_eq(rd.players_data[0].pending_mutations, pend0 + 1, "mutate queued on the mutant side")
+	rd.players_data[0].pending_mutations = pend0
+	var holder = Node.new()
+	holder.set_script(_flag_script())
+	holder._is_meca = true
+	tree.root.add_child(holder)
+	EntityService.stop_enemy_time_slow()
+	m.runtime.fire("enemy_hit", 0, null, holder)
+	_check(abs(EntityService.enemy_time_factor - 0.4) < 0.01, "slow time on an evolved target: %s" % EntityService.enemy_time_factor)
+	EntityService.stop_enemy_time_slow()
+	holder._is_meca = false
+	m.runtime.fire("enemy_hit", 0, null, holder)
+	_eq(EntityService.enemy_time_factor, 1.0, "not a mecha target")
+	holder.queue_free()
+	m.runtime.end_wave()
+	# 波次之外的扳机
+	var luck0 = rd.get_player_effect(Keys.stat_luck_hash, 0)
+	m.runtime.fire("mutated", 0)
+	_eq(rd.get_player_effect(Keys.stat_luck_hash, 0) - luck0, 1, "mutated fires outside a wave")
+	# 文本：没有未翻译的 key
+	for loc in ["zh", "en", "ja", "de"]:
+		TranslationServer.set_locale(loc)
+		var t = GE.graph_text(g, false)
+		_check(t.find("BE_") < 0 and t.find("{") < 0, loc + ": " + t)
+	TranslationServer.set_locale("en")
+	for k in ["stat_evolution", "bonus_crit_damage", "meca_only", "time_shift_on_hit", "weapon_set_bonus", "more_horde"]:
+		_check(m.stat_name(k).find("BE_") < 0 and m.stat_name(k).find("{") < 0 and m.stat_name(k) != k, "stat name: " + k + " = " + m.stat_name(k))
+
+
+func _flag_script() -> GDScript:
+	var s = GDScript.new()
+	s.source_code = "extends Node\nvar _is_meca = false\nvar _is_mutant = false\n"
+	s.reload()
+	return s
+
+
+# 其他 mod 的内容：add_mod_item（原版 1.2.0.1 重建时会丢）、直接加进列表的对象在重建后保留；套组里被移除的不补回
+func test_305_other_mods_content() -> void:
+	var a = _plain_item().duplicate()
+	a.my_id = "item_be_test_modapi"
+	a._generate_hashes()
+	isvc.add_mod_item(a)
+	var b = _plain_item().duplicate()
+	b.my_id = "item_be_test_direct"
+	b._generate_hashes()
+	isvc.items.push_back(b)
+	var c = _plain_item().duplicate()
+	c.my_id = "item_be_test_inset"
+	c._generate_hashes()
+	isvc.base_game_item_set.items.push_back(c)
+	isvc.invalidate_items_cache()
+	var items = isvc.items
+	_check(a in items, "add_mod_item content kept after a rebuild")
+	_check(b in items, "directly added content kept after a rebuild")
+	_check(c in items, "set content listed")
+	m._lists_changed()
+	_check(a in isvc.items and b in isvc.items, "kept after BroEditor invalidates the lists")
+	isvc.base_game_item_set.items.erase(c)
+	isvc.remove_mod_item(a)
+	isvc.invalidate_items_cache()
+	_check(not c in isvc.items, "content removed from its set not restored")
+	_check(not a in isvc.items, "remove_mod_item content not restored")
+	isvc.items.erase(b)
+	isvc.invalidate_items_cache()
+	_check(not b in isvc.items, "directly removed content stays removed")

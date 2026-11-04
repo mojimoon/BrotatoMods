@@ -55,6 +55,7 @@ func _on_enemy_died(enemy: Enemy, args: Entity.DieArgs) -> void:
 	var pos = enemy.global_position
 	var burning = args.is_burning or (is_instance_valid(enemy) and enemy._is_burning)
 	var cursed = _be_is_cursed(enemy)
+	var evolved = _be_camp(enemy)
 	# 致命一击的伤害类型（条件"伤害类型"）：燃烧致死取燃烧的缩放属性，否则取最后一次命中的缩放属性
 	var info = {"stats": []}
 	if args.is_burning:
@@ -76,6 +77,17 @@ func _on_enemy_died(enemy: Enemy, args: Entity.DieArgs) -> void:
 			rt.fire("burning_kill", p, pos, null, info)
 		if cursed:
 			rt.fire("cursed_kill", p, pos, null, info)
+		# 史前惧兽：进化（机械 / 异变）敌人
+		if evolved != "":
+			rt.fire("evolved_kill", p, pos, null, info)
+			rt.fire(evolved + "_kill", p, pos, null, info)
+
+
+# 进化敌人的阵营："meca" / "mutant" / ""
+static func _be_camp(enemy) -> String:
+	if not is_instance_valid(enemy) or not "_is_meca" in enemy:
+		return ""
+	return "meca" if enemy._is_meca else ("mutant" if enemy._is_mutant else "")
 
 
 static func _be_is_cursed(enemy) -> bool:

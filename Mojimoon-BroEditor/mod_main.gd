@@ -56,6 +56,7 @@ const WSTAT_FIELDS = [
 	["nb_projectiles", "int", ""], ["projectile_spread", "float", ""], ["piercing", "int", ""],
 	["piercing_dmg_reduction", "float", "pct"], ["bounce", "int", ""], ["bounce_dmg_reduction", "float", "pct"],
 	["projectile_speed", "int", ""], ["attack_type", "int", ""], ["alternate_attack_type", "bool", ""],
+	["can_shoot_without_target", "bool", ""],
 ]
 # 开局状态的默认值
 const START_DEFAULT = {
@@ -142,7 +143,9 @@ func _ready() -> void:
 	_register_enemy_behavior()
 	# 自定义角色必须在 ProgressData 读档之前注册（存档里的本局可能就是自定义角色）
 	_register_customs()
-	# DLC 角色在 ProgressData 就绪后才加入：本帧结束后再应用档案
+	# 此时 ProgressData 还没检查拥有的 DLC：上面查找角色时建立的原版列表缓存不含 DLC 内容，作废后按套组重建
+	_lists_changed()
+	# 档案在 ProgressData 就绪后（本帧结束）应用
 	call_deferred("apply_all")
 
 
@@ -193,6 +196,9 @@ static func new_profile() -> Dictionary:
 		"fuse": [],	# 角色：融合的角色 id（开局获得它们的全部效果，同 GMO / cave-modtools）
 		"ban_items": [],
 		"ban_weapons": [],
+		# 角色：升级时不出现的属性（原版 banned_upgrades，升级 id）、机械化选项里不出现的属性（banned_meca_stats）；null = 不修改
+		"ban_upgrades": null,
+		"ban_meca": null,
 		"wanted_tags": null,
 		"graph": null,
 		"start": {},
@@ -231,9 +237,16 @@ static func normalize_profile(p) -> Dictionary:
 		if v != 0 or str(k) in SET_KEYS:
 			stats[str(k)] = v
 	out.stats = stats
-	for k in ["effects", "weapons", "wanted_tags"]:
+	for k in ["effects", "weapons", "wanted_tags", "ban_upgrades", "ban_meca"]:
 		if out[k] != null and not out[k] is Array:
 			out[k] = null
+	for k in ["ban_upgrades", "ban_meca"]:
+		if out[k] is Array:
+			var ids = []
+			for x in out[k]:
+				if not str(x) in ids:
+					ids.push_back(str(x))
+			out[k] = ids
 	for k in ["start_items", "ban_items", "ban_weapons", "fuse"]:
 		if not out[k] is Array:
 			out[k] = []
@@ -1116,15 +1129,12 @@ func _unregister_unit(kind: String, id: String) -> void:
 	var isvc = _isvc()
 	match kind:
 		"character":
-			var c = _customs.get(id)
 			_customs.erase(id)
-			if c != null:
-				isvc.characters.erase(c)
+			_lists_changed()
 		"item":
-			var it = _custom_items.get(id)
-			_custom_items.erase(id)
-			if it != null:
-				isvc.items.erase(it)
+			if _custom_items.has(id):
+				_custom_items.erase(id)
+				_lists_changed()
 				_repool = true
 		"weapon":
 			for w in family_members(id):
@@ -1523,6 +1533,39 @@ func _isvc():
 	return _autoload("ItemService")
 
 
+# 1.2 起原版的 items / characters / weapons 是按物品套组重建的缓存：自定义对象增删后作废，
+# 下次访问时重建（extensions/singletons/item_service.gd 在重建后补回本模组的对象），并清空按 id 查找的缓存
+func _lists_changed() -> void:
+	var isvc = _isvc()
+	if isvc == null:
+		return
+	isvc.invalidate_items_cache()
+	isvc.invalidate_characters_cache()
+	isvc.invalidate_weapons_cache()
+	isvc._item_id_lookup = {}
+	isvc._weapon_id_lookup = {}
+	isvc._base_weapon_lookup = {}
+	isvc._limited_item_origins_dirty = true
+
+
+# 物品套组（DLC 与免费更新）是否在本局 / 当前选择中启用
+static func set_active(id: String) -> bool:
+	var pd = _autoload("ProgressData")
+	return pd != null and id in pd.active_update_data
+
+
+# 补的低级武器只在原家族所属的套组启用时进商店池（自定义武器总是可以）
+func weapon_in_active_set(w) -> bool:
+	if is_custom_family(w.weapon_id):
+		return true
+	var vm = _vanilla_members(w.weapon_id)
+	var isvc = _isvc()
+	if vm.empty() or isvc == null:
+		return true
+	var ud = isvc.get_update_data_by_item_id(vm[0])
+	return ud == null or set_active(ud.id)
+
+
 func find_character(id: String):
 	var isvc = _isvc()
 	if isvc == null:
@@ -1665,7 +1708,8 @@ func stat_text_key(key: String) -> String:
 # 属性显示名：原版 STAT_X；属性获取修改（gain_stat_x / gain_x）= "<属性> 获取 %"；其余用本 mod 的 BE_K_X
 # 原版标签含义不清（NUMBER_OF_ENEMIES = "敌人"）的 key：用本 mod 的标签
 # item_box_gold：原版标签"箱子里的材料"不如袋子的说法清楚，用本 mod 的标签
-const OWN_LABEL_KEYS = ["number_of_enemies", "item_box_gold"]
+# time_shift_on_hit：原版标签是一句话（"受伤时可以扭曲时间"），数值其实是敌人减速的百分比
+const OWN_LABEL_KEYS = ["number_of_enemies", "item_box_gold", "time_shift_on_hit"]
 # 原版效果文本不含数值（"同时仅能装备1种武器"）的 key：不借用该文本
 const NO_LIBRARY_TEXT = ["weapon_slot"]
 const TEXT_FORMAT_LIKE = {"effect_bounce_damage": "effect_piercing_damage"}
@@ -1871,9 +1915,8 @@ func start_item_effect(s):
 	if r == null or r is CharacterData:
 		return null
 	var weapon = r is WeaponData
-	# 没有 DLC 时原版会丢掉诅咒的初始装备：改为普通初始装备
-	var pd = _autoload("ProgressData")
-	var cursed = bool(s.get("cursed", false)) and pd != null and pd.is_dlc_available_and_active("abyssal_terrors")
+	# 深渊恐惧套组未启用时原版会丢掉诅咒的初始装备：改为普通初始装备
+	var cursed = bool(s.get("cursed", false)) and set_active("abyssal_terrors")
 	var ck = ("cursed_" if cursed else "") + ("starting_weapon" if weapon else "starting_item")
 	return make_effect({"set": {
 		"key": id, "value": max(1, int(s.get("n", 1))), "custom_key": ck, "storage_method": 1, "effect_sign": 3,
@@ -1904,7 +1947,7 @@ func _set_message(key: String, text: String) -> void:
 
 
 const BACKUP_FIELDS = {
-	"character": ["effects", "name", "starting_weapons", "wanted_tags"],
+	"character": ["effects", "name", "starting_weapons", "wanted_tags", "banned_upgrades", "banned_meca_stats"],
 	"item": ["effects", "name", "value", "tier", "max_nb", "tags", "replaced_by"],
 	"weapon": ["effects", "name", "value", "stats", "sets"],
 	"set": ["set_bonuses"],
@@ -1973,6 +2016,7 @@ func apply_all() -> void:
 	_good_dirs = null
 	_ban_cache.clear()
 	_global_ban = null
+	_lists_changed()
 	_register_customs()
 	_register_custom_items()
 	_register_weapon_families()
@@ -1980,12 +2024,11 @@ func apply_all() -> void:
 	_apply_items()
 	_apply_weapons()
 	_apply_families()
+	# 原版的列表与按 id 查找的缓存（新增或删除对象、改稀有度 / 升级链后会过期）
+	_lists_changed()
 	if _repool and isvc.has_method("init_unlocked_pool"):
 		isvc.init_unlocked_pool()
 	_repool = false
-	# 原版按 id 查找道具 / 武器的缓存（新增或删除对象后会过期）
-	isvc._item_id_lookup = {}
-	isvc._weapon_id_lookup = {}
 	for id in profiles:
 		var p = profiles[id]
 		var c = find_character(id)
@@ -2009,6 +2052,10 @@ func apply_all() -> void:
 				c.starting_weapons = ws
 		if p.wanted_tags is Array:
 			c.wanted_tags = p.wanted_tags.duplicate()
+		if p.ban_upgrades is Array:
+			c.banned_upgrades = p.ban_upgrades.duplicate()
+		if p.ban_meca is Array:
+			c.banned_meca_stats = p.ban_meca.duplicate()
 	_apply_fusion()
 	if apply_group_locks():
 		isvc.init_unlocked_pool()
@@ -2592,14 +2639,35 @@ static func scaling_names(scaling: Array) -> Array:
 	return out
 
 
-# 对象来源：原版 / dlc1、dlc2… / 模组（按资源路径；本模组新增的对象没有路径，属于模组）
+# 对象来源：原版（含免费更新）/ dlc1、dlc2 / 模组。1.2 起 DLC2 的内容不在 res://dlcs/ 下：按所属物品套组判断；
+# 不在任何套组里的原版路径对象按路径；本模组新增的对象没有路径，属于模组
+const DLC_SOURCES = {"abyssal_terrors": "dlc1", "primal_dread": "dlc2"}
+
+
 static func source_of(res) -> String:
 	var path = res.resource_path if res != null else ""
+	if path == "":
+		return "mod"
+	var isvc = _autoload("ItemService")
+	if isvc != null:
+		for u in isvc.update_data_list:
+			if u != null and u.item_set != null and _set_contains(u.item_set, res):
+				return DLC_SOURCES.get(u.id, "vanilla")
 	if path.begins_with("res://dlcs/dlc_"):
 		return "dlc" + path.get_slice("/", 3).trim_prefix("dlc_")
 	if path.begins_with("res://items/") or path.begins_with("res://weapons/"):
 		return "vanilla"
 	return "mod"
+
+
+static func _set_contains(s, res) -> bool:
+	if res is CharacterData:
+		return res in s.characters
+	if res is WeaponData:
+		return res in s.weapons
+	if res in s.items:
+		return true
+	return s is PrimalDreadItemSetData and (res in s.meca_items or res in s.mutant_items or res in s.evolution_items)
 
 
 # ============================================================
@@ -2629,7 +2697,7 @@ func create_custom(base_id: String, suffix: String = "") -> String:
 		var bp = profiles.get(base_id)
 		if bp != null and bp.enabled:
 			# 基底已有档案：连同档案内容一起复制
-			for k in ["effects", "stats", "weapons", "start_items", "fuse", "ban_items", "ban_weapons", "wanted_tags", "desc"]:
+			for k in ["effects", "stats", "weapons", "start_items", "fuse", "ban_items", "ban_weapons", "ban_upgrades", "ban_meca", "wanted_tags", "desc"]:
 				p[k] = bp[k].duplicate(true) if bp[k] is Array or bp[k] is Dictionary else bp[k]
 		if p.effects == null:
 			p.effects = []
@@ -2642,6 +2710,10 @@ func create_custom(base_id: String, suffix: String = "") -> String:
 			p.weapons = ws
 		if p.wanted_tags == null:
 			p.wanted_tags = backup_value(base, "wanted_tags").duplicate()
+		for pair in [["ban_upgrades", "banned_upgrades"], ["ban_meca", "banned_meca_stats"]]:
+			if p[pair[0]] == null:
+				var orig = backup_value(base, pair[1])
+				p[pair[0]] = orig.duplicate() if orig is Array else []
 	else:
 		p.name = tr("BE_NEW_CHARACTER")
 		p.effects = []
@@ -2658,11 +2730,8 @@ func delete_custom(id: String) -> bool:
 	if not is_custom(id) or is_in_saved_run(id):
 		return false
 	profiles.erase(id)
-	var c = _customs.get(id)
 	_customs.erase(id)
-	var isvc = _isvc()
-	if c != null and isvc != null:
-		isvc.characters.erase(c)
+	_lists_changed()
 	return true
 
 
@@ -2719,13 +2788,15 @@ func _register_custom(id: String) -> void:
 		c.banned_item_groups = []
 		c.banned_items = []
 		c.banned_upgrades = []
+		c.banned_meca_stats = []
 		c.starting_weapons = []
 		c.starting_items = []
 		c.item_appearances = []
+		c.set_meta("broeditor", true)
 		_customs[id] = c
 	c._generate_hashes()
 	if not c in isvc.characters:
-		isvc.characters.push_back(c)
+		_lists_changed()
 	_fill_custom(c, id, profiles[id])
 
 
@@ -2740,6 +2811,46 @@ func _fill_custom(c, id: String, p: Dictionary) -> void:
 	if c.starting_weapons.empty():
 		c.starting_weapons = [load("res://weapons/melee/fist/1/fist_data.tres")]
 	c.wanted_tags = p.wanted_tags.duplicate() if p.wanted_tags is Array else []
+	# 升级 / 机械化禁用的属性：档案没有时同基底；需要的物品套组（史前惧兽的变异体等）同基底
+	c.banned_upgrades = _base_list(p.ban_upgrades, base, "banned_upgrades")
+	c.banned_meca_stats = _base_list(p.ban_meca, base, "banned_meca_stats")
+	c.required_item_set = base.required_item_set if base != null and base != c else ""
+
+
+# 禁用页"升级"的候选：原版升级按 upgrade_id 去重 -> [[升级 id, 属性 key]]（属性 key 用于名称与图标）
+func upgrade_ban_options() -> Array:
+	var out = []
+	var seen = {}
+	var isvc = _isvc()
+	for u in isvc.upgrades if isvc != null else []:
+		if u == null or seen.has(u.upgrade_id) or u.effects.empty():
+			continue
+		seen[u.upgrade_id] = true
+		out.push_back([u.upgrade_id, str(u.effects[0].key)])
+	return out
+
+
+# 禁用页"机械化"的候选：史前惧兽机械化时可能出现的属性（没有该 DLC 时为空）
+func meca_ban_options() -> Array:
+	var out = []
+	var pd = _autoload("ProgressData")
+	var isvc = _isvc()
+	var dlc = isvc.get_dlc_data_by_id("primal_dread") if isvc != null else null
+	if dlc == null or pd == null or not pd.is_dlc_available("primal_dread") or not "meca_stat_categories" in dlc:
+		return out
+	for cat in dlc.meca_stat_categories.values():
+		for h in cat:
+			var k = Keys.hash_to_string.get(h, "")
+			if k != "" and not k in out:
+				out.push_back(k)
+	return out
+
+
+func _base_list(v, base, field: String) -> Array:
+	if v is Array:
+		return v.duplicate()
+	var orig = backup_value(base, field) if base != null else null
+	return orig.duplicate() if orig is Array else []
 
 
 # ============================================================
@@ -2782,9 +2893,8 @@ func delete_custom_item(id: String) -> bool:
 		return false
 	item_profiles.erase(id)
 	disabled.item.erase(id)
-	var it = _custom_items.get(id)
 	_custom_items.erase(id)
-	_isvc().items.erase(it)
+	_lists_changed()
 	_repool = true
 	return true
 
@@ -2805,6 +2915,7 @@ func _register_custom_item(id: String) -> void:
 		it = load("res://items/global/item_data.gd").new()
 		it.my_id = id
 		it.unlocked_by_default = true
+		it.set_meta("broeditor", true)
 		_custom_items[id] = it
 	# 基础字段直接取档案（自定义道具的档案总是完整的）
 	var base = find_target("item", p.base)
@@ -2824,7 +2935,7 @@ func _register_custom_item(id: String) -> void:
 		it.effects = []
 	it._generate_hashes()
 	if not it in isvc.items:
-		isvc.items.push_back(it)
+		_lists_changed()
 		_repool = true
 
 
@@ -3056,7 +3167,7 @@ func _unregister_weapon(id: String) -> void:
 	weapon_profiles.erase(id)
 	_orig_effects.erase(id)
 	if w != null:
-		_isvc().weapons.erase(w)
+		_lists_changed()
 	_repool = true
 
 
@@ -3103,6 +3214,7 @@ func _register_custom_weapon(weapon_id: String, t: int) -> void:
 	var w = _custom_weapons.get(id)
 	if w == null:
 		w = load("res://items/global/weapon_data.gd").new()
+		w.set_meta("broeditor", true)
 		_custom_weapons[id] = w
 	w.my_id = id
 	w.weapon_id = weapon_id
@@ -3120,7 +3232,6 @@ func _register_custom_weapon(weapon_id: String, t: int) -> void:
 		w.icon = custom_icon(weapon_id, f, "weapon")
 		w.name = f.name if f.name != "" else tr("BE_NEW_WEAPON")
 		_set_message(weapon_id.to_upper(), w.name)
-	w.add_to_chars_as_starting = []
 	w.upgrades_into = null
 	w._generate_hashes()
 	_orig_effects.erase(id)
@@ -3129,7 +3240,7 @@ func _register_custom_weapon(weapon_id: String, t: int) -> void:
 		p.custom = true
 		weapon_profiles[id] = p
 	if not w in _isvc().weapons:
-		_isvc().weapons.push_back(w)
+		_lists_changed()
 		_repool = true
 
 
@@ -3228,8 +3339,9 @@ func _effect_goodness(n: Dictionary) -> int:
 # 否则诅咒效果的数值（方向 = E）。E = 0（中立）的路径不变。方向交给原版：+1 按正面放大、-1 按负面缩小
 func curse_graph(g: Dictionary, modifier: float) -> Dictionary:
 	var out = g.duplicate(true)
-	var pd = _autoload("ProgressData")
-	var dlc = pd.get_dlc_data("abyssal_terrors") if pd != null else null
+	var isvc = _isvc()
+	# 深渊恐惧未启用（未拥有 / 套组关闭）时：带诅咒的蓝图（旧存档）按原数值
+	var dlc = isvc.get_dlc_data_by_id("abyssal_terrors") if isvc != null and set_active("abyssal_terrors") else null
 	if dlc == null or modifier <= 0.0:
 		return out
 	var by_id = GraphEffect.nodes_by_id(out)
@@ -3325,6 +3437,86 @@ func curse_graph(g: Dictionary, modifier: float) -> Dictionary:
 	return out
 
 
+# 异变（史前惧兽）把蓝图复制到肿瘤上：原版按异变强度缩放效果的 value（蓝图的 value 是 CURSE_PROBE），
+# 多份相同的复制在肿瘤上合并时 value 相加。这里把强度 f = value / CURSE_PROBE 换算到图里：
+# 每个效果节点（诅咒时会被改的那些数值，以及详细信息里的额外属性加成、"获得效果"引用的效果）按 f 缩放，
+# 计数 / 冷却等条件不变；中立的效果（变量）不变。缩放后非零的数值至少保留 1（同原版异变的向上取整）
+func scale_graph(g: Dictionary, f: float) -> Dictionary:
+	var out = g.duplicate(true)
+	if f <= 0.0 or abs(f - 1.0) < 0.0001:
+		return out
+	var by_id = GraphEffect.nodes_by_id(out)
+	var done = {}
+	for path in GraphEffect.paths(out):
+		var eff = by_id[path[-1]]
+		if done.has(eff.id) or _effect_goodness(eff) == 0:
+			continue
+		done[eff.id] = true
+		if eff.kind == "grant":
+			var ge = make_effect(eff.params.ref) if eff.params.get("ref") is Dictionary else null
+			if ge != null:
+				ge.value = _scale_int(int(ge.value), f)
+				eff.params.ref = _effect_to_spec(eff.params.ref, ge)
+			continue
+		for pname in Catalog.CURSE_EFFECT_PARAMS.get(eff.kind, []):
+			var v = int(eff.params.get(pname, _node_default(eff.kind, pname)))
+			if v == 0:
+				continue
+			v = _scale_int(v, f)
+			var mx = Catalog.CURSE_MAX.get(eff.kind, {}).get(pname)
+			eff.params[pname] = int(min(v, mx)) if mx != null else v
+		if eff.params.get("scaling_stats") is Array:
+			for row in eff.params.scaling_stats:
+				row[1] = float(row[1]) * f
+	return out
+
+
+# 异变期间（RunData._is_mutating）卸下的蓝图的"仅一次"令牌：[玩家] -> [令牌列表...]。异变后加回的同一张图
+# 消耗这里的记录、不重新发放；异变结束后没被认领的（持有者没有被换回来）按原版卸下处理
+var _mutation_tokens: Array = [[], [], [], []]
+
+
+static func is_mutating() -> bool:
+	var rd = _autoload("RunData")
+	return rd != null and "_is_mutating" in rd and rd._is_mutating
+
+
+func keep_mutation_tokens(p: int, tokens: Array) -> bool:
+	if tokens.empty() or p < 0 or p >= _mutation_tokens.size() or not is_mutating():
+		return false
+	_mutation_tokens[p].push_back(tokens)
+	return true
+
+
+func take_mutation_tokens(p: int, tokens: Array) -> bool:
+	if tokens.empty() or p < 0 or p >= _mutation_tokens.size() or not is_mutating():
+		return false
+	var sig = str(tokens)
+	for i in _mutation_tokens[p].size():
+		if str(_mutation_tokens[p][i]) == sig:
+			_mutation_tokens[p].remove(i)
+			return true
+	return false
+
+
+# 一次异变结束（extensions/singletons/run_data.gd）：清掉没被认领的令牌，并触发蓝图扳机"道具异变时"
+func after_mutation(p: int, mutated) -> void:
+	if p >= 0 and p < _mutation_tokens.size():
+		var tokens = GraphEffect.once_list(p)
+		for list in _mutation_tokens[p]:
+			for t in list:
+				if tokens != null:
+					GraphEffect.take_once(tokens, t)
+		_mutation_tokens[p] = []
+	if mutated != null and runtime != null:
+		runtime.fire("mutated", p, null, null, {"item": mutated})
+
+
+static func _scale_int(v: int, f: float) -> int:
+	var sv = 1 if v > 0 else -1
+	return sv * int(max(1, ceil(abs(v) * f - 0.0001)))
+
+
 static func _node_default(kind: String, pname: String):
 	var d = Catalog.node_def(kind)
 	if d != null:
@@ -3380,9 +3572,22 @@ func _library_sources() -> Array:
 	return sources
 
 
+# 未拥有的 DLC 的内容（1.2 起全部资源都在本体里，只是不进原版列表）：[{characters, items, weapons}]
 func _dlcs() -> Array:
+	var out = []
+	var isvc = _isvc()
 	var pd = _autoload("ProgressData")
-	return pd.available_dlcs if pd != null and "available_dlcs" in pd else []
+	if isvc == null or pd == null:
+		return out
+	for u in isvc.update_data_list:
+		if u == null or u.item_set == null or u.update_type != UpdateData.UpdateType.DLC or pd.is_dlc_available(u.id):
+			continue
+		var s = u.item_set
+		var items = s.items.duplicate()
+		if s is PrimalDreadItemSetData:
+			items += s.meca_items + s.mutant_items + s.evolution_items
+		out.push_back({"characters": s.characters, "items": items, "weapons": s.weapons})
+	return out
 
 
 # 未启用的 DLC 里的角色 / 道具（效果库引用它们的效果）

@@ -3,9 +3,10 @@
 # 用法（Git Bash）：bash mods/tests/BroEditor/run_tests.sh [core|ui|battle|compat|all|core,ui]
 #   默认 = core,ui,battle；compat = 与 QianMo-BroLab、cave-modtools 同时加载的兼容性测试；all = 全部
 #   compat 之后自动再运行 compat_off：卸下这两个 mod、沿用同一个 user://，检查停用 mod 后的表现
+#   BE_COMPAT_MODS="QianMo-BroLab" 只与列出的 mod 做 compat 测试（默认 BroLab + cave-modtools）
 #   BE_ONLY=<名字片段> 只跑名字含该片段的测试；BE_KEEP_LOG=<路径> 保留完整日志
 #
-# - 在反编译的游戏工程（本仓库的上一级目录）里运行，使用真实的 ItemService / RunData / ModLoader
+# - 在反编译的游戏工程（本仓库上一级的 1.2/，BROTATO_GAME 可覆盖；其中的 mods/ 是指向本仓库的目录联接）里运行，使用真实的 ItemService / RunData / ModLoader
 # - 先把 mods/<MOD> 同步到 mods-unpacked/<MOD>（编辑器模式下 ModLoader 只加载这里的 mod）
 # - compat 组在单独的进程里运行：临时把 other_mods/mods-unpacked 下的两个 mod 复制进 mods-unpacked，结束后删除
 # - APPDATA 指向临时目录：user:// 与真实存档、ModLoader 配置完全隔离
@@ -14,9 +15,11 @@ set -u
 BE_KEEP_LOG=${BE_KEEP_LOG:-}
 
 HERE=$(cd "$(dirname "$0")" && pwd)
-PROJECT=$(cd "$HERE/../../.." && pwd)
+ROOT=$(cd "$HERE/../../.." && pwd)
+PROJECT=${BROTATO_GAME:-$ROOT/1.2}
 MOD=Mojimoon-BroEditor
-COMPAT_MODS="QianMo-BroLab cave-modtools"
+# BE_COMPAT_MODS 可覆盖 compat 组同时加载的 mod（如还没适配当前游戏版本的 mod 先不加载）
+COMPAT_MODS=${BE_COMPAT_MODS:-"QianMo-BroLab cave-modtools"}
 SEL=${1:-core,ui,battle}
 [ "$SEL" = "all" ] && SEL=core,ui,battle,compat
 GODOT=${GODOT:-/d/env/godot_3.7-dev1/Godot_v3.7-dev1_win64.exe}
@@ -43,7 +46,7 @@ cleanup_compat() {
 run_godot() {
 	local sandbox=${3:-}
 	[ -z "$sandbox" ] && sandbox=$(mktemp -d)
-	(cd "$PROJECT" && APPDATA=$(cygpath -w "$sandbox") BE_TEST=1 BE_SUITE="$1" timeout 900 "$GODOT" --no-window --audio-driver Dummy --path . \
+	(cd "$PROJECT" && APPDATA=$(cygpath -w "$sandbox") BE_TEST=1 BE_SUITE="$1" BE_COMPAT_MODS="$COMPAT_MODS" timeout 900 "$GODOT" --no-window --audio-driver Dummy --path . \
 		-s "res://mods/tests/BroEditor/run_be.gd" > "$2" 2>&1)
 	local st=$?
 	[ -z "${3:-}" ] && rm -rf "$sandbox"
@@ -103,12 +106,12 @@ fi
 
 if [ "$HAS_COMPAT" -gt 0 ]; then
 	for m in $COMPAT_MODS; do
-		if [ ! -d "$PROJECT/other_mods/mods-unpacked/$m" ]; then
+		if [ ! -d "$ROOT/other_mods/mods-unpacked/$m" ]; then
 			echo "compat: $m not found in other_mods/mods-unpacked" >&2
 			exit 2
 		fi
 		rm -rf "$PROJECT/mods-unpacked/$m"
-		cp -r "$PROJECT/other_mods/mods-unpacked/$m" "$PROJECT/mods-unpacked/$m"
+		cp -r "$ROOT/other_mods/mods-unpacked/$m" "$PROJECT/mods-unpacked/$m"
 	done
 	[ -n "$NORMAL" ] && echo
 	SHARED=$(mktemp -d)

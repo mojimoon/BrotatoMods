@@ -78,7 +78,7 @@ const OBJECT_TABS = [
 	["stats", "BE_TAB_STATS", C_ACCENT_3],
 	["blueprint", "BE_TAB_BLUEPRINT", C_ACCENT_2],
 ]
-const SOURCES = [["all", "BE_FILTER_ALL"], ["vanilla", "BE_SRC_VANILLA"], ["dlc1", "BE_SRC_DLC1"], ["mod", "BE_SRC_MOD"]]
+const SOURCES = [["all", "BE_FILTER_ALL"], ["vanilla", "BE_SRC_VANILLA"], ["dlc1", "BE_SRC_DLC1"], ["dlc2", "BE_SRC_DLC2"], ["mod", "BE_SRC_MOD"]]
 const SORTS = [["tier", "BE_SORT_TIER"], ["name", "BE_SORT_NAME"], ["price", "BE_SORT_PRICE"]]
 
 var initial_id := ""
@@ -127,6 +127,7 @@ const WSTAT_LAYOUT = [
 	["#attack"],
 	["nb_projectiles"], ["piercing", "piercing_dmg_reduction"],
 	["bounce", "bounce_dmg_reduction"], ["projectile_speed", "projectile_spread"],
+	["can_shoot_without_target"],
 ]
 # 界面显示方式：pct = 内部 0–1 显示为百分比
 const WSTAT_SHOW = {
@@ -2556,6 +2557,13 @@ func _wstat_cell(grid: Control, k: String, type: String, base, v: Dictionary, w)
 		_attr_row(grid, tr("BE_WS_ATTACK_TYPE"), tb, "attack_type")
 		_mark_name("attack_type", str(mode), str(base_mode))
 		return
+	if type == "bool":
+		var cb = CheckBox.new()
+		cb.pressed = bool(v.wstats.get(k, base.get(k)))
+		cb.connect("toggled", self, "_on_wstat_bool", [k])
+		_attr_row(grid, tr("BE_WS_" + k.to_upper()), cb, k)
+		_mark_name(k, cb.pressed, bool(base.get(k)))
+		return
 	var mode = WSTAT_SHOW.get(k, "")
 	var cur = v.wstats.get(k, base.get(k))
 	var ctl = _spin(-99999, 99999, 0.01 if type == "float" and mode == "" else 1)
@@ -2602,6 +2610,17 @@ func _on_wstat_changed(value, f: Array) -> void:
 		_changed()
 		if _aspd_label != null and is_instance_valid(_aspd_label):
 			_aspd_label.text = _aspd_text(_mod.weapon_stats_for(_character(), p))
+
+
+func _on_wstat_bool(on: bool, k: String) -> void:
+	var p = _p()
+	var base = _mod.backup_value(_character(), "stats")
+	if on == bool(base.get(k)):
+		p.wstats.erase(k)
+	else:
+		p.wstats[k] = on
+	_mark_name(k, on, bool(base.get(k)))
+	_changed()
 
 
 # 近战攻击方式：突刺 / 横扫 / 交替（原版 alternate_attack_type，从突刺开始）
@@ -2748,7 +2767,10 @@ func _build_stat_tables(col: Control, v: Dictionary) -> void:
 				table.add_child(_label(tr(k.substr(1)), FONT_SMALL, C_ACCENT_3))
 			else:
 				table.add_child(_stat_row(k, v) if k != "" else Control.new())
-	for g in ["BE_GRP_SHOP", "BE_GRP_MAP", "BE_GRP_RULES"]:
+	for g in ["BE_GRP_SHOP", "BE_GRP_MAP", "BE_GRP_EVOLUTION", "BE_GRP_RULES"]:
+		# 进化（史前惧兽）：没有这个 DLC 时不显示
+		if g == "BE_GRP_EVOLUTION" and not ProgressData.is_dlc_available("primal_dread"):
+			continue
 		var gb = _section(col, g, C_ACCENT_3)
 		var grid = _stat_grid(gb)
 		for k in groups[g]:
@@ -2804,9 +2826,19 @@ func _stat_icon(key: String) -> Texture:
 	if key.begins_with("gain_") and key != "gain_pct_gold_start_wave":
 		base = key.substr(5)
 	var tex = null
-	for path in Catalog.STAT_ICON_PATHS.get(base, []):
-		if tex == null and ResourceLoader.exists(path):
-			tex = load(path)
+	for src in Catalog.STAT_ICON_PATHS.get(base, []):
+		if tex != null:
+			break
+		if src.begins_with("res://"):
+			if ResourceLoader.exists(src):
+				tex = load(src)
+			continue
+		# 原版对象 id：用它的图标（未拥有的 DLC 里的对象也找得到）
+		var r = _mod._find_any(src)
+		if r == null:
+			r = _mod._find_dlc(src)
+		if r != null and r.icon != null:
+			tex = r.icon
 	for k in [base, Catalog.STAT_ICON_ALIASES.get(base, "")]:
 		if k != "" and tex == null:
 			tex = ItemService.get_stat_small_icon(Keys.generate_hash(k))
@@ -3727,7 +3759,7 @@ func _build_gear() -> void:
 		_apply_action_style(b, C_ACCENT_3)
 		b.connect("pressed", self, "_open_picker", [m[1]])
 		irow.add_child(b)
-	var dlc = ProgressData.is_dlc_available_and_active("abyssal_terrors")
+	var dlc = BEMain.set_active("abyssal_terrors")
 	for i in v.start_items.size():
 		var s = v.start_items[i]
 		var r = _mod._find_any(str(s.get("id", "")))
@@ -3936,7 +3968,68 @@ func _build_bans() -> void:
 		var grid = _icon_grid(8)
 		scroll.add_child(grid)
 		_ban_grids[kind] = [grid, title]
+	_build_stat_bans()
 	_fill_bans()
+
+
+# 属性禁用：升级时不出现的属性（原版 banned_upgrades）、机械化选项里不出现的属性（史前惧兽，banned_meca_stats）
+func _build_stat_bans() -> void:
+	var card = _card(_page)
+	var box = VBoxContainer.new()
+	box.add_constant_override("separation", 6)
+	card.add_child(box)
+	for entry in [["ban_upgrades", "banned_upgrades", "BE_BAN_UPGRADES", _mod.upgrade_ban_options()], ["ban_meca", "banned_meca_stats", "BE_BAN_MECA", _mod.meca_ban_options()]]:
+		var opts: Array = entry[3]
+		if opts.empty():
+			continue
+		var cur = _stat_ban_list(entry[0], entry[1])
+		var row = HBoxContainer.new()
+		box.add_child(row)
+		var title = _label(tr(entry[2]).replace("{0}", str(cur.size())), FONT_NORMAL, C_DANGER)
+		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(title)
+		var clear = _button(tr("BE_BANS_CLEAR"), FONT_DESC)
+		_apply_action_style(clear, C_DANGER)
+		clear.connect("pressed", self, "_on_stat_ban_set", [entry[0], entry[1], []])
+		row.add_child(clear)
+		var grid = GridContainer.new()
+		grid.columns = 6
+		grid.add_constant_override("hseparation", 6)
+		grid.add_constant_override("vseparation", 6)
+		box.add_child(grid)
+		for o in opts:
+			var id = o[0] if o is Array else o
+			var stat = o[1] if o is Array else o
+			var c = _chip(stat_name(stat), id, id in cur, C_DANGER)
+			c.icon = _stat_icon(stat)
+			c.expand_icon = false
+			c.connect("pressed", self, "_on_stat_ban_toggle", [entry[0], entry[1], id])
+			grid.add_child(c)
+
+
+# 生效的列表：档案没有修改时为角色原有的
+func _stat_ban_list(pkey: String, field: String) -> Array:
+	var v = _view()
+	if v.get(pkey) is Array:
+		return v[pkey]
+	var c = _character()
+	var orig = _mod.backup_value(c, field) if c != null else null
+	return orig if orig is Array else []
+
+
+func _on_stat_ban_toggle(pkey: String, field: String, id: String) -> void:
+	var list = _stat_ban_list(pkey, field).duplicate()
+	if id in list:
+		list.erase(id)
+	else:
+		list.push_back(id)
+	_on_stat_ban_set(pkey, field, list)
+
+
+func _on_stat_ban_set(pkey: String, field: String, list: Array) -> void:
+	_p()[pkey] = list.duplicate()
+	_changed()
+	_build_page()
 
 
 func _ban_list(kind: String) -> Array:

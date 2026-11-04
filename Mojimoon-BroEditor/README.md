@@ -10,6 +10,8 @@
 
 ## English
 
+**Now Supports v1.2 and Primal Dread!**
+
 **Edit any character, item or weapon, or create your own — all with in-game visual editor. No coding required.**
 
 ### Features
@@ -55,6 +57,8 @@ Files are saved in `%APPDATA%\Brotato\Mojimoon-BroEditor\` (Windows), `~/Library
 - `uploads.json`: your Workshop uploads from this computer, used to delete them later.
 
 <!-- BBCode
+
+[pullquote]Now Supports v1.2 and Primal Dread![/pullquote]
 
 [pullquote]Edit any character, item or weapon, or create your own — all with in-game visual editor. No coding required.[/pullquote]
 
@@ -137,6 +141,8 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 ## 中文
 
+**现已支持 1.2 版本和史前惧兽！**
+
 **修改原版角色、道具、武器，或者原创一个——都能在游戏中可视化编辑，无需代码。**
 
 ### 功能
@@ -181,6 +187,8 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 - `uploads.json`：本机在工坊上传的记录，用于之后删除。
 
 <!-- BBCode
+
+[pullquote]现已支持 1.2 版本和史前惧兽！[/pullquote]
 
 [pullquote]修改原版角色、道具、武器，或者原创一个——都能在游戏中可视化编辑，无需代码。[/pullquote]
 

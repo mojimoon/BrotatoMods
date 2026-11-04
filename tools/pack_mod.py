@@ -1,8 +1,8 @@
 """打包 mod 并复制到创意工坊测试目录（PowerShell / cmd / bash 都能直接运行）。
 
 用法：python mods/tools/pack_mod.py <MOD> [workshop_dir]
-  1. mods/<MOD> 同步到 mods-unpacked/<MOD>
-  2. 打包为 <工程根>/<MOD>.zip（内部路径 mods-unpacked/<MOD>/...，与 OneItemToRuleThemAll 一致，不含 .md）
+  1. mods/<MOD> 同步到 <游戏工程>/mods-unpacked/<MOD>（游戏工程 = 仓库上一级的 1.2/，可用环境变量 BROTATO_GAME 覆盖）
+  2. 打包为 <游戏工程>/<MOD>.zip（内部路径 mods-unpacked/<MOD>/...，与 OneItemToRuleThemAll 一致，不含 .md）
   3. 复制 zip 到 workshop_dir（默认 1942280/3671094202）
 """
 import os
@@ -21,8 +21,9 @@ def main() -> int:
     if not mod.startswith("Mojimoon-"):
         mod = "Mojimoon-" + mod
     workshop = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_WORKSHOP
-    project = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-    src = os.path.join(project, "mods", mod)
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    project = os.environ.get("BROTATO_GAME") or os.path.join(root, "1.2")
+    src = os.path.join(root, "mods", mod)
     if not os.path.isdir(src):
         print("mod not found: " + src)
         return 2
