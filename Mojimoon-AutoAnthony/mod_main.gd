@@ -44,7 +44,6 @@ var cfg_w_effects: int = 125		# 武器额外效果 50–250%（100% ≈ 原版�
 var cfg_avg: int = 100				# 平均数值 50–250%
 var cfg_variance: int = 100			# 浮动范围 50–250%（100% = 原版离散度）
 var cfg_triggers: int = 125			# 触发效果 50–250%（100% = 原版特殊行比例）
-var cfg_native_ratio: int = 0		# 保留原版道具 0–100%
 var cfg_fixed_seed: bool = false
 var cfg_seed: int = 0
 var cfg_font_scale: int = 100		# 设置界面字体大小 80–125%（界面偏好：不进分享码）
@@ -170,7 +169,6 @@ func get_cfg() -> Dictionary:
 		"avg": cfg_avg,
 		"variance": cfg_variance,
 		"triggers": cfg_triggers,
-		"native_ratio": cfg_native_ratio,
 	}
 
 
@@ -232,7 +230,6 @@ func apply_settings(d: Dictionary) -> void:
 	cfg_avg = int(clamp(int(d.get("avg", 100)), 50, 250))
 	cfg_variance = int(clamp(int(d.get("variance", 100)), 50, 250))
 	cfg_triggers = int(clamp(int(d.get("triggers", 125)), 50, 250))
-	cfg_native_ratio = int(clamp(int(d.get("native_ratio", 0)), 0, 100))
 	cfg_fixed_seed = bool(d.get("fixed_seed", false))
 	cfg_seed = int(d.get("seed", 0))
 
@@ -527,6 +524,13 @@ func _activate(state: Dictionary) -> void:
 				for sem in gen.ban_reasons(it.effects):
 					if not sem in ch.wanted_tags and not sem in gen.player_ban_sems:
 						gen.player_ban_sems.push_back(sem)
+	# 本局角色锁定的进化路线：只对一边有意义的效果可以出现在普通道具上
+	for ch in chars:
+		for e in ch.effects:
+			if e.key in ["meca_only", "dual_evolution"] and not 1 in gen.run_sides:
+				gen.run_sides.push_back(1)
+			if e.key in ["mutant_only", "dual_evolution"] and not -1 in gen.run_sides:
+				gen.run_sides.push_back(-1)
 	register_low_weapons(state.cfg)
 	plan = gen.generate(run_native(isvc.items), run_native(isvc.characters), native_only(chars), run_native(isvc.weapons) + _low_weapons)
 	_gen = gen
@@ -547,7 +551,10 @@ func _activate(state: Dictionary) -> void:
 				res.value = int(p.price)
 			# 金鱼 / 沙漏 / 镜子在原版"用后 / 移除时变成另一件道具"：重组后不再继承
 			res.replaced_by = null
-			if rename:
+			if p.get("fossil", false):
+				# 化石：名称固定为"化石：<原名>"（与原版化石一致，不论是否开启重命名）
+				res.name = tr("AA_FOSSIL_NAME_FMT").replace("{0}", tr(_backups[res.get_instance_id()].name))
+			elif rename:
 				res.name = _compose_name(p.adj, _backups[res.get_instance_id()].name)
 			# 究极混沌：新稀有度与随机图标
 			if p.has("tier"):
@@ -580,7 +587,8 @@ func _activate(state: Dictionary) -> void:
 				res.value = int(pw.price)
 	_rebuild_groups_and_bans(isvc)
 	# 商店的分档池在本局开始时（RunData.reset）已按原稀有度建好：稀有度改变后重建
-	if (bool(state.cfg.get("chaos", false)) or bool(state.cfg.get("tier_chaos", false)) or not _low_weapons.empty()) and isvc.has_method("init_unlocked_pool"):
+	# 生成了新化石：原版化石移出商店池（见 extensions/singletons/item_service.gd）
+	if (bool(state.cfg.get("chaos", false)) or bool(state.cfg.get("tier_chaos", false)) or not _low_weapons.empty() or has_fossils()) and isvc.has_method("init_unlocked_pool"):
 		isvc.init_unlocked_pool()
 	triggers_dirty = true
 	ModLoaderLog.info("Activated seed %d: %d items, %d characters, %d weapons" % [int(state.seed), plan.items.size(), plan.characters.size(), plan.weapons.size()], MOD_ID)
@@ -738,7 +746,7 @@ func _backup(res) -> void:
 func restore() -> void:
 	# 商店分档池按稀有度建好后不会自己更新：稀有度被改过（混沌）或补过低级武器时，还原后要重建，
 	# 否则之后不混沌的生成（关闭重组道具、返回角色选择、重新开始）会沿用混沌时的分档池（第 1 波刷出 T4 道具）
-	var repool = not _low_weapons.empty()
+	var repool = not _low_weapons.empty() or has_fossils()
 	for id in _backups:
 		var b = _backups[id]
 		var res = b.res
@@ -775,6 +783,16 @@ func restore() -> void:
 	_gen = null
 	plan = {}
 	triggers_dirty = true
+
+
+# 本局生成了新化石（原版化石不进商店池）
+func has_fossils() -> bool:
+	if plan.empty():
+		return false
+	for id in plan.items:
+		if plan.items[id].get("fossil", false):
+			return true
+	return false
 
 
 func is_generated(res) -> bool:

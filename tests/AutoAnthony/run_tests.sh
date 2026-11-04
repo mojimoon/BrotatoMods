@@ -5,6 +5,8 @@
 #   weapons：武器重组的全部测试；items = core,battle,audit；all = 全部
 #   AA_ONLY=<名字片段> 只跑名字含该片段的测试
 #   AA_INACTIVE_SETS=primal_dread[,abyssal_terrors,...] 本次运行停用这些物品套组（审计 DLC 对先验与估值的影响）
+#   AA_UNOWNED_DLC=abyssal_terrors,primal_dread 模拟未拥有这些 DLC（需要 1.2/singletons/platforms/steam.gd 的测试补丁）；
+#     写死了 DLC 道具的测试会失败（找不到道具），test_310 检查不生成只在该 DLC 里有意义的效果
 #   AA_AUDIT=1 运行只打印数据的审计测试（武器组 test_156 / 157 / 163）；AA_SEARCH=<次数> 运行参数搜索（test_160 / 164）
 #
 # - 在反编译的游戏工程（本仓库上一级的 1.2/，BROTATO_GAME 可覆盖；其中的 mods/ 是指向本仓库的目录联接）里运行，使用真实的 ItemService / RunData / ModLoader

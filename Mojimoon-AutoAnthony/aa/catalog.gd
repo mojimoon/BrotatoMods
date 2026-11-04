@@ -415,20 +415,52 @@ const ANCHORED_ITEMS = [
 	"item_builder_turret_0", "item_builder_turret_1", "item_builder_turret_2", "item_builder_turret_3",
 ]
 # 无论"强制重组"与否都保持原样，也不作为机制来源（1.2 / 史前惧兽）：
-#   肿瘤（异变把复制的效果加到它上面，按 ID 识别）、已使用的生命形态扫描仪；
+#   肿瘤（异变把复制的效果加到它上面，按 ID 识别）、生命形态扫描仪及其用后形态（离开商店时按 ID 找到并替换）；
 #   恐龙蛋链（每波末按 ID 找到蛋并换成 replaced_by 的下一阶，重组后的蛋没有 replaced_by；蛋的效果在别的道具上不会孵化）、弹药恐龙；
-#   进化路线道具（机械 / 异变 / 双路线，只在进化值超过阈值时注入商店，身份就是所属路线；进化飞跃按 ID 排除异变，
-#   其余效果大多只对机械武器、异变或进化敌人有意义）
+#   进化飞跃（进化值 ×2 是乘法效果，生效 / 移除时乘除当前值，与获得顺序有关；原版按 ID 排除异变）、
+#   剃须泡沫（唯一的效果"敌人进化几率"就是路线本身）；
+#   原版化石（重组时由普通道具生成新的化石，见 FOSSIL_*；原版化石不进商店池）
 const ANCHORED_ALWAYS = [
-	"item_tumor", "item_used_lifeform_scanner",
+	"item_tumor", "item_lifeform_scanner", "item_used_lifeform_scanner",
 	"item_dino_egg", "item_dino_egg_2", "item_dino_egg_1", "item_ammosaurus",
-	"item_meca_evolved_leap", "item_titanium_excess", "item_jamming_backpack", "item_cybernetic_arm", "item_failsafe_core",
-	"item_shaving_foam_can_meca",
-	"item_mut_evolved_leap", "item_eldritch_figurine", "item_boosted_mitosis", "item_wildfire_mutation", "item_shaving_foam_can_mutant",
-	"item_plastic_boots",
+	"item_meca_evolved_leap", "item_mut_evolved_leap", "item_shaving_foam_can_meca", "item_shaving_foam_can_mutant",
+	"item_fossil_jaw", "item_fossil_left_arm", "item_fossil_left_leg", "item_fossil_right_arm", "item_fossil_right_leg",
+	"item_fossil_skull", "item_fossil_spine", "item_fossil_tail", "item_fossil_tooth",
 ]
+# 其余进化路线道具（只在进化值超过 ±2 时由原版注入商店：注入的是同一资源的副本，重组后的效果自动生效）：
+#   道具 ID -> 路线（1 机械 / -1 异变 / 0 双路线）。重组时保留原版的进化值行（PRESERVED_NATIVE_KEYS）、保留原价，
+#   并必带一条本路线的机制（PATH_MECHANICS）；不计入先验与价格池，不作为核心属性 / 偏好词条保底道具
+const PATH_ITEMS = {
+	"item_titanium_excess": 1, "item_jamming_backpack": 1, "item_cybernetic_arm": 1, "item_failsafe_core": 1,
+	"item_eldritch_figurine": -1, "item_boosted_mitosis": -1, "item_wildfire_mutation": -1,
+	"item_plastic_boots": 0,
+}
+# 路线机制（来自路线道具）：key -> 路线（0 = 两条路线都可用）
+const PATH_MECHANICS = {
+	"dismantle_price": 1, "slow_meca_on_hit": 1, "damage_taken_on_materials": 1, "weapon_slot": 1,
+	"heal_on_mutant_kill": -1, "mutation_fruit_chance": -1, "mutate_into_better_tier_chance": -1,
+	"has_plastic_boots": 0,
+}
+# 只对一边有意义的效果（机械敌人、拆卸 / 异变敌人、异变本身）：-> 路线（1 机械 / -1 异变）。
+# 道具是开局固定的，玩家走哪条路线要到局中才知道：这些效果只出现在同路线的路线道具上，
+# 或者本局有角色锁定了路线（机械土豆只能机械、变异体只能异变、疯狂科学家双路线）时出现在普通道具上
+const SIDE_MECHANICS = {
+	"slow_meca_on_hit": 1, "dismantle_price": 1,
+	"heal_on_mutant_kill": -1, "mutation_fruit_chance": -1, "mutate_into_better_tier_chance": -1, "effect_mutate_end_of_wave": -1,
+}
+
+# 化石（史前惧兽）：原版的 9 件化石不进商店池，改为本局随机挑选同样数量（同稀有度分布）的普通重组道具做成化石：
+#   名称"化石：<原名>"，效果 = +[属性 A] / 代价 / 每有一件化石 +[属性 A]，附原版的化石计数行；独特
+#   每件化石的期望化石数（含自身）：按原版化石反推（"每件化石"行价值 ≈ 预算 − 属性行），中位数约 3.2
+const FOSSIL_COUNT_EXPECT = 3.2
+# +[属性 A] 行与"每件化石"行的单位数之比（原版 1–3.3）
+const FOSSIL_LINE_RATIO = [1.0, 3.0]
 # 不作为机制来源（道具本身照常重组 / 锚定）
 const MECHANIC_SOURCE_EXTRA_EXCLUDED = ["item_dino_egg", "item_dino_egg_2", "item_dino_egg_1"]
+const FOSSIL_ITEMS = [
+	"item_fossil_jaw", "item_fossil_left_arm", "item_fossil_left_leg", "item_fossil_right_arm", "item_fossil_right_leg",
+	"item_fossil_skull", "item_fossil_spine", "item_fossil_tail", "item_fossil_tooth",
+]
 
 
 static func is_anchored(id: String, force: bool, lootable: bool) -> bool:
@@ -721,6 +753,7 @@ const COUNTER_REF = {
 	# 成长型道具的计数（次要属性、诅咒）：诅咒按闪避估计
 	"xp_gain": 30.0, "pickup_range": 40.0, "explosion_damage": 30.0, "explosion_size": 20.0, "consumable_heal": 4.0,
 	"stat_curse": 25.0,
+	"fossil_count": FOSSIL_COUNT_EXPECT,
 }
 # ============================================================
 # 成长型道具（原版石头皮肤、线圈、发电机、复古卫衣）：小概率生成，T2 及以上
@@ -728,7 +761,7 @@ const COUNTER_REF = {
 #   B 只取 %伤害 / 攻速 / 最大生命（2 : 2 : 1）；A 取主 / 次要属性与诅咒
 # ============================================================
 # 从 100% 往下减的效果：带它的道具限制件数（见 Generator.reduction_limit）
-const REDUCTION_KEYS = ["items_price", "reroll_price", "weapons_price", "next_level_xp_needed", "specific_items_price"]
+const REDUCTION_KEYS = ["items_price", "reroll_price", "weapons_price", "next_level_xp_needed", "specific_items_price", "dismantle_price"]
 const REDUCTION_TOTAL_CAP = 50.0
 const GROWTH_ITEM_CHANCE = 0.06
 # 成长型道具只出现在 T3 及以上（原版的属性转化道具全是 T3–T4；T2 便宜、买得早、持有久，最容易超模）
@@ -794,7 +827,8 @@ const GAIN_MOD_STEPS = [10, 15, 20, 25, 33, 40, 50]
 # 特殊行的类型比例：触发条款 / 计数型 / 属性修改 / 搬运机制
 const SPECIAL_KIND_WEIGHTS = {"trigger": 0.43, "scaling": 0.16, "gain_mod": 0.07, "mechanic": 0.19, "next_wave": 0.06, "char": 0.09}
 # 可按预算缩放数值的机制（原版 Effect，数值线性含义）：缩放范围为原版数值的 1 单位 .. 1.5 倍
-const SCALAR_MECHANIC_EXCLUDED = ["hp_start_next_wave", "hp_start_wave", "speed_cap", "hp_cap", "lock_current_weapons", "dodge_cap", "one_shot_trees", "structures_can_crit", "burning_stacks"]
+const SCALAR_MECHANIC_EXCLUDED = ["hp_start_next_wave", "hp_start_wave", "speed_cap", "hp_cap", "lock_current_weapons", "dodge_cap", "one_shot_trees", "structures_can_crit", "burning_stacks",
+	"damage_taken_on_materials", "has_plastic_boots"]
 
 
 # ============================================================
@@ -897,14 +931,22 @@ const CLASS_BONUS_KINDS = {
 # （旧表，武器类型加成的权重见 CLASS_BONUS_KINDS）
 const BURN_BONUS_W = 0.12		# 燃烧目标额外伤害，每 1%
 const PACIFIST_W = 0.4			# 每 0.01 材料+经验 / 存活敌人（波末约 30 个存活敌人）
-const WEAPON_SLOT_W = 25.0
+# +1 武器栏：原版义肢手臂（IV 级、价格 100，唯一的效果）的预算约 56
+const WEAPON_SLOT_W = 55.0
 const GROUP_STRUCTURES_VALUE = 6.0
 const CHAR_COMPONENT_WEIGHTS = {"class_bonus": 0.5, "burn_bonus": 0.1, "pacifist": 0.05, "weapon_slot": 0.1}
 # "更多角色效果"选项开启时追加的角色效果
 const MORE_CHAR_COMPONENT_WEIGHTS = {
 	"group_structures": 0.05, "xp_needed": 0.15, "cryptid": 0.1, "charm": 0.08, "beast_master": 0.05,
 	"map_size": 0.04, "self_price": 0.06, "weapons_price": 0.08,
+	# 史前惧兽：每波结束时异变一次（变异体）、挖掘点（考古学家）
+	"mutate_end_of_wave": 0.05, "dig_sites": 0.06,
 }
+# 每波结束时异变一次：每次异变（去掉一条负面或复制一条正面）约值 4 材料；不能异变时原版改为 -1 进化（道具附带 -1 进化）
+const MUTATE_PER_WAVE = 4.0
+# 每个挖掘点每波约值 4（站 5 秒挖出一个箱子，约六成能挖完）
+const DIG_SITE_PER_WAVE = 4.0
+const DIG_SITES_MAX = 3
 # 更多角色效果的代价：道具价格 +X%、升级所需经验 +X%
 const MORE_CHAR_DOWNSIDE_CHANCE = 0.4
 # 神秘生物：波末每棵存活的树获得 X 材料与经验；波末平均存活约 2 棵树
@@ -966,23 +1008,36 @@ const BETA_RESTRICTIONS = {
 	"stronger_elites_on_kill": {"got": 6.0, "w": 0.5, "min_budget": 4.0},
 	"disable_item_locking": {"got": 8.0, "w": 0.6, "min_budget": 6.0},
 	"remove_shop_items": {"got": 5.0, "w": 0.5, "min_budget": 4.0},
+	# 史前惧兽（老兵 / 穴居人 / 幸存者）：波次之间不回血、波末不吸取果实、永久迷雾（逐波加深）、
+	# 每 10 波多 2 个尸潮波次、商店不出售武器（捆绑：箱子改为给武器）
+	"no_cure_between_wave": {"got": 12.0, "w": 0.8, "min_budget": 10.0},
+	"fog_of_war_permanent": {"got": 6.0, "w": 0.6, "min_budget": 5.0},
+	"more_horde": {"got": 5.0, "w": 0.6, "min_budget": 4.0},
+	"no_fruit_attracted_end_of_wave": {"got": 3.0, "w": 0.6, "min_budget": 3.0},
+	"effect_no_weapon_in_shop": {"got": 15.0, "w": 0.7, "min_budget": 12.0},
 }
 # 捆绑的第二行
-const BETA_BUNDLES = {"max_melee_weapons": "max_ranged_weapons", "destroy_weapons": "minimum_weapons_in_shop"}
+const BETA_BUNDLES = {
+	"max_melee_weapons": "max_ranged_weapons", "destroy_weapons": "minimum_weapons_in_shop",
+	"effect_no_weapon_in_shop": "effect_crate_give_weapon",
+}
 # 全部角色效果开启时，代价里使用这些限制的概率
 const BETA_RESTRICTION_CHANCE = 0.5
 # 正面效果（进入"角色效果"特殊行）
 const BETA_POSITIVE_WEIGHTS = {
 	"all_weapons_sets": 0.06, "min_weapons_shop": 0.03, "weapon_slot_upgrades": 0.05,
 	"item_steals": 0.04, "guaranteed_item": 0.08,
+	# 史前惧兽（时间旅行者）：受伤时时间变慢（敌人减速 75%，持续几秒）
+	"time_shift": 0.04,
 }
+const TIME_SHIFT_VALUE = 14.0
 # 升级属性 ±X%（船长 / 藤壶；正面已在常规机制池）：每波约 1.3 次升级，每次升级约值 8 材料
 const LEVELS_PER_WAVE = 1.3
 const LEVEL_UPGRADE_VALUE = 8.0
 const ALL_WEAPONS_SETS_VALUE = 10.0
 const MIN_WEAPONS_SHOP_VALUE = 2.0
-# 升级时获得武器栏而不是属性（宝宝）：上限 6 + k，每个武器栏约 25，减去失去的一次升级
-const WEAPON_SLOT_UPGRADE_NET = 13.0
+# 升级时获得武器栏而不是属性（宝宝）：上限 6 + k，每个武器栏（WEAPON_SLOT_W）减去失去的一次升级，再按获得较晚折算（×0.75）
+const WEAPON_SLOT_UPGRADE_NET = 36.0
 # 每个商店可偷 1 件道具（黑帮，偷窃可能生成精英）：每波约值 12 材料
 const ITEM_STEAL_PER_WAVE = 12.0
 # 商店总是出售 [某件一级道具] + 每有 1 个该道具获得 +N 属性（渔夫与诱饵）：平均每两波买一件，持有期间平均约 3.5 件
@@ -992,6 +1047,9 @@ const BETA_UNIQUE_KEYS = [
 	"die_in_one_hit", "can_attack_while_moving", "destroy_weapons", "minimum_weapons_in_shop", "max_weapon_tier",
 	"min_weapon_tier", "max_melee_weapons", "max_ranged_weapons", "remove_shop_items", "weapon_slot_upgrades",
 	"all_weapons_count_for_sets", "guaranteed_shop_items",
+	# 史前惧兽：替换存储的开关（多份叠加后卖掉一份会恢复旧值）
+	"no_cure_between_wave", "fog_of_war_permanent", "more_horde", "no_fruit_attracted_end_of_wave",
+	"effect_no_weapon_in_shop", "effect_crate_give_weapon", "time_shift_on_hit", "effect_mutate_end_of_wave",
 ]
 # 原版独特道具上、多份叠加会出技术问题的效果：带这些效果的重组道具设为独特
 #   覆盖写入（多份不叠加，卖掉一份会恢复旧值）：击退光环（灯笼）、闪避上限（幽灵服）、消耗品持续回复（干肉条）、锁定武器（结）
@@ -1002,6 +1060,8 @@ const UNIQUE_MECHANIC_KEYS = [
 	"minimum_weapon_cooldowns", "modify_every_x_projectile", "structures_can_crit", "one_shot_trees",
 	# 史前惧兽：怀表每波只触发一次（按玩家记录，第二份无作用）、纵火狂的燃烧叠加是开关
 	"slow_time_when_below_hp", "burning_stacks",
+	# 失效保护核心（受伤扣材料而不是生命）、塑料靴（不受水坑影响）：开关
+	"damage_taken_on_materials", "has_plastic_boots",
 ]
 # 同上，按效果脚本识别：搜刮虫虫（刷怪器每个玩家只记录一只，多只追同一个目标）
 const UNIQUE_MECHANIC_SCRIPTS = ["res://effects/items/lootworm_effect.gd"]
@@ -1065,7 +1125,8 @@ const ITEM_STAT_BANS = {"item_will_o_the_wisp": ["stat_elemental_damage"], "item
 
 # 原道具上保留的原版行：+诅咒（深海 DLC 的诅咒道具）。价值约为 0，但水手 / 生物等角色想要带"诅咒"词条的道具，
 # 保留后这些道具仍带 stat_curse 词条
-const PRESERVED_NATIVE_KEYS = ["stat_curse"]
+# 以及进化路线道具的进化值行（决定路线，价值按 0 计）
+const PRESERVED_NATIVE_KEYS = ["stat_curse", "stat_evolution"]
 
 # 原版这些计数的文本不显示"每 N 个"（原版只用 N = 1）：生成时 N 固定为 1，单个计数的价值即最小价值
 const COUNTER_NB_FIXED = [
@@ -1083,6 +1144,7 @@ static func counter_text(counter: String, perm_only: bool) -> String:
 # 战利品外星人出现几率是相对值（+100% = 基础几率 ×2），不在此列
 const PCT_CAPS = {
 	"instant_gold_attracting": 100, "chance_double_gold": 100, "curse_locked_items": 100, "extra_item_in_crate": 100,
+	"heal_on_mutant_kill": 100, "mutation_fruit_chance": 100, "mutate_into_better_tier_chance": 100,
 }
 
 

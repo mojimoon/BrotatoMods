@@ -79,14 +79,6 @@ func test_11_generated_items_are_well_formed() -> void:
 			_check(has_pos or _has_up_mechanic(p.effects), "%s has a positive line: %s" % [id, _texts(p.effects)])
 
 
-func test_13_native_ratio_keeps_items() -> void:
-	var cfg = _cfg()
-	cfg.native_ratio = 50
-	var n50 = _gen(7, cfg).items.size()
-	var n0 = _gen(7).items.size()
-	_check(n50 < n0 * 0.7 and n50 > n0 * 0.3, "about half kept native (%d of %d)" % [n50, n0])
-
-
 func test_14_sliders() -> void:
 	var cfg = _cfg()
 	var base = 0.0
@@ -1049,7 +1041,7 @@ func test_95_curse_whole_pool() -> void:
 		return
 	rd.current_wave = 12
 	# 原版诅咒对这些 key 有特殊处理（固定值 / 随机值 / 数值越小越好）
-	var special_keys = ["dodge_cap", "hp_start_next_wave", "extra_elite_next_wave_chance", "hit_protection", "stat_curse", "knockback_aura", "modify_every_x_projectile"]
+	var special_keys = ["dodge_cap", "hp_start_next_wave", "extra_elite_next_wave_chance", "hit_protection", "stat_curse", "knockback_aura", "modify_every_x_projectile", "stat_evolution"]
 	var n_items = 0
 	var n_trig = 0
 	var n_side = 0
@@ -1259,16 +1251,6 @@ func test_100_core_stat_items() -> void:
 				_check(seen.has(str(t) + "/" + st), "seed %d has core %d/%s" % [sd, t, st])
 	ratios[0].sort()
 	print("AUDIT core items: n=%d, core-line value / budget median %.2f" % [ratios[0].size(), ratios[0][ratios[0].size() / 2]])
-	# 保留原版滑条：被保留原版的道具不会被选为核心道具
-	var cfg = _cfg()
-	cfg.native_ratio = 50
-	var g2 = Generator.new(cfg, 3)
-	var p2 = g2.generate(isvc.items, isvc.characters, [], [])
-	var n_core = 0
-	for id in p2.items:
-		if p2.items[id].has("core"):
-			n_core += 1
-	_eq(n_core, Catalog.CORE_STATS.size() * Catalog.CORE_TIERS.size(), "core items survive native_ratio 50%")
 
 
 # ============================================================
@@ -2880,18 +2862,17 @@ func _primal_set():
 	return null
 
 
-# 进化路线道具、肿瘤、恐龙蛋链：强制重组时也保持原版，不作为机制来源
+# 进化飞跃、剃须泡沫、肿瘤、恐龙蛋链、生命形态扫描仪、原版化石：强制重组时也保持原版，不作为机制来源；
+# 其余进化路线道具参与重组（见 test_306）
 func test_300_evolution_items_anchored() -> void:
 	var ps = _primal_set()
 	_check(ps != null, "primal dread item set found")
 	if ps == null:
 		return
-	var path_ids = []
 	for it in ps.meca_items + ps.mutant_items + ps.evolution_items:
-		path_ids.push_back(it.my_id)
-		_check(it.my_id in Catalog.ANCHORED_ALWAYS, "path item always anchored: " + it.my_id)
-	for id in Catalog.ANCHORED_ALWAYS:
-		_check(_item(id) != null, "anchored id exists: " + id)
+		_check(it.my_id in Catalog.ANCHORED_ALWAYS or Catalog.PATH_ITEMS.has(it.my_id), "path item handled: " + it.my_id)
+	for id in Catalog.ANCHORED_ALWAYS + Catalog.PATH_ITEMS.keys() + Catalog.FOSSIL_ITEMS:
+		_check(_item(id) != null, "listed id exists: " + id)
 	m.cfg_force_items = true
 	var gen = Generator.new(_cfg(), 7)
 	var plan = gen.generate(m.run_native(isvc.items), m.run_native(isvc.characters), [], [])
@@ -2901,9 +2882,15 @@ func test_300_evolution_items_anchored() -> void:
 		for mech in gen.mechanics_by_tier[t]:
 			_check(not mech.source in Catalog.ANCHORED_ALWAYS and not mech.source in Catalog.MECHANIC_SOURCE_EXTRA_EXCLUDED, "not a mechanic source: " + mech.source)
 	for id in plan.items:
+		var fossil = plan.items[id].get("fossil", false)
 		for e in plan.items[id].effects:
 			var k = e.custom_key if e.custom_key != "" else e.key
-			_check(not k in ["stat_evolution", "item_lifeform_scanner", "fossil_count"], "%s carries no %s" % [id, k])
+			_check(k != "item_lifeform_scanner", "%s carries no scanner effect" % id)
+			if k == "fossil_count":
+				_check(fossil, "%s: fossil counter only on fossils" % id)
+			# 进化值行只在路线道具上（保留原版行）
+			if k == "stat_evolution":
+				_check(Catalog.PATH_ITEMS.has(id), "%s: evolution line only on path items" % id)
 
 
 # 本局未启用的物品套组：内容不参与重组、不作为来源
@@ -3035,3 +3022,190 @@ func test_305_real_mutation_copies_clause() -> void:
 	rd.players_data[0].items.clear()
 	rd.get_player_effects(0)[Keys.stat_evolution_hash] = 0
 	m.on_menu_reset()
+
+
+
+# 进化路线道具：保留原版进化值行与原价，必带一条本路线的机制；路线道具自己的机制作为来源
+func test_306_path_items_reassembled() -> void:
+	var ps = _primal_set()
+	if ps == null:
+		print("  (primal dread unavailable, skipped)")
+		return
+	var n_mech = 0
+	for sd in [3, 17, 91]:
+		var gen = Generator.new(_cfg(), sd)
+		var plan = gen.generate(m.run_native(isvc.items), m.run_native(isvc.characters), [], [])
+		for id in Catalog.PATH_ITEMS:
+			var native = _item(id)
+			_check(plan.items.has(id), "path item reassembled: " + id)
+			if not plan.items.has(id):
+				continue
+			var p = plan.items[id]
+			_eq(int(p.get("price", 0)), int(native.value), id + " keeps the vanilla price")
+			var native_evo = []
+			for e in native.effects:
+				if e.key == "stat_evolution" and e.custom_key == "":
+					native_evo.push_back(e.value)
+			var evo = []
+			var side_ok = false
+			var side = int(Catalog.PATH_ITEMS[id])
+			for e in p.effects:
+				var k = e.custom_key if e.custom_key != "" else e.key
+				if k == "stat_evolution":
+					evo.push_back(e.value)
+				if Catalog.PATH_MECHANICS.has(k):
+					var ms = int(Catalog.PATH_MECHANICS[k])
+					if side == 0 or ms == 0 or ms == side:
+						side_ok = true
+			_eq(str(evo), str(native_evo), id + " keeps its evolution line")
+			_check(side_ok, "%s carries a path mechanic: %s" % [id, _texts(p.effects)])
+		for t in 4:
+			for mech in gen.mechanics_by_tier[t]:
+				if Catalog.PATH_ITEMS.has(mech.source):
+					n_mech += 1
+	_check(n_mech >= 6, "path items are mechanic sources (%d)" % n_mech)
+
+
+# 单边效果（只对机械或异变有意义）：只在同路线的路线道具上；本局角色锁定路线时也可以出现在普通道具上
+func test_307_side_mechanics() -> void:
+	for sides in [[], [-1]]:
+		var n_normal = 0
+		var n_path = 0
+		for sd in range(1, 16):
+			var gen = Generator.new(_cfg(), sd)
+			gen.run_sides = sides
+			var plan = gen.generate(m.run_native(isvc.items), m.run_native(isvc.characters), [], [])
+			for id in plan.items:
+				var side = int(Catalog.PATH_ITEMS.get(id, 0))
+				for e in plan.items[id].effects:
+					var k = e.custom_key if e.custom_key != "" else e.key
+					if not Catalog.SIDE_MECHANICS.has(k):
+						continue
+					var s = int(Catalog.SIDE_MECHANICS[k])
+					_check(s == side or s in sides, "%s (side %d, run %s) carries %s" % [id, side, str(sides), k])
+					if Catalog.PATH_ITEMS.has(id):
+						n_path += 1
+					else:
+						n_normal += 1
+		print("AUDIT side mechanics run_sides=%s: %d on path items, %d on normal items" % [str(sides), n_path, n_normal])
+		_check(n_path > 0, "side mechanics on path items")
+		if not sides.empty():
+			_check(n_normal > 0, "locked side allows side mechanics on normal items")
+
+
+# 化石：数量与稀有度分布同原版化石，名称"化石：<原名>"，结构 = 属性 A / 代价 / 每件化石 +A / 计数；原版化石不进商店池
+func test_308_fossils() -> void:
+	var per_tier = [0, 0, 0, 0]
+	for it in m.run_native(isvc.items):
+		if it.my_id in Catalog.FOSSIL_ITEMS:
+			per_tier[it.tier] += 1
+	if per_tier == [0, 0, 0, 0]:
+		print("  (no vanilla fossils, skipped)")
+		return
+	for sd in [5, 6]:
+		var gen = Generator.new(_cfg(), sd)
+		var plan = gen.generate(m.run_native(isvc.items), m.run_native(isvc.characters), [], [])
+		var got = [0, 0, 0, 0]
+		for id in plan.items:
+			var p = plan.items[id]
+			if not p.get("fossil", false):
+				continue
+			got[_item(id).tier] += 1
+			_check(p.get("unique", false), id + " fossil is unique")
+			var a = p.effects[0]
+			_check(Catalog.STATS.has(a.key) and a.value > 0, id + " first line is +A")
+			var per = null
+			var marker = false
+			for e in p.effects:
+				if e.get_script() == gen.scaling_script and e.stat_scaled == "fossil_count":
+					per = e
+				elif e.key == "fossil_count":
+					marker = true
+			_check(per != null and per.key == a.key and per.value > 0, id + " per-fossil line scales A")
+			_check(marker, id + " counts as a fossil")
+			var has_neg = false
+			for e in p.effects:
+				if e != a and e != per and e.key != "fossil_count" and not _is_good(e):
+					has_neg = true
+			_check(has_neg, "%s fossil has a downside: %s" % [id, _texts(p.effects)])
+			var v = _value_of(gen, p.effects, _item(id).tier)
+			_check(v > 0.5 * gen.item_budget(_item(id)) and v < 2.0 * gen.item_budget(_item(id)), "%s fossil value %.1f ~ budget %.1f" % [id, v, gen.item_budget(_item(id))])
+		_eq(str(got), str(per_tier), "fossil count per tier")
+	# 实际生效：名称与商店池
+	m.start_new_run()
+	var fossil_id = ""
+	for id in m.plan.items:
+		if m.plan.items[id].get("fossil", false):
+			fossil_id = id
+	_check(fossil_id != "", "fossils generated in a run")
+	if fossil_id != "":
+		var res = _item(fossil_id)
+		_check(res.name.begins_with(tr("AA_FOSSIL_NAME_FMT").replace("{0}", "")), "fossil name: " + res.name)
+	for t in 4:
+		for it in isvc.get_pool(t, isvc.TierData.ITEMS):
+			_check(not it.my_id in Catalog.FOSSIL_ITEMS, "vanilla fossil out of the shop pool: " + it.my_id)
+	m.restore()
+	var back = false
+	for t in 4:
+		for it in isvc.get_pool(t, isvc.TierData.ITEMS):
+			if it.my_id in Catalog.FOSSIL_ITEMS:
+				back = true
+	_check(back, "vanilla fossils back in the pool after restore")
+
+
+# 史前惧兽角色效果：更多角色效果（每波异变、挖掘点）与全部角色效果（时间变慢、老兵 / 穴居人 / 幸存者的限制）
+func test_309_dlc2_character_effects() -> void:
+	var cfg = _cfg()
+	cfg.char_effects = true
+	cfg.all_char_effects = true
+	var seen = {}
+	for sd in range(1, 30):
+		var gen = Generator.new(cfg, sd)
+		gen.run_sides = [-1]
+		var plan = gen.generate(m.run_native(isvc.items), m.run_native(isvc.characters), [], [])
+		for id in plan.items:
+			var p = plan.items[id]
+			for e in p.effects:
+				var k = e.custom_key if e.custom_key != "" else e.key
+				if k in ["effect_mutate_end_of_wave", "dig_sites", "time_shift_on_hit", "no_cure_between_wave", "fog_of_war_permanent",
+						"more_horde", "no_fruit_attracted_end_of_wave", "effect_no_weapon_in_shop", "effect_crate_give_weapon"]:
+					seen[k] = seen.get(k, 0) + 1
+					if k in Catalog.BETA_UNIQUE_KEYS:
+						_check(p.get("unique", false), "%s unique with %s" % [id, k])
+					_check(e.get_text(0, false) != "", "%s %s has text" % [id, k])
+			var ks = []
+			for e in p.effects:
+				ks.push_back(e.key)
+			if "effect_no_weapon_in_shop" in ks:
+				_check("effect_crate_give_weapon" in ks, id + " no-weapon shop bundled with crate weapons")
+	print("AUDIT dlc2 char effects ", seen)
+	for k in ["effect_mutate_end_of_wave", "dig_sites", "no_cure_between_wave", "fog_of_war_permanent", "more_horde", "effect_no_weapon_in_shop"]:
+		_check(seen.get(k, 0) > 0, "seen " + k)
+
+
+# 未拥有 / 未启用 DLC 时（AA_UNOWNED_DLC / AA_INACTIVE_SETS）：不生成只在该 DLC 里有意义的效果
+func test_310_no_dlc_effects_without_dlc() -> void:
+	var pd = tree.root.get_node("ProgressData")
+	var abyss = "abyssal_terrors" in pd.active_update_data
+	var primal = "primal_dread" in pd.active_update_data
+	print("  abyssal_terrors active: %s, primal_dread active: %s" % [abyss, primal])
+	var cfg = _cfg()
+	cfg.char_effects = true
+	cfg.all_char_effects = true
+	var n = 0
+	for sd in range(1, 21):
+		var gen = Generator.new(cfg, sd)
+		var plan = gen.generate(m.run_native(isvc.items), m.run_native(isvc.characters), [], [])
+		for id in plan.items:
+			n += 1
+			if not primal:
+				_check(not plan.items[id].get("fossil", false), id + " no fossils without primal dread")
+			for e in plan.items[id].effects:
+				var k = e.custom_key if e.custom_key != "" else e.key
+				if not abyss:
+					_check(k != "stat_curse" and not (e is TriggerEffect and e.cond == "cursed"), "%s: no curse without abyssal terrors (%s)" % [id, _texts([e])])
+					if e.get_script() == gen.scaling_script:
+						_check(e.stat_scaled != "stat_curse", id + " no per-curse counter")
+				if not primal:
+					_check(not k in ["stat_evolution", "fossil_count"] and not Catalog.SIDE_MECHANICS.has(k) and (k == "weapon_slot" or not Catalog.PATH_MECHANICS.has(k)), "%s: no primal dread effect (%s)" % [id, k])
+	_check(n > 0, "items generated")

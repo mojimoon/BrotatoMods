@@ -191,7 +191,6 @@ func _reset() -> void:
 	m.cfg_w_effects = 125
 	m.cfg_tier_chaos = false
 	m.cfg_w_rename = true
-	m.cfg_native_ratio = 0
 	m.cfg_fixed_seed = true
 	m.cfg_seed = 42
 	_setup_player("character_well_rounded")

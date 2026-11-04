@@ -16,7 +16,6 @@ extends Reference
 #   variance     浮动范围：对数正态倍率 V 的离散度，100 = 原版"价值 / 价格"的离散度（σ = 0.35，四分位约 0.8–1.27）；
 #                净价值按 √V、正面幅度按 V，差额由代价补足（_variance_comp）
 #   triggers     触发效果：100 = 原版同稀有度道具带特殊行（触发 / 机制）的比例
-#   native_ratio 保留原版道具的比例
 #   char_effects 角色效果可出现在道具上
 #
 # 输出 plan：
@@ -118,7 +117,7 @@ func generate(items: Array, all_characters: Array, selected: Array, weapons: Arr
 	if cfg.get("items", true):
 		var gen_items = []
 		for item in items:
-			if _is_reassemblable_item(item) and not _keeps_native(item):
+			if _is_reassemblable_item(item):
 				gen_items.push_back(item)
 		var orig_tiers = {}
 		if cfg.get("chaos", false):
@@ -127,9 +126,10 @@ func generate(items: Array, all_characters: Array, selected: Array, weapons: Arr
 			orig_tiers = _chaos_shuffle(gen_items, false)
 		assign_prices(gen_items, orig_tiers)
 		var core = pick_core_items(gen_items)
+		var fossils = pick_fossil_items(items, gen_items, core)
 		for item in gen_items:
 			last_vm = 1.0
-			var r = generate_item(item, core.get(item.my_id, ""))
+			var r = _generate_fossil_item(item) if item.my_id in fossils else generate_item(item, core.get(item.my_id, ""))
 			if not r.empty():
 				r["vmult"] = last_vm
 				plan.items[item.my_id] = r
@@ -269,12 +269,6 @@ static func has_unique_effect(effects: Array) -> bool:
 	return false
 
 
-# "保留原版道具"滑条：按道具 ID 的种子决定是否保留原版
-func _keeps_native(item) -> bool:
-	_seed_for(item.my_id)
-	return rng.randf() < float(cfg.get("native_ratio", 0)) / 100.0
-
-
 # 核心属性道具的分配：T1–T3 每档为每个核心属性各挑一件道具（种子确定；优先挑价格接近该档中位数的道具）
 # 返回 {道具 ID: 属性}
 func pick_core_items(gen_items: Array) -> Dictionary:
@@ -322,6 +316,8 @@ func _ensure_player_wanted_tags(plan: Dictionary, items: Array, gen_items: Array
 			for it in sorted_items:
 				if it.tier != tier or not plan.items.has(it.my_id) or core.has(it.my_id) or used.has(it.my_id) or it.my_id in player_banned_ids:
 					continue
+				if Catalog.PATH_ITEMS.has(it.my_id) or plan.items[it.my_id].get("fossil", false):
+					continue
 				if tag in it.tags:
 					with_tag.push_back(it)
 				else:
@@ -346,6 +342,9 @@ func _ensure_player_wanted_tags(plan: Dictionary, items: Array, gen_items: Array
 func _tier_has_tag(plan: Dictionary, items: Array, tier: int, tag: String) -> bool:
 	for it in items:
 		if it.tier != tier or it is CharacterData or it is WeaponData or not it.can_be_looted or it.my_id in player_banned_ids:
+			continue
+		# 进化路线道具不在常规商店池里；生成了新化石时原版化石不进商店池
+		if Catalog.PATH_ITEMS.has(it.my_id) or (it.my_id in Catalog.FOSSIL_ITEMS and not fossil_ids.empty()):
 			continue
 		if plan.items.has(it.my_id) and not _ban_ok(plan.items[it.my_id]):
 			continue
@@ -459,6 +458,8 @@ func _generate_mechanic_tag_item(item, tag: String) -> Dictionary:
 	for t in 4:
 		for m in mechanics_by_tier[t]:
 			if Catalog.MECHANIC_BANNED_KEYS.has(m.effect.key):
+				continue
+			if not _side_ok(m.effect.custom_key if m.effect.custom_key != "" else m.effect.key):
 				continue
 			var probe = _mechanic_copy(m, -1.0, item.my_id)
 			if tag in _tags_for([probe]):
@@ -639,7 +640,7 @@ func _collect_priors(items: Array, characters: Array, weapons: Array) -> void:
 				mechs.push_back(e)
 		if src is ItemData and not src is CharacterData and not src is WeaponData and src.tier >= 0 and src.tier <= 3:
 			_record_structure(src)
-			if not src.my_id in Catalog.ANCHORED_ITEMS and not src.my_id in Catalog.ANCHORED_ALWAYS and src.can_be_looted:
+			if not src.my_id in Catalog.ANCHORED_ITEMS and not src.my_id in Catalog.ANCHORED_ALWAYS and not Catalog.PATH_ITEMS.has(src.my_id) and src.can_be_looted:
 				lines_by_tier[src.tier].push_back(pos_lines)
 				tier_count[src.tier] += 1
 				if has_neg:
@@ -776,11 +777,15 @@ func item_budget(item) -> float:
 func assign_prices(gen_items: Array, orig_tiers: Dictionary = {}) -> void:
 	var pools = [[], [], [], []]
 	for it in gen_items:
-		if it.value >= Catalog.PRICE_POOL_MIN and not it.my_id in Catalog.PRICE_POOL_EXCLUDED:
+		if it.value >= Catalog.PRICE_POOL_MIN and not it.my_id in Catalog.PRICE_POOL_EXCLUDED and not Catalog.PATH_ITEMS.has(it.my_id):
 			pools[int(orig_tiers.get(it.my_id, it.tier))].push_back(it.value)
 	for t in 4:
 		pools[t].sort()
 	for it in gen_items:
+		# 进化路线道具保留原价（只在路线上出现，价格是路线设计的一部分）
+		if Catalog.PATH_ITEMS.has(it.my_id):
+			gen_prices[it.my_id] = int(it.value)
+			continue
 		var pool: Array = pools[it.tier]
 		if pool.empty():
 			continue
@@ -1096,9 +1101,11 @@ func _trigger_rate() -> float:
 # ============================================================
 func generate_item(item, core_stat: String = "") -> Dictionary:
 	_seed_for(item.my_id)
-	if rng.randf() < float(cfg.get("native_ratio", 0)) / 100.0:
-		return {}
+	# 原"保留原版道具"滑条的一次抽取：保留，使同一种子下其余道具的生成与之前的版本一致（隐藏价值乘数按此标定）
+	rng.randf()
 	cur_stat_bans = Catalog.ITEM_STAT_BANS.get(item.my_id, [])
+	if Catalog.PATH_ITEMS.has(item.my_id):
+		return _generate_path_item(item)
 	if core_stat != "":
 		return _generate_core_item(item, core_stat)
 	if item.tier >= Catalog.GROWTH_MIN_TIER and rng.randf() < Catalog.GROWTH_ITEM_CHANCE:
@@ -1106,6 +1113,165 @@ func generate_item(item, core_stat: String = "") -> Dictionary:
 		if not g.empty():
 			return g
 	return _generate_item_once(item, false)
+
+
+# 进化路线道具：普通重组（进化值行由 _preserved_lines 保留）+ 第一个特殊行固定为一条本路线的机制
+var forced_mech = null
+# 本局角色锁定的路线（1 机械 / -1 异变，双路线两者都有），由 mod_main 按本局角色设置；当前生成的路线道具所属路线（0 = 无）
+var run_sides: Array = []
+var cur_path_side := 0
+
+
+# 单边效果（catalog.SIDE_MECHANICS）只出现在同路线的路线道具上，或本局角色锁定了该路线时出现在普通道具上
+func _side_ok(key: String) -> bool:
+	if not Catalog.SIDE_MECHANICS.has(key):
+		return true
+	var s = int(Catalog.SIDE_MECHANICS[key])
+	return s == cur_path_side or s in run_sides
+
+
+func _generate_path_item(item) -> Dictionary:
+	var side = int(Catalog.PATH_ITEMS[item.my_id])
+	cur_path_side = side
+	var cands = []
+	var cheapest = null
+	for t in 4:
+		for m in mechanics_by_tier[t]:
+			if m.down:
+				continue
+			var k = m.effect.custom_key if m.effect.custom_key != "" else m.effect.key
+			if not Catalog.PATH_MECHANICS.has(k):
+				continue
+			var ms = int(Catalog.PATH_MECHANICS[k])
+			if (ms != 0 and ms != side) or not _side_ok(k):
+				continue
+			var min_value = _mechanic_min_value(m)
+			if cheapest == null or min_value < _mechanic_min_value(cheapest):
+				cheapest = m
+			if min_value <= _base_budget(item) * 1.1:
+				cands.push_back(m)
+	if cands.empty() and cheapest != null:
+		cands.push_back(cheapest)
+	if cands.empty():
+		var r0 = _generate_item_once(item, false)
+		cur_path_side = 0
+		return r0
+	forced_mech = cands[rng.randi() % cands.size()]
+	var r = _generate_item_once(item, true)
+	cur_path_side = 0
+	forced_mech = null
+	r["path"] = side
+	return r
+
+
+# 机制可缩放时的最小价值（1 单位），否则为原值
+func _mechanic_min_value(m: Dictionary) -> float:
+	if not m.get("scalar", false):
+		return abs(m.value)
+	var ic = Catalog.MECHANIC_INTERCEPT.get(m.effect.key, {})
+	if not ic.empty():
+		return abs(m.value) * (ic.min - ic.offset) / max(1.0, abs(m.effect.value) - ic.offset)
+	return abs(m.value) / max(1.0, abs(m.effect.value))
+
+
+# ============================================================
+# 化石：本局挑选与原版化石同样数量、同稀有度分布的普通重组道具（不含路线道具、核心属性道具），返回 {道具 ID: true}
+# ============================================================
+var fossil_ids: Dictionary = {}
+var _fossil_tmpl = {}		# {"per": 原版"每件化石"行, "marker": 原版化石计数行}
+
+
+func pick_fossil_items(items: Array, gen_items: Array, core: Dictionary) -> Dictionary:
+	fossil_ids = {}
+	_fossil_tmpl = {}
+	var per_tier = [0, 0, 0, 0]
+	for it in items:
+		if not it.my_id in Catalog.FOSSIL_ITEMS or it.tier < 0 or it.tier > 3:
+			continue
+		per_tier[it.tier] += 1
+		for e in it.effects:
+			if e.get_script() == scaling_script and e.stat_scaled == "fossil_count":
+				_fossil_tmpl["per"] = e
+			elif e.key == "fossil_count" and e.custom_key == "":
+				_fossil_tmpl["marker"] = e
+	if not _fossil_tmpl.has("per") or not _fossil_tmpl.has("marker"):
+		return {}
+	for t in 4:
+		if per_tier[t] == 0:
+			continue
+		var pool = []
+		for it in gen_items:
+			if it.tier == t and it.can_be_looted and not core.has(it.my_id) and not Catalog.PATH_ITEMS.has(it.my_id) \
+					and not Catalog.ITEM_STAT_BANS.has(it.my_id) and _preserved_lines(it).empty():
+				pool.push_back(it)
+		pool.sort_custom(self, "_sort_by_id")
+		rng.seed = hash(str(seed_value) + "/fossil/" + str(t))
+		for _i in per_tier[t]:
+			if pool.empty():
+				break
+			var k = rng.randi() % pool.size()
+			fossil_ids[pool[k].my_id] = true
+			pool.remove(k)
+	return fossil_ids
+
+
+# 化石：+[属性 A] / 代价 / 每有一件化石 +[属性 A] / 化石计数（原版的四行结构）
+#   正面总价值 = 预算 + 代价换来的预算 = A 行 + "每件化石"行（按期望化石数估值）
+func _generate_fossil_item(item) -> Dictionary:
+	_seed_for(item.my_id + "/fossil")
+	cur_tier = item.tier
+	cur_stat_bans = Catalog.ITEM_STAT_BANS.get(item.my_id, [])
+	var perm_mult: float = Catalog.PERM_MULT[item.tier]
+	var vm = _variance_mult()
+	var budget: float = _base_budget(item) * _net_mult(vm)
+	var budget_total = budget
+	pos_cat = ""
+	neg_cat = "*"
+	# 最小化石（A 行与"每件化石"行各 1 单位）不超过预算的 1.3 倍（低价道具上不出现单位价值高的属性，如护甲）
+	var allowed = []
+	var cheapest = ""
+	for st in Catalog.SCALING_STATS:
+		if st in Catalog.SIDE_ONLY_STATS:
+			continue
+		var min_v = Catalog.stat_w(st) * Catalog.stat_unit(st) * (Catalog.FOSSIL_COUNT_EXPECT + 1.0)
+		if min_v <= budget * 1.3:
+			allowed.push_back(st)
+		if cheapest == "" or min_v < Catalog.stat_w(cheapest) * Catalog.stat_unit(cheapest) * (Catalog.FOSSIL_COUNT_EXPECT + 1.0):
+			cheapest = st
+	if allowed.empty():
+		allowed = [cheapest]
+	var a = _pick_stat(false, [], allowed)
+	anchor_stat = a
+	var used = [a]
+	var dres = _gen_downsides(item, _variance_comp(item, vm, rng.randf_range(0.15, 0.35)), perm_mult, used, budget_total)
+	budget += dres.got
+	var unit = Catalog.stat_unit(a)
+	var ratio = rng.randf_range(Catalog.FOSSIL_LINE_RATIO[0], Catalog.FOSSIL_LINE_RATIO[1])
+	var per_unit_value = Valuation.scaling_value(a, unit, "fossil_count", 1)
+	var line_unit_value = Catalog.stat_w(a) * unit
+	var units = max(1.0, budget / (per_unit_value + ratio * line_unit_value))
+	var pv = int(max(1.0, round(units)) * unit)
+	var av = int(min(max(unit, round(units * ratio) * unit), _line_cap(a, false)))
+	var per = _fossil_tmpl.per.duplicate()
+	per.key = a
+	per.key_hash = Keys.generate_hash(a)
+	per.value = pv
+	per.effect_sign = Effect.Sign.FROM_VALUE
+	var effects = [_stat_effect(a, av)] + dres.effects + [per, _fossil_tmpl.marker.duplicate()]
+	pos_cat = ""
+	neg_cat = ""
+	anchor_stat = ""
+	cur_tier = -1
+	return {
+		"effects": effects,
+		"adj": "",
+		"tags": _tags_for(effects),
+		"main_stats": main_stats(effects),
+		"budget": budget_total,
+		"class": [Catalog.STAT_CATEGORY.get(a, "A"), "*"],
+		"fossil": true,
+		"limit": 1,
+	}
 
 
 # 成长型道具（原版石头皮肤、线圈、发电机、复古卫衣）：见 catalog.GROWTH_*
@@ -1119,8 +1285,8 @@ func _generate_growth_item(item) -> Dictionary:
 	neg_cat = "*"
 	var b_stat = _pick_weighted(Catalog.GROWTH_TARGETS)
 	var aw = {}
-	# 诅咒是 DLC 属性：未启用 DLC 时玩家 effects 里没有它
-	var curse_ok = PlayerRunData.init_effects().has(Keys.stat_curse_hash)
+	# 诅咒只来自深渊恐惧（1.2 起玩家 effects 里总有诅咒，要看本局是否启用该物品套组）
+	var curse_ok = curse_active()
 	for s in Catalog.GROWTH_COUNTERS:
 		if s == b_stat or s in cur_stat_bans or (s == "stat_curse" and not curse_ok):
 			continue
@@ -1235,12 +1401,19 @@ func _generate_item_once(item, force_special: bool) -> Dictionary:
 	if rng.randf() < p_special - 1.0:
 		slots += 1
 	for _slot in slots:
-		if budget <= 4.0:
+		if budget <= 4.0 and not (forced_mech != null and _slot == 0):
 			break
 		var share = rng.randf_range(0.4, 0.8) if slots == 1 else rng.randf_range(0.3, 0.5)
 		var kind = _pick_weighted(Catalog.SPECIAL_KIND_WEIGHTS)
 		var done = false
-		if kind == "mechanic" and budget > 8.0:
+		if forced_mech != null and _slot == 0:
+			var fe = _mechanic_copy(forced_mech, budget * share, item.my_id)
+			var fv = fe.get_meta("aa_value")
+			effects.push_back(fe)
+			budget -= fv
+			done = true
+			main_line = {"value": fv, "adj": _adj(Catalog.ADJ_MECHANIC)}
+		elif kind == "mechanic" and budget > 8.0:
 			var m = _pick_mechanic(tier, false, budget * 1.1)
 			if m != null:
 				var me = _mechanic_copy(m, budget * share, item.my_id)
@@ -1580,6 +1753,8 @@ func _pick_mechanic(tier: int, downside: bool, max_abs_value: float):
 					min_value = abs(m.value) * (ic.min - ic.offset) / max(1.0, abs(m.effect.value) - ic.offset)
 			var mk = m.effect.custom_key if m.effect.custom_key != "" else m.effect.key
 			if "heal" in banned_payloads and mk in Catalog.HEAL_KEYS:
+				continue
+			if not _side_ok(mk):
 				continue
 			if m.down == downside and min_value <= max_abs_value:
 				pool.push_back(m)
@@ -1977,6 +2152,12 @@ func _collect_char_templates(all_characters: Array, items: Array = []) -> void:
 				char_templates["weapons_price"] = e
 			elif e.key == "items_price" and e.value > 0:
 				char_templates["items_price_up"] = e
+			elif e.key == "effect_mutate_end_of_wave" and e.value > 0:
+				char_templates["mutate_end_of_wave"] = e
+			elif e.key == "dig_sites" and e.value > 0:
+				char_templates["dig_sites"] = e
+			elif e.key == "time_shift_on_hit" and e.value > 0:
+				char_templates["time_shift"] = e
 			if e.get_script() == class_script:
 				char_templates.class_bonus.push_back(e)
 			elif e.key == "pacifist" and e.value > 0:
@@ -2130,6 +2311,25 @@ func gen_char_component(target: float, holder = null) -> Dictionary:
 				e6.set_meta("aa_value", val6)
 				e6.set_meta("aa_tags", ["xp_gain"])
 				return {"effect": e6, "value": val6}
+			"mutate_end_of_wave":
+				# 每波结束时异变一次（单边效果：不能异变时原版改为 -1 进化）；开关，道具为独特
+				var vmu = Catalog.MUTATE_PER_WAVE * pm
+				if not char_templates.has("mutate_end_of_wave") or not _side_ok("effect_mutate_end_of_wave") or target < vmu * 0.5 or target > vmu * 2.0:
+					continue
+				var emu = char_templates.mutate_end_of_wave.duplicate()
+				emu.set_meta("aa_value", vmu)
+				emu.set_meta("aa_tags", [])
+				return {"effect": emu, "value": vmu}
+			"dig_sites":
+				var per_d = Catalog.DIG_SITE_PER_WAVE * pm
+				if not char_templates.has("dig_sites") or target < per_d * 0.6:
+					continue
+				var nd = int(clamp(round(target / per_d), 1, Catalog.DIG_SITES_MAX))
+				var edg = char_templates.dig_sites.duplicate()
+				edg.value = nd
+				edg.set_meta("aa_value", nd * per_d)
+				edg.set_meta("aa_tags", ["exploration"])
+				return {"effect": edg, "value": nd * per_d}
 			"group_structures":
 				if not char_templates.has("group_structures") or target > Catalog.GROUP_STRUCTURES_VALUE * 2.5:
 					continue
@@ -2190,6 +2390,14 @@ func _gen_beta_positive(kind: String, target: float, pm: float, holder) -> Dicti
 			var e = _beta_line(t, 1, val, ["economy"])
 			var e2 = t2.duplicate()
 			return {"effect": e, "effects": [e, e2], "value": val}
+		"time_shift":
+			# 受伤时时间变慢（替换存储：多份不叠加，道具为独特）
+			var t = char_templates.get("time_shift", null)
+			var val = Catalog.TIME_SHIFT_VALUE
+			if t == null or target < val * 0.5 or target > val * 2.5:
+				return {}
+			var e = _beta_line(t, t.value, val)
+			return {"effect": e, "effects": [e], "value": val}
 		"guaranteed_item":
 			var t = _beta_tmpl("guaranteed_shop_items")
 			var tc = _beta_tmpl("item_counter")
@@ -2807,6 +3015,11 @@ func _try_clause(budget: float, perm_mult: float, negative: bool, fixed_trigger:
 
 
 # 机制条件：按扳机的概率（cond_p，默认 COND_CHANCE）抽一个可接的条件；fixed_cond 固定条件
+# 本局启用了深渊恐惧（诅咒、被诅咒的敌人）
+func curse_active() -> bool:
+	return "abyssal_terrors" in ProgressData.active_update_data
+
+
 func _pick_cond(c: Dictionary, fixed_cond: String) -> void:
 	var options = []
 	for k in Catalog.conds_for(c.trigger):
@@ -2815,6 +3028,9 @@ func _pick_cond(c: Dictionary, fixed_cond: String) -> void:
 	# 用某类伤害命中敌人（潜水员）：只在"更多角色效果"开启时出现
 	if c.trigger == "hit_enemy" and not cfg.get("char_effects", false):
 		options.erase("dmg_type")
+	# 被诅咒的敌人只在启用深渊恐惧时出现
+	if not curse_active():
+		options.erase("cursed")
 	if fixed_cond != "":
 		if not fixed_cond in options:
 			return
@@ -3141,13 +3357,13 @@ func handling_of(e, src) -> String:
 	if Catalog.WEAPON_COUNTERS.has(e.custom_key):
 		return "weapon_counter"
 	if k in ["cryptid", "charm_on_hit", "beast_master_effect", "map_size", "specific_items_price", "weapons_price",
-			"group_structures", "next_level_xp_needed"] or (k == "items_price" and e.value > 0):
+			"group_structures", "next_level_xp_needed", "effect_mutate_end_of_wave", "dig_sites"] or (k == "items_price" and e.value > 0):
 		return "char_more"
 	if e.key == "die_in_one_hit":
 		return "char_beta"
 	if k in Catalog.BETA_RESTRICTIONS or k in Catalog.BETA_BUNDLES.values() or k in [
 			"all_weapons_count_for_sets", "weapon_slot_upgrades", "item_steals", "item_steals_spawns_random_elite",
-			"guaranteed_shop_items"] or (is_scaling(e) and e.stat_scaled.begins_with("item_")):
+			"guaranteed_shop_items", "time_shift_on_hit"] or (is_scaling(e) and e.stat_scaled.begins_with("item_")):
 		if not (k == "remove_shop_items" and e.key != "structure"):
 			return "char_beta"
 	if k in ["pacifist", "bonus_non_elemental_damage_against_burning_targets", "weapon_slot"] or e.get_script() == load("res://effects/items/class_bonus_effect.gd"):
