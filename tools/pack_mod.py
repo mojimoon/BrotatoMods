@@ -3,14 +3,14 @@
 用法：python mods/tools/pack_mod.py <MOD> [workshop_dir]
   1. mods/<MOD> 同步到 <游戏工程>/mods-unpacked/<MOD>（游戏工程 = 仓库上一级的 1.2/，可用环境变量 BROTATO_GAME 覆盖）
   2. 打包为 <游戏工程>/<MOD>.zip（内部路径 mods-unpacked/<MOD>/...，与 OneItemToRuleThemAll 一致，不含 .md）
-  3. 复制 zip 到 workshop_dir（默认 1942280/3671094202）
+  3. 复制 zip 到 workshop_dir（默认 1942280/3811213360）
 """
 import os
 import shutil
 import sys
 import zipfile
 
-DEFAULT_WORKSHOP = r"D:\SteamLibrary\steamapps\workshop\content\1942280\3671094202"
+DEFAULT_WORKSHOP = r"D:\SteamLibrary\steamapps\workshop\content\1942280\3811213360"
 
 
 def main() -> int:
