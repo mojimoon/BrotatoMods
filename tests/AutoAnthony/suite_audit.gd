@@ -100,7 +100,7 @@ func test_60_param_sweep() -> void:
 	for D in [2.0, 2.5, 3.0]:
 		native_net[D] = [[], [], [], []]
 	var g0 = Generator.new(_cfg(), 1)
-	for item in isvc.items:
+	for item in m.run_native(isvc.items):
 		if not g0._is_reassemblable_item(item) or not item.can_be_looted:
 			continue
 		var plain = true
@@ -134,7 +134,7 @@ func test_60_param_sweep() -> void:
 			var real = [[], [], [], []]
 			for sd in [1, 42, 777]:
 				var gen = Generator.new(cfg, sd)
-				var plan = gen.generate(isvc.items, isvc.characters, [], [])
+				var plan = gen.generate(m.run_native(isvc.items), m.run_native(isvc.characters), [], [])
 				for id in plan.items:
 					var t = _item(id).tier
 					var mt = _item_metrics(gen, plan.items[id].effects, t)
@@ -166,7 +166,7 @@ func test_60_param_sweep() -> void:
 # ============================================================
 func test_70_class_distribution_matches_native() -> void:
 	var gen0 = Generator.new(_cfg(), 1)
-	gen0._collect_priors(isvc.items, isvc.characters, isvc.weapons)
+	gen0._collect_priors(m.run_native(isvc.items), m.run_native(isvc.characters), m.run_native(isvc.weapons))
 	var native = {}
 	var n_native = 0.0
 	for t in 4:
@@ -177,7 +177,7 @@ func test_70_class_distribution_matches_native() -> void:
 	var n_gen = 0.0
 	for sd in SEEDS:
 		var gen = Generator.new(_cfg(), sd)
-		var plan = gen.generate(isvc.items, isvc.characters, [], [])
+		var plan = gen.generate(m.run_native(isvc.items), m.run_native(isvc.characters), [], [])
 		for id in plan.items:
 			var c = gen.classify(plan.items[id].effects)
 			if c != "":
@@ -312,6 +312,7 @@ func test_101_character_bans_and_wanted_tags_in_rolls() -> void:
 								all_in = false
 						if all_in:
 							r.sem_main += 1
+							print("AUDIT group-ban leak %s %s %s main=%s in_group=%s" % [cid, mode, it.my_id, str(ms), str(isvc.item_groups)])
 				if _has_any(sems, _pos_semantics(it.effects)):
 					r.sem_any += 1
 				if _has_any(remove_tags, it.tags):
@@ -554,7 +555,7 @@ func test_116_generated_prices_and_budget() -> void:
 			if mech.effect.key == "level_upgrades_modifications" and not mech.down:
 				found = true
 				print("AUDIT level upgrades mechanic: +%d%% valued %.1f (%.2f per %%)" % [mech.effect.value, mech.value, mech.value / mech.effect.value])
-	_check(found or tree.root.get_node("ProgressData").get_dlc_data("abyssal_terrors") == null, "level upgrade mechanic collected")
+	_check(found or not "abyssal_terrors" in tree.root.get_node("ProgressData").available_dlc_ids, "level upgrade mechanic collected")
 	_check(Catalog.MECHANIC_VALUE_MULT["level_upgrades_modifications"] < 1.0, "level upgrade valuation lowered")
 
 

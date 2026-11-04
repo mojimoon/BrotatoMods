@@ -192,13 +192,13 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 	# 击杀被诅咒的敌人：挂上原版 DLC 的诅咒效果行为
 	var en_cursed = yield(_wait_enemy(main), "completed")
 	if en_cursed != null:
-		var cb = load("res://dlcs/dlc_1/effect_behaviors/enemy/curse_enemy_effect_behavior.gd").new()
+		var cb = load("res://effect_behaviors/enemies/curse_enemy_effect_behavior.gd").new()
 		en_cursed.effect_behaviors.add_child(cb)
 		var _cbi = cb.init(en_cursed)
 		var _kcur = en_cursed.take_damage(999999, TakeDamageArgs.new(0))
 		yield(_wait_frames(2), "completed")
 	# 砍倒树木：按原版刷树队列生成一棵树并击倒
-	main._entity_spawner.queue_to_spawn_trees.push_back([EntityType.NEUTRAL, load("res://entities/units/neutral/tree.tscn"), player.global_position + Vector2(150, 0)])
+	main._entity_spawner.queue_to_spawn_trees.push_back(SpawnRequest.new(EntityType.NEUTRAL, load("res://entities/units/neutral/tree.tscn"), player.global_position + Vector2(150, 0)))
 	for i in 100:
 		if not main._entity_spawner.neutrals.empty():
 			break

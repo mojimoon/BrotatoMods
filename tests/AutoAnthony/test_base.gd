@@ -40,6 +40,11 @@ func setup(p_tree: SceneTree, p_ctx: Dictionary) -> int:
 	Generator = load(MOD_DIR + "aa/generator.gd")
 	TriggerEffect = load(MOD_DIR + "aa/trigger_effect.gd")
 	Runtime = load(MOD_DIR + "aa/runtime.gd")
+	# AA_INACTIVE_SETS=primal_dread,abyssal_terrors：本次运行停用这些物品套组（审计 DLC 对先验的影响）
+	var pd = tree.root.get_node("ProgressData")
+	for id in OS.get_environment("AA_INACTIVE_SETS").split(",", false):
+		pd.active_update_data.erase(id)
+		print("inactive item set: ", id)
 	_unlock_everything()
 	return 0
 

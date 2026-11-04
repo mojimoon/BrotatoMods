@@ -10,6 +10,8 @@
 
 ## English
 
+**Now Supports v1.2 and Primal Dread!**
+
 **Every run, brand-new items and weapons.** Auto-Anthonyology breaks every item and weapon into its parts — stats, triggers, effects, mechanics — and puts them back together at random, at the same value. Same icons, same rarities, completely different items.
 
 Inspired by the *Auto-Anthonyology* mod for Slay the Spire 2, which itself comes from Challenge #45 of The Binding of Isaac: Repentance. Many thanks to the original author!
@@ -65,6 +67,8 @@ The **preview** under the item and weapon tabs lists everything for the current 
 If you like this mod, please consider liking, favoriting and sharing it, thank you! Comments and suggestions are also very welcome!
 
 <!-- BBCode
+
+[pullquote]Now Supports v1.2 and Primal Dread![/pullquote]
 
 [b]Every run, brand-new items and weapons.[/b] Auto-Anthonyology breaks every item and weapon into its parts — stats, triggers, effects, mechanics — and puts them back together at random, at the same value. Same icons, same rarities, completely different items.
 
@@ -138,6 +142,8 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 
 ## 中文
 
+**现已支持 1.2 版本和史前惧兽！**
+
 **每一局，都是全新的道具和武器。** 东尼算法把每件道具和武器拆成零件——属性、触发条件、效果、机制——再按同等价值随机拼回去。图标和稀有度不变，内容却完全不同。
 
 灵感来自《杀戮尖塔 2》的东尼算法（Auto-Anthonyology）mod，后者源于《以撒的结合：忏悔》中的挑战 45。在此向原作者致谢！
@@ -191,6 +197,8 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 道具页与武器页下方的**预览**可以在开局前按当前设置与种子列出全部内容。
 
 <!-- BBCode
+
+[pullquote]现已支持 1.2 版本和史前惧兽！[/pullquote]
 
 [b]每一局，都是全新的道具和武器。[/b] 东尼算法把每件道具和武器拆成零件——属性、触发条件、效果、机制——再按同等价值随机拼回去。图标和稀有度不变，内容却完全不同。
 

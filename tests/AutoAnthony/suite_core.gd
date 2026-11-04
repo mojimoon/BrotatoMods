@@ -299,8 +299,7 @@ func test_24_state_roundtrip_and_resume_repair() -> void:
 
 
 func test_25_curse_compatible() -> void:
-	var pd = tree.root.get_node("ProgressData")
-	var dlc = pd.get_dlc_data("abyssal_terrors")
+	var dlc = isvc.get_dlc_data_by_id("abyssal_terrors") if "abyssal_terrors" in tree.root.get_node("ProgressData").available_dlc_ids else null
 	if dlc == null:
 		print("  (DLC data unavailable, skipped)")
 		return
@@ -674,7 +673,7 @@ func test_80_native_effect_coverage() -> void:
 					k = "(" + e.text_key + ")"
 				if group[0] == "weapon" and not h in ["trigger", "scaling"]:
 					h = "weapon"
-				if src is ItemData and src.my_id in Catalog.MECHANIC_SOURCE_EXCLUDED:
+				if src is ItemData and (Catalog.is_mechanic_source_excluded(src.my_id) or src.my_id in Catalog.MECHANIC_SOURCE_EXTRA_EXCLUDED):
 					h = "anchored"
 				var key = k + "|" + h
 				if not kinds.has(key):
@@ -1034,12 +1033,8 @@ func test_94_other_mod_items_untouched() -> void:
 	_check(not m.plan.items.has("item_testmod_widget"), "mod item not reassembled")
 	_check(fake.effects == fake_effects and fake.name == "TESTMOD_WIDGET", "mod item unchanged")
 	_check(fake in isvc.items, "mod item still registered")
+	# 1.2 的商店池只从物品套组建立（add_mod_item 的道具原版本身就不进池），这里只检查重建池子不出错
 	isvc.init_unlocked_pool()
-	var in_pool = false
-	for it in isvc.get_pool(fake.tier, 0):
-		if it == fake:
-			in_pool = true
-	_check(in_pool, "mod item still in the shop pool")
 	var pl = m.preview_plan(42)
 	_check(not pl.items.has("item_testmod_widget"), "preview ignores mod item")
 	m.on_menu_reset()
@@ -1048,8 +1043,7 @@ func test_94_other_mod_items_untouched() -> void:
 
 
 func test_95_curse_whole_pool() -> void:
-	var pd = tree.root.get_node("ProgressData")
-	var dlc = pd.get_dlc_data("abyssal_terrors")
+	var dlc = isvc.get_dlc_data_by_id("abyssal_terrors") if "abyssal_terrors" in tree.root.get_node("ProgressData").available_dlc_ids else null
 	if dlc == null:
 		print("  (DLC data unavailable, skipped)")
 		return
@@ -1365,7 +1359,11 @@ func test_106_starting_items_stay_native() -> void:
 	for it in isvc.items:
 		if "pet" in it.tags:
 			_check(it.my_id in ids, "beast master: pet %s kept native" % it.my_id)
-	_eq(m.starting_item_ids([bm]).size(), 1 + bm.starting_items.size(), "beast master without item list: lootworm + selectable pets")
+	# 1.2：驯兽师的初始道具里多了鼠王；不带道具列表时 = 角色效果里的初始道具 + 开局可选道具（去重）
+	var own = m.starting_item_ids([bm])
+	_check("item_lootworm" in own, "beast master without item list: lootworm")
+	for it in bm.starting_items:
+		_check(it.my_id in own, "beast master without item list: selectable " + it.my_id)
 	_setup_player("character_beast_master")
 	m.start_new_run()
 	for id in ids:
@@ -1561,7 +1559,7 @@ func test_111_more_character_effects() -> void:
 		print("AUDIT   sample: " + s)
 	_check(seen_off.empty(), "more character effects only with the option on")
 	for k in more_keys:
-		if k != "charm_on_hit" or tree.root.get_node("ProgressData").get_dlc_data("abyssal_terrors") != null:
+		if k != "charm_on_hit" or "abyssal_terrors" in tree.root.get_node("ProgressData").available_dlc_ids:
 			_check(seen.has(k), "more character effect appears: " + k)
 	_check(counters.size() >= 3, "weapon counters appear in the regular pool")
 	# 武器数量计数在玩家身上实际生效：持有 2 把武器时"每把武器 +2 护甲"= +4
@@ -2870,3 +2868,170 @@ func test_175_trigger_conditions() -> void:
 		var te = TriggerEffect.make(c)
 		_check(te.get_text(0, true).find("[img") != -1, "scaling icon: " + te.get_text(0, true))
 		_check(te.get_text(0, false).find("[img") == -1 and te.get_text(0, false).find("{") == -1, "plain scaling text: " + te.get_text(0, false))
+
+
+# ============================================================
+# 1.2 / 史前惧兽
+# ============================================================
+func _primal_set():
+	for u in isvc.update_data_list:
+		if u != null and u.id == "primal_dread":
+			return u.item_set
+	return null
+
+
+# 进化路线道具、肿瘤、恐龙蛋链：强制重组时也保持原版，不作为机制来源
+func test_300_evolution_items_anchored() -> void:
+	var ps = _primal_set()
+	_check(ps != null, "primal dread item set found")
+	if ps == null:
+		return
+	var path_ids = []
+	for it in ps.meca_items + ps.mutant_items + ps.evolution_items:
+		path_ids.push_back(it.my_id)
+		_check(it.my_id in Catalog.ANCHORED_ALWAYS, "path item always anchored: " + it.my_id)
+	for id in Catalog.ANCHORED_ALWAYS:
+		_check(_item(id) != null, "anchored id exists: " + id)
+	m.cfg_force_items = true
+	var gen = Generator.new(_cfg(), 7)
+	var plan = gen.generate(m.run_native(isvc.items), m.run_native(isvc.characters), [], [])
+	for id in Catalog.ANCHORED_ALWAYS:
+		_check(not plan.items.has(id), "not reassembled even when forced: " + id)
+	for t in 4:
+		for mech in gen.mechanics_by_tier[t]:
+			_check(not mech.source in Catalog.ANCHORED_ALWAYS and not mech.source in Catalog.MECHANIC_SOURCE_EXTRA_EXCLUDED, "not a mechanic source: " + mech.source)
+	for id in plan.items:
+		for e in plan.items[id].effects:
+			var k = e.custom_key if e.custom_key != "" else e.key
+			_check(not k in ["stat_evolution", "item_lifeform_scanner", "fossil_count"], "%s carries no %s" % [id, k])
+
+
+# 本局未启用的物品套组：内容不参与重组、不作为来源
+func test_301_inactive_item_sets_excluded() -> void:
+	var pd = tree.root.get_node("ProgressData")
+	var ps = _primal_set()
+	if ps == null or not "primal_dread" in pd.active_update_data:
+		print("  (primal dread inactive, skipped)")
+		return
+	var saved = pd.active_update_data.duplicate()
+	pd.active_update_data.erase("primal_dread")
+	var native = m.run_native(isvc.items)
+	for it in ps.items:
+		_check(not it in native, "inactive set item excluded: " + it.my_id)
+	_check(_item("item_potato") in native, "base items kept")
+	m.start_new_run()
+	for it in ps.items:
+		_check(not m.plan.items.has(it.my_id), "inactive set item not reassembled: " + it.my_id)
+	for w in ps.weapons:
+		_check(not w in m.run_native(isvc.weapons), "inactive set weapon excluded: " + w.my_id)
+	m.on_menu_reset()
+	pd.active_update_data = saved
+	_check(ps.items[0] in m.run_native(isvc.items), "active again after restore")
+
+
+# 异变把触发条款复制到肿瘤 / 删掉异变道具上的条款：读档时按记录补回，不按模板补回被删掉的条款
+func test_302_mutation_clauses_survive_resume() -> void:
+	m.start_new_run()
+	var c = {"trigger": "kill", "chance": 10, "payload": "gold", "value": 1}
+	var tumor = _item("item_tumor").duplicate()
+	tumor.effects = [TriggerEffect.make(c)]
+	tumor.is_mutant = true
+	rd.players_data[0].items.push_back(tumor)
+	var victim = null
+	for id in m.plan.items:
+		for e in m.plan.items[id].effects:
+			if e is TriggerEffect:
+				victim = _item(id)
+		if victim != null:
+			break
+	_check(victim != null, "some generated item has a clause")
+	var mutated = victim.duplicate()
+	mutated.is_mutant = true
+	var kept = []
+	for e in victim.effects:
+		if not e is TriggerEffect:
+			kept.push_back(e)
+	mutated.effects = kept
+	rd.players_data[0].items.push_back(mutated)
+	m.record_mutations(0)
+	var state = JSON.parse(JSON.print({"aa_state": rd.get_state().aa_state})).result
+	_eq(state.aa_state.mutated["0"].size(), 2, "tumor and mutated item recorded")
+	# 模拟读档时丢失了触发条款
+	tumor.effects = []
+	m.on_menu_reset()
+	m.on_resume({"aa_state": state.aa_state, "shop_items": [[], [], [], []]})
+	_eq(tumor.effects.size(), 1, "tumor clause restored")
+	_check(tumor.effects.size() == 1 and tumor.effects[0] is TriggerEffect and tumor.effects[0].chance == 10, "restored clause matches")
+	var has = false
+	for e in mutated.effects:
+		if e is TriggerEffect:
+			has = true
+	_check(not has, "clauses removed by mutation are not re-added from the template")
+	rd.players_data[0].items.erase(tumor)
+	rd.players_data[0].items.erase(mutated)
+	m.on_menu_reset()
+
+
+# 补全的低级武器：缓存重建后仍在列表与商店池中
+func test_303_low_weapons_survive_rebuild() -> void:
+	m.cfg_weapons = true
+	m.cfg_w_low_tiers = true
+	m.start_new_run()
+	var sword1 = isvc.get_element_safe(isvc.weapons, "weapon_sword_1")
+	_check(sword1 != null, "low weapon registered")
+	isvc.invalidate_weapons_cache()
+	_check(sword1 != null and sword1 in isvc.weapons, "low weapon survives a rebuild")
+	isvc.init_unlocked_pool()
+	_check(sword1 != null and sword1 in isvc.get_pool(sword1.tier, isvc.TierData.WEAPONS), "low weapon in the shop pool")
+	m.on_menu_reset()
+	isvc.invalidate_weapons_cache()
+	_check(isvc.get_element_safe(isvc.weapons, "weapon_sword_1") == null, "low weapon gone after reset")
+
+
+# 绑定在武器场景上的史前惧兽武器效果
+func test_304_dlc2_weapon_bound_effects() -> void:
+	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
+	for id in ["weapon_light_saber_3", "weapon_shovel_1", "weapon_carbon_bow_1", "weapon_molotov_1", "weapon_flail_1", "weapon_sticky_grenade_1", "weapon_boomerang_1"]:
+		var w = isvc.get_element_safe(isvc.weapons, id)
+		_check(w != null, "weapon exists: " + id)
+		if w == null:
+			continue
+		var bound = false
+		for e in w.effects:
+			bound = bound or WG.bound_key(e)
+		_check(bound, "family-bound effect: " + id)
+
+
+# 原版异变把重组道具上的正面触发条款复制到肿瘤上，并被记录
+func test_305_real_mutation_copies_clause() -> void:
+	var pd = tree.root.get_node("ProgressData")
+	if not "primal_dread" in pd.active_update_data:
+		print("  (primal dread inactive, skipped)")
+		return
+	m.start_new_run()
+	rd.players_data[0].items.clear()
+	var it = _item("item_potato").duplicate()
+	it.effects = [TriggerEffect.make({"trigger": "kill", "chance": 20, "payload": "gold", "value": 3})]
+	rd.add_item(it, 0)
+	rd.get_player_effects(0)[Keys.stat_evolution_hash] = -40
+	var mutated = rd.mutate_random_item(0)
+	_check(mutated != null and mutated.is_mutant, "item mutated")
+	var tumor = null
+	for x in rd.players_data[0].items:
+		if x.my_id == "item_tumor":
+			tumor = x
+	_check(tumor != null, "tumor created")
+	if tumor != null:
+		var copied = null
+		for e in tumor.effects:
+			if e is TriggerEffect:
+				copied = e
+		_check(copied != null and copied.added_by_mutation and copied.value >= 1 and copied.value <= 3, "clause copied into the tumor and scaled")
+	var rec = m.active_state.get("mutated", {}).get("0", [])
+	var ids = []
+	for r in rec:
+		ids.push_back(r[0])
+	_check("item_tumor" in ids and "item_potato" in ids, "mutation recorded: " + str(ids))
+	rd.players_data[0].items.clear()
+	rd.get_player_effects(0)[Keys.stat_evolution_hash] = 0
+	m.on_menu_reset()

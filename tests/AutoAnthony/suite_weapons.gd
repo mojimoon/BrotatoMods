@@ -389,7 +389,7 @@ func test_144_weapon_selection_shows_reassembled() -> void:
 		return
 	_check(m.plan.weapons.has("weapon_sword_1") and sword1.stats == m.plan.weapons["weapon_sword_1"].stats, "listed weapon shows the reassembled stats")
 	var seed0 = int(m.active_state.seed)
-	sc._player_weapons[0] = sword1
+	sc._player_weapons[0] = [sword1]
 	sc._on_selections_completed()
 	for i in 6:
 		yield(tree, "idle_frame")
@@ -449,7 +449,7 @@ func test_145_toggle_low_tiers_with_chaos() -> void:
 			elif pick == null:
 				pick = el
 	_eq(stale, 0, "no unregistered weapons listed after turning lower tiers off")
-	sc._player_weapons[0] = pick
+	sc._player_weapons[0] = [pick]
 	sc._on_selections_completed()
 	for i in 6:
 		yield(tree, "idle_frame")
@@ -1638,7 +1638,8 @@ func _upgrade_snapshot(value) -> String:
 			parts.push_back(var2str(key) + ":" + _upgrade_snapshot(value[key]))
 		return "{" + PoolStringArray(parts).join(",") + "}"
 	if value is Resource:
-		if value is Texture or value is Script:
+		# 场景只记路径（1.2 的武器效果里带投射物 / 建筑场景，展开后快照有数百 MB，会让 Godot 崩溃）
+		if value is Texture or value is Script or value is PackedScene:
 			return value.resource_path
 		var stored = {}
 		for prop in value.get_property_list():

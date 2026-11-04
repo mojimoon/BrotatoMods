@@ -38,7 +38,8 @@ const PERM_MULT_CHARACTER = 7.0
 const DOWNSIDE_DIVISOR = 2.5
 # 隐藏价值乘数（按稀有度）：用"真实频率"审计生成道具与原版纯属性道具的强度比 real，
 # real < 1 的档位乘以 1 / real 补齐，real >= 1 的保持不变。由测试 test_60 的审计结果标定。
-const HIDDEN_TIER_MULT = [1.0, 1.12, 1.08, 1.0]
+# 1.2：史前惧兽套组启用与否先验不同（建议值分别为 1.04 / 1.13 / 1.08 / 1 与 1 / 1.12 / 1.12 / 1.02），取两者平均
+const HIDDEN_TIER_MULT = [1.02, 1.12, 1.1, 1.0]
 # 预算模型：同稀有度内 预算 = k × 价格（过原点的线性），k = 原版纯属性道具的净价值中位数 / 价格中位数
 # （T1–T4 约 0.40 / 0.35 / 0.38 / 0.56）。原版档内"价值 - 价格"几乎没有斜率（档内 R² 只有 0.07–0.33），
 # 任何档内曲线都是建模选择；旧的 价格^0.69 与正比模型对原版的拟合相同（R² 都是 0.918），而价格现在由本 mod 生成，
@@ -46,7 +47,7 @@ const HIDDEN_TIER_MULT = [1.0, 1.12, 1.08, 1.0]
 # 重组道具的价格：从同稀有度被重组道具的原版价格分布中有放回抽取（不是均匀分布；低于此值的占位价格不参与）
 const PRICE_POOL_MIN = 5
 # 不进入价格池的道具：金鱼（23）/ 休息的金鱼（30）的价格远低于同稀有度，会把重组道具的价格拉低
-const PRICE_POOL_EXCLUDED = ["item_goldfish", "item_goldfish_used"]
+const PRICE_POOL_EXCLUDED = ["item_goldfish", "item_goldfish_used", "item_tumor", "item_used_lifeform_scanner", "item_dino_egg_2", "item_dino_egg_1"]
 # 机制估值修正：来源道具 / 机制 key -> 估值倍率（< 1 = 同样预算给出更高的数值）
 #   从升级中获得的属性 +X%（藤壶）；MultiTool 里评级偏低的特殊机制道具（花园 C、眼罩）；
 #   珍珠（箱子里额外出现这件道具自己：本身价值取决于道具的其他行）
@@ -413,6 +414,31 @@ const ANCHORED_ITEMS = [
 	"item_fish_hook",
 	"item_builder_turret_0", "item_builder_turret_1", "item_builder_turret_2", "item_builder_turret_3",
 ]
+# 无论"强制重组"与否都保持原样，也不作为机制来源（1.2 / 史前惧兽）：
+#   肿瘤（异变把复制的效果加到它上面，按 ID 识别）、已使用的生命形态扫描仪；
+#   恐龙蛋链（每波末按 ID 找到蛋并换成 replaced_by 的下一阶，重组后的蛋没有 replaced_by；蛋的效果在别的道具上不会孵化）、弹药恐龙；
+#   进化路线道具（机械 / 异变 / 双路线，只在进化值超过阈值时注入商店，身份就是所属路线；进化飞跃按 ID 排除异变，
+#   其余效果大多只对机械武器、异变或进化敌人有意义）
+const ANCHORED_ALWAYS = [
+	"item_tumor", "item_used_lifeform_scanner",
+	"item_dino_egg", "item_dino_egg_2", "item_dino_egg_1", "item_ammosaurus",
+	"item_meca_evolved_leap", "item_titanium_excess", "item_jamming_backpack", "item_cybernetic_arm", "item_failsafe_core",
+	"item_shaving_foam_can_meca",
+	"item_mut_evolved_leap", "item_eldritch_figurine", "item_boosted_mitosis", "item_wildfire_mutation", "item_shaving_foam_can_mutant",
+	"item_plastic_boots",
+]
+# 不作为机制来源（道具本身照常重组 / 锚定）
+const MECHANIC_SOURCE_EXTRA_EXCLUDED = ["item_dino_egg", "item_dino_egg_2", "item_dino_egg_1"]
+
+
+static func is_anchored(id: String, force: bool, lootable: bool) -> bool:
+	return id in ANCHORED_ALWAYS or (id in ANCHORED_ITEMS and not (force and lootable))
+
+
+static func is_mechanic_source_excluded(id: String) -> bool:
+	return id in MECHANIC_SOURCE_EXCLUDED or id in ANCHORED_ALWAYS
+
+
 # 强制重组 (BETA)：原版按下标读取效果的道具，效果行不足时补空效果（望远镜：商店按 effects[1] 统计刷新折扣）
 const FORCE_PAD_EFFECTS = {"item_spyglass": 2}
 # 不作为机制来源：建造者炮台（角色专属）、蝾螈（属性互换按道具 ID 在商店中重置）
@@ -455,6 +481,13 @@ const CHAR_MECHANIC_BANNED = [
 	"additional_weapon_effects", "tier_iv_weapon_effects", "tier_i_weapon_effects", "unique_weapon_effects",
 	"poisoned_fruit", "upgraded_baits", "die_in_one_hit", "boosted_wanted_item_tag", "max_turret_count", "trees_start_wave",
 	"enemy_percent_damage_taken",
+	# 史前惧兽角色：进化路线、规则与开局机制
+	"meca_only", "mutant_only", "dual_evolution", "materials_as_health", "no_level_upgrades", "effect_no_weapon_in_shop",
+	"effect_crate_give_weapon", "extra_starting_weapon_choices", "fog_of_war_permanent", "burn_weapon",
+	"burn_weapon_give_primitive_bonus", "burn_primitive_bonus", "effect_mixing_up_wave", "no_cure_between_wave",
+	"no_fruit_attracted_end_of_wave", "more_horde", "weapon_set_bonus", "effect_mutate_end_of_wave", "dig_sites",
+	"poacher_zone_materials", "gain_stat_for_killed_enemies_in_zone", "time_shift_on_hit", "time_shift_stats",
+	"meca_parts_on_level_up", "mutation_fruit_chance",
 ]
 # 角色效果（整局持有）的总价值估计找不到时的默认值
 const CHARACTER_BUDGET_DEFAULT = 60.0
@@ -467,6 +500,12 @@ const STAT_TEXT_KEYS = {
 const MECHANIC_BANNED_KEYS = [
 	"stats_next_wave", "starting_item", "starting_weapon", "cursed_starting_item",
 	"fog_visibility", "stat_curse",
+	# 进化值：决定果实拾取、进化道具进池与异变能否发生，属于道具 / 角色身份
+	"stat_evolution",
+	# 生命形态扫描仪：离开商店时按道具 ID 找到持有者并移除（在别的道具上永远不会生效）
+	"item_lifeform_scanner",
+	# 化石：计数标记，只有化石道具会被"每装备一件化石物品"计入
+	"fossil_count",
 ]
 
 # 名称形容词：按主要效果选择（每项多个候选，按道具随机）
@@ -755,7 +794,7 @@ const GAIN_MOD_STEPS = [10, 15, 20, 25, 33, 40, 50]
 # 特殊行的类型比例：触发条款 / 计数型 / 属性修改 / 搬运机制
 const SPECIAL_KIND_WEIGHTS = {"trigger": 0.43, "scaling": 0.16, "gain_mod": 0.07, "mechanic": 0.19, "next_wave": 0.06, "char": 0.09}
 # 可按预算缩放数值的机制（原版 Effect，数值线性含义）：缩放范围为原版数值的 1 单位 .. 1.5 倍
-const SCALAR_MECHANIC_EXCLUDED = ["hp_start_next_wave", "hp_start_wave", "speed_cap", "hp_cap", "lock_current_weapons", "dodge_cap", "one_shot_trees", "structures_can_crit"]
+const SCALAR_MECHANIC_EXCLUDED = ["hp_start_next_wave", "hp_start_wave", "speed_cap", "hp_cap", "lock_current_weapons", "dodge_cap", "one_shot_trees", "structures_can_crit", "burning_stacks"]
 
 
 # ============================================================
@@ -961,6 +1000,8 @@ const BETA_UNIQUE_KEYS = [
 const UNIQUE_MECHANIC_KEYS = [
 	"knockback_aura", "dodge_cap", "consumable_heal_over_time", "lock_current_weapons", "hp_cap", "speed_cap",
 	"minimum_weapon_cooldowns", "modify_every_x_projectile", "structures_can_crit", "one_shot_trees",
+	# 史前惧兽：怀表每波只触发一次（按玩家记录，第二份无作用）、纵火狂的燃烧叠加是开关
+	"slow_time_when_below_hp", "burning_stacks",
 ]
 # 同上，按效果脚本识别：搜刮虫虫（刷怪器每个玩家只记录一只，多只追同一个目标）
 const UNIQUE_MECHANIC_SCRIPTS = ["res://effects/items/lootworm_effect.gd"]

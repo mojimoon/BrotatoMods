@@ -68,6 +68,7 @@ var _effect_registered := false
 func _init() -> void:
 	var dir: String = ModLoaderMod.get_unpacked_dir() + MOD_ID + "/extensions/"
 	ModLoaderMod.install_script_extension(dir + "singletons/run_data.gd")
+	ModLoaderMod.install_script_extension(dir + "singletons/item_service.gd")
 	ModLoaderMod.install_script_extension(dir + "main.gd")
 	ModLoaderMod.install_script_extension(dir + "singletons/weapon_service.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/run/character_selection.gd")
@@ -387,8 +388,9 @@ func any_start_weapons(character) -> Array:
 	var isvc = _autoload("ItemService")
 	var pd = _autoload("ProgressData")
 	var out = []
+	var inactive = inactive_set_members()
 	for w in isvc.weapons:
-		if w.tier in tiers and w.can_be_looted and (pd == null or pd.weapons_unlocked.has(w.weapon_id_hash)) and (is_native_resource(w) or w in _low_weapons):
+		if w.tier in tiers and w.can_be_looted and (pd == null or pd.weapons_unlocked.has(w.weapon_id_hash)) and (is_native_resource(w) or w in _low_weapons) and not inactive.has(w):
 			out.push_back(w)
 	out.sort_custom(self, "_sort_by_name")
 	return isvc.get_ordered_starting_weapons(out)
@@ -450,7 +452,7 @@ func preview_plan(p_seed: int, kind: String = "") -> Dictionary:
 	var gen = Generator.new(cfg, p_seed)
 	var isvc = _autoload("ItemService")
 	var low = _low_tier_weapons(cfg, isvc)
-	var p = gen.generate(native_only(isvc.items), native_only(isvc.characters), [], native_only(isvc.weapons) + low)
+	var p = gen.generate(run_native(isvc.items), run_native(isvc.characters), [], run_native(isvc.weapons) + low)
 	p["low_weapons"] = low
 	return p
 
@@ -459,7 +461,7 @@ func preview_plan(p_seed: int, kind: String = "") -> Dictionary:
 func _low_tier_weapons(cfg: Dictionary, isvc) -> Array:
 	if not bool(cfg.get("weapons", false)) or not bool(cfg.get("w_low_tiers", false)):
 		return []
-	return Generator.WeaponGen.make_low_tiers(native_only(isvc.weapons))
+	return Generator.WeaponGen.make_low_tiers(run_native(isvc.weapons))
 
 
 # 注册补出的低级武器（商店、合成、存档按 ID 查找）；restore() 时移除
@@ -506,13 +508,19 @@ func _activate(state: Dictionary) -> void:
 	# 本局不重组：初始道具与商店里的同 ID 道具一致，背包合并显示、存档（原版按 ID 缓存序列化）、独特限制都保持正确
 	#（"重组初始道具"选项开启时照常重组：开局已持有的初始道具由 _materialize_owned 换成生成版本，同 ID 仍一致）
 	if not bool(state.cfg.get("starting_items", false)):
-		gen.run_excluded_ids = starting_item_ids(chars, native_only(isvc.items))
+		gen.run_excluded_ids = starting_item_ids(chars, run_native(isvc.items))
 	# 本局所有玩家角色的偏好词条：重组后 T1–T3 每个稀有度都保证有带这些词条的道具
 	for ch in chars:
 		for t in ch.wanted_tags:
 			if not t in gen.player_wanted_tags:
 				gen.player_wanted_tags.push_back(t)
 		gen.player_banned_ids += ch.banned_items
+		# 禁用的道具组（吸血鬼禁用生命再生组）：单属性组同样作为禁用语义，偏好词条保底道具不会落在被禁的组里
+		#（否则"想要的词条"抽取时该档全被禁，原版会退回不检查禁用的备用池）
+		for g in ch.banned_item_groups:
+			var need = Catalog.GROUP_STATS.get(g, [])
+			if need.size() == 1 and not need[0] in ch.wanted_tags and not need[0] in gen.player_ban_sems:
+				gen.player_ban_sems.push_back(need[0])
 		for id in ch.banned_items:
 			var it = _find(isvc.items, id)
 			if it != null:
@@ -520,7 +528,7 @@ func _activate(state: Dictionary) -> void:
 					if not sem in ch.wanted_tags and not sem in gen.player_ban_sems:
 						gen.player_ban_sems.push_back(sem)
 	register_low_weapons(state.cfg)
-	plan = gen.generate(native_only(isvc.items), native_only(isvc.characters), native_only(chars), native_only(isvc.weapons) + _low_weapons)
+	plan = gen.generate(run_native(isvc.items), run_native(isvc.characters), native_only(chars), run_native(isvc.weapons) + _low_weapons)
 	_gen = gen
 	var rename = bool(state.cfg.get("rename", true))
 	for id in plan.items:
@@ -662,6 +670,35 @@ static func native_only(arr: Array) -> Array:
 	var out = []
 	for r in arr:
 		if is_native_resource(r):
+			out.push_back(r)
+	return out
+
+
+# 1.2：ItemService.items / weapons / characters 包含所有已拥有 DLC 与更新的内容，不管本局是否启用了对应的物品套组。
+# 本局的先验、机制来源与重组对象只取已启用的套组（未启用套组的内容不在商店池里，也不参与重组）；
+# 不在任何更新套组里的原版内容（基础游戏、不可获得的"用后形态"等）照常保留
+static func inactive_set_members() -> Dictionary:
+	var out = {}
+	var isvc = _autoload("ItemService")
+	var pd = _autoload("ProgressData")
+	if isvc == null or pd == null or not "update_data_list" in isvc:
+		return out
+	for u in isvc.update_data_list:
+		if u == null or u.item_set == null or u.id in pd.active_update_data:
+			continue
+		for field in ["items", "weapons", "characters", "meca_items", "mutant_items", "evolution_items"]:
+			if field in u.item_set:
+				for r in u.item_set.get(field):
+					out[r] = true
+	return out
+
+
+# 原版内容中属于本局已启用套组的部分
+static func run_native(arr: Array) -> Array:
+	var inactive = inactive_set_members()
+	var out = []
+	for r in native_only(arr):
+		if not inactive.has(r):
 			out.push_back(r)
 	return out
 
@@ -839,6 +876,7 @@ static func _dup_effects(effects: Array) -> Array:
 # 只补回缺失的触发条款（诅咒物品按诅咒系数增强），其余效果保持存档原样（例如已消失的一次性效果不会被补回）。
 func _repair_loaded(state: Dictionary) -> void:
 	var rd = _autoload("RunData")
+	_restore_mutated(rd)
 	for pd in rd.players_data:
 		for it in pd.items:
 			_repair_item(it)
@@ -858,6 +896,9 @@ func _repair_item(it) -> void:
 	var tmpl = _template_for(it)
 	if tmpl == null or tmpl == it:
 		return
+	# 异变过的道具：触发条款已按异变记录还原（异变可能删掉了某条负面条款），不再按模板补回
+	if it.has_meta("aa_mutation_record"):
+		return
 	it.name = tmpl.name
 	if not it is CharacterData:
 		it.tags = tmpl.tags
@@ -875,8 +916,9 @@ func _repair_item(it) -> void:
 		return
 	var dlc = null
 	var pd = _autoload("ProgressData")
-	if pd != null:
-		dlc = pd.get_dlc_data("abyssal_terrors")
+	var isvc = _autoload("ItemService")
+	if it.is_cursed and pd != null and isvc != null and "abyssal_terrors" in pd.active_update_data:
+		dlc = isvc.get_dlc_data_by_id("abyssal_terrors")
 	var new_effects = it.effects.duplicate()
 	for e in tmpl.effects:
 		if e is TriggerEffect:
@@ -886,6 +928,65 @@ func _repair_item(it) -> void:
 			new_effects.push_back(ne)
 	it.effects = new_effects
 	it.name = tmpl.name
+
+
+# ============================================================
+# 异变（史前惧兽）：原版把道具（含重组道具）上的一条正面效果复制到肿瘤上，触发条款同样会被复制、按异变系数缩放并参与合并；
+# 异变也可能删掉重组道具上的一条负面条款。肿瘤不是重组道具、没有模板，异变过的道具与模板也不再一致，
+# 读档时丢失的触发条款无法按模板修复：每次异变后把这些道具上的触发条款记入 aa_state（随存档保存），读档时按记录补回
+# ============================================================
+const TUMOR_ID = "item_tumor"
+
+
+func record_mutations(player_index: int) -> void:
+	if active_state == null:
+		return
+	var rd = _autoload("RunData")
+	var entries = []
+	for it in rd.players_data[player_index].items:
+		if it.my_id == TUMOR_ID or it.is_mutant:
+			var clauses = []
+			for e in it.effects:
+				if e is TriggerEffect:
+					clauses.push_back(e.serialize())
+			entries.push_back([it.my_id, clauses])
+	if not active_state.get("mutated") is Dictionary:
+		active_state["mutated"] = {}
+	active_state.mutated[str(player_index)] = entries
+
+
+# 读档：按记录补回肿瘤与异变道具上丢失的触发条款（同 ID 的多件按持有顺序对应）
+func _restore_mutated(rd) -> void:
+	var rec = active_state.get("mutated", {}) if active_state != null else {}
+	if not rec is Dictionary:
+		return
+	for p in rd.get_player_count():
+		var entries: Array = rec.get(str(p), []).duplicate()
+		for it in rd.players_data[p].items:
+			if not (it.my_id == TUMOR_ID or it.is_mutant):
+				continue
+			var idx = -1
+			for i in entries.size():
+				if entries[i][0] == it.my_id:
+					idx = i
+					break
+			if idx < 0:
+				continue
+			var clauses: Array = entries[idx][1]
+			entries.remove(idx)
+			it.set_meta("aa_mutation_record", true)
+			var has_trigger = false
+			for e in it.effects:
+				if e is TriggerEffect:
+					has_trigger = true
+			if has_trigger or clauses.empty():
+				continue
+			var effects = it.effects.duplicate()
+			for d in clauses:
+				var e = TriggerEffect.new()
+				e.deserialize_and_merge(d)
+				effects.push_back(e)
+			it.effects = effects
 
 
 # ============================================================

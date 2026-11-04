@@ -38,3 +38,12 @@ func resume_from_state(state: Dictionary) -> void:
 	var m = AAMain.get_mod()
 	if m != null:
 		m.on_resume(state)
+
+
+# 异变（史前惧兽）：记录肿瘤 / 异变道具上的触发条款，读档时补回（见 mod_main.record_mutations）
+func mutate_random_item(player_index: int):
+	var mutated = .mutate_random_item(player_index)
+	var m = AAMain.get_mod()
+	if m != null:
+		m.record_mutations(player_index)
+	return mutated

@@ -59,7 +59,9 @@ const REF_STATS = {
 const TIER_STAT_FRAC = [0.15, 0.27, 0.5, 1.0]
 
 # 可建模（计入 power）的效果脚本 id / key
-const MODELED_EFFECTS = ["weapon_exploding", "weapon_burning", "weapon_projectiles_on_hit", "weapon_gain_stat_for_every_stat", "weapon_stack"]
+# 碳纤维弓（史前惧兽）的 5 条联动效果：每支箭按最高属性随机附带其中一种，数值互不可比（减速百分比、穿透数、地雷几率……），
+# 且只留在碳纤维弓家族；按 power（箭本身）估值，不单独计残差
+const MODELED_EFFECTS = ["weapon_exploding", "weapon_burning", "weapon_projectiles_on_hit", "weapon_gain_stat_for_every_stat", "weapon_stack", "weapon_carbon_bow_stat"]
 # 按计数加固定伤害的效果（船长之剑"每个空武器栏 +X 伤害"、棍子"每多 1 把同名武器 +X 伤害"）：
 # 计入每次命中的伤害，价值随 X / 面板伤害变化；计数取典型值
 const FREE_SLOTS_REF = 2.0

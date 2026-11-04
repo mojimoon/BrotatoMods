@@ -508,7 +508,7 @@ func _is_reassemblable_item(item) -> bool:
 	if item.my_id in run_excluded_ids:
 		return false
 	# 强制重组 (BETA)：锚定道具中商店里买得到的也参与重组
-	if item.my_id in Catalog.ANCHORED_ITEMS and not (cfg.get("force_items", false) and item.can_be_looted):
+	if Catalog.is_anchored(item.my_id, cfg.get("force_items", false), item.can_be_looted):
 		return false
 	if item.tier < 0 or item.tier > 3:
 		return false
@@ -634,12 +634,12 @@ func _collect_priors(items: Array, characters: Array, weapons: Array) -> void:
 					trigger_stat_prior[sk] = trigger_stat_prior.get(sk, 0.0) + 1.0
 				continue
 			if src is ItemData and not src is CharacterData and not src is WeaponData and is_mechanic(e) \
-					and not src.my_id in Catalog.MECHANIC_SOURCE_EXCLUDED and src.tier >= 0 and src.tier <= 3 \
+					and not Catalog.is_mechanic_source_excluded(src.my_id) and not src.my_id in Catalog.MECHANIC_SOURCE_EXTRA_EXCLUDED and src.tier >= 0 and src.tier <= 3 \
 					and e.get_text(0, false) != "" and _mechanic_keys_exist(e, effect_keys):
 				mechs.push_back(e)
 		if src is ItemData and not src is CharacterData and not src is WeaponData and src.tier >= 0 and src.tier <= 3:
 			_record_structure(src)
-			if not src.my_id in Catalog.ANCHORED_ITEMS and src.can_be_looted:
+			if not src.my_id in Catalog.ANCHORED_ITEMS and not src.my_id in Catalog.ANCHORED_ALWAYS and src.can_be_looted:
 				lines_by_tier[src.tier].push_back(pos_lines)
 				tier_count[src.tier] += 1
 				if has_neg:
@@ -1954,7 +1954,7 @@ func _collect_char_templates(all_characters: Array, items: Array = []) -> void:
 				char_templates.beta[bk] = e
 	guaranteed_candidates = []
 	for it in items:
-		if it.tier == 0 and it.can_be_looted and not it is CharacterData and not it is WeaponData 				and not it.my_id in Catalog.ANCHORED_ITEMS and not it.my_id in run_excluded_ids:
+		if it.tier == 0 and it.can_be_looted and not it is CharacterData and not it is WeaponData 				and not it.my_id in Catalog.ANCHORED_ITEMS and not it.my_id in Catalog.ANCHORED_ALWAYS and not it.my_id in run_excluded_ids:
 			guaranteed_candidates.push_back(it.my_id)
 	guaranteed_candidates.sort()
 	for src in items + characters:

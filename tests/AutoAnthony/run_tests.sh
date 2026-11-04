@@ -4,9 +4,10 @@
 #   core（默认）：道具与共通部分的逻辑测试；battle：真实战斗场景；audit：价值 / 分布统计审计；
 #   weapons：武器重组的全部测试；items = core,battle,audit；all = 全部
 #   AA_ONLY=<名字片段> 只跑名字含该片段的测试
+#   AA_INACTIVE_SETS=primal_dread[,abyssal_terrors,...] 本次运行停用这些物品套组（审计 DLC 对先验与估值的影响）
 #   AA_AUDIT=1 运行只打印数据的审计测试（武器组 test_156 / 157 / 163）；AA_SEARCH=<次数> 运行参数搜索（test_160 / 164）
 #
-# - 在反编译的游戏工程（本仓库的上一级目录）里运行，使用真实的 ItemService / RunData / ModLoader
+# - 在反编译的游戏工程（本仓库上一级的 1.2/，BROTATO_GAME 可覆盖；其中的 mods/ 是指向本仓库的目录联接）里运行，使用真实的 ItemService / RunData / ModLoader
 # - 先把 mods/<MOD> 同步到 mods-unpacked/<MOD>（编辑器模式下 ModLoader 只加载这里的 mod）
 # - APPDATA 指向临时目录：user:// 与真实存档、ModLoader 配置完全隔离
 # - 测试文件在 mods/tests 下，不会被打包进 mod
@@ -14,7 +15,8 @@ set -u
 AA_KEEP_LOG=${AA_KEEP_LOG:-}
 
 HERE=$(cd "$(dirname "$0")" && pwd)
-PROJECT=$(cd "$HERE/../../.." && pwd)
+ROOT=$(cd "$HERE/../../.." && pwd)
+PROJECT=${BROTATO_GAME:-$ROOT/1.2}
 MOD=Mojimoon-AutoAnthony
 SUITE=${1:-core}
 GODOT=${GODOT:-/d/env/godot_3.7-dev1/Godot_v3.7-dev1_win64.exe}

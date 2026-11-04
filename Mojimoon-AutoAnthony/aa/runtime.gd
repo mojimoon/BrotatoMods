@@ -11,7 +11,7 @@ const Valuation = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/valuation
 const AAEnemyBehavior = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/enemy_behavior.gd")
 # 每波期望触发次数不超过该值时才显示浮动图标（避免高频扳机刷屏）
 const FEEDBACK_MAX_RATE = 12.0
-const EXPLOSION_EFFECT_PATH = "res://items/all/rip_and_tear/rip_and_tear_effect_1.tres"
+const EXPLOSION_EFFECT_PATH = "res://items/all/00_base_game/rip_and_tear/rip_and_tear_effect_1.tres"
 
 # 本波已结束（运行时每波重建）
 var _wave_over := false

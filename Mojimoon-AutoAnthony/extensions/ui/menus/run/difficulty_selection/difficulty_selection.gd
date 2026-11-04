@@ -5,8 +5,8 @@ extends "res://ui/menus/run/difficulty_selection/difficulty_selection.gd"
 const AAMain = preload("res://mods-unpacked/Mojimoon-AutoAnthony/mod_main.gd")
 
 
+# Godot 3 会自动调用每一层脚本的 _ready（父类先于本扩展），不能再调用 ._ready()
 func _ready() -> void:
-	._ready()
 	# 延迟到其他 mod 的按钮就位后再排位，避免重叠
 	call_deferred("_aa_init_button")
 

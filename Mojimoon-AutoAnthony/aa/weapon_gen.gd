@@ -16,7 +16,15 @@ const Valuation = preload("res://mods-unpacked/Mojimoon-AutoAnthony/aa/valuation
 # 绑定在武器场景 / 家族上的效果：只留在原家族（不给别的武器，也不从原家族拿走）
 #   电击枪 / 鱼叉枪的区域减速由投射物场景实现（效果只是说明文字）；磁轨炮的未受伤加成只在它的场景脚本里生效；
 #   砖头的"命中后碎裂并替换为新武器"只适合砖头这种消耗型武器
-const FAMILY_BOUND_KEYS = ["weapon_slow_in_zone", "effect_no_hit_boost", "break_on_hit"]
+#   史前惧兽：光剑反弹投射物（光剑场景）、铲子挖箱子（铲子场景）、碳纤维弓的 5 条联动效果（弓的场景）、
+#   莫洛托夫的火焰池（投射物场景）、连枷末端暴击（连枷场景）、粘性手雷的延迟爆炸（手雷投射物）、回旋镖返程（说明文字）
+const FAMILY_BOUND_KEYS = [
+	"weapon_slow_in_zone", "effect_no_hit_boost", "break_on_hit",
+	"weapon_deflect_projectiles", "weapon_crate_dig_chance", "weapon_carbon_bow_stat", "fire_puddle_on_hit",
+	"crit_on_whip_tip", "weapon_delayed_exploding",
+]
+# 只有说明文字（key 为空）、靠 text_key 识别的绑定效果
+const FAMILY_BOUND_TEXT_KEYS = ["EFFECT_BOOMERANG_RETURN"]
 # 只对远程武器有效的效果（暴击时贯穿 / 弹跳、每 X 发投射物、捡材料时换弹）
 const RANGED_ONLY_KEYS = ["pierce_on_crit", "bounce_on_crit", "modify_every_x_projectile", "reload_when_pickup_gold"]
 # 浮动范围 100% 时家族强度倍率的对数标准差（原版"价值 / 价格"的离散度约 0.36，但大部分是模型误差，不照搬）
@@ -49,7 +57,7 @@ static func family_of(w) -> String:
 
 
 static func bound_key(e) -> bool:
-	return WeaponValue.effect_key(e) in FAMILY_BOUND_KEYS or WeaponValue.effect_id(e) in FAMILY_BOUND_KEYS
+	return WeaponValue.effect_key(e) in FAMILY_BOUND_KEYS or WeaponValue.effect_id(e) in FAMILY_BOUND_KEYS 		or e.text_key in FAMILY_BOUND_TEXT_KEYS
 
 
 static func ranged_only(e) -> bool:
