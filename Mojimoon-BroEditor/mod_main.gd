@@ -123,14 +123,17 @@ func _init() -> void:
 	ModLoaderMod.install_script_extension(dir + "singletons/run_data.gd")
 	ModLoaderMod.install_script_extension(dir + "singletons/weapon_service.gd")
 	ModLoaderMod.install_script_extension(dir + "main.gd")
-	ModLoaderMod.install_script_extension(dir + "ui/menus/shop/shop.gd")
-	ModLoaderMod.install_script_extension(dir + "ui/menus/shop/coop_shop.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/run/character_selection.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/run/weapon_selection.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/run/difficulty_selection/difficulty_selection.gd")
 
 
 func _ready() -> void:
+	# 1.2 base_shop 用 := 从 RunData（.tscn 自动加载）推断类型；_init 时 RunData 尚未实例化，
+	# 在那时加载会解析失败，并被 CrashReporter 当成 mod 崩溃（下次启动禁用全部 mod）
+	var dir: String = ModLoaderMod.get_unpacked_dir() + MOD_ID + "/extensions/"
+	ModLoaderMod.install_script_extension(dir + "ui/menus/shop/shop.gd")
+	ModLoaderMod.install_script_extension(dir + "ui/menus/shop/coop_shop.gd")
 	_register_translations()
 	load_profiles()
 	runtime = Runtime.new()
