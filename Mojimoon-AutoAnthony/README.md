@@ -1,6 +1,6 @@
 # Brotato: Auto-Anthonyology / 土豆兄弟：东尼算法
 
-[Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3671094202) | [Open in Steam Client](https://link.steam.watch/url/CommunityFilePage/3671094202) | [DESIGN / 设计](DESIGN.md) | [CHANGELOG / 更新日志](CHANGELOG.md)
+[Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3811213360) | [Open in Steam Client](https://link.steam.watch/url/CommunityFilePage/3811213360) | [DESIGN / 设计](DESIGN.md) | [CHANGELOG / 更新日志](CHANGELOG.md)
 
 [English](#english) | [中文](#中文) | [Screenshots](#screenshots) | [截图](#截图)
 
@@ -276,6 +276,6 @@ GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMod
 
 灵感来自《杀戮尖塔 2》的东尼算法 mod 与《以撒的结合：忏悔》挑战 45。快用分享码一键分享你的道具池！
 
-创意工坊：https://steamcommunity.com/sharedfiles/filedetails/?id=3671094202
+创意工坊：https://steamcommunity.com/sharedfiles/filedetails/?id=3811213360
 
 -->
