@@ -4505,7 +4505,7 @@ func _scroll() -> ScrollContainer:
 	s.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	s.scroll_horizontal_enabled = false
 	# 加宽滚动条：悬停预览时滚轮滚动的是原版物品详情（原版行为），拖动滚动条更容易滚动列表
-	s.get_v_scrollbar().rect_min_size.x = 16
+	s.get_v_scrollbar().rect_min_size.x = 12
 	return s
 
 
