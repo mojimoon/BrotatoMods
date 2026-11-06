@@ -47,6 +47,7 @@ The settings have three tabs. The switch on each tab turns that part on or off.
 | Force reassembly | Off | Spyglass, Bait, Pocket Factory, Axolotl, Goldfish and Fish Hook are reassembled too. |
 | Chaos / Ultimate chaos | Off | Shuffle item rarities / rarities and icons (pick one). |
 | Average value / Variance / Triggers | 100% / 100% / 125% | Overall strength, strength spread, and how often items have triggered or mechanic effects (100% = original). |
+| Keep original items | 0% | Keeps a share of the original items. |
 
 **Reassemble weapons** (default off)
 
@@ -106,6 +107,7 @@ The settings have three tabs. The switch on each tab turns that part on or off.
 [tr][td]Force reassembly[/td][td]Off[/td][td]Spyglass, Bait, Pocket Factory, Axolotl, Goldfish and Fish Hook are reassembled too.[/td][/tr]
 [tr][td]Chaos / Ultimate chaos[/td][td]Off[/td][td]Shuffle item rarities / rarities and icons (pick one).[/td][/tr]
 [tr][td]Average value / Variance / Triggers[/td][td]100% / 100% / 125%[/td][td]Overall strength, strength spread, and how often items have triggered or mechanic effects (100% = original).[/td][/tr]
+[tr][td]Keep original items[/td][td]0%[/td][td]Keeps a share of the original items.[/td][/tr]
 [/table]
 
 [h2]Reassemble weapons (default off)[/h2]
@@ -177,6 +179,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 | 强制重组 | 关 | 望远镜、诱饵、口袋工厂、蝾螈、金鱼、鱼钩也参与重组。 |
 | 混沌 / 究极混沌 | 关 | 随机交换道具的稀有度 / 稀有度和图标（二选一）。 |
 | 平均数值 / 浮动范围 / 触发效果 | 100% / 100% / 125% | 整体强度、强弱差异、带触发或机制效果的概率（100% = 原版）。 |
+| 保留原版道具 | 0% | 保留一定比例的原版道具。 |
 
 **重组武器**（默认关）
 
@@ -234,6 +237,7 @@ GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/
 [tr][td]强制重组[/td][td]关[/td][td]望远镜、诱饵、口袋工厂、蝾螈、金鱼、鱼钩也参与重组。[/td][/tr]
 [tr][td]混沌 / 究极混沌[/td][td]关[/td][td]随机交换道具的稀有度 / 稀有度和图标（二选一）。[/td][/tr]
 [tr][td]平均数值 / 浮动范围 / 触发效果[/td][td]100% / 100% / 125%[/td][td]整体强度、强弱差异、带触发或机制效果的概率（100% = 原版）。[/td][/tr]
+[tr][td]保留原版道具[/td][td]0%[/td][td]保留一定比例的原版道具。[/td][/tr]
 [/table]
 
 [h2]重组武器（默认关）[/h2]

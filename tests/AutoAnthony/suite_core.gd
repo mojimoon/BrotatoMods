@@ -79,6 +79,96 @@ func test_11_generated_items_are_well_formed() -> void:
 			_check(has_pos or _has_up_mechanic(p.effects), "%s has a positive line: %s" % [id, _texts(p.effects)])
 
 
+# 保留原版道具滑条：约一半保留原版；核心属性保底只补被保留原版道具未覆盖的属性；原版化石按件保留，其余被替换
+func test_13_native_ratio_keeps_items() -> void:
+	var cfg = _cfg()
+	cfg.native_ratio = 50
+	var n50 = _gen(7, cfg).items.size()
+	var n0 = _gen(7).items.size()
+	_check(n50 < n0 * 0.7 and n50 > n0 * 0.3, "about half kept native (%d of %d)" % [n50, n0])
+	# 0% 与不设滑条一致
+	var cfg0 = _cfg()
+	cfg0.native_ratio = 0
+	var a = _gen(7, cfg0)
+	var b = _gen(7)
+	var same = a.items.size() == b.items.size()
+	for id in a.items:
+		same = same and b.items.has(id) and _texts(a.items[id].effects) == _texts(b.items[id].effects)
+	_check(same, "native_ratio 0 = default generation")
+	var items = m.run_native(isvc.items)
+	var gen = Generator.new(cfg, 3)
+	var plan = gen.generate(items, m.run_native(isvc.characters), [], [])
+	var kept = {}
+	for it in gen.kept_native:
+		kept[it.my_id] = true
+	for t in Catalog.CORE_TIERS:
+		for st in Catalog.CORE_STATS:
+			var n_core = 0
+			for id in plan.items:
+				if plan.items[id].get("core", "") == st and _item(id).tier == t:
+					n_core += 1
+			var covered = gen._native_covers(t, st)
+			_check(n_core <= 1, "%d/%s: at most one core item" % [t, st])
+			if covered:
+				_eq(n_core, 0, "%d/%s: covered by a kept native item, no core item" % [t, st])
+	var n_fossil_native = 0
+	var n_kept_fossil = 0
+	for it in items:
+		if it.my_id in Catalog.FOSSIL_ITEMS:
+			n_fossil_native += 1
+			if not it.my_id in plan.replaced_fossils:
+				n_kept_fossil += 1
+	var n_new = 0
+	for id in plan.items:
+		if plan.items[id].get("fossil", false):
+			n_new += 1
+	if n_fossil_native > 0:
+		_eq(n_new + n_kept_fossil, n_fossil_native, "fossil total unchanged (kept %d + new %d)" % [n_kept_fossil, n_new])
+	# 实际生效：保留的原版化石留在商店池，被替换的移出
+	if n_fossil_native > 0:
+		m.cfg_native_ratio = 50
+		m.start_new_run()
+		var in_pool = {}
+		for t in 4:
+			for it in isvc.get_pool(t, isvc.TierData.ITEMS):
+				in_pool[it.my_id] = true
+		for id in Catalog.FOSSIL_ITEMS:
+			if _item(id) == null or not _item(id).can_be_looted:
+				continue
+			var replaced = id in m.plan.replaced_fossils
+			if replaced:
+				_check(not in_pool.has(id), id + " replaced, out of the pool")
+			elif ProgressData.items_unlocked.has(Keys.generate_hash(id)) or _item(id).unlocked_by_default:
+				_check(in_pool.has(id), id + " kept, in the pool")
+		m.restore()
+		m.cfg_native_ratio = 0
+	# 100%：全部保留原版，不生成核心道具与化石
+	var cfg100 = _cfg()
+	cfg100.native_ratio = 100
+	var p100 = _gen(7, cfg100)
+	var gen_count = 0
+	for id in p100.items:
+		if not Catalog.PATH_ITEMS.has(id):
+			gen_count += 1
+	_eq(gen_count, 0, "native_ratio 100 keeps everything native")
+
+
+# 化石不算满足偏好词条：只有化石带某词条时，该稀有度视为没有带该词条的道具
+func test_13b_fossils_not_wanted_tag() -> void:
+	var gen = Generator.new(_cfg(), 5)
+	var plan = gen.generate(m.run_native(isvc.items), m.run_native(isvc.characters), [], [])
+	var n = 0
+	for id in plan.items:
+		if plan.items[id].get("fossil", false) and not plan.items[id].tags.empty():
+			var only = {"items": {id: plan.items[id]}}
+			_check(not gen._tier_has_tag(only, [_item(id)], _item(id).tier, plan.items[id].tags[0]), id + " fossil tag does not satisfy")
+			n += 1
+	_check(n > 0, "fossils with tags checked")
+	var native = _item("item_fossil_skull")
+	if native != null and not native.tags.empty():
+		_check(not gen._tier_has_tag({"items": {}}, [native], native.tier, native.tags[0]), "vanilla fossil tag does not satisfy")
+
+
 func test_14_sliders() -> void:
 	var cfg = _cfg()
 	var base = 0.0
@@ -3107,7 +3197,8 @@ func test_307_side_mechanics() -> void:
 			_check(n_normal > 0, "locked side allows side mechanics on normal items")
 
 
-# 化石：数量与稀有度分布同原版化石，名称"化石：<原名>"，结构 = 属性 A / 代价 / 每件化石 +A / 计数；原版化石不进商店池
+# 化石：数量与稀有度分布同原版化石，名称"化石：<原名>"，结构 = 属性 A / 代价 / 每件化石 +A / 计数；原版化石不进商店池。
+# 属性 A 不是四种伤害；原版牙齿的位置是不限量的连接化石（+A / 视作化石，无"每件化石"行、无代价）
 func test_308_fossils() -> void:
 	var per_tier = [0, 0, 0, 0]
 	for it in m.run_native(isvc.items):
@@ -3116,18 +3207,30 @@ func test_308_fossils() -> void:
 	if per_tier == [0, 0, 0, 0]:
 		print("  (no vanilla fossils, skipped)")
 		return
+	var n_link = 0
 	for sd in [5, 6]:
 		var gen = Generator.new(_cfg(), sd)
 		var plan = gen.generate(m.run_native(isvc.items), m.run_native(isvc.characters), [], [])
+		_eq(plan.replaced_fossils.size(), per_tier[0] + per_tier[1] + per_tier[2] + per_tier[3], "all vanilla fossils replaced")
 		var got = [0, 0, 0, 0]
 		for id in plan.items:
 			var p = plan.items[id]
 			if not p.get("fossil", false):
 				continue
 			got[_item(id).tier] += 1
-			_check(p.get("unique", false), id + " fossil is unique")
 			var a = p.effects[0]
 			_check(Catalog.STATS.has(a.key) and a.value > 0, id + " first line is +A")
+			_check(a.key in Generator.fossil_stats(), "%s fossil stat %s allowed" % [id, a.key])
+			if p.get("link", false):
+				n_link += 1
+				print("AUDIT link fossil: " + _texts(p.effects))
+				_check(not p.get("unique", false) and int(p.get("limit", 0)) <= 0, id + " link fossil is unlimited")
+				_eq(p.effects.size(), 2, id + " link fossil = +A / counts as fossil")
+				_check(p.effects[1].key == "fossil_count" and p.effects[1].text_key != "[EMPTY]", id + " link marker shown")
+				_eq(int(p.price), int(_item("item_fossil_tooth").value), id + " link fossil keeps the tooth price")
+				continue
+			_check(p.get("unique", false), id + " fossil is unique")
+			print("AUDIT fossil T%d: %s" % [_item(id).tier + 1, _texts(p.effects)])
 			var per = null
 			var marker = false
 			for e in p.effects:
@@ -3145,6 +3248,19 @@ func test_308_fossils() -> void:
 			var v = _value_of(gen, p.effects, _item(id).tier)
 			_check(v > 0.5 * gen.item_budget(_item(id)) and v < 2.0 * gen.item_budget(_item(id)), "%s fossil value %.1f ~ budget %.1f" % [id, v, gen.item_budget(_item(id))])
 		_eq(str(got), str(per_tier), "fossil count per tier")
+	_eq(n_link, 2, "one link fossil per seed")
+	# 属性 A 的分布：经验获取会出现，四种伤害不出现
+	var dist = {}
+	for sd in range(20, 32):
+		var plan = Generator.new(_cfg(), sd).generate(m.run_native(isvc.items), m.run_native(isvc.characters), [], [])
+		for id in plan.items:
+			if plan.items[id].get("fossil", false) and not plan.items[id].get("link", false):
+				var k = plan.items[id].effects[0].key
+				dist[k] = dist.get(k, 0) + 1
+	print("AUDIT fossil stats over 12 seeds: " + str(dist))
+	_check(dist.has("xp_gain"), "xp gain fossils appear")
+	for k in Catalog.FOSSIL_EXCLUDED_STATS:
+		_check(not dist.has(k), "no fossil on " + k)
 	# 实际生效：名称与商店池
 	m.start_new_run()
 	var fossil_id = ""

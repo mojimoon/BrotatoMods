@@ -116,9 +116,13 @@ func generate(items: Array, all_characters: Array, selected: Array, weapons: Arr
 	var plan = {"items": {}, "characters": {}, "weapons": {}, "seed": seed_value}
 	if cfg.get("items", true):
 		var gen_items = []
+		kept_native = []
 		for item in items:
 			if _is_reassemblable_item(item):
-				gen_items.push_back(item)
+				if _keeps_native(item):
+					kept_native.push_back(item)
+				else:
+					gen_items.push_back(item)
 		var orig_tiers = {}
 		if cfg.get("chaos", false):
 			orig_tiers = _chaos_shuffle(gen_items, true)
@@ -127,12 +131,21 @@ func generate(items: Array, all_characters: Array, selected: Array, weapons: Arr
 		assign_prices(gen_items, orig_tiers)
 		var core = pick_core_items(gen_items)
 		var fossils = pick_fossil_items(items, gen_items, core)
+		plan["replaced_fossils"] = replaced_fossils
+		var links = []
 		for item in gen_items:
 			last_vm = 1.0
-			var r = _generate_fossil_item(item) if item.my_id in fossils else generate_item(item, core.get(item.my_id, ""))
+			if str(fossils.get(item.my_id, "")) == "link":
+				links.push_back(item)
+				continue
+			var r = _generate_fossil_item(item) if fossils.has(item.my_id) else generate_item(item, core.get(item.my_id, ""))
 			if not r.empty():
 				r["vmult"] = last_vm
 				plan.items[item.my_id] = r
+		# 连接化石在其余化石之后生成（化石计数行按其余化石的"每件化石"行估值）
+		for item in links:
+			last_vm = 1.0
+			plan.items[item.my_id] = _generate_link_fossil(item)
 		cur_stat_bans = []
 		_ensure_player_wanted_tags(plan, items, gen_items, core)
 		for item in gen_items:
@@ -269,7 +282,29 @@ static func has_unique_effect(effects: Array) -> bool:
 	return false
 
 
-# 核心属性道具的分配：T1–T3 每档为每个核心属性各挑一件道具（种子确定；优先挑价格接近该档中位数的道具）
+# "保留原版道具"滑条：按道具 ID 的种子决定是否保留原版（与 generate_item 的第一次抽取相同，滑条为 0 时其余生成不变）
+var kept_native: Array = []
+
+
+func _keeps_native(item) -> bool:
+	_seed_for(item.my_id)
+	return rng.randf() < float(cfg.get("native_ratio", 0)) / 100.0
+
+
+# 被滑条保留的原版道具里已有以该属性为主属性的可掉落道具（化石、路线道具、角色禁用的道具不算）
+func _native_covers(tier: int, stat: String) -> bool:
+	for it in kept_native:
+		if it.tier != tier or not it.can_be_looted or it.my_id in player_banned_ids:
+			continue
+		if Catalog.PATH_ITEMS.has(it.my_id) or it.my_id in Catalog.FOSSIL_ITEMS:
+			continue
+		if stat in main_stats(it.effects):
+			return true
+	return false
+
+
+# 核心属性道具的分配：T1–T3 每档为每个核心属性各挑一件道具（种子确定；优先挑价格接近该档中位数的道具）；
+# 被保留的原版道具已覆盖的属性不再分配
 # 返回 {道具 ID: 属性}
 func pick_core_items(gen_items: Array) -> Dictionary:
 	var res = {}
@@ -284,6 +319,8 @@ func pick_core_items(gen_items: Array) -> Dictionary:
 		for st in stats:
 			if pool.empty():
 				break
+			if not kept_native.empty() and _native_covers(t, st):
+				continue
 			var weights = {}
 			for k in pool.size():
 				var d = abs(log(max(1.0, price_of(pool[k])) / tier_price_median[t]))
@@ -343,8 +380,10 @@ func _tier_has_tag(plan: Dictionary, items: Array, tier: int, tag: String) -> bo
 	for it in items:
 		if it.tier != tier or it is CharacterData or it is WeaponData or not it.can_be_looted or it.my_id in player_banned_ids:
 			continue
-		# 进化路线道具不在常规商店池里；生成了新化石时原版化石不进商店池
-		if Catalog.PATH_ITEMS.has(it.my_id) or (it.my_id in Catalog.FOSSIL_ITEMS and not fossil_ids.empty()):
+		# 进化路线道具不在常规商店池里；化石鼓励成套购买，不算满足偏好词条（原版与生成的都不算）
+		if Catalog.PATH_ITEMS.has(it.my_id) or it.my_id in Catalog.FOSSIL_ITEMS:
+			continue
+		if plan.items.has(it.my_id) and plan.items[it.my_id].get("fossil", false):
 			continue
 		if plan.items.has(it.my_id) and not _ban_ok(plan.items[it.my_id]):
 			continue
@@ -1101,7 +1140,7 @@ func _trigger_rate() -> float:
 # ============================================================
 func generate_item(item, core_stat: String = "") -> Dictionary:
 	_seed_for(item.my_id)
-	# 原"保留原版道具"滑条的一次抽取：保留，使同一种子下其余道具的生成与之前的版本一致（隐藏价值乘数按此标定）
+	# 第一次抽取由"保留原版道具"滑条使用（_keeps_native），这里跳过它，使其余生成与滑条无关
 	rng.randf()
 	cur_stat_bans = Catalog.ITEM_STAT_BANS.get(item.my_id, [])
 	if Catalog.PATH_ITEMS.has(item.my_id):
@@ -1183,26 +1222,49 @@ func _mechanic_min_value(m: Dictionary) -> float:
 # 化石：本局挑选与原版化石同样数量、同稀有度分布的普通重组道具（不含路线道具、核心属性道具），返回 {道具 ID: true}
 # ============================================================
 var fossil_ids: Dictionary = {}
-var _fossil_tmpl = {}		# {"per": 原版"每件化石"行, "marker": 原版化石计数行}
+var replaced_fossils: Array = []	# 被替换（移出商店池）的原版化石 ID
+# {"per": 原版"每件化石"行, "marker": 化石计数行, "link_marker": 牙齿的"视作化石"行, "link_price": 牙齿价格}
+var _fossil_tmpl = {}
+var _fossil_per_values: Array = []	# 已生成化石的"每件化石"行：每多一件化石的价值
 
 
+# 每件原版化石按种子决定是否保留原版（"保留原版道具"滑条），被替换的化石由同稀有度的普通重组道具生成新化石；
+# 原版牙齿（不限量、只有化石计数）的位置生成"连接化石"。返回 {道具 ID: true | "link"}
 func pick_fossil_items(items: Array, gen_items: Array, core: Dictionary) -> Dictionary:
 	fossil_ids = {}
+	replaced_fossils = []
 	_fossil_tmpl = {}
-	var per_tier = [0, 0, 0, 0]
+	_fossil_per_values = []
+	var natives = []
 	for it in items:
 		if not it.my_id in Catalog.FOSSIL_ITEMS or it.tier < 0 or it.tier > 3:
 			continue
-		per_tier[it.tier] += 1
+		natives.push_back(it)
 		for e in it.effects:
 			if e.get_script() == scaling_script and e.stat_scaled == "fossil_count":
 				_fossil_tmpl["per"] = e
 			elif e.key == "fossil_count" and e.custom_key == "":
-				_fossil_tmpl["marker"] = e
+				if it.my_id == Catalog.FOSSIL_LINK_ITEM:
+					_fossil_tmpl["link_marker"] = e
+					_fossil_tmpl["link_price"] = int(it.value)
+				else:
+					_fossil_tmpl["marker"] = e
+	# 化石计数行统一用牙齿的"视作化石"（有文本；其余原版化石的计数行不显示）
+	if _fossil_tmpl.has("link_marker"):
+		_fossil_tmpl["marker"] = _fossil_tmpl.link_marker
 	if not _fossil_tmpl.has("per") or not _fossil_tmpl.has("marker"):
 		return {}
+	natives.sort_custom(self, "_sort_by_id")
+	var ratio = float(cfg.get("native_ratio", 0)) / 100.0
+	var to_replace = [[], [], [], []]
+	for it in natives:
+		if ratio > 0:
+			rng.seed = hash(str(seed_value) + "/fossil_keep/" + it.my_id)
+			if rng.randf() < ratio:
+				continue
+		to_replace[it.tier].push_back(it)
 	for t in 4:
-		if per_tier[t] == 0:
+		if to_replace[t].empty():
 			continue
 		var pool = []
 		for it in gen_items:
@@ -1211,13 +1273,24 @@ func pick_fossil_items(items: Array, gen_items: Array, core: Dictionary) -> Dict
 				pool.push_back(it)
 		pool.sort_custom(self, "_sort_by_id")
 		rng.seed = hash(str(seed_value) + "/fossil/" + str(t))
-		for _i in per_tier[t]:
+		for native in to_replace[t]:
 			if pool.empty():
 				break
 			var k = rng.randi() % pool.size()
-			fossil_ids[pool[k].my_id] = true
+			var link = native.my_id == Catalog.FOSSIL_LINK_ITEM and _fossil_tmpl.has("link_marker")
+			fossil_ids[pool[k].my_id] = "link" if link else true
+			replaced_fossils.push_back(native.my_id)
 			pool.remove(k)
 	return fossil_ids
+
+
+# 化石属性 A 的候选：计数属性去掉四种伤害（化石鼓励成套购买，主属性偏通用），加上经验获取
+static func fossil_stats() -> Array:
+	var out = []
+	for st in Catalog.SCALING_STATS + Catalog.FOSSIL_EXTRA_STATS:
+		if not st in Catalog.SIDE_ONLY_STATS and not st in Catalog.FOSSIL_EXCLUDED_STATS and not st in out:
+			out.push_back(st)
+	return out
 
 
 # 化石：+[属性 A] / 代价 / 每有一件化石 +[属性 A] / 化石计数（原版的四行结构）
@@ -1235,9 +1308,7 @@ func _generate_fossil_item(item) -> Dictionary:
 	# 最小化石（A 行与"每件化石"行各 1 单位）不超过预算的 1.3 倍（低价道具上不出现单位价值高的属性，如护甲）
 	var allowed = []
 	var cheapest = ""
-	for st in Catalog.SCALING_STATS:
-		if st in Catalog.SIDE_ONLY_STATS:
-			continue
+	for st in fossil_stats():
 		var min_v = Catalog.stat_w(st) * Catalog.stat_unit(st) * (Catalog.FOSSIL_COUNT_EXPECT + 1.0)
 		if min_v <= budget * 1.3:
 			allowed.push_back(st)
@@ -1262,6 +1333,7 @@ func _generate_fossil_item(item) -> Dictionary:
 	per.key_hash = Keys.generate_hash(a)
 	per.value = pv
 	per.effect_sign = Effect.Sign.FROM_VALUE
+	_fossil_per_values.push_back(Catalog.stat_w(a) * pv)
 	var effects = [_stat_effect(a, av)] + dres.effects + [per, _fossil_tmpl.marker.duplicate()]
 	pos_cat = ""
 	neg_cat = ""
@@ -1276,6 +1348,41 @@ func _generate_fossil_item(item) -> Dictionary:
 		"class": [Catalog.STAT_CATEGORY.get(a, "A"), "*"],
 		"fossil": true,
 		"limit": 1,
+	}
+
+
+# 连接化石（原版牙齿的位置）：不限量、原版价格，效果 = +[属性 A] / 视作化石。不带"每件化石"行（不限量时加成按件数平方增长），不带代价。
+#   化石计数行的价值 = 期望持有的其他化石数 × 其余化石"每件化石"行的平均单件价值；预算扣除它之后给属性 A，至少 +1 最大生命
+func _generate_link_fossil(item) -> Dictionary:
+	_seed_for(item.my_id + "/fossil")
+	cur_tier = item.tier
+	cur_stat_bans = Catalog.ITEM_STAT_BANS.get(item.my_id, [])
+	gen_prices[item.my_id] = int(_fossil_tmpl.link_price)
+	var budget: float = _base_budget(item) * _net_mult(_variance_mult())
+	var per_avg = 0.0
+	for v in _fossil_per_values:
+		per_avg += v / max(1, _fossil_per_values.size())
+	var rest = budget - (Catalog.FOSSIL_COUNT_EXPECT - 1.0) * per_avg
+	var allowed = []
+	for st in fossil_stats():
+		if Catalog.stat_w(st) * Catalog.stat_unit(st) <= rest:
+			allowed.push_back(st)
+	var a = "stat_max_hp"
+	var av = Catalog.stat_unit(a)
+	if not allowed.empty():
+		a = _pick_stat(false, [], allowed)
+		av = int(clamp(_round_to_unit(rest / Catalog.stat_w(a), a), Catalog.stat_unit(a), _line_cap(a, false)))
+	var effects = [_stat_effect(a, av), _fossil_tmpl.link_marker.duplicate()]
+	cur_tier = -1
+	return {
+		"effects": effects,
+		"adj": "",
+		"tags": _tags_for(effects),
+		"main_stats": main_stats(effects),
+		"budget": budget,
+		"class": [Catalog.STAT_CATEGORY.get(a, "A"), "-"],
+		"fossil": true,
+		"link": true,
 	}
 
 

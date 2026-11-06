@@ -481,11 +481,17 @@ const SIDE_MECHANICS = {
 }
 
 # 化石（史前惧兽）：原版的 9 件化石不进商店池，改为本局随机挑选同样数量（同稀有度分布）的普通重组道具做成化石：
-#   名称"化石：<原名>"，效果 = +[属性 A] / 代价 / 每有一件化石 +[属性 A]，附原版的化石计数行；独特
+#   名称"化石：<原名>"，效果 = +[属性 A] / 代价 / 每有一件化石 +[属性 A]，附原版的化石计数行；独特。
+#   "保留原版道具"滑条按件保留原版化石，只替换其余的；原版牙齿的位置生成不限量的"连接化石"（Generator._generate_link_fossil）
 #   每件化石的期望化石数（含自身）：按原版化石反推（"每件化石"行价值 ≈ 预算 − 属性行），中位数约 3.2
 const FOSSIL_COUNT_EXPECT = 3.2
 # +[属性 A] 行与"每件化石"行的单位数之比（原版 1–3.3）
 const FOSSIL_LINE_RATIO = [1.0, 3.0]
+# 化石属性 A 不用的属性（四种伤害偏向特定构筑）与额外可用的次要属性（需经 Utils.get_stat 读取，"每件化石"行才生效）
+const FOSSIL_EXCLUDED_STATS = ["stat_melee_damage", "stat_ranged_damage", "stat_elemental_damage", "stat_engineering"]
+const FOSSIL_EXTRA_STATS = ["xp_gain"]
+# 原版牙齿（不限量、只有化石计数）：其位置生成"连接化石"
+const FOSSIL_LINK_ITEM = "item_fossil_tooth"
 # 不作为机制来源（道具本身照常重组 / 锚定）
 const MECHANIC_SOURCE_EXTRA_EXCLUDED = ["item_dino_egg", "item_dino_egg_2", "item_dino_egg_1"]
 const FOSSIL_ITEMS = [

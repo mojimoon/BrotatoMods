@@ -176,6 +176,7 @@ func _reset() -> void:
 	m.cfg_avg = 100
 	m.cfg_variance = 100
 	m.cfg_triggers = 100
+	m.cfg_native_ratio = 0
 	m.cfg_char_effects = false
 	m.cfg_all_char_effects = false
 	m.cfg_more_double = false

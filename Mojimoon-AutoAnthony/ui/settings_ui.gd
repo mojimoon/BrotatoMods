@@ -75,6 +75,7 @@ const SLIDERS = [
 	["cfg_avg", "AA_UI_AVG", 50, 250, 5, "AA_UI_AVG_DESC"],
 	["cfg_variance", "AA_UI_VARIANCE", 50, 250, 5, "AA_UI_VARIANCE_DESC"],
 	["cfg_triggers", "AA_UI_TRIGGERS", 50, 250, 5, "AA_UI_TRIGGERS_DESC"],
+	["cfg_native_ratio", "AA_UI_NATIVE", 0, 100, 5, "AA_UI_NATIVE_DESC"],
 ]
 const WEAPON_SLIDERS = [
 	["cfg_w_avg", "AA_UI_AVG", 50, 250, 5, "AA_UI_W_AVG_DESC"],
