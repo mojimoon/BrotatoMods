@@ -32,7 +32,7 @@ func _config() -> void:
 		if not ModsConfigInterface.is_connected("setting_changed", self, "setting_changed"):
 			ModsConfigInterface.connect("setting_changed", self, "setting_changed")
 
-	var config = ModLoaderConfig.get_config(MOD_ID, version)
+	var config = ModLoaderConfig.get_configs(MOD_ID).get(version)
 	var defaultConfig = ModLoaderConfig.get_default_config(MOD_ID)
 	if data != null:
 		# ModLoaderLog.info("Current Version is %s." % version, MOD_ID)

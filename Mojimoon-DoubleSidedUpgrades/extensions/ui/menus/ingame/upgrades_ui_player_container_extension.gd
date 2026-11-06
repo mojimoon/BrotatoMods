@@ -54,7 +54,7 @@ func show_upgrades_for_level(level: int) -> void :
 
 func _get_mod_config_values() -> Dictionary:
 	var conf = settings_dict.duplicate()
-	var config = ModLoaderConfig.get_config(MYMODID, version)
+	var config = ModLoaderConfig.get_configs(MYMODID).get(version)
 	if config != null:
 		for key in settings_dict.keys():
 			if config.data.has(key):
@@ -127,12 +127,14 @@ func _try_curse(upgrade: UpgradeData, conf: Dictionary) -> UpgradeData:
 	if not conf["CURSED_UPGRADE"]:
 		return upgrade
 	
-	for dlc_id in RunData.enabled_dlcs:
-		var dlc_data = ProgressData.get_dlc_data(dlc_id)
-		if dlc_data and dlc_data.has_method("curse_item"):
-			if conf["FORCE_CURSED_UPGRADE"]:
-				upgrade = dlc_data.curse_item(upgrade, player_index)
-			else:
-				upgrade = dlc_data.update_item_effects(upgrade, player_index)
+	# 1.2: DLC resources always load; only curse when Abyssal Terrors is active this run
+	if not "abyssal_terrors" in ProgressData.active_update_data:
+		return upgrade
+	var dlc_data = ItemService.get_dlc_data_by_id("abyssal_terrors")
+	if dlc_data:
+		if conf["FORCE_CURSED_UPGRADE"]:
+			upgrade = dlc_data.curse_item(upgrade, player_index)
+		else:
+			upgrade = dlc_data.update_item_effects(upgrade, player_index)
 	
 	return upgrade
