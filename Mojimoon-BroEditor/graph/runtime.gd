@@ -529,6 +529,8 @@ func _charm(p: int, target, secs: float = Utils.CHARM_DURATION) -> void:
 		t.wait_time = max(0.1, secs)
 	b.charm(p)
 	if t != null:
+		# 其他 mod（如 Capybara）在 charm() 里会重设等待时间：启动后再按本节点的时长重启一次
+		t.start(max(0.1, secs))
 		t.wait_time = old
 
 

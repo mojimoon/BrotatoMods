@@ -13,7 +13,8 @@ func _be_init_button() -> void:
 
 
 # 选定难度：额外禁用次数（原版此时发放禁用次数）、起始波次
-func _on_element_pressed(element: InventoryElement, inventory_player_index: int) -> void:
+# element 不写类型：其他 mod（如 Capybara）扩展 InventoryElement 后，ModLoader 重载出的新类与父类签名里的旧类不一致，会导致本扩展解析失败
+func _on_element_pressed(element, inventory_player_index: int) -> void:
 	var was_selected = difficulty_selected
 	._on_element_pressed(element, inventory_player_index)
 	var m = BEMain.get_mod()

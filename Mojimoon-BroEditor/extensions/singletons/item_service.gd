@@ -11,20 +11,32 @@ const BEMain = preload("res://mods-unpacked/Mojimoon-BroEditor/mod_main.gd")
 
 func _rebuild_items() -> void:
 	var old = _items.duplicate()
+	_be_strip_own(_items, _mod_items)
 	._rebuild_items()
 	_restore_extras("items", _items, old, "_custom_items", _mod_items)
 
 
 func _rebuild_characters() -> void:
 	var old = _characters.duplicate()
+	_be_strip_own(_characters, _mod_characters)
 	._rebuild_characters()
 	_restore_extras("characters", _characters, old, "_customs", _mod_characters)
 
 
 func _rebuild_weapons() -> void:
 	var old = _weapons.duplicate()
+	_be_strip_own(_weapons, _mod_weapons)
 	._rebuild_weapons()
 	_restore_extras("weapons", _weapons, old, "_custom_weapons", _mod_weapons)
+
+
+# 其他 mod（如 Capybara）在重建前把列表里所有"非套组"对象记进 _mod_items / _mod_characters / _mod_weapons 并在重建后补回：
+# 本模组的对象也会被记进去，删除后仍留在列表 / 商店池里。重建前先把本模组的对象从列表和 _mod_* 里拿掉，重建后由 _restore_extras 按当前注册补回。
+static func _be_strip_own(list: Array, mod_list: Array) -> void:
+	for arr in [list, mod_list]:
+		for r in arr.duplicate():
+			if r != null and r.has_meta("broeditor"):
+				arr.erase(r)
 
 
 # 上一次重建时由套组 / _mod_items / 本模组提供的对象（不是"直接加进列表的"）：[列表名] -> {对象: true}
@@ -58,7 +70,12 @@ func _restore_extras(name: String, list: Array, old: Array, field: String, mod_l
 
 # 原版只把套组里的道具 / 武器放进商店池：本模组的自定义道具与武器等级按原版条件补进去
 func init_unlocked_pool() -> void:
+	# 其他 mod 可能已把本模组的对象（包括已删除的）记进 _mod_*、并在建池时加进池：前后都去掉记录，下面加池时跳过已在池里的
+	for arr in [_mod_items, _mod_weapons, _mod_characters]:
+		_be_strip_own([], arr)
 	.init_unlocked_pool()
+	for arr in [_mod_items, _mod_weapons, _mod_characters]:
+		_be_strip_own([], arr)
 	var m = BEMain.get_mod()
 	if m == null:
 		return
@@ -67,12 +84,16 @@ func init_unlocked_pool() -> void:
 			continue
 		if RunData.current_difficulty < item.minimum_difficulty or not ProgressData.items_unlocked.has(item.my_id_hash):
 			continue
+		if item in _tiers_data[item.tier][TierData.ALL_ITEMS]:
+			continue
 		_tiers_data[item.tier][TierData.ALL_ITEMS].push_back(item)
 		_tiers_data[item.tier][TierData.ITEMS].push_back(item)
 	for weapon in m._custom_weapons.values():
 		if weapon == null or not weapon.can_be_looted or not m.weapon_in_active_set(weapon):
 			continue
 		if not ProgressData.weapons_unlocked.has(weapon.weapon_id_hash):
+			continue
+		if weapon in _tiers_data[weapon.tier][TierData.ALL_ITEMS]:
 			continue
 		_tiers_data[weapon.tier][TierData.ALL_ITEMS].push_back(weapon)
 		_tiers_data[weapon.tier][TierData.WEAPONS].push_back(weapon)
