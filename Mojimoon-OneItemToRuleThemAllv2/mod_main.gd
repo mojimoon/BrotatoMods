@@ -377,9 +377,10 @@ func _make_replacement(target_id: String, orig_item, player_index: int):
 # （40 + 2*min(20,-1)），本 mod 不沿用此固定值。
 func _curse_item(item_data, player_index: int):
 	var progress_data = _autoload("ProgressData")
-	if progress_data != null:
-		var dlc = progress_data.get_dlc_data("abyssal_terrors")
-		if dlc != null and dlc.has_method("curse_item"):
+	var item_service = _autoload("ItemService")
+	if progress_data != null and item_service != null and "abyssal_terrors" in progress_data.active_update_data:
+		var dlc = item_service.get_dlc_data_by_id("abyssal_terrors")
+		if dlc != null:
 			return dlc.curse_item(item_data, player_index, false)
 	if item_data != null:
 		item_data.is_cursed = true

@@ -102,7 +102,7 @@ func _ready() -> void:
 	if _mod == null:
 		queue_free()
 		return
-	if not ProgressData.is_dlc_available_and_active("abyssal_terrors"):
+	if not ("abyssal_terrors" in ProgressData.active_update_data):
 		_mod.force_cursed = false
 
 	_base_stylebox = StyleBoxFlat.new()
@@ -227,7 +227,7 @@ func _build_options_card(parent: Control) -> void:
 	_enable_switch.connect("toggled", self, "_on_enable_toggled")
 	row.add_child(_enable_switch)
 
-	var dlc_active = ProgressData.is_dlc_available_and_active("abyssal_terrors")
+	var dlc_active = ("abyssal_terrors" in ProgressData.active_update_data)
 	var curse_text = tr("MOJI_CURSE")
 	if not dlc_active:
 		curse_text += " (" + tr("MOJI_CURSE_DLC_REQUIRED") + ")"
@@ -732,7 +732,7 @@ func _on_import_pressed() -> void:
 	if not _mod.import_settings_code(_clipboard_get()):
 		_status.text = tr("MOJI_IMPORT_FAILED")
 		return
-	if not ProgressData.is_dlc_available_and_active("abyssal_terrors"):
+	if not ("abyssal_terrors" in ProgressData.active_update_data):
 		_mod.force_cursed = false
 	_enable_switch.set_pressed_no_signal(_mod.enabled)
 	_curse_switch.set_pressed_no_signal(_mod.force_cursed)

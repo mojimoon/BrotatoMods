@@ -6,7 +6,7 @@ const ModMain = preload("res://mods-unpacked/Mojimoon-OneItemToRuleThemAllv2/mod
 
 
 func _ready() -> void:
-	._ready()
+	# Godot 3 already calls every _ready level; no super call
 	# 延迟到其他 mod（如 cave-modtools）的按钮就位后再排位，避免重叠
 	call_deferred("_moji_init_button")
 
