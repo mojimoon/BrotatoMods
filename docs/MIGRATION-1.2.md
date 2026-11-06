@@ -377,7 +377,7 @@ DLC1 自身内容（`dlcs/dlc_1/characters`、`items`、`weapons`）仍在原位
 
 ### 10.6 其他
 - 选择角色界面的「随机区域」改为在可用区域里随机抽取，并按区域 id 记住上次的选择（旧版按下标记录）。
-- 读档 / 启动时自动同步挑战奖励：已完成的挑战会补发未解锁的道具/武器奖励（`ChallengeService.sync_challenge_rewards(false)`，在 `ProgressData` 加载存档后和 `ChallengeService` 初始化时调用；选项菜单里的「重置/同步」用 `true`，同时重新锁上未完成挑战的奖励）。`unlock_reward(chal, track_in_run = true)` 新增参数。
+- 读档 / 启动时自动同步挑战奖励：已完成的挑战会补发未解锁的道具/武器奖励（`ChallengeService.sync_challenge_rewards(false)`，在 `ProgressData` 加载存档后和 `ChallengeService` 初始化时调用；选项菜单的「已完成挑战」按钮（`_on_CompletedChallengeCheckButton_pressed`）用 `true`，同时重新锁上未完成挑战的奖励）。`unlock_reward(chal, track_in_run = true)` 新增参数。
 - 图鉴完成度按已启用的 DLC 套组计算分母。
 
 ### 10.7 对两个 mod 的影响
