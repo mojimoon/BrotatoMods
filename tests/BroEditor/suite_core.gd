@@ -2535,6 +2535,19 @@ func test_308_nested_structure_details() -> void:
 	_check(m.effect_text(e).find("99") >= 0, "text shows new damage")
 	var spec = m._effect_to_spec({"from": "weapon_crowbar_1", "i": 0}, e)
 	_eq(int(spec.sub["structure_effect.stats"].damage), 99, "spec round trip")
+	# 炮塔附带的易伤效果（5 秒 +10%，最多 3 层）
+	var vf = "structure_effect.effects.0"
+	_check(vf in Catalog.sub_fields(effects[0]), "crowbar turret vulnerability listed")
+	var v = m.make_effect({"from": "weapon_crowbar_1", "i": 0, "sub": {vf: {"value": 20, "duration_secs": 8, "max_stacks": 4}}})
+	var ve = v.structure_effect.effects[0]
+	_eq([ve.value, ve.duration_secs, ve.max_stacks], [20, 8, 4], "vulnerability applied")
+	_eq(effects[0].structure_effect.effects[0].value, 10, "vulnerability template untouched")
+	_check(m.effect_text(v).find("80") >= 0, "text shows new max vulnerability")
+	_eq(int(m._effect_to_spec({"from": "weapon_crowbar_1", "i": 0}, v).sub[vf].duration_secs), 8, "vulnerability round trip")
+	# 流血炮塔（道具）同样可改
+	var bt = m.orig_effects("item_bleeding_turret")
+	if not bt.empty():
+		_check("effects.0" in Catalog.sub_fields(bt[0]), "bleeding turret vulnerability listed")
 
 
 # 史前惧兽效果拆解：病毒、干扰背包、怀表、臭臭大王花、泥潭爱好者（新状态扳机）

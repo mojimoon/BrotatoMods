@@ -116,9 +116,13 @@ func _grid(parent: Control) -> GridContainer:
 func _field_name(name: String) -> String:
 	# 嵌套字段（"效果字段.子资源字段"）：各级名称用 · 连接
 	if name.find(".") >= 0:
+		# 数组下标接在数组名后（"附带效果 1"）
 		var parts = []
 		for p in name.split("."):
-			parts.push_back(_field_name(p))
+			if p.is_valid_integer() and not parts.empty():
+				parts[parts.size() - 1] += " " + str(int(p) + 1)
+			else:
+				parts.push_back(_field_name(p))
 		return PoolStringArray(parts).join(" · ")
 	for k in ["BE_FIELD_" + name.to_upper(), "BE_WS_" + name.to_upper()]:
 		if ui.tr(k) != k:

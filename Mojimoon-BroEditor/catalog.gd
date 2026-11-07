@@ -318,40 +318,67 @@ const SUB_HIDDEN = ["sound_db_mod", "is_healing"]
 
 
 # 效果里可在详细信息里编辑的子资源字段：带脚本的 Resource（燃烧数据、武器属性等；场景、音效除外）。
-# 子资源是效果时（撬棍生成的炮塔）列出它的子资源，字段名为 "效果字段.子资源字段"（只展开一层）
-static func sub_fields(e, nested: bool = true) -> Array:
+# 子资源是效果时（撬棍生成的炮塔）列出它的子资源，字段名为 "效果字段.子资源字段"；
+# 子效果数组（炮塔 / 地雷附带的易伤、燃烧、爆炸效果）列出各效果本身（"effects.0"）与它的子资源（"effects.0.burning_data"）。
+# 效果最多向下展开两层
+static func sub_fields(e, depth: int = 0) -> Array:
 	var out = []
 	for p in e.get_property_list():
-		if not p.usage & PROPERTY_USAGE_SCRIPT_VARIABLE or not p.usage & PROPERTY_USAGE_STORAGE or p.type != TYPE_OBJECT:
+		if not p.usage & PROPERTY_USAGE_SCRIPT_VARIABLE or not p.usage & PROPERTY_USAGE_STORAGE:
 			continue
 		var r = e.get(p.name)
-		if not r is Resource or r.get_script() == null:
+		if p.type == TYPE_ARRAY:
+			if depth >= 2:
+				continue
+			for i in r.size():
+				if r[i] is Resource and "key_hash" in r[i]:
+					var name = p.name + "." + str(i)
+					if not sub_child_fields(r[i]).empty():
+						out.push_back(name)
+					for f in sub_fields(r[i], depth + 1):
+						out.push_back(name + "." + f)
+			continue
+		if p.type != TYPE_OBJECT or not r is Resource or r.get_script() == null:
 			continue
 		if "key_hash" in r:
-			if nested:
-				for f in sub_fields(r, false):
+			if depth < 1:
+				for f in sub_fields(r, depth + 1):
 					out.push_back(p.name + "." + f)
 		elif not sub_child_fields(r).empty() or "scaling_stats" in r:
 			out.push_back(p.name)
 	return out
 
 
-# 按 sub_fields 的字段名取子资源
+# 按 sub_fields 的字段名取子资源（数字段是数组下标）
 static func sub_get(e, field: String):
 	for part in field.split("."):
-		if e == null or not part in e:
+		e = sub_child(e, part)
+		if e == null:
 			return null
-		e = e.get(part)
 	return e
 
 
-# 子资源的标量字段
+static func sub_child(holder, part: String):
+	if holder is Array:
+		return holder[int(part)] if part.is_valid_integer() and int(part) < holder.size() else null
+	return holder.get(part) if holder is Object and part in holder else null
+
+
+static func sub_put(holder, part: String, v) -> void:
+	if holder is Array:
+		holder[int(part)] = v
+	else:
+		holder.set(part, v)
+
+
+# 子资源的标量字段（子效果不含文本 / 好坏 / 计算方式）
 static func sub_child_fields(r) -> Array:
 	var out = []
+	var is_effect = "key_hash" in r
 	for p in r.get_property_list():
 		if not p.usage & PROPERTY_USAGE_SCRIPT_VARIABLE or not p.usage & PROPERTY_USAGE_STORAGE:
 			continue
-		if p.name in SUB_HIDDEN or p.name.begins_with("_") or p.name.ends_with("_hash"):
+		if p.name in SUB_HIDDEN or p.name.begins_with("_") or p.name.ends_with("_hash") or (is_effect and p.name in LATE_FIELDS):
 			continue
 		if p.type in [TYPE_INT, TYPE_REAL, TYPE_BOOL]:
 			out.push_back({"name": p.name, "type": p.type})

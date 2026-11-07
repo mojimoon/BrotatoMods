@@ -940,6 +940,7 @@ BE_FIELD_PUDDLE_SCALE,火焰池缩放,Fire pool scale,Échelle du bassin de feu,
 BE_FIELD_BURNING_DATA,燃烧,Burning,Brûlure,炎上,화상,燃燒,Горение,Podpalenie,Quemadura,Queimadura,Brennen,Yanma,Bruciatura
 BE_FIELD_STATS,数值,Stats,Statistiques,数値,수치,數值,Параметры,Statystyki,Estadísticas,Atributos,Werte,Değerler,Statistiche
 BE_FIELD_STRUCTURE_EFFECT,生成的构筑物,Spawned structure,Structure créée,生成される建造物,생성되는 구조물,生成的構築物,Создаваемое строение,Tworzona budowla,Estructura generada,Estrutura gerada,Erzeugtes Bauwerk,Oluşan yapı,Struttura generata
+BE_FIELD_EFFECTS,附带效果,Attached effect,Effet associé,付随効果,부가 효과,附帶效果,Доп. эффект,Dodatkowy efekt,Efecto adjunto,Efeito anexo,Zusatzeffekt,Ek etki,Effetto associato
 BE_TRIG_PUDDLE,站在泥潭里时,While in a puddle,Dans une flaque,水たまりの中にいる間,웅덩이 안에 있을 때,站在泥潭裡時,Пока стоите в луже,Stojąc w kałuży,Dentro de un charco,Dentro de uma poça,In einer Pfütze,Su birikintisindeyken,In una pozzanghera
 BE_N_IN_PUDDLE,站在泥潭里时（状态）,While in a puddle (state),Dans une flaque (état),水たまりの中（状態）,웅덩이 안 (상태),站在泥潭裡時（狀態）,В луже (состояние),W kałuży (stan),En un charco (estado),Em uma poça (estado),In einer Pfütze (Zustand),Su birikintisinde (durum),In una pozzanghera (stato)
 BE_TX_IN_PUDDLE,站在泥潭里时, while standing in a puddle, en étant dans une flaque,水たまりの中にいる間は,웅덩이 안에 있을 때,站在泥潭裡時,", пока вы стоите в луже",", gdy stoisz w kałuży", mientras estás en un charco, enquanto está em uma poça, in einer Pfütze, su birikintisindeyken, mentre sei in una pozzanghera

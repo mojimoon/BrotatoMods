@@ -1654,14 +1654,14 @@ func make_effect(spec: Dictionary):
 			var r = Catalog.sub_get(e, f)
 			if not r is Resource or not subs[f] is Dictionary:
 				continue
-			# 嵌套在子效果里的（"效果字段.子资源字段"）：先复制外层效果
+			# 嵌套的（"效果字段.子资源字段"、"effects.0"…）：沿路径复制外层效果 / 数组，不影响模板
+			var parts = f.split(".")
 			var owner = e
-			var field = f
-			if f.find(".") >= 0:
-				var outer = f.get_slice(".", 0)
-				field = f.get_slice(".", 1)
-				owner = e.get(outer).duplicate()
-				e.set(outer, owner)
+			for j in parts.size() - 1:
+				var child = Catalog.sub_child(owner, parts[j]).duplicate()
+				Catalog.sub_put(owner, parts[j], child)
+				owner = child
+			var field = parts[parts.size() - 1]
 			r = r.duplicate()
 			var vals = subs[f].duplicate()
 			if vals.get("scaling_stats") is Array and "scaling_stats" in r:
@@ -1672,7 +1672,7 @@ func make_effect(spec: Dictionary):
 				r.scaling_stats = Utils.convert_to_hash_array(sc)
 			vals.erase("scaling_stats")
 			_set_typed(r, vals)
-			owner.set(field, r)
+			Catalog.sub_put(owner, field, r)
 	e._generate_hashes()
 	return e
 
