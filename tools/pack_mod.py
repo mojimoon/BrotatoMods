@@ -32,11 +32,20 @@ def main() -> int:
     unpacked = os.path.join(project, "mods-unpacked", mod)
     if os.path.isdir(unpacked):
         shutil.rmtree(unpacked)
-    shutil.copytree(src, unpacked)
+    shutil.copytree(src, unpacked, ignore=shutil.ignore_patterns(".import"))
+    # mods/<MOD>/.import/（导入后的贴图）放到工程 .import/ 与 zip 根目录
+    imports = os.path.join(src, ".import")
+    import_files = sorted(os.listdir(imports)) if os.path.isdir(imports) else []
+    for f in import_files:
+        shutil.copy2(os.path.join(imports, f), os.path.join(project, ".import", f))
 
     # 2. 打包（目录项也写入，与原版 mod 的 zip 结构一致）
     out = os.path.join(project, mod + ".zip")
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+        if import_files:
+            z.writestr(".import/", "")
+        for f in import_files:
+            z.write(os.path.join(imports, f), ".import/" + f)
         z.writestr("mods-unpacked/", "")
         for d, dirs, files in os.walk(unpacked):
             dirs.sort()
