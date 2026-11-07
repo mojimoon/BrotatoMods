@@ -256,3 +256,65 @@ func test_87_tick_trigger_charm_ignite() -> void:
 	yield(_frames(4), "completed")
 	m.profiles.erase(CH)
 	m.apply_all()
+
+
+# 碳纤维弓：随机四属性加成与各属性特效（效果是弓的脚本读的；改动后仍按属性找到、数值生效）
+func test_310_carbon_bow() -> void:
+	var Catalog = load(MOD_DIR + "catalog.gd")
+	var wid = "weapon_carbon_bow_1"
+	var effects = m.orig_effects(wid)
+	if effects.empty():
+		return
+	var idx = {}
+	for i in effects.size():
+		_check(effects[i] is CarbonBowStatEffect, "carbon effect %d keeps its script" % i)
+		idx[effects[i].stat_name] = i
+	for e in m.build_effects(wid, m.new_profile()):
+		var t = m.effect_text(e)
+		_check(t != "" and t.find("{") < 0, "text: " + t)
+	var specs = []
+	for i in effects.size():
+		specs.push_back({"from": wid, "i": i})
+	specs[idx.stat_ranged_damage].set = {"value": 3}
+	specs[idx.stat_melee_damage].set = {"value": 80, "duration": 1.5}
+	specs[idx.stat_elemental_damage].sub = {"burning_data": {"duration": 9}}
+	specs[idx.stat_engineering].set = {"value": 100}
+	specs[idx.stat_engineering].sub = {"structure_effect.stats": {"damage": 77}}
+	_check("burning_data" in Catalog.sub_fields(effects[idx.stat_elemental_damage]), "burning details listed")
+	_check("structure_effect.stats" in Catalog.sub_fields(effects[idx.stat_engineering]), "landmine details listed")
+	var p = m.new_profile()
+	p.effects = specs
+	m.weapon_profiles[wid] = p
+	m.apply_all()
+	_eq(effects[idx.stat_ranged_damage].value, 1, "template untouched")
+	_setup_player(CH)
+	rd.players_data[0].items = []
+	rd.add_character(m.find_character(CH), 0)
+	rd.add_weapon(isvc.get_element_safe(isvc.weapons, wid), 0)
+	rd.current_wave = 1
+	var _e = tree.change_scene("res://main.tscn")
+	yield(_frames(10), "completed")
+	var main = tree.current_scene
+	var player = main._players[0]
+	player.disable_hurtbox()
+	main._wave_timer.start(600)
+	var bow = null
+	for w in player.current_weapons:
+		if w is CarbonBowWeapon:
+			bow = w
+	_check(bow != null, "carbon bow in battle")
+	if bow != null:
+		_eq(bow._stat_effects.size(), 4, "four stat effects found")
+		_eq(bow._variants.size(), 4, "four variants")
+		var base_pierce = bow.stats.piercing
+		_eq(bow._variants[Keys.stat_ranged_damage_hash].piercing - base_pierce, 3, "ranged piercing edited")
+		_eq(bow._variants[Keys.stat_elemental_damage_hash].burning_data.duration >= 9, true, "burning duration edited")
+		_eq(bow._stat_effects[Keys.stat_melee_damage_hash].duration, 1.5, "slow duration edited")
+		_eq(bow._stat_effects[Keys.stat_engineering_hash].structure_effect.stats.damage, 77, "landmine damage edited")
+		for h in bow._variants:
+			_eq(bow._variants[h].scaling_stats.size(), 1, "variant scales with one stat")
+			_eq(bow._variants[h].scaling_stats[0][0], h, "variant scales with its stat")
+	main._on_WaveTimer_timeout()
+	yield(_frames(2), "completed")
+	var _b = tree.change_scene(MenuData.character_selection_scene)
+	yield(_frames(4), "completed")
