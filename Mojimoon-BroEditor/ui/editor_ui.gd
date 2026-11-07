@@ -3400,7 +3400,7 @@ func _effect_field_rows(grid: GridContainer, e, method: String, binds: Array) ->
 
 # 效果字段的专用控件（效果页与详细信息弹窗共用）：选择框 / 属性列表，修改时调用 target.method(值, binds...)；
 # 其他字段返回 null，由调用方用通用控件
-const SIGN_NAMES = ["BE_SIGN_POSITIVE", "BE_SIGN_NEGATIVE", "BE_SIGN_NEUTRAL", "BE_SIGN_FROM_VALUE", "BE_SIGN_FROM_ARG", "BE_SIGN_OVERRIDE"]
+const SIGN_NAMES = ["BE_SIGN_POSITIVE", "BE_SIGN_NEGATIVE", "BE_SIGN_NEUTRAL", "BE_SIGN_FROM_VALUE", "BE_SIGN_FROM_ARG", "BE_SIGN_OVERRIDE", "BE_SIGN_EVOLUTION_MECA", "BE_SIGN_EVOLUTION_MUTANT"]
 const STORAGE_NAMES = ["SUM", "KEY_VALUE", "REPLACE", "APPEND_KEY", "APPEND_KEY_VALUE"]
 # "按此属性"（stat_scaled）除属性外可用的计数（原版 LinkedStats / get_scaling_bonus 特判的 key）
 const SCALED_SOURCES = [

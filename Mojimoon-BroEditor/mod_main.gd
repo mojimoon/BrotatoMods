@@ -1791,6 +1791,9 @@ func stat_effect(key: String, value: int):
 	# 好坏按该属性在原版效果里的方向（如价格越低越好、敌人数量中立）：决定文本颜色与诅咒方向（有利放大、不利缩小、中立不变）
 	var dir = _good_dir(key) * (1 if value > 0 else -1)
 	sets.effect_sign = 0 if dir > 0 else (1 if dir < 0 else 2)
+	# 进化值：按数值正负（原版据此显示机械蓝 / 异变黄，见 effect.gd get_text）
+	if key == "stat_evolution":
+		sets.effect_sign = 3
 	if key in CAP_KEYS or key in SET_KEYS:
 		sets.storage_method = 2
 	return make_effect({"set": sets})

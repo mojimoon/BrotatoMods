@@ -2572,3 +2572,19 @@ func test_309_dlc2_splits() -> void:
 	_check(m.runtime._state_holds({"kind": "in_puddle", "params": {}}, pl), "in puddle holds")
 	pl.acid_in_puddle = false
 	_check(not m.runtime._state_holds({"kind": "in_puddle", "params": {}}, pl), "out of puddle")
+
+
+# 进化值的颜色同原版：属性行按数值正负（机械蓝 / 异变黄），蓝图属性效果同色
+func test_310_evolution_colors() -> void:
+	var meca = Utils.get_evolution_color(1).to_html()
+	var mutant = Utils.get_evolution_color(-1).to_html()
+	_eq(m.stat_effect("stat_evolution", 3).effect_sign, 3, "evolution from value")
+	_check(m.effect_text(m.stat_effect("stat_evolution", 3)).find(meca) >= 0, "+evolution meca color")
+	_check(m.effect_text(m.stat_effect("stat_evolution", -3)).find(mutant) >= 0, "-evolution mutant color")
+	var GE = load(GraphEffectScript)
+	for v in [3, -3]:
+		var g = GE.new_graph()
+		var t = GE.add_node(g, "level_up", Vector2.ZERO)
+		GE.add_link(g, t, GE.add_node(g, "perm_stat", Vector2.ZERO, {"stat": "stat_evolution", "value": v}))
+		var txt = GE.graph_text(g, true)
+		_check(txt.find(meca if v > 0 else mutant) >= 0, "graph evolution color: " + txt)

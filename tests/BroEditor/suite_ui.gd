@@ -437,7 +437,7 @@ func test_154_field_controls() -> void:
 	var signs = []
 	for it in ui.field_control("effect_sign", 0, ui, "_on_field_option", [0, "effect_sign"]).items:
 		signs.push_back(it[1])
-	_eq(signs, [0, 1, 2, 3, 5], "sign options: 4 hidden, curse shown")
+	_eq(signs, [0, 1, 2, 3, 5, 6, 7], "sign options: 4 hidden, curse + evolution shown")
 	# 文本：可直接输入，双行显示；列表文字不经过翻译
 	var tk = ui.field_control("text_key", "", ui, "_on_field_option", [0, "text_key"])
 	_check(tk.allow_custom and tk.two_line, "text_key allows input, two lines")

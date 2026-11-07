@@ -364,11 +364,11 @@ static func _payload_text(n: Dictionary, trigger_kind: String, colored: bool) ->
 	var state = trigger_kind in Catalog.STATE_TRIGGERS
 	match n.kind:
 		"temp_stat":
-			return _tr("BE_PX_STATE_STAT" if state else "BE_PX_TEMP_STAT").replace("{0}", _col(_signed(v), good, colored)).replace("{1}", stat)
+			return _tr("BE_PX_STATE_STAT" if state else "BE_PX_TEMP_STAT").replace("{0}", _stat_col(_signed(v), str(_p(n, "stat", "")), v, colored)).replace("{1}", stat)
 		"perm_stat":
-			return _tr("BE_PX_PERM_STAT").replace("{0}", _col(_signed(v), good, colored)).replace("{1}", stat)
+			return _tr("BE_PX_PERM_STAT").replace("{0}", _stat_col(_signed(v), str(_p(n, "stat", "")), v, colored)).replace("{1}", stat)
 		"timed_stat":
-			return _tr("BE_PX_TIMED_STAT").replace("{0}", _col(_signed(v), good, colored)).replace("{1}", stat).replace("{2}", str(int(_p(n, "secs", 1))))
+			return _tr("BE_PX_TIMED_STAT").replace("{0}", _stat_col(_signed(v), str(_p(n, "stat", "")), v, colored)).replace("{1}", stat).replace("{2}", str(int(_p(n, "secs", 1))))
 		"heal_hp":
 			return _tr("BE_PX_HEAL").replace("{0}", _col(str(v), good, colored))
 		"add_gold":
@@ -500,6 +500,13 @@ static func _item_names(ids: Array) -> String:
 static func _stat_name(key: String) -> String:
 	var m = _mod()
 	return m.stat_name(key) if m != null else key
+
+
+# 属性数值的颜色：进化值同原版（机械蓝 / 异变黄，双向进化时为有利）
+static func _stat_col(text: String, key: String, v: int, colored: bool) -> String:
+	if colored and key == "stat_evolution" and v != 0 and not (RunData.players_data.size() > 0 and RunData.is_dual_evolution(0)):
+		return "[color=#" + Utils.get_evolution_color(v).to_html() + "]" + text + "[/color]"
+	return _col(text, v >= 0, colored)
 
 
 static func _col(text: String, good: bool, colored: bool) -> String:
