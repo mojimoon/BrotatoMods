@@ -2463,7 +2463,7 @@ func test_306_stat_groups_and_icons() -> void:
 	# 禁用页：只显示已禁用的；编辑用选择器（词条 / 类别筛选）
 	ui._on_tab_pressed("bans")
 	yield(tree, "idle_frame")
-	_eq(ui._ban_grids["items"][0].get_child_count(), 1, "nothing banned: only the empty hint")
+	_eq(ui._ban_grids["items"][0].get_child_count(), 0, "nothing banned: empty grid")
 	ui._open_picker("ban_weapons")
 	var tag = ""
 	for r in ui._picker.res:
