@@ -4091,8 +4091,6 @@ func _fill_bans() -> void:
 			_set_icon_style(b, C_DANGER, 2)
 			b.connect("pressed", self, "_on_ban_toggle", [kind, id])
 			grid.add_child(b)
-		if banned.empty():
-			grid.add_child(_desc(tr("BE_BANS_NONE")))
 		_ban_grids[kind][1].text = tr("BE_BAN_ITEMS" if kind == "items" else "BE_BAN_WEAPONS").replace("{0}", str(banned.size()))
 
 
@@ -4571,9 +4569,16 @@ func _show_preview(b: Control, r) -> void:
 	if _item_popup == null or not is_instance_valid(_item_popup):
 		_item_popup = load(ITEM_POPUP).instance()
 		_item_popup.buttons_enabled = false
-		add_child(_item_popup)
+		# _wl-ImprovedTooltips 按祖先节点名判断弹窗来源：不在 MenuCodex / *Selection 下就当作商店，
+		# 读取本局角色（局外为 null，正式版直接段错误崩溃）。放进名为 *Selection 的容器，按图鉴处理
+		var holder = Control.new()
+		holder.name = "BroEditorPreviewSelection"
+		holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		holder.set_anchors_and_margins_preset(Control.PRESET_WIDE)
+		add_child(holder)
+		holder.add_child(_item_popup)
 		_ignore_mouse(_item_popup)
-	_item_popup.raise()
+	_item_popup.get_parent().raise()
 	_item_popup.display_item_data(r, b, false)
 
 
