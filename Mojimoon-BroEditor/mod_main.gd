@@ -37,7 +37,9 @@ const MAX_DESC = 300
 
 const Catalog = preload("res://mods-unpacked/Mojimoon-BroEditor/catalog.gd")
 const GraphEffect = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/graph_effect.gd")
-const Runtime = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/runtime.gd")
+# runtime.gd 预加载 enemy_behavior.gd（继承 EnemyEffectBehavior）：在 _init 时预加载会让原版 enemy.gd 在其他 mod 的
+# enemy.gd 扩展安装前编译，之后 main.gd 的 `is Boss` 解析失败（Oudstand-DamageMeter）。所以在 _ready 里再加载
+const RUNTIME_PATH = "res://mods-unpacked/Mojimoon-BroEditor/graph/runtime.gd"
 const BurnChance = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/burn_chance_effect.gd")
 # 上限类属性：角色效果直接设定上限值（原版 REPLACE 存储），而不是加减
 const CAP_KEYS = ["hp_cap", "speed_cap", "dodge_cap", "crit_chance_cap"]
@@ -136,7 +138,7 @@ func _ready() -> void:
 	ModLoaderMod.install_script_extension(dir + "ui/menus/shop/coop_shop.gd")
 	_register_translations()
 	load_profiles()
-	runtime = Runtime.new()
+	runtime = load(RUNTIME_PATH).new()
 	runtime.mod = self
 	add_child(runtime)
 	# 存档反序列化按 get_id() 在 ItemService.effects 中查找效果脚本：要在 ProgressData 读档之前注册
