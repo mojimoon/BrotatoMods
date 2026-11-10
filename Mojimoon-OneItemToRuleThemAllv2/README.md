@@ -4,7 +4,10 @@
 
 [English](#english) | [中文](#中文) | [Screenshots](#screenshots) | [截图](#截图)
 
-> modid: Mojimoon-OneItemToRuleThemAllv2
+- modid: Mojimoon-OneItemToRuleThemAllv2
+- id: 3808638762
+- title: [Primal Dread] One Item to Rule Them All v2
+- 标题: [史前惧兽] 假如所有道具变成 One Item to Rule Them All v2
 
 ![](../img/OneItemToRuleThemAllv2/oitrta-v2-icon.png)
 

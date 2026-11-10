@@ -4,7 +4,10 @@
 
 [English](#english) | [中文](#中文) | [Screenshots](#screenshots) | [截图](#截图)
 
-> modid: Mojimoon-AutoAnthony
+- modid: Mojimoon-AutoAnthony
+- id: 3811213360
+- title: [Primal Dread] AutoAnthony
+- 标题: [史前惧兽] 东尼算法 AutoAnthony
 
 ![](../img/AutoAnthony/aa-icon.png)
 

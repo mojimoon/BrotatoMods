@@ -4,7 +4,10 @@
 
 [English](#english) | [中文](#中文) | [Screenshots](#screenshots) | [截图](#截图)
 
-> modid: Mojimoon-BroEditor
+- modid: Mojimoon-BroEditor
+- id: 3817655214
+- title: [Primal Dread] BroEditor - Universal Visual Editor (+Workshop!)
+- 标题: [史前惧兽] BroEditor - 万能可视化编辑器 [工坊上线!]
 
 ![](../img/BroEditor/be-icon.png)
 

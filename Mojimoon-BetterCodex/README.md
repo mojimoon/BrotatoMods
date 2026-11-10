@@ -1,10 +1,14 @@
-# BetterCodex - Better In-Game Codex / 更好的游戏内图鉴
+# BetterCodex
 
 [CHANGELOG / 更新日志](CHANGELOG.md)
 
 [English](#english) | [中文](#中文) | [Screenshots](#screenshots) | [截图](#截图)
 
-> modid: Mojimoon-BetterCodex
+- modid: Mojimoon-BetterCodex
+- title: [Primal Dread] BetterCodex
+- 标题: [史前惧兽] BetterCodex - 更好的图鉴
+
+![](../img/BetterCodex/bc-icon.png)
 
 ## English
 

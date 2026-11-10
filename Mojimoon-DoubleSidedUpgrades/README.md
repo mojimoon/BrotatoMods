@@ -4,7 +4,10 @@
 
 [English](#english) | [中文](#中文) | [Screenshots](#screenshots)
 
-> modid: Mojimoon-DoubleSidedUpgrades
+- modid: Mojimoon-DoubleSidedUpgrades
+- id: 3671945570
+- title: [Primal Dread] Cursed & Double Sided Upgrades
+- 标题: [史前惧兽] 诅咒和双面升级 Cursed & Double Sided Upgrades
 
 ![](../img/DoubleSidedUpgrades/dsu-icon.png)
 
