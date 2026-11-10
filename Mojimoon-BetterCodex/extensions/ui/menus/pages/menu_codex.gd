@@ -688,6 +688,7 @@ func _bc_header(tab: String, desc, it) -> void:
 		# 代替原来的类别文字：独特的 / 限制 (X) / 构筑物（同样式、不是链接；宠物由同名标签显示）+ 标签链接
 		var Extras = load(BC_DIR + "ui/extras.gd")
 		var tags = it.tags.duplicate()
+		var font_color = cat.get_color("font_color").to_html(false)
 		tags.sort()
 		var tag_texts = []
 		for tag in tags:
@@ -701,11 +702,11 @@ func _bc_header(tab: String, desc, it) -> void:
 			plain.push_back(tr("STRUCTURE"))
 		for t in plain:
 			if not tag_texts.has(t):
-				parts.push_back("[color=#%s]%s[/color]" % [cat.get_color("font_color").to_html(false), t])	# 保持原类别文字的黄色
+				parts.push_back("[color=#%s]%s[/color]" % [font_color, t])
 		for i in tags.size():
 			parts.push_back(_bc_link("tag:" + tags[i], tag_texts[i]))
 		if parts.empty():
-			parts.push_back("[color=#%s]%s[/color]" % [cat.get_color("font_color").to_html(false), cat.text])
+			parts.push_back("[color=#%s]%s[/color]" % [font_color, cat.text])
 	box.bbcode_text = "[center]" + "  ·  ".join(parts) + "[/center]"
 
 
