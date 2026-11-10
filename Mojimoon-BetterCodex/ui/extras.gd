@@ -71,6 +71,8 @@ func reset_defaults() -> void:
 	curse_pct = int(clamp(curse_band[1], 10, 110)) if curse_band.size() > 0 else 110
 	if in_run:
 		mut_val = int(clamp(abs(RunData.get_player_effect(Keys.stat_evolution_hash, 0)), 1, Preview.mut_max()))
+		# 局内可掉落异变果：异变预览默认打开
+		mut_on = load("res://mods-unpacked/Mojimoon-BetterCodex/ui/shop_hook.gd").fruit_can_drop()
 		atk = int(Utils.get_stat(Keys.stat_attack_speed_hash, 0))
 		stat_range = int(Utils.get_stat(Keys.stat_range_hash, 0))
 		count = int(clamp(RunData.get_player_weapons_ref(0).size(), 1, 6))
@@ -351,21 +353,8 @@ func _refresh_mutation() -> void:
 		c.queue_free()
 	if not mut_on:
 		return
-	var shown = display_item(item)	# 开着诅咒时：复制的基础值取诅咒后的
-	var info = Preview.mutation(shown, mut_val)
-	# _mut_box.add_child(_label("%s x%s" % [tr("BC_MUT_SCALE"), str(stepify(Preview.mut_scale(mut_val), 0.01))], DIM_COLOR))
-	if info.copy.empty():
-		_mut_box.add_child(_label(tr("BC_NO_MUT_COPY"), DIM_COLOR))
-	else:
-		_mut_box.add_child(_label(tr("BC_MUT_COPY"), MUTANT_COLOR))
-		for e in info.copy:
-			_add_effect(_mut_box, e)
-	for pair in info.later:
-		_add_effect(_mut_box, pair[0], false, " [color=#%s](%s)[/color]" % [DIM_COLOR.to_html(false), tr("BC_MUT_NEED").format([pair[1]])])
-	if not item is CharacterData and ItemService.can_item_be_mutated(shown) and not info.remove.empty():
-		_mut_box.add_child(_label(tr("BC_MUT_REMOVE"), MUTANT_COLOR))
-		for e in info.remove:
-			_add_effect(_mut_box, e, true)
+	# 开着诅咒时：复制的基础值取诅咒后的；与商店描述末尾的异变预览同样的显示
+	load("res://mods-unpacked/Mojimoon-BetterCodex/ui/mutation_view.gd").build(_mut_box, display_item(item), mut_val, 0, true)
 
 
 func _build_calc() -> void:

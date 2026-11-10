@@ -788,3 +788,68 @@ func test_codex_mutation_cursed():
 	var cb = codex.get_node("root/BCSettings").find_node("quick_open", true, false)
 	_check(cb.get_stylebox("hover") == cb.get_stylebox("normal"), "checkbox hover style same as normal")
 	_close(codex)
+
+
+# 预先构建 + 快速重开：内容不变时不重建元素；获得次数变了就重建
+func test_codex_prewarm_and_reuse():
+	var codex = load("res://ui/menus/pages/menu_codex.tscn").instance()
+	codex.name = "MenuCodex"
+	tree.root.add_child(codex)
+	yield(_wait(3), "completed")
+	codex.bc_prewarm()
+	_check(not codex.visible, "prewarm leaves the codex hidden")
+	_check(codex._bc_tabs.items.all.size() > 100, "prewarm built the lists")
+	var first = codex._bc_tabs.items.all[0]
+	var t0 = OS.get_ticks_usec()
+	codex._pop()
+	var reopen_ms = (OS.get_ticks_usec() - t0) / 1000
+	_check(codex.visible, "opened")
+	_check(is_instance_valid(first) and codex._bc_tabs.items.all[0] == first, "elements reused")
+	_check(reopen_ms < 100, "reopen fast: %d ms" % reopen_ms)
+	codex._on_BackButton_pressed()
+	var it = ItemService.items[5]
+	ProgressData.items_bought[it.my_id_hash] = ProgressData.items_bought.get(it.my_id_hash, 0) + 1
+	codex._pop()
+	yield(_wait(2), "completed")
+	_check(not is_instance_valid(first) or codex._bc_tabs.items.all[0] != first, "rebuilt after a purchase")
+	_close(codex)
+
+
+# 商店里（局内）的图鉴：描述末尾不再加异变预览（图鉴有自己的异变区块，局内可掉落时默认打开）；提示在暂停菜单下面
+func test_shop_codex_single_mutation_view():
+	if not "primal_dread" in ProgressData.active_update_data:
+		return
+	var c = RunData.players_data[0].current_character
+	RunData.players_data[0].items = [c]
+	for id in ["item_alien_eyes", "item_baby_elephant", "item_coffee"]:
+		RunData.add_item(_item(id), 0)
+	RunData.bc_reset_mutable_counts()
+	RunData.current_wave = 3
+	ItemService.init_unlocked_pool()
+	var shop = load("res://ui/menus/shop/shop.tscn").instance()
+	var prev = tree.current_scene
+	tree.root.add_child(shop)
+	tree.current_scene = shop
+	yield(_wait(10), "completed")
+	var hook = shop.get_node("BCShopHook")
+	_check(shop.get_node("BCShopHint").get_index() < shop.get_node("PauseMenu").get_index(), "hint below the pause menu")
+	hook.open(_item("item_alien_eyes"))
+	yield(_wait(5), "completed")
+	var t = hook.codex._bc_tabs.items
+	_check(t.extras.mut_on, "mutation on by default (fruit can drop)")
+	_check(not _has_mut_preview(t.desc), "no second preview in the codex description")
+	var seps = 0
+	for n in _all(t.extras._mut_box):
+		if n is HSeparator:
+			seps += 1
+	_eq(seps, 1, "one mutation view with its separator")
+	var label_ok = false
+	for n in _all(t.extras._mut_box):
+		if n is Label and (n.text.begins_with(tr("BC_MUT_COPY") + " x") or n.text.begins_with(tr("BC_NO_MUT_COPY") + " x")):
+			label_ok = true
+	_check(label_ok, "merged header '%s x…'" % tr("BC_MUT_COPY"))
+	hook.codex.hide()
+	tree.current_scene = prev
+	tree.root.remove_child(shop)
+	shop.queue_free()
+	yield(_wait(3), "completed")

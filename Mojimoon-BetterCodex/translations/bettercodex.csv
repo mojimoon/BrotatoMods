@@ -35,8 +35,8 @@ BC_UNIQUE,独特,Unique,Unique,ユニーク,고유,獨特,Уникальный,U
 BC_LIMITED,限制,Limited,Limité,制限,제한,限制,Ограниченный,Ograniczony,Limitado,Limitado,Begrenzt,Sınırlı,Limitato
 BC_FRAMES,f,f,f,f,f,f,f,f,f,f,f,f,f
 BC_TEMP_FILTER,筛选,Filter,Filtre,フィルター,필터,篩選,Фильтр,Filtr,Filtro,Filtro,Filter,Filtre,Filtro
-BC_MUT_COPY,可复制,Copyable,Copiable,コピー可能,복사 가능,可複製,Копируется,Do skopiowania,Copiable,Copiável,Kopierbar,Kopyalanabilir,Copiabile
-BC_MUT_REMOVE,可清除,Removable,Supprimable,除去可能,제거 가능,可清除,Удаляется,Do usunięcia,Eliminable,Removível,Entfernbar,Kaldırılabilir,Rimovibile
+BC_MUT_COPY,异变可复制,Mutation can copy,La mutation peut copier,変異でコピー可能,변이 복사 가능,異變可複製,Мутация может копировать,Mutacja może skopiować,La mutación puede copiar,A mutação pode copiar,Mutation kann kopieren,Mutasyon kopyalayabilir,La mutazione può copiare
+BC_MUT_REMOVE,异变可清除,Mutation can remove,La mutation peut retirer,変異で除去可能,변이 제거 가능,異變可清除,Мутация может убрать,Mutacja może usunąć,La mutación puede eliminar,A mutação pode remover,Mutation kann entfernen,Mutasyon kaldırabilir,La mutazione può rimuovere
 BC_MUT_SCALE,缩放,Scale,Échelle,倍率,배율,縮放,Масштаб,Skala,Escala,Escala,Skalierung,Ölçek,Scala
 BC_CURRENT_PRICE,当前实际价格,Current price,Prix actuel,現在の価格,현재 가격,目前實際價格,Текущая цена,Aktualna cena,Precio actual,Preço atual,Aktueller Preis,Güncel fiyat,Prezzo attuale
 BC_CURSE_WAVE,本波 {0}–{1}%,This wave {0}–{1}%,Cette vague {0}–{1}%,このウェーブ {0}–{1}%,이번 웨이브 {0}–{1}%,本波 {0}–{1}%,Эта волна {0}–{1}%,Ta fala {0}–{1}%,Esta oleada {0}–{1}%,Esta onda {0}–{1}%,Diese Welle {0}–{1}%,Bu dalga {0}–{1}%,Questa ondata {0}–{1}%

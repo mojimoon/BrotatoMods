@@ -13,6 +13,8 @@ var _bc_tabs = {}	# "items" / "weapons" -> {inv, desc, all, current, extras, f�
 var _bc_origin = {}	# my_id_hash -> [物品套组 id, DLC2 进化路线 "" / meca / mutant / both]
 var _bc_temp = null	# 临时筛选 {"title", "ids"}
 var _bc_badge_font = null
+var _bc_extras_script = null
+var _bc_icon_script = null
 var _bc_updates = {}	# 物品套组 id -> UpdateData（图标 + 颜色）
 
 
@@ -26,15 +28,132 @@ func _bc_setting(key: String, default = true):
 
 
 func _pop():
-	_bc_free_detached()
 	_bc_temp = null
-	_bc_unlock_begin()
-	._pop()
-	_bc_setup()
-	_bc_unlock_end()
+	var sig = _bc_signature()
+	if not _bc_tabs.empty() and sig == _bc_last_signature:
+		_bc_unlock_begin()
+		_bc_reopen()
+		_bc_unlock_end()
+	else:
+		_bc_free_detached()
+		_bc_unlock_begin()
+		._pop()
+		_bc_setup()
+		_bc_unlock_end()
+		_bc_last_signature = sig
+		_bc_challenge_signature = _bc_csig()
+		_bc_enemy_signature = _bc_esig()
 	_bc_count_progress()
 	if _bc_setting("quick_open"):
 		_bc_skip_animation()
+
+
+# ---- 快速重开：道具 / 武器列表的内容没变时不重建（原版每次打开都重建全部元素，再加上角标、筛选，是打开慢的主要原因）----
+
+var _bc_last_signature = null
+const BC_PREWARM_DELAY = 1.0
+
+
+# 预先构建：图鉴进树约 1 秒后在后台做一次完整构建（同一帧里打开再隐藏：不绘制、不播放动画与音效，焦点还原），
+# 之后第一次打开就走快速重开。战斗中（Main 场景）不做，避免卡顿。
+func _ready() -> void:
+	var scene = get_tree().current_scene
+	if scene != null and scene.name == "Main":
+		return
+	get_tree().create_timer(BC_PREWARM_DELAY + randf()).connect("timeout", self, "bc_prewarm")	# 错开同一场景里的多个图鉴
+
+
+func bc_prewarm() -> void:
+	if not is_inside_tree() or visible or (not _bc_tabs.empty() and _bc_signature() == _bc_last_signature):
+		return
+	var focus = get_focus_owner()
+	var popup_before = Utils._popup if RunData.is_coop_run else null
+	var quick = _bc_setting("quick_open")
+	_pop()
+	animation_tree.active = false
+	if not quick:
+		_bc_skip_animation()
+	hide()
+	if RunData.is_coop_run:
+		Utils._popup = popup_before
+	elif is_instance_valid(focus):
+		focus.grab_focus()
+	_bc_restore_locks()
+var _bc_challenge_signature = null
+var _bc_enemy_signature = null
+
+
+func _bc_csig() -> Array:
+	return [ChallengeService.challenges.size(), ProgressData.challenges_completed.size(), TranslationServer.get_locale()]
+
+
+func _bc_esig() -> Array:
+	return [ItemService.entities.size(), _bc_sum(ProgressData.killed_enemies), _bc_sum(ProgressData.killed_by_enemies), TranslationServer.get_locale()]
+
+
+static func _bc_sum(d: Dictionary) -> int:
+	var n = 0
+	for v in d.values():
+		n += v
+	return n
+
+
+# 决定列表内容的状态：物品集合、解锁、获得次数（图鉴描述是否解锁）、解锁全部、语言
+func _bc_signature() -> Array:
+	var bought = 0
+	for v in ProgressData.items_bought.values():
+		bought += v
+	return [ItemService.items.size(), ItemService.weapons.size(), ProgressData.items_unlocked.size(), ProgressData.weapons_unlocked.size(),
+		ProgressData.items_bought.size(), bought, _bc_setting("unlock_all", false), TranslationServer.get_locale(), str(ProgressData.active_update_data)]
+
+
+# 原版 _pop 去掉道具 / 武器列表的重建（敌人列表的击杀数会变，照原版重建）
+func _bc_reopen() -> void:
+	unlocked_entities = 0
+	focus_before_created = get_focus_owner()
+	popup()
+	if RunData.is_coop_run:
+		Utils._popup = self
+	animation_tree.set("parameters/conditions/finish", false)
+	animation_tree.active = true
+	var csig = _bc_csig()
+	if csig != _bc_challenge_signature:	# 挑战列表也很慢：没有新完成的挑战就不重建
+		tab_challenge.set_elements(true)
+		_bc_challenge_signature = csig
+	lb_texture.player_index = player_index
+	rb_texture.player_index = player_index
+	_focus_control($"%but_tab_challenger")
+	for item in ItemService.items:
+		item.is_locked = not ProgressData.items_unlocked.has(item.my_id_hash)
+	for weapon in ItemService.weapons:
+		weapon.is_locked = not ProgressData.weapons_unlocked.has(weapon.weapon_id_hash)
+	var list_of_entities: Array = ItemService.entities.duplicate()
+	var list_of_entities_id: Array = []
+	for entity in list_of_entities:
+		if entity._get_how_many_killed() > 0:
+			unlocked_entities += 1
+		if list_of_entities_id.has(entity.my_id_hash):
+			list_of_entities.erase(entity)
+		else:
+			list_of_entities_id.append(entity.my_id_hash)
+	var esig = _bc_esig()
+	if esig != _bc_enemy_signature:	# 击杀数没变就不重建敌人列表
+		inventory_enemies.set_elements(list_of_entities)
+		_bc_enemy_signature = esig
+	inventory_enemies.on_element_focused(inventory_enemies.get_child(0))
+	_unlockall_icon.visible = ProgressData.is_unlock_all_save()
+	for tab in _bc_tabs:
+		var t = _bc_tabs[tab]
+		t.current = null
+		t.extras.reset_defaults()
+		t.extras.show_item(null)
+		_bc_grey_banned(tab)
+		_bc_reset_filters(tab)
+		_bc_fill_options(tab)
+	_bc_apply_all()
+	for tab in _bc_tabs:
+		if _bc_tabs[tab].inv.get_child_count() > 0:
+			_bc_tabs[tab].inv.on_element_focused(_bc_tabs[tab].inv.get_child(0))
 
 
 # 进度按真实存档计算（解锁全部时图鉴里看到的是临时数据）
@@ -416,13 +535,23 @@ func _bc_apply_all() -> void:
 func _bc_apply(tab: String) -> void:
 	var t = _bc_tabs[tab]
 	var inv = t.inv
-	for c in inv.get_children():
-		inv.remove_child(c)
+	var wanted = []
 	for e in t.all:
 		if is_instance_valid(e) and _bc_match(tab, e.item):
+			wanted.push_back(e)
+	var same = wanted.size() == inv.get_child_count()
+	if same:
+		for e in wanted:
+			if e.get_parent() != inv:
+				same = false
+				break
+	if not same:	# 显示的元素不变时什么都不做（没有筛选时打开图鉴不必重排）
+		for c in inv.get_children():
+			inv.remove_child(c)
+		for e in wanted:
 			inv.add_child(e)
-	inv.emit_signal("need_to_sort_inventory")
-	inv.queue_set_focus_neighbours()
+		inv.emit_signal("need_to_sort_inventory")
+		inv.queue_set_focus_neighbours()
 	if tab == "items":
 		t.ui.temp_row.visible = _bc_temp != null
 		if _bc_temp != null:
@@ -528,6 +657,10 @@ func _bc_on_setting(on: bool, key: String) -> void:
 
 # 局内：P1 的禁用道具变灰（角色禁用只在非无尽波次生效，与商店一致；加上消耗禁用次数禁掉的）
 func _bc_grey_banned(tab: String) -> void:
+	for e in _bc_tabs[tab].all:
+		if not e.has_meta("bc_modulate"):
+			e.set_meta("bc_modulate", e.modulate)
+		e.modulate = e.get_meta("bc_modulate")
 	if not load(BC_DIR + "ui/extras.gd").scene_in_run(get_tree()) or RunData.players_data.empty():
 		return
 	var banned = RunData.players_data[0].banned_items
@@ -540,7 +673,7 @@ func _bc_grey_banned(tab: String) -> void:
 		if it == null:
 			continue
 		if char_banned.has(it.my_id_hash) or banned.has(it.my_id_hash) or (it is WeaponData and banned.has(it.weapon_id_hash)):
-			e.modulate = Color(0.35, 0.35, 0.35)
+			e.modulate = Color(0.35, 0.35, 0.35, e.get_meta("bc_modulate").a)
 
 
 func _bc_badge_label(text: String, color: Color, align: int, valign: int) -> Label:
@@ -567,14 +700,17 @@ func _bc_add_badges(e, tab: String) -> void:
 	root.name = "BCBadges"
 	root.mouse_filter = MOUSE_FILTER_IGNORE
 	root.set_anchors_and_margins_preset(PRESET_WIDE)
-	var Extras = load(BC_DIR + "ui/extras.gd")
+	if _bc_extras_script == null:
+		_bc_extras_script = load(BC_DIR + "ui/extras.gd")
+		_bc_icon_script = load(BC_DIR + "ui/outlined_icon.gd")
+	var Extras = _bc_extras_script
 	if Extras.has_price(it) and _bc_setting("badge_price"):
 		root.add_child(_bc_badge_label(str(it.value), Color("#ffd75e"), Label.ALIGN_LEFT, Label.VALIGN_TOP))
 	if tab == "items" and it.max_nb > 0 and _bc_setting("badge_limit"):
 		root.add_child(_bc_badge_label(str(it.max_nb), Color("#ff6b6b") if it.max_nb == 1 else Color("#ffa94d"), Label.ALIGN_RIGHT, Label.VALIGN_TOP))
 	# 右下角来源图标（带描边）：机械 / 异变道具用机械部件 / 异变果图标，其他用物品套组图标（按物品套组栏的颜色着色）
 	if _bc_setting("badge_source"):
-		var Icon = load(BC_DIR + "ui/outlined_icon.gd")
+		var Icon = _bc_icon_script
 		var icons = []
 		var evo = _bc_evo_of(it)
 		if evo != "":

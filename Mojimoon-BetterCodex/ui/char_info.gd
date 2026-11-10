@@ -31,15 +31,21 @@ func setup(character) -> void:
 	extras.show_item(character)
 	extras.connect("tag_pressed", self, "_on_tag")
 	extras.connect("banned_pressed", self, "_on_banned")
+	call_deferred("_ensure_codex")
 
 
 func _codex():
+	_ensure_codex()
+	codex._pop()
+	return codex
+
+
+# 先建好图鉴节点：它进树后会在后台预先构建，第一次点开就很快
+func _ensure_codex() -> void:
 	if codex == null or not is_instance_valid(codex):
 		codex = load("res://ui/menus/pages/menu_codex.tscn").instance()
 		codex.name = "MenuCodex"
 		get_tree().current_scene.add_child(codex)
-	codex._pop()
-	return codex
 
 
 # 偏好标签：一个临时筛选，包含带任一偏好标签的道具

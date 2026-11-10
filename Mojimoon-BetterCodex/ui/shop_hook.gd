@@ -24,15 +24,21 @@ func _ready() -> void:
 	hint.margin_top = -30
 	hint.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	shop.add_child(hint)
+	var pause = shop.get_node_or_null("PauseMenu")
+	if pause != null:	# 放在暂停菜单下面：暂停时被盖住
+		shop.move_child(hint, pause.get_index())
 	RunData.bc_reset_mutable_counts()	# 进商店时数一遍，之后随获得 / 失去道具增量更新
 	update_hint()
 	# 买道具（以及其他 mod 的回收）都会改变材料：随 gold_changed 刷新异变果提示
 	RunData.connect("gold_changed", self, "_on_gold_changed")
+	call_deferred("_ensure_codex")
 	# var timer = Timer.new()
 	# timer.wait_time = 5.0
 	# timer.autostart = true
 	# timer.connect("timeout", self, "update_hint")
 	# add_child(timer)
+
+
 func _on_gold_changed(_value, _player_index) -> void:
 	call_deferred("update_hint")	# 买下的道具在扣钱之后才加入背包
 
@@ -106,13 +112,18 @@ func _input(event: InputEvent) -> void:
 
 
 func open(it) -> void:
+	_ensure_codex()
+	codex._pop()
+	codex.bc_open_item(it)
+
+
+# 先建好图鉴节点：它进树后会在后台预先构建，第一次打开就很快
+func _ensure_codex() -> void:
 	if codex == null or not is_instance_valid(codex):
 		codex = load("res://ui/menus/pages/menu_codex.tscn").instance()
 		codex.name = "MenuCodex"
 		shop.add_child(codex)
 		codex.connect("codex_closed", self, "update_hint")
-	codex._pop()
-	codex.bc_open_item(it)
 
 
 static func _all_nodes(node: Node) -> Array:
