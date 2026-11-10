@@ -370,7 +370,7 @@ func _bc_build_tab(tab: String, inv, desc) -> void:
 	var row2 = HBoxContainer.new()
 	var keys = ["tier", "tag", "source", "special"] if tab == "items" else ["tier", "type", "class", "source"]
 	for key in keys:
-		var ob = OptionButton.new()
+		var ob = load(BC_DIR + "ui/grid_select.gd").new()	# 多列网格弹窗：道具标签等长列表不会超出屏幕
 		ob.size_flags_horizontal = SIZE_EXPAND_FILL
 		ob.clip_text = true
 		ob.connect("item_selected", self, "_bc_on_option", [tab, key])
@@ -448,7 +448,7 @@ func _bc_fill_options(tab: String) -> void:
 		named.sort_custom(self, "_bc_by_label")
 		opts["class"] = [["", tr("BC_CLASS")]] + named
 	for key in t.ui:
-		if not t.ui[key] is OptionButton:
+		if not t.ui[key].has_method("get_item_metadata"):
 			continue
 		var ob = t.ui[key]
 		ob.clear()
@@ -462,7 +462,7 @@ func _bc_by_label(a, b) -> bool:
 	return a[1] < b[1]
 
 
-func _bc_select_option(ob: OptionButton, value) -> void:
+func _bc_select_option(ob, value) -> void:
 	for i in ob.get_item_count():
 		if typeof(ob.get_item_metadata(i)) == typeof(value) and ob.get_item_metadata(i) == value:
 			ob.select(i)
@@ -485,7 +485,7 @@ func _bc_on_clear(tab: String) -> void:
 		_bc_temp = null
 	_bc_reset_filters(tab)
 	for key in _bc_tabs[tab].ui:
-		if _bc_tabs[tab].ui[key] is OptionButton:
+		if _bc_tabs[tab].ui[key].has_method("get_item_metadata"):
 			_bc_select_option(_bc_tabs[tab].ui[key], _bc_tabs[tab].f[key])
 	_bc_apply(tab)
 
@@ -563,9 +563,8 @@ func _bc_apply_bar_font(t) -> void:
 	for c in [t.ui.search, t.ui.badges, t.ui.temp_label] + t.ui.temp_row.get_children() + t.ui.search.get_parent().get_children():
 		c.add_font_override("font", font)
 	for key in t.ui:
-		if t.ui[key] is OptionButton:
-			t.ui[key].add_font_override("font", font)
-			t.ui[key].get_popup().add_font_override("font", font)
+		if t.ui[key].has_method("set_list_font"):
+			t.ui[key].set_list_font(font)
 
 
 # ---- 角标 ----

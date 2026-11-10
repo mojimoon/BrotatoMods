@@ -273,6 +273,17 @@ func test_codex_filters_and_badges():
 	for e in shown:
 		_check(e.item.tags.has("stat_luck"), "tag kept " + e.item.my_id)
 	_check(t.ui.tag.get_selected_metadata() == "stat_luck", "tag option selected")
+	# 标签多：网格弹窗不超出屏幕，点选即筛选
+	t.ui.tag._open()
+	yield(_wait(2), "completed")
+	var view = t.ui.tag.get_viewport_rect()
+	_check(view.encloses(t.ui.tag._popup.get_global_rect()), "tag grid fits on screen: %s" % t.ui.tag._popup.get_global_rect())
+	_eq(t.ui.tag._grid.columns, 3, "long list uses 3 columns")
+	var pick = 2
+	t.ui.tag._grid.get_child(pick).emit_signal("pressed")
+	yield(_wait(), "completed")
+	_eq(t.f.tag, t.ui.tag.get_item_metadata(pick), "picked tag filters")
+	_check(not t.ui.tag._popup.visible, "grid closed after pick")
 	codex._bc_on_clear("items")
 	_eq(t.inv.get_child_count(), total, "clear restores")
 	t.ui.search.text = "item_fossil"

@@ -32,6 +32,9 @@ func _initialize() -> void:
 	codex._bc_tabs.items.extras._curse_btn.pressed = true
 	codex._bc_tabs.items.extras._on_mut_toggled(true)
 	yield(_shot(out + "/items.png"), "completed")
+	codex._bc_tabs.items.ui.tag._open()
+	yield(_shot(out + "/tag_grid.png"), "completed")
+	codex._bc_tabs.items.ui.tag._popup.hide()
 	codex.bc_show_tab("weapons")
 	for e in codex._bc_tabs.weapons.all:
 		if e.item.my_id == "weapon_smg_1":
