@@ -358,7 +358,6 @@ func _bc_build_tab(tab: String, inv, desc) -> void:
 	var clear = Button.new()
 	clear.text = "X"	# 游戏字体没有 × 字形
 	clear.rect_min_size.x = 40
-	clear.hint_tooltip = tr("BC_CLEAR")
 	clear.connect("pressed", self, "_bc_on_clear", [tab])
 	row1.add_child(clear)
 	var badges = Button.new()
