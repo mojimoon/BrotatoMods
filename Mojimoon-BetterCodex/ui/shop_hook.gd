@@ -30,13 +30,13 @@ func _ready() -> void:
 	hint.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	shop.add_child(hint)
 	update_hint()
-	# 买道具（以及其他 mod 的回收）都会改变材料：随 gold_changed 刷新异变果提示；另留一个很慢的兜底刷新
+	# 买道具（以及其他 mod 的回收）都会改变材料：随 gold_changed 刷新异变果提示
 	RunData.connect("gold_changed", self, "_on_gold_changed")
-	var timer = Timer.new()
-	timer.wait_time = 5.0
-	timer.autostart = true
-	timer.connect("timeout", self, "update_hint")
-	add_child(timer)
+	# var timer = Timer.new()
+	# timer.wait_time = 5.0
+	# timer.autostart = true
+	# timer.connect("timeout", self, "update_hint")
+	# add_child(timer)
 	mut_panel = PanelContainer.new()
 	mut_panel.name = "BCMutationPreview"
 	mut_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
