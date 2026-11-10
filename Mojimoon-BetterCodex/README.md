@@ -4,5 +4,5 @@
 
 - 测试：`bash mods/tests/BetterCodex/run_tests.sh [normal|compat|all]`（compat 同时加载 ImprovedTooltips 3019195689 与 ItemRefund 3834897339）
 - 截图：`godot --path 1.2 -s res://mods/tests/BetterCodex/shot.gd`（BC_SHOT_DIR）
-- 打包：`python mods/tools/pack_mod.py BetterCodex "D:\dev\mod\Brotato\1.2\dist-BetterCodex"`
+- 打包：`python mods/tools/pack_mod.py BetterCodex "D:\SteamLibrary\steamapps\workshop\content\1942280\3671094202"`（与 DebugMenu 一起加载）
 - 翻译：`translations/bettercodex.csv`（13 种语言，手工维护；初版从 codex/ui_strings.json 生成）
