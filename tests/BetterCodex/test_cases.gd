@@ -853,3 +853,37 @@ func test_shop_codex_single_mutation_view():
 	tree.root.remove_child(shop)
 	shop.queue_free()
 	yield(_wait(3), "completed")
+
+
+# 商店：快捷键 C（真实输入事件，图鉴预先构建之后）打开图鉴
+func test_shop_hotkey_after_prewarm():
+	RunData.players_data[0].weapons = [_weapon("weapon_pistol_1")]
+	RunData.current_wave = 3
+	ItemService.init_unlocked_pool()
+	var shop = load("res://ui/menus/shop/shop.tscn").instance()
+	var prev = tree.current_scene
+	tree.root.add_child(shop)
+	tree.current_scene = shop
+	yield(_wait(10), "completed")
+	var hook = shop.get_node("BCShopHook")
+	yield(tree.create_timer(2.5), "timeout")	# 预先构建（1–2 秒）
+	_check(hook.codex != null and not hook.codex._bc_tabs.empty(), "shop codex prewarmed")
+	var el = null
+	for n in _all(shop):
+		if n is InventoryElement and n.item is WeaponData and n.is_visible_in_tree():
+			el = n
+	el.grab_focus()
+	yield(_wait(2), "completed")
+	print("focus owner: ", shop.get_focus_owner())
+	var ev = InputEventKey.new()
+	ev.scancode = KEY_C
+	ev.pressed = true
+	tree.input_event(ev)
+	yield(_wait(3), "completed")
+	_check(hook.codex.visible, "C opens the codex (focus %s)" % shop.get_focus_owner())
+	hook.codex.hide()
+	tree.current_scene = prev
+	tree.root.remove_child(shop)
+	shop.queue_free()
+	yield(_wait(3), "completed")
+	RunData.players_data[0].weapons = []

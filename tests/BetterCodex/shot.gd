@@ -24,6 +24,9 @@ func _initialize() -> void:
 			break
 	codex.bc_focus_item(it, "items")
 	yield(_wait(5), "completed")
+	codex._bc_tabs.items.extras.curse_band = [30, 60, 90]
+	codex._bc_tabs.items.extras.show_item(codex._bc_tabs.items.current)
+	yield(_wait(2), "completed")
 	codex._bc_tabs.items.extras._curse_btn.pressed = true
 	codex._bc_tabs.items.extras._on_mut_toggled(true)
 	yield(_shot(out + "/items.png"), "completed")

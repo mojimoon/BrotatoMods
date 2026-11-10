@@ -94,7 +94,7 @@ func _input(event: InputEvent) -> void:
 	var use_mouse = false
 	if event is InputEventMouseButton and event.pressed and event.button_index == BUTTON_RIGHT:
 		use_mouse = true
-	elif event is InputEventKey and event.pressed and not event.echo and event.scancode == hotkey():
+	elif event is InputEventKey and event.pressed and not event.echo and (event.scancode == hotkey() or event.physical_scancode == hotkey()):	# 物理键位也认：输入法 / 键盘布局可能改变 scancode
 		use_mouse = true
 	elif not (event is InputEventJoypadButton and event.pressed and event.button_index == JOY_R3):
 		return
