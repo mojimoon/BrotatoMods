@@ -1,0 +1,66 @@
+extends SceneTree
+
+# 截图检查布局（需要窗口）：godot --path 1.2 -s res://mods/tests/BetterCodex/shot.gd，输出到 BC_SHOT_DIR
+
+func _initialize() -> void:
+	yield(self, "idle_frame")
+	yield(self, "idle_frame")
+	var out = OS.get_environment("BC_SHOT_DIR")
+	var cases = load("res://mods/tests/BetterCodex/test_cases.gd").new()
+	cases.tree = self
+	cases._unlock_everything()
+	cases._setup_player()
+	var codex = load("res://ui/menus/pages/menu_codex.tscn").instance()
+	codex.name = "MenuCodex"
+	root.add_child(codex)
+	yield(_wait(3), "completed")
+	codex._pop()
+	codex.bc_show_tab("items")
+	yield(_wait(3), "completed")
+	var it = null
+	for x in root.get_node("ItemService").items:
+		if x.replaced_by != null:
+			it = x
+			break
+	codex.bc_focus_item(it, "items")
+	yield(_wait(5), "completed")
+	codex._bc_tabs.items.extras._curse_btn.pressed = true
+	codex._bc_tabs.items.extras._on_mut_toggled(true)
+	yield(_shot(out + "/items.png"), "completed")
+	codex.bc_show_tab("weapons")
+	for e in codex._bc_tabs.weapons.all:
+		if e.item.my_id == "weapon_smg_1":
+			codex._on_InventoryWeapons_element_pressed(e)
+	yield(_wait(5), "completed")
+	yield(_shot(out + "/weapons.png"), "completed")
+	var sc = codex.get_node("root/BetterTabContainer/TabContainer/tab_weapons/HBoxContainer/VBoxContainer/scroll_right_weapons")
+	sc.scroll_vertical = 2000
+	yield(_shot(out + "/weapons2.png"), "completed")
+	codex.hide()
+	codex.queue_free()
+	var c = null
+	for x in root.get_node("ItemService").characters:
+		if x.wanted_tags.size() > 0 and x.banned_item_groups.size() > 0:
+			c = x
+			break
+	cases._setup_player(c.my_id)
+	var scene = load("res://ui/menus/run/weapon_selection.tscn").instance()
+	root.add_child(scene)
+	current_scene = scene
+	yield(_shot(out + "/weapon_selection.png"), "completed")
+	scene.find_node("BCCharacterInfo", true, false)._on_banned(c, null)
+	yield(_shot(out + "/banned.png"), "completed")
+	quit()
+
+
+func _wait(n):
+	for i in n:
+		yield(self, "idle_frame")
+
+
+func _shot(path: String):
+	for i in 8:
+		yield(self, "idle_frame")
+	var img = root.get_texture().get_data()
+	img.flip_y()
+	img.save_png(path)

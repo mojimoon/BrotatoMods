@@ -1,0 +1,78 @@
+key,zh,en,fr,ja,ko,zh_TW,ru,pl,es,pt,de,tr,it
+BC_SEARCH,搜索...,Search...,Rechercher...,検索...,검색...,搜尋...,Поиск...,Szukaj...,Buscar...,Pesquisar...,Suchen...,Ara...,Cerca...
+BC_ALL,全部,All,Tous,すべて,전체,全部,Все,Wszystkie,Todos,Todos,Alle,Tüm,Tutti
+BC_TIER,稀有度,Rarity,Rareté,レアリティ,희귀도,稀有度,Редкость,Rzadkość,Rareza,Raridade,Seltenheit,Nadirlik,Rarità
+BC_TYPE,类型,Type,Type,タイプ,유형,類型,Тип,Typ,Tipo,Tipo,Typ,Tür,Tipo
+BC_MELEE,近战,Melee,Mêlée,近接,근접,近戰,Ближний бой,Walka wręcz,Cuerpo a cuerpo,Corpo a corpo,Nahkampf,Yakın dövüş,Mischia
+BC_RANGED,远战,Ranged,À distance,遠隔,원거리,遠戰,Дальний бой,Dystans,A distancia,À distância,Fernkampf,Menzilli,A distanza
+BC_CLASS,武器类别,Set,Catégorie,種類,분류,類別,Класс,Klasa,Clase,Classe,Klasse,Sınıf,Classe
+BC_SOURCE,来源,Source,Source,入手先,출처,來源,Источник,Źródło,Origen,Origem,Quelle,Kaynak,Fonte
+BC_BASE_GAME,本体,Base Game,Jeu de base,基本ゲーム,기본 게임,本體,Основная игра,Gra podstawowa,Juego base,Jogo base,Basisspiel,Temel Oyun,Gioco base
+BC_TAG,道具标签,Tag,Étiquette,タグ,태그,標籤,Тег,Tag,Etiqueta,Etiqueta,Tag,Etiket,Etichetta
+BC_SPECIAL,特殊,Special,Spécial,特殊,특수,特殊,Особые,Specjalne,Especial,Especial,Spezial,Özel,Speciale
+BC_FOSSIL,化石,Fossils,Fossiles,化石,화석,化石,Окаменелости,Skamieliny,Fósiles,Fósseis,Fossilien,Fosiller,Fossili
+BC_BADGES,角标,Badges,Badges,バッジ,배지,角標,Значки,Odznaki,Insignias,Selos,Abzeichen,Rozetler,Badge
+BC_CLEAR,清除筛选,Clear Filters,Effacer les filtres,フィルターをクリア,필터 지우기,清除篩選,Очистить фильтры,Wyczyść filtry,Borrar filtros,Limpar filtros,Filter löschen,Filtreleri temizle,Cancella filtri
+BC_CURSE,诅咒,Curse,Malédiction,呪い,저주,詛咒,Проклятие,Klątwa,Maldición,Maldição,Fluch,Lanet,Maledizione
+BC_MECHA,机械化,Mecha,Méca,メカ化,기계화,機械化,Механизация,Mechanizacja,Mecanizar,Mecanizar,Mecha,Mekanik,Meccanizza
+BC_MUTATION,异变,Mutation,Mutation,変異,돌연변이,異變,Мутация,Mutacja,Mutación,Mutação,Mutation,Mutasyon,Mutazione
+BC_NO_MUT_COPY,异变无法复制,Mutation can't copy,Non copiable par Mutation,変異でコピー不可,돌연변이 복제 불가,異變無法複製,Мутация не копирует,Mutacja nie kopiuje,Mutación no copia,Mutação não copia,Mutation kopiert nicht,Mutasyon kopyalayamaz,Mutazione non copia
+BC_NO_MUT_REMOVE,异变无法清除,Mutation can't remove,Non retirable par Mutation,変異で除去不可,돌연변이 제거 불가,異變無法清除,Мутация не убирает,Mutacja nie usuwa,Mutación no elimina,Mutação não remove,Mutation entfernt nicht,Mutasyon kaldıramaz,Mutazione non rimuove
+BC_MUT_NEED,需异变≥{0},Needs Mutation ≥ {0},Mutation ≥ {0} requise,変異≥{0}が必要,돌연변이 ≥ {0} 필요,需異變≥{0},Нужна Мутация ≥ {0},Wymaga Mutacji ≥ {0},Requiere Mutación ≥ {0},Requer Mutação ≥ {0},Benötigt Mutation ≥ {0},Mutasyon ≥ {0} gerekir,Richiede Mutazione ≥ {0}
+BC_ATTACK_SPEED_CALC,攻速计算器,Attack Speed Calculator,Calculateur de vitesse d'attaque,攻撃速度計算機,공격 속도 계산기,攻速計算機,Калькулятор скорости атаки,Kalkulator szybkości ataku,Calculadora de velocidad de ataque,Calculadora de velocidade de ataque,Angriffsgeschwindigkeitsrechner,Saldırı hızı hesaplayıcı,Calcolatore velocità d'attacco
+BC_ATTACK_SPEED,攻速,A.Spd,Vit. Atq,攻速,공속,攻速,Ск. атаки,Szyb. atk,Vel. Atq,Vel. Atq,Angr.-Tempo,Sal. Hız,Vel. Att
+BC_STAT_RANGE,范围,Range,Portée,射程,사거리,範圍,Дальность,Zasięg,Alcance,Alcance,Reichweite,Menzil,Gittata
+BC_WEAPON_COUNT,武器数量,#Weapon,#Arme,武器数,무기 수,武器數量,№ Оружие,#Bronie,#Arma,#Arma,#Waffe,#Silah,#Arma
+BC_TOOLTIP_CD,显示冷却,Tooltip Cooldown,Récupération (info),ツールチップクールダウン,툴팁 재사용,顯示冷卻,Перезарядка (подсказка),Odstęp (podpowiedź),Enfriamiento (información),Recarga (dica),Abklingzeit (Tooltip),İpucu bekleme,Ricarica (tooltip)
+BC_ACTUAL_CD,实际冷却,Actual Cooldown,Récupération (réelle),実際のクールダウン,실제 재사용,實際冷卻,Фактическая перезарядка,Odstęp (rzeczywisty),Enfriamiento real,Recarga real,Tatsächliche Abklingzeit,Gerçek bekleme,Ricarica reale
+BC_BREAKPOINTS,攻速断点,A.Spd Breakpoints,Seuils de vit. atq,攻撃速度ブレイクポイント,공격 속도 분기점,攻速斷點,Контрольные точки скорости атаки,Punkty szybkości ataku,Puntos de vel. atq,Pontos de vel. atq,Angriffsschwellen,Saldırı hızı kırılım noktaları,Soglie vel. att
+BC_EVERY_SHOTS,每发射{shots}次:,every {shots} shots:,toutes les {shots} attaques :,リロード毎{shots}回:,장전 {shots}회마다:,每發射{shots}次:,каждые {shots} выстрелов:,co {shots} strzałów:,cada {shots} disparos:,a cada {shots} tiros:,alle {shots} Schüsse:,her {shots} atışta:,ogni {shots} colpi:
+BC_EQUIV,等效,equiv,équiv,相当,상당,等效,экв,odpow,equiv,equiv,äquiv,eşdeğ,equiv
+BC_BASE_PRICE,基础价格,Base Price,Prix de base,基本価格,기본 가격,基礎價格,Базовая цена,Cena bazowa,Precio base,Preço base,Basispreis,Temel fiyat,Prezzo base
+BC_PER_WAVE,/波,/wave,/vague,/ウェーブ,/웨이브,每波,/волна,/fala,/ronda,/onda,/Welle,/dalga,/onda
+BC_WAVE,波次,Wave,Vague,ウェーブ,웨이브,波次,Волна,Fala,Ronda,Onda,Welle,Dalga,Onda
+BC_RELATED,关联内容,Related,Contenu lié,関連,관련 항목,關聯內容,Связанное,Powiązane,Relacionado,Relacionado,Verwandt,İlgili,Correlati
+BC_PREFERRED_TAGS,偏好标签,Preferred Tags,Étiquettes préférées,推奨タグ,선호 태그,偏好標籤,Предпочитаемые теги,Preferowane tagi,Etiquetas preferidas,Etiquetas preferidas,Bevorzugte Tags,Tercih edilen etiketler,Etichette preferite
+BC_BANNED_ITEMS,禁用道具,Banned Items,Objets exclus,出現しないアイテム,금지 아이템,禁用道具,Запрещённые предметы,Zablokowane przedmioty,Objetos excluidos,Itens excluídos,Gesperrte Gegenstände,Yasaklı eşyalar,Oggetti esclusi
+BC_UNIQUE,独特,Unique,Unique,ユニーク,고유,獨特,Уникальный,Unikalny,Único,Único,Einzigartig,Benzersiz,Unico
+BC_LIMITED,限制,Limited,Limité,制限,제한,限制,Ограниченный,Ograniczony,Limitado,Limitado,Begrenzt,Sınırlı,Limitato
+BC_FRAMES,帧数,Frames,Frames,フレーム,프레임,幀數,Кадры,Klatki,Fotogramas,Quadros,Frames,Kareler,Fotogrammi
+BC_TEMP_FILTER,临时筛选,Temporary filter,Filtre temporaire,一時フィルター,임시 필터,臨時篩選,Временный фильтр,Filtr tymczasowy,Filtro temporal,Filtro temporário,Temporärer Filter,Geçici filtre,Filtro temporaneo
+BC_MUT_COPY,可复制,Copyable,Copiable,コピー可能,복사 가능,可複製,Копируется,Do skopiowania,Copiable,Copiável,Kopierbar,Kopyalanabilir,Copiabile
+BC_MUT_REMOVE,可清除,Removable,Supprimable,除去可能,제거 가능,可清除,Удаляется,Do usunięcia,Eliminable,Removível,Entfernbar,Kaldırılabilir,Rimovibile
+BC_MUT_SCALE,缩放,Scale,Échelle,倍率,배율,縮放,Масштаб,Skala,Escala,Escala,Skalierung,Ölçek,Scala
+BC_CURRENT_PRICE,当前实际价格,Current price,Prix actuel,現在の価格,현재 가격,目前實際價格,Текущая цена,Aktualna cena,Precio actual,Preço atual,Aktueller Preis,Güncel fiyat,Prezzo attuale
+BC_CURSE_WAVE,本波 {0}–{1}%,This wave {0}–{1}%,Cette vague {0}–{1}%,このウェーブ {0}–{1}%,이번 웨이브 {0}–{1}%,本波 {0}–{1}%,Эта волна {0}–{1}%,Ta fala {0}–{1}%,Esta oleada {0}–{1}%,Esta onda {0}–{1}%,Diese Welle {0}–{1}%,Bu dalga {0}–{1}%,Questa ondata {0}–{1}%
+BC_TAG_CONSUMABLE,消耗品,Consumable,Consommable,消耗品,소모품,消耗品,Расходуемое,Przedmiot jednorazowy,Consumible,Consumível,Verbrauchsgegenstand,Tüketilebilir,Consumabile
+BC_TAG_ECONOMY,经济,Economy,Économie,経済,경제,經濟,Экономика,Ekonomia,Economía,Economia,Wirtschaft,Ekonomi,Economia
+BC_TAG_EXPLORATION,探索,Exploration,Exploration,探索,탐험,探索,Исследование,Eksploracja,Exploración,Exploração,Erkundung,Keşif,Esplorazione
+BC_TAG_EXPLOSIVE,爆炸,Explosive,Explosif,爆発,폭발성,爆炸,Разрывное,Wybuchowa,Explosiva,Explosiva,Explosiv,Patlayıcı,Arma esplosiva
+BC_TAG_KNOCKBACK,击退,Knockback,Poussée,ノックバック,넉백,擊退,Отталкивание,Odrzut,Derribo,Empurrão,Rückstoß,İtme,Respinta
+BC_TAG_LESS_ENEMIES,减少敌人,Less Enemies,Moins d'ennemis,敵が少ない,적 감소,減少敵人,Меньше врагов,Mniej wrogów,Menos enemigos,Menos inimigos,Weniger Feinde,Daha az düşman,Meno nemici
+BC_TAG_LESS_ENEMY_SPEED,减少敌人速度,Less Enemy Speed,Vitesse ennemie réduite,敵の速度低下,적 속도 감소,減少敵人速度,Снижение скорости врагов,Mniejsza prędkość wrogów,Menor velocidad enemiga,Velocidade inimiga reduzida,Geringere Feindgeschwindigkeit,Düşman hızı azaltma,Velocità nemica ridotta
+BC_TAG_LOCK,锁定,Lock,Verrouiller,ロック,잠금,上鎖,Закрепить,Zablokuj,Bloquear,Travar,Sperren,Kilitle,Blocca
+BC_TAG_MORE_ENEMIES,更多敌人,More Enemies,Plus d'ennemis,敵が多い,적 증가,更多敵人,Больше врагов,Więcej wrogów,Más enemigos,Mais inimigos,Mehr Feinde,Daha fazla düşman,Più nemici
+BC_TAG_NUMBER_OF_ENEMIES,敌人,Enemies,Ennemis,敵,적,敵人,Враги,Wrogowie,Enemigos,Inimigos,Gegner,Düşmanlar,Nemici
+BC_TAG_PET,宠物,Pet,Familier,ペット,펫,寵物,Питомец,Zwierzak,Mascota,Mascote,Haustier,Evcil Hayvan,Mascotte
+BC_TAG_PICKUP,拾取,Pickup,Ramassable,拾得,픽업,拾取,Подбираемое,Podnoszone,Recogible,Coletável,Aufhebbar,Toplanabilir,Raccoglibile
+BC_TAG_STAND_STILL,静止,Stand Still,Immobile,その場に留まる,제자리 정지,靜止,Стоять на месте,Stać w miejscu,Quieto,Ficar parado,Stillstehen,Olduğu yerde dur,Stare fermo
+BC_TAG_STAT_ARMOR,护甲,Armor,Armure,防御力,방어구,盔甲,Броня,Pancerz,Armadura,Armadura,Rüstung,Zırh,Corazza
+BC_TAG_STAT_ATTACK_SPEED,%攻击速度,% Attack Speed,% Vitesse d'Attaque,攻撃速度(%),% 공격 속도,%攻擊速度,% скорости атаки,% prędkości ataku,% de vel. ataque,% de velocidade de ataque,% Angriffstempo,% Saldırı Hızı,% di velocità attacco
+BC_TAG_STAT_CRIT_CHANCE,%暴击率,% Crit Chance,% Chance Critique,クリティカル率(%),% 치명타율,%爆擊機率,% вероятности крит. удара,% szans na traf. kryt.,% de prob. crít.,% de chance crítica,% Krit-Chance,% Kritik Hasar Olasılığı,% di prob. critica
+BC_TAG_STAT_CURSE,诅咒,Curse,Malédiction,呪い,저주,詛咒,Проклятие,Klątwa,Maldición,Maldição,Fluch,Lanet,Maledizione
+BC_TAG_STAT_DODGE,%闪避,% Dodge,% Esquive,回避率(%),% 회피,%迴避,Уклонение,% szans na unik,% de agilidad,% de esquiva,% Ausweichen,% Kaçınma,% di schivata
+BC_TAG_STAT_ELEMENTAL_DAMAGE,元素伤害,Elemental Damage,Dégâts Élémentaires,元素ダメージ,원소 대미지,屬性傷害,Стихийный урон,Obrażenia od żywiołów,Daño elemental,Dano elemental,Elementarschaden,Element Hasarı,Danni elementali
+BC_TAG_STAT_ENGINEERING,工程学,Engineering,Ingénierie,エンジニアリング,엔지니어링,工程學,Инженерия,Inżynieria,Ingeniería,Engenharia,Technik,Mühendislik,Ingegneria
+BC_TAG_STAT_HARVESTING,收获,Harvesting,Récolte,収穫,수확,收穫結算,Сбор,Zbieranie,Recolección,Coleta,Ernte,Toplama,Raccolto
+BC_TAG_STAT_HP_REGENERATION,生命再生,HP Regeneration,Régénération de PV,HP再生,HP 재생,HP再生,Восстановление ОЗ,Regeneracja PZ,Recuperación de PS,Recuperação de PV,HP-Regeneration,Sağlık Yenileme,Recupero salute
+BC_TAG_STAT_LIFESTEAL,%生命窃取,% Life Steal,% Vol de Vie,ライフスティール(%),% 생명 훔침,%生命竊取,% кражи жизни,% wysysanego życia,% de robo de salud,% de roubo de vida,% Lebensraub,% Can Çalma,% di furto vita
+BC_TAG_STAT_LUCK,幸运,Luck,Chance,運,행운,運氣,Удача,Szczęście,Suerte,Sorte,Glück,Şans,Fortuna
+BC_TAG_STAT_MAX_HP,最大生命值,Max HP,PV Max,最大HP,최대 HP,最大HP,Макс. ОЗ,Maks. PZ,PS máximos,PV máximo,Max. HP,Maks. Sağlık,PS massimi
+BC_TAG_STAT_MELEE_DAMAGE,近战伤害,Melee Damage,Dégâts en Mêlée,近接ダメージ,근거리 대미지,近距離傷害,Урон в ближнем бою,Obr. w walce wręcz,Daño cuerpo a cuerpo,Dano corpo a corpo,Nahkampfschaden,Yakın Saldırı Hasarı,Danni da mischia
+BC_TAG_STAT_PERCENT_DAMAGE,%伤害,% Damage,% Dégâts,ダメージ(%),% 대미지,%傷害,% урона,% obrażeń,% de daño,% de dano,% Schaden,% Hasar,% di danni
+BC_TAG_STAT_RANGE,范围,Range,Portée,射程,범위,範圍,Дальность,Zasięg,Alcance,Alcance,Reichweite,Menzil,Portata
+BC_TAG_STAT_RANGED_DAMAGE,远程伤害,Ranged Damage,Dégâts à Distance,遠距離ダメージ,원거리 대미지,範圍傷害,Урон в дальнем бою,Obrażenia dystansowe,Daño a distancia,Dano de longo alcance,Fernkampfschaden,Menzilli Saldırı Hasarı,Danni da distanza
+BC_TAG_STAT_SPEED,%速度,% Speed,% Vitesse,移動速度(%),% 속도,%速度,% скорости,% szybkości,% de velocidad,% de velocidade,% Tempo,% Hız,% di velocità
+BC_TAG_STRUCTURE,构筑物(偏好),Structure (Preference),Structure (Préférence),構造物(好み),구조물(선호),構築物(偏好),Структура (предпочтение),Struktura (preferencja),Estructura (Preferencia),Estrutura (Preferência),Struktur (Präferenz),Yapı (Tercih),Struttura (Preferenza)
+BC_TAG_STRUCTURE_REAL,构筑物,Structure,Structure,建造物,구조,結構物,Постройка,Struktura,Estructura,Estrutura,Konstruktion,Yapı,Struttura
+BC_TAG_XP_GAIN,获得%经验,% XP Gain,% Gain d'XP,経験値の獲得量(%),% XP 획득,獲得%XP,% бонусного опыта,Zdobywany % PD,% de XP recibida,% de EXP ganha,% XP-Gewinn,% TP Kazanımı,% di guadagno PE
