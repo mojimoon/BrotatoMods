@@ -8,133 +8,231 @@
 
 ## English
 
-**For Brotato 1.2 (incl. Primal Dread and the 1.2.0.2 beta).**
+**For Brotato 1.2, the Primal Dread update (both the release and the beta).**
 
-**Everything from the [web codex](https://brotato.mojimoon.top/) — filters, curse / mecha / mutation previews, actual attack speed, price calculator — right inside the game.** All numbers come from the game's own calculations, so they stay correct when the game changes them.
+**The popular [web codex](https://brotato.mojimoon.top/), brought right into the game: search and filters, curse / mecha / mutation previews, actual attack speed and a price calculator.**
 
 ### Features
 
-**Codex list**
+- **A better codex overview**: badges (base price, item limit, item set), search and filters (rarity, item tag, item set, special items, weapon type / class), and items banned for you are greyed out during a run.
+- **Better item details**:
+  - Item tags and weapon classes under the name; click one to filter by it.
+  - Related items (Hourglass, Goldfish, Dino Egg…), click to jump.
+  - **Curse preview** (10–110%). During a run, the slider highlights the range this wave can roll and starts at its median.
+  - **Mecha preview** for weapons.
+  - **Mutation preview**: which effects can be copied (already scaled) and which negative effects can be removed. Below the threshold it shows "Mutation too low (X/threshold)" with the effects that unlock there.
+  - **Actual attack speed**: weapon stats show the real average cooldown instead of the tooltip value. The **attack speed calculator** gives the frame range, reload, DPS change and breakpoints for any attack speed, range and weapon count.
+  - **Price calculator**: price at any wave, with or without Nightmare inflation.
+  - During a run, everything starts at your current values (mutation, attack speed, range, weapon count, wave, difficulty).
+- **Character info** on the weapon / difficulty selection screen: preferred tags, banned items and a mutation preview; click one to open the codex filtered.
+- **Shop**:
+  - Right-click an item or weapon (or hover it and press **C**, gamepad **R3**) to open it in the codex; owned cursed / meca items open with their actual strength.
+  - Mutation preview at the end of every description; when a mutation fruit can't drop yet, the bottom-left hint shows how many uncursed items are missing.
+- **Fast**: no opening animation, and the codex is prepared in the background, so it opens in about 10 ms.
+- Every number comes from the game's own calculations, so it stays correct after balance changes. Supports all 13 game languages and follows the game's font size.
 
-- **Badges** on every entry: base price (top left), item limit (top right; red = unique, orange = limited) and item set (bottom right: the colored item set icon, or the meca part / mutation fruit icon for Primal Dread's meca and mutant items). Each badge can be turned off in Settings.
-- **Search and filters**: rarity, item tag, item set (base game / DLC / update), special (fossils, meca items, mutant items); for weapons: type (melee / ranged), class and source. Long lists open as a compact grid.
-- In a run, **items banned for P1 are greyed out** (the character's banned items and the ones banned with ban tokens).
+### Settings
 
-**Details**
+Click **Settings** in the codex:
 
-- **Clickable links** under the name: item tags and weapon classes filter the list. "Unique / Limited (X) / Structure" replace the original category line.
-- **Related items** (Hourglass, Goldfish, Dino Egg → Ammosaurus …): click to jump.
-- **Curse preview** (10–110 %): the description shows the cursed item. In a run, the bar highlights the range this wave can roll and starts at its median.
-- **Mecha preview** for weapons (power 1–80).
-- **Mutation preview**: which effects can be copied (already scaled) and which negative effects can be removed. Below the threshold (67 / 40 depending on the game version) it shows "Mutation too low (X/threshold)" and the effects that unlock at the threshold. Cursed items cannot be mutated: their effects can still be copied (with cursed values) but nothing is removed.
-- **Attack speed calculator**: actual average cooldown with the frame range, reload and equivalent cooldown, DPS change and attack speed breakpoints, for any attack speed, range and number of weapons. The weapon stats always show the **actual** cooldown instead of the tooltip value.
-- **Price calculator**: price at any wave, with or without Nightmare inflation, plus the current actual price in a run.
-- In a run, mutation, attack speed, range, weapon count, wave and difficulty start at your current values; the mutation preview is already on when a mutation fruit can drop.
-
-**Character info on weapon / difficulty selection**
-
-- Preferred tags, banned items and a mutation preview for the selected character. Clicking a tag or a banned item opens the codex with a matching filter.
-
-**Shop**
-
-- **Right-click** a shop item or one of your weapons / items (or hover it and press **C**, gamepad **R3**) to open it in the codex. Owned cursed / meca items open with their actual strength.
-- When a mutation fruit can drop, every item and character description ends with a **mutation preview**. When it can't, the hint in the bottom-left corner shows how many uncursed items are still missing (x/3).
-
-**Settings** (the Settings button in the codex)
-
-- Codex: price / limit / item set badges, **unlock the whole codex without touching your save**.
-- Shop: bottom-left hint, right-click to open the codex (turn off to use only the hotkey; right-clicks are then left untouched for other mods), the codex hotkey, and **Mutation preview**: Default (when a mutation fruit can drop) / Evolution <= 0 (DLC2 owned, not forced onto the meca path, evolution <= 0) / Off.
-
-**Faster codex**: no opening animation; the codex is built in the background and reused while nothing changes, so it usually opens in about 10 ms.
-
-Supports all 13 game languages. All added text follows the game's font size setting.
+- **Codex**: price / limit / item set badges; **Unlock entire codex** (your save is never touched).
+- **Shop**: bottom-left hint; right-click opens the codex (turn it off to keep right-click free for other mods); codex hotkey; **Mutation preview**: Default (when a mutation fruit can drop) / Evolution <= 0 / Off.
 
 ### Compatibility
 
-- Tested with **ImprovedTooltips**, **ItemRefund** and **BroEditor**. The item popup itself is not modified.
-- Known issue (not caused by this mod): **DebugMenu 1.2.0 + ImprovedTooltips** together crash when entering the shop, because DebugMenu preloads its menu scene too early. Loading the menu with `load()` when it is opened fixes it.
+Tested with ImprovedTooltips, ItemRefund and BroEditor. The item popup itself is never modified.
 
-## 中文
+If you like this mod, please consider liking, favoriting and sharing it, thank you! Comments and suggestions are also very welcome!
 
-**适用于土豆兄弟 1.2（含史前惧兽 DLC 与 1.2.0.2 测试版）。**
+<!-- BBCode
 
-**把[网页图鉴](https://brotato.mojimoon.top/)的功能搬进游戏：筛选、诅咒 / 机械化 / 异变预览、实际攻速、价格计算。** 数值都直接调用游戏自身的计算，游戏调整数值后也不会过时。
+[pullquote]For Brotato 1.2, the Primal Dread update (both the release and the beta).[/pullquote]
 
-### 功能
+[pullquote]The popular web codex, brought right into the game: search and filters, curse / mecha / mutation previews, actual attack speed and a price calculator.[/pullquote]
 
-**图鉴列表**
+[h1]Features[/h1]
 
-- **角标**：基础价格（左上）、数量上限（右上；红色为独特，橙色为限制）、物品套组（右下：物品套组的彩色图标，史前惧兽的机械 / 异变道具显示机械部件 / 异变果图标）。每种角标都可以在设置里关掉。
-- **搜索与筛选**：稀有度、道具标签、物品套组（本体 / DLC / 更新）、特殊（化石、机械道具、异变道具）；武器为类型（近战 / 远程）、武器类别、来源。长列表以网格弹出。
-- 局内打开时，**P1 被禁用的道具会变灰**（角色自带禁用和消耗禁用次数禁掉的）。
+[list]
+[*][b]A better codex overview[/b]: badges (base price, item limit, item set), search and filters (rarity, item tag, item set, special items, weapon type / class), and items banned for you are greyed out during a run.
+[*][b]Better item details[/b]:
+[list]
+[*]Item tags and weapon classes under the name; click one to filter by it.
+[*]Related items (Hourglass, Goldfish, Dino Egg…), click to jump.
+[*][b]Curse preview[/b] (10–110%). During a run, the slider highlights the range this wave can roll and starts at its median.
+[*][b]Mecha preview[/b] for weapons.
+[*][b]Mutation preview[/b]: which effects can be copied (already scaled) and which negative effects can be removed. Below the threshold it shows "Mutation too low (X/threshold)" with the effects that unlock there.
+[*][b]Actual attack speed[/b]: weapon stats show the real average cooldown instead of the tooltip value. The [b]attack speed calculator[/b] gives the frame range, reload, DPS change and breakpoints for any attack speed, range and weapon count.
+[*][b]Price calculator[/b]: price at any wave, with or without Nightmare inflation.
+[*]During a run, everything starts at your current values (mutation, attack speed, range, weapon count, wave, difficulty).
+[/list]
+[*][b]Character info[/b] on the weapon / difficulty selection screen: preferred tags, banned items and a mutation preview; click one to open the codex filtered.
+[*][b]Shop[/b]:
+[list]
+[*]Right-click an item or weapon (or hover it and press [b]C[/b], gamepad [b]R3[/b]) to open it in the codex; owned cursed / meca items open with their actual strength.
+[*]Mutation preview at the end of every description; when a mutation fruit can't drop yet, the bottom-left hint shows how many uncursed items are missing.
+[/list]
+[*][b]Fast[/b]: no opening animation, and the codex is prepared in the background, so it opens in about 10 ms.
+[*]Every number comes from the game's own calculations, so it stays correct after balance changes. Supports all 13 game languages and follows the game's font size.
+[/list]
 
-**详情**
+[h1]Settings[/h1]
 
-- 名字下方是**可点击的链接**：道具标签、武器类别，点击即筛选；“独特的 / 限制 (X) / 构筑物”代替原来的类别文字。
-- **关联内容**（沙漏、金鱼、恐龙蛋 → 弹药恐龙……）：点击跳转。
-- **诅咒预览**（10–110%）：描述直接显示诅咒后的物品。局内会在滑条上高亮本波可能出现的强度范围，默认取中位数。
-- 武器的**机械化预览**（强度 1–80）。
-- **异变预览**：可被复制的效果（已按异变缩放）与可被清除的负面效果。低于阈值时（按游戏版本为 67 / 40）显示“异变不足 (X/阈值)”和到阈值才能复制的效果。诅咒道具不能被异变：效果仍可被复制（按诅咒后的数值），但不会被清除。
-- **攻速计算器**：任意攻速、范围、武器数量下的实际平均冷却与帧数范围、换弹与等效冷却、DPS 变化和攻速断点。武器属性里的冷却也总是显示**实际冷却**，而不是游戏提示里的值。
-- **价格计算**：任意波次、是否噩梦的价格，局内另外显示当前实际价格。
-- 局内打开时，异变、攻速、范围、武器数量、波次、难度默认取当前值；可掉落异变果时异变预览默认打开。
+Click [b]Settings[/b] in the codex:
 
-**武器 / 难度选择界面的角色信息**
+[list]
+[*][b]Codex[/b]: price / limit / item set badges; [b]Unlock entire codex[/b] (your save is never touched).
+[*][b]Shop[/b]: bottom-left hint; right-click opens the codex (turn it off to keep right-click free for other mods); codex hotkey; [b]Mutation preview[/b]: Default (when a mutation fruit can drop) / Evolution <= 0 / Off.
+[/list]
 
-- 当前角色的偏好标签、禁用道具和异变预览；点击标签或禁用道具，打开图鉴并显示对应的筛选。
+[h1]Compatibility[/h1]
 
-**商店**
+Tested with ImprovedTooltips, ItemRefund and BroEditor. The item popup itself is never modified.
 
-- **右键**商品或已有的武器 / 道具（或悬停后按 **C**，手柄 **R3**），在图鉴里打开它；已有的诅咒 / 机械化物品按实际强度预览。
-- 可掉落异变果时，每个道具和角色的描述末尾都有**异变预览**；不可掉落时，左下角提示还差几个未诅咒道具（x/3）。
+[pullquote]If you like this mod, please consider liking, favoriting and sharing it, thank you! Comments and suggestions are also very welcome![/pullquote]
 
-**设置**（图鉴里的“设置”按钮）
+GitHub repo: [url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/url]
 
-- 图鉴：价格 / 数量上限 / 物品套组角标、**解锁全部图鉴（不修改存档）**。
-- 商店：左下角提示、右键跳转图鉴（关掉后只用快捷键，右键完全留给其他 mod）、跳转图鉴快捷键，以及**启用异变预览**：默认（可掉落异变果时）/ 进化 <= 0（有 DLC2、不是强制机械路线、进化 <= 0）/ 关。
+-->
 
-**更快的图鉴**：跳过开场动画；图鉴会在后台预先构建，内容不变时直接复用，通常约 10 毫秒就能打开。
+### Screenshots
 
-支持游戏的全部 13 种语言，新增的文字都跟随设置里的字体大小。
-
-### 兼容性
-
-- 与 **ImprovedTooltips**、**ItemRefund**、**BroEditor** 一起测试过；不修改物品弹窗本身。
-- 已知问题（与本 mod 无关）：**DebugMenu 1.2.0 与 ImprovedTooltips** 同时加载时，进入商店会崩溃，原因是 DebugMenu 过早预加载了它的菜单场景；改为打开菜单时再 `load()` 即可。
-
-## Screenshots
-
-Mutation preview in the shop / 商店里的异变预览
+Mutation preview in the shop
 
 ![](../img/BetterCodex/bc-en-1.jpg)
 
-Filters, badges and the price calculator / 筛选、角标与价格计算
+Filters, badges and the price calculator
 
 ![](../img/BetterCodex/bc-en-2.jpg)
 
-Mutation: copyable and removable effects / 异变：可复制与可清除的效果
+Mutation: copyable and removable effects
 
 ![](../img/BetterCodex/bc-en-3.jpg)
 
-Related items and the mutation threshold / 关联内容与异变阈值
+Related items and the mutation threshold
 
 ![](../img/BetterCodex/bc-en-4.jpg)
 
-Mecha preview and the attack speed calculator / 机械化预览与攻速计算器
+Mecha preview and the attack speed calculator
 
 ![](../img/BetterCodex/bc-en-5.jpg)
 
-## 截图
+Character tags, banned items and the mutation preview
+
+![](../img/BetterCodex/bc-en-6.jpg)
+
+## 中文
+
+**适用于 Brotato 1.2 史前惧兽更新（含正式版和 beta 版）。**
+
+**将广受欢迎的[网页图鉴](https://brotato.mojimoon.top/)功能直接搬进游戏：筛选和搜索、诅咒 / 机械化 / 异变预览、实际攻速、价格计算器。**
+
+### 功能
+
+- **更好的图鉴总览**：角标（基础价格、数量上限、物品套组）、搜索和筛选（稀有度、道具标签、物品套组、特殊道具、武器类型 / 类别）、局内以灰色显示禁用道具。
+- **更好的道具详情**：
+  - 显示道具标签和武器类别，点击即可筛选。
+  - 关联内容（沙漏、金鱼、恐龙蛋……），点击跳转。
+  - **诅咒预览**（10–110%）。局内会在滑条上高亮本波可能出现的强度范围，默认取中位数。
+  - 武器的**机械化预览**。
+  - **异变预览**：可被复制的效果（已按异变缩放）与可被清除的负面效果。低于阈值时显示“异变不足 (X/阈值)”和到阈值才能复制的效果。
+  - **实际攻速**：武器属性里的冷却显示实际平均冷却，而不是游戏提示里的值。**攻速计算器**给出任意攻速、范围、武器数量下的帧数范围、换弹、DPS 变化和攻速断点。
+  - **价格计算器**：任意波次、是否噩梦的价格。
+  - 局内打开时，异变、攻速、范围、武器数量、波次、难度都默认取当前值。
+- **角色信息**：武器 / 难度选择界面显示当前角色的偏好标签、禁用道具和异变预览，点击即打开图鉴并筛选。
+- **商店**：
+  - 右键商品或已有的武器 / 道具（或悬停后按 **C**，手柄 **R3**），在图鉴里打开它；已有的诅咒 / 机械化物品按实际强度预览。
+  - 每个描述末尾显示异变预览；还不能掉落异变果时，左下角提示还差几个未诅咒道具。
+- **更快**：跳过开场动画，图鉴在后台预先准备好，约 10 毫秒就能打开。
+- 所有数值都直接调用游戏自身的计算，平衡调整后也不会过时。支持游戏全部 13 种语言，跟随游戏的字体大小设置。
+
+### 设置
+
+点击图鉴里的**设置**：
+
+- **图鉴**：价格 / 数量上限 / 物品套组角标；**解锁全部图鉴**（不会修改存档）。
+- **商店**：左下角提示；右键跳转图鉴（关掉后右键完全留给其他 mod）；跳转图鉴快捷键；**启用异变预览**：默认（可掉落异变果时）/ 进化 <= 0 / 关。
+
+### 兼容性
+
+与 ImprovedTooltips、ItemRefund、BroEditor 一起测试过，不修改物品弹窗本身。
+
+如果你喜欢这个 mod，欢迎点赞、收藏、转发，多谢啦！有问题或建议欢迎在评论区留言！
+
+<!-- BBCode
+
+[pullquote]适用于 Brotato 1.2 史前惧兽更新（含正式版和 beta 版）。[/pullquote]
+
+[pullquote]将广受欢迎的网页图鉴功能直接搬进游戏：筛选和搜索、诅咒 / 机械化 / 异变预览、实际攻速、价格计算器。[/pullquote]
+
+[h1]功能[/h1]
+
+[list]
+[*][b]更好的图鉴总览[/b]：角标（基础价格、数量上限、物品套组）、搜索和筛选（稀有度、道具标签、物品套组、特殊道具、武器类型 / 类别）、局内以灰色显示禁用道具。
+[*][b]更好的道具详情[/b]：
+[list]
+[*]显示道具标签和武器类别，点击即可筛选。
+[*]关联内容（沙漏、金鱼、恐龙蛋……），点击跳转。
+[*][b]诅咒预览[/b]（10–110%）。局内会在滑条上高亮本波可能出现的强度范围，默认取中位数。
+[*]武器的[b]机械化预览[/b]。
+[*][b]异变预览[/b]：可被复制的效果（已按异变缩放）与可被清除的负面效果。低于阈值时显示“异变不足 (X/阈值)”和到阈值才能复制的效果。
+[*][b]实际攻速[/b]：武器属性里的冷却显示实际平均冷却，而不是游戏提示里的值。[b]攻速计算器[/b]给出任意攻速、范围、武器数量下的帧数范围、换弹、DPS 变化和攻速断点。
+[*][b]价格计算器[/b]：任意波次、是否噩梦的价格。
+[*]局内打开时，异变、攻速、范围、武器数量、波次、难度都默认取当前值。
+[/list]
+[*][b]角色信息[/b]：武器 / 难度选择界面显示当前角色的偏好标签、禁用道具和异变预览，点击即打开图鉴并筛选。
+[*][b]商店[/b]：
+[list]
+[*]右键商品或已有的武器 / 道具（或悬停后按 [b]C[/b]，手柄 [b]R3[/b]），在图鉴里打开它；已有的诅咒 / 机械化物品按实际强度预览。
+[*]每个描述末尾显示异变预览；还不能掉落异变果时，左下角提示还差几个未诅咒道具。
+[/list]
+[*][b]更快[/b]：跳过开场动画，图鉴在后台预先准备好，约 10 毫秒就能打开。
+[*]所有数值都直接调用游戏自身的计算，平衡调整后也不会过时。支持游戏全部 13 种语言，跟随游戏的字体大小设置。
+[/list]
+
+[h1]设置[/h1]
+
+点击图鉴里的[b]设置[/b]：
+
+[list]
+[*][b]图鉴[/b]：价格 / 数量上限 / 物品套组角标；[b]解锁全部图鉴[/b]（不会修改存档）。
+[*][b]商店[/b]：左下角提示；右键跳转图鉴（关掉后右键完全留给其他 mod）；跳转图鉴快捷键；[b]启用异变预览[/b]：默认（可掉落异变果时）/ 进化 <= 0 / 关。
+[/list]
+
+[h1]兼容性[/h1]
+
+与 ImprovedTooltips、ItemRefund、BroEditor 一起测试过，不修改物品弹窗本身。
+
+[pullquote]如果你喜欢这个 mod，欢迎点赞、收藏、转发，多谢啦！有问题或建议欢迎在评论区留言！[/pullquote]
+
+GitHub 仓库：[url=https://github.com/mojimoon/BrotatoMods]mojimoon/BrotatoMods[/url]
+
+-->
+
+### 截图
+
+商店里的异变预览
 
 ![](../img/BetterCodex/bc-zh-1.jpg)
 
+筛选、角标与价格计算
+
 ![](../img/BetterCodex/bc-zh-2.jpg)
+
+异变：可复制与可清除的效果
 
 ![](../img/BetterCodex/bc-zh-3.jpg)
 
+关联内容与异变阈值
+
 ![](../img/BetterCodex/bc-zh-4.jpg)
 
+机械化预览与攻速计算器
+
 ![](../img/BetterCodex/bc-zh-5.jpg)
+
+角色标签、禁用道具与异变预览
+
+![](../img/BetterCodex/bc-zh-6.jpg)
 
 ## Development / 开发
 
