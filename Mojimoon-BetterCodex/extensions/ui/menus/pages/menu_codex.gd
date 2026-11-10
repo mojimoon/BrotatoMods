@@ -701,7 +701,7 @@ func _bc_header(tab: String, desc, it) -> void:
 			plain.push_back(tr("STRUCTURE"))
 		for t in plain:
 			if not tag_texts.has(t):
-				parts.push_back("[color=#8fd3ff]%s[/color]" % t)
+				parts.push_back("[color=#%s]%s[/color]" % [cat.get_color("font_color").to_html(false), t])	# 保持原类别文字的黄色
 		for i in tags.size():
 			parts.push_back(_bc_link("tag:" + tags[i], tag_texts[i]))
 		if parts.empty():

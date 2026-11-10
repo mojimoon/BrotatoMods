@@ -28,11 +28,12 @@ func _bc_add_mutation_preview(item_data, player_index: int) -> void:
 	var sep = HSeparator.new()
 	var line = StyleBoxLine.new()
 	line.color = BC_MUTANT_COLOR
-	line.thickness = 2
+	line.thickness = 1
 	sep.add_stylebox_override("separator", line)
 	sep.add_constant_override("separation", 14)
 	box.add_child(sep)
-	box.add_child(_bc_label("%s %d · %s x%s" % [tr("BC_MUTATION"), evolution, tr("BC_MUT_SCALE"), str(stepify(Preview.mut_scale(evolution), 0.01))]))
+	# box.add_child(_bc_label("%s %d · %s x%s" % [tr("BC_MUTATION"), evolution, tr("BC_MUT_SCALE"), str(stepify(Preview.mut_scale(evolution), 0.01))]))
+	box.add_child(_bc_label("%s x%s" % [tr("BC_MUTATION"), str(stepify(Preview.mut_scale(evolution), 0.01))]))
 	if info.copy.empty():
 		box.add_child(_bc_label(tr("BC_NO_MUT_COPY"), Color(0.65, 0.65, 0.65)))
 	else:
