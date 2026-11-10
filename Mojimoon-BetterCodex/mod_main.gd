@@ -18,8 +18,10 @@ func _init() -> void:
 	ModLoaderMod.install_script_extension(dir + "ui/menus/pages/menu_codex.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/run/weapon_selection.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/run/difficulty_selection/difficulty_selection.gd")
+	ModLoaderLog.info("extensions installed", MOD_ID)
 	_load_translations()
 	_load_settings()
+	ModLoaderLog.info("init done", MOD_ID)
 
 
 # 商店：挂一个只监听输入的节点（ui/shop_hook.gd），不扩展商店脚本
@@ -60,21 +62,23 @@ func save_settings() -> void:
 
 
 # CSV：key,zh,en,...；空格子回退：中文系 → zh，其他 → en
+# 整个读成文本再拆行：从 zip 读取时逐行读 File（eof_reached / get_position）会让游戏启动卡死
 func _load_translations() -> void:
 	var f = File.new()
 	if f.open(MOD_DIR + "translations/bettercodex.csv", File.READ) != OK:
 		ModLoaderLog.error("translations not found", MOD_ID)
 		return
-	var header = f.get_csv_line()
+	var lines = f.get_as_text().split("\n", false)
+	f.close()
+	var header = parse_csv_line(lines[0].strip_edges())
 	var tables = []
 	for i in range(1, header.size()):
 		var t = Translation.new()
 		t.locale = header[i]
 		tables.push_back(t)
 	var en = Array(header).find("en")
-	# 从 zip 读取时 eof_reached() 不会变 true（游戏启动卡死），按位置判断
-	while f.get_position() < f.get_len():
-		var row = f.get_csv_line()
+	for li in range(1, lines.size()):
+		var row = parse_csv_line(lines[li].strip_edges())
 		if row.size() < header.size() or row[0] == "":
 			continue
 		for i in range(1, header.size()):
@@ -82,6 +86,33 @@ func _load_translations() -> void:
 			if v == "":
 				v = row[1] if header[i].begins_with("zh") else row[en]
 			tables[i - 1].add_message(row[0], v)
-	f.close()
 	for t in tables:
 		TranslationServer.add_translation(t)
+
+
+# 一行 CSV（支持引号与 "" 转义；不支持字段内换行）
+static func parse_csv_line(line: String) -> Array:
+	var out = []
+	var cur = ""
+	var quoted = false
+	var i = 0
+	while i < line.length():
+		var ch = line[i]
+		if quoted:
+			if ch == "\"" and i + 1 < line.length() and line[i + 1] == "\"":
+				cur += "\""
+				i += 1
+			elif ch == "\"":
+				quoted = false
+			else:
+				cur += ch
+		elif ch == "\"":
+			quoted = true
+		elif ch == ",":
+			out.push_back(cur)
+			cur = ""
+		else:
+			cur += ch
+		i += 1
+	out.push_back(cur)
+	return out

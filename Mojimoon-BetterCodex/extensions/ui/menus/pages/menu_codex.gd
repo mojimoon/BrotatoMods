@@ -5,8 +5,7 @@ extends "res://ui/menus/pages/menu_codex.gd"
 # 本脚本在 mod _init 时安装：不在类级别 preload，不对 autoload 表达式用 := 推断。
 
 const BC_DIR = "res://mods-unpacked/Mojimoon-BetterCodex/"
-const BC_SET_ABBR = {"new_dawn": "ND", "paws_n_claws": "PC", "abyssal_terrors": "DLC1", "primal_dread": "DLC2"}
-const BC_SET_COLORS = {"new_dawn": "#c99a2e", "paws_n_claws": "#c4505f", "abyssal_terrors": "#b75cff", "primal_dread": "#6f9a12"}
+const BC_SET_ORDER = ["base", "new_dawn", "paws_n_claws", "abyssal_terrors", "primal_dread"]
 const BC_EVO_ICONS = {"meca": "res://items/consumables/meca_parts/meca_parts.png", "mutant": "res://items/consumables/mutation_fruit/mutation_fruit.png"}
 const BC_SPECIALS = ["fossil", "meca", "mutant"]
 
@@ -14,6 +13,7 @@ var _bc_tabs = {}	# "items" / "weapons" -> {inv, desc, all, current, extras, f�
 var _bc_origin = {}	# my_id_hash -> [物品套组 id, DLC2 进化路线 "" / meca / mutant / both]
 var _bc_temp = null	# 临时筛选 {"title", "ids"}
 var _bc_badge_font = null
+var _bc_updates = {}	# 物品套组 id -> UpdateData（图标 + 颜色）
 
 
 func _bc_mod():
@@ -148,6 +148,7 @@ func _bc_build_origin() -> void:
 			continue
 		for x in ud.item_set.items + ud.item_set.weapons:
 			_bc_origin[x.my_id_hash] = [ud.id, ""]
+		_bc_updates[ud.id] = ud
 		var evo = {"meca_items": "meca", "mutant_items": "mutant", "evolution_items": "both"}
 		for field in evo:
 			if field in ud.item_set:
@@ -268,7 +269,7 @@ func _bc_fill_options(tab: String) -> void:
 			for set in it.sets:
 				classes[set.my_id] = tr(set.name)
 	opts.source = [["", tr("BC_SOURCE")]]
-	for s in ["base"] + BC_SET_ABBR.keys():
+	for s in BC_SET_ORDER:
 		if sources.has(s):
 			opts.source.push_back([s, _bc_set_name(s)])
 	if tab == "items":
@@ -537,8 +538,20 @@ func _bc_add_badges(e, tab: String) -> void:
 		root.add_child(box)
 	else:
 		var s = _bc_set_of(it) if _bc_setting("badge_source") else ""
-		if BC_SET_ABBR.has(s):
-			root.add_child(_bc_badge_label(BC_SET_ABBR[s], Color(BC_SET_COLORS[s]).lightened(0.25), Label.ALIGN_LEFT, Label.VALIGN_BOTTOM))
+		if _bc_updates.has(s) and _bc_updates[s].icon != null:
+			# 右下角：物品套组图标，按物品套组栏的颜色着色
+			var icon = TextureRect.new()
+			icon.texture = _bc_updates[s].icon
+			icon.modulate = _bc_updates[s].color
+			icon.expand = true
+			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			icon.mouse_filter = MOUSE_FILTER_IGNORE
+			icon.set_anchors_and_margins_preset(PRESET_BOTTOM_RIGHT)
+			icon.margin_left = -26
+			icon.margin_top = -26
+			icon.margin_right = -4
+			icon.margin_bottom = -4
+			root.add_child(icon)
 	e.add_child(root)
 
 
@@ -588,8 +601,7 @@ func _bc_select(tab: String, it) -> void:
 	t.extras.show_item(it)
 	_bc_redisplay(tab, false)
 	_bc_unlock_end()
-	if tab == "weapons":
-		_bc_weapon_header(t.desc, it)
+	_bc_header(tab, t.desc, it)
 
 
 # 诅咒 / 机械化后的描述 + 实际冷却
@@ -602,40 +614,60 @@ func _bc_redisplay(tab: String, reset: bool = true) -> void:
 		_bc_unlock_begin()
 		t.desc.set_item(shown, 0)
 		_bc_unlock_end()
-		if tab == "weapons":
-			_bc_weapon_header(t.desc, t.current)
+		_bc_header(tab, t.desc, t.current)
 	if shown is WeaponData:
 		_bc_fix_cooldown(t.desc, shown)
 
 
-# 图鉴标题下：武器类型与类别改为可点击的按钮（点击筛选），代替原来的类别文字
-func _bc_weapon_header(desc, w) -> void:
+# 图鉴标题下原来的类别行（只在图鉴里）：武器 = 类型 + 类别按钮（代替原文字）；道具 = 原文字（限制 (X)、构筑物……）+ 标签按钮。点击筛选
+func _bc_header(tab: String, desc, it) -> void:
 	var cat = desc._category
 	var box = cat.get_parent().get_node_or_null("BCCategory")
 	if box == null:
-		box = HBoxContainer.new()
+		if tab == "weapons":
+			box = HBoxContainer.new()
+			box.alignment = BoxContainer.ALIGN_CENTER
+		else:
+			# 道具：居中、可换行的一行文字，标签是可点击的链接
+			box = RichTextLabel.new()
+			box.bbcode_enabled = true
+			box.fit_content_height = true
+			box.scroll_active = false
+			box.add_font_override("normal_font", load("res://resources/fonts/actual/base/font_26.tres"))
+			box.connect("meta_clicked", self, "bc_filter_tag", [], CONNECT_DEFERRED)	# 处理点击时不能改自己的文本（会崩溃）
 		box.name = "BCCategory"
-		box.alignment = BoxContainer.ALIGN_CENTER
 		cat.get_parent().add_child_below_node(cat, box)
-	for c in box.get_children():
-		box.remove_child(c)
-		c.queue_free()
-	box.visible = w != null
-	cat.visible = w == null
-	if w == null:
+	if box is HBoxContainer:	# RichTextLabel 的子节点是它自己的滚动条，不能删
+		for c in box.get_children():
+			box.remove_child(c)
+			c.queue_free()
+	box.visible = it != null
+	cat.visible = it == null
+	if it == null:
 		return
 	var font = load("res://resources/fonts/actual/base/font_26.tres")
-	var type_btn = Button.new()
-	type_btn.text = tr("BC_MELEE") if w.type == WeaponData.Type.MELEE else tr("BC_RANGED")
-	type_btn.add_font_override("font", font)
-	type_btn.connect("pressed", self, "_bc_filter_type", [w.type])
-	box.add_child(type_btn)
-	for set in w.sets:
-		var b = Button.new()
-		b.text = tr(set.name)
-		b.add_font_override("font", font)
-		b.connect("pressed", self, "_bc_filter_set", [set.my_id])
-		box.add_child(b)
+	if tab == "weapons":
+		_bc_header_button(box, tr("BC_MELEE") if it.type == WeaponData.Type.MELEE else tr("BC_RANGED"), font, "_bc_filter_type", [it.type])
+		for set in it.sets:
+			_bc_header_button(box, tr(set.name), font, "_bc_filter_set", [set.my_id])
+		return
+	var parts = []
+	if cat.text != "":
+		parts.push_back("[color=#%s]%s[/color]" % [cat.get_color("font_color").to_html(false), cat.text])
+	var Extras = load(BC_DIR + "ui/extras.gd")
+	var tags = it.tags.duplicate()
+	tags.sort()
+	for tag in tags:
+		parts.push_back("[url=%s][color=#8fd3ff]%s[/color][/url]" % [tag, Extras.tag_name(tag)])
+	box.bbcode_text = "[center]" + "  ·  ".join(parts) + "[/center]"
+
+
+func _bc_header_button(box: Control, text: String, font, method: String, args: Array) -> void:
+	var b = Button.new()
+	b.text = text
+	b.add_font_override("font", font)
+	b.connect("pressed", self, method, args)
+	box.add_child(b)
 
 
 func _bc_filter_type(type: int) -> void:

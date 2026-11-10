@@ -357,13 +357,29 @@ func test_codex_item_detail():
 	codex.bc_show_tab("items")
 	var it = null
 	for x in ItemService.items:
-		if x.replaced_by != null:
+		if x.replaced_by != null and x.tags.size() > 0:
 			it = x
 			break
 	codex.bc_focus_item(it, "items")
 	yield(_wait(), "completed")
 	var t = codex._bc_tabs.items
 	_check(t.current == it, "focused related root")
+	var header = t.desc._category.get_parent().get_node_or_null("BCCategory")
+	_check(header != null and header.visible and not t.desc._category.visible, "item header")
+	if header != null and it.tags.size() > 0:
+		_eq(header.bbcode_text.count("[url="), it.tags.size(), "tag links in header")
+		header.emit_signal("meta_clicked", it.tags[0])
+		yield(_wait(), "completed")
+		_eq(t.f.tag, it.tags[0], "header tag filter")
+		codex.bc_focus_item(it, "items")
+		yield(_wait(), "completed")
+	var icons = 0
+	for e in t.all:
+		if e.has_node("BCBadges"):
+			for c in e.get_node("BCBadges").get_children():
+				if c is TextureRect and c.anchor_left == 1.0:
+					icons += 1
+	_check(icons > 50, "item set icons bottom-right: %d" % icons)
 	t.extras._on_mut_toggled(true)
 	t.extras._on_mut_slid(30)
 	_check(t.extras._mut_box.get_child_count() > 0, "mutation lines")

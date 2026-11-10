@@ -19,7 +19,7 @@ func _initialize() -> void:
 	yield(_wait(3), "completed")
 	var it = null
 	for x in root.get_node("ItemService").items:
-		if x.replaced_by != null:
+		if x.replaced_by != null and x.tags.size() > 0:
 			it = x
 			break
 	codex.bc_focus_item(it, "items")

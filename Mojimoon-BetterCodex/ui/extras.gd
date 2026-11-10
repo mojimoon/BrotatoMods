@@ -304,13 +304,7 @@ func _build_links() -> void:
 	elif item is WeaponData:
 		pass	# 武器类型 / 类别显示在图鉴标题下（menu_codex 扩展）
 	else:
-		if item.tags.size() > 0:
-			var f = _flow()
-			var tags = item.tags.duplicate()
-			tags.sort()
-			for tag in tags:
-				f.add_child(_button(tag_name(tag), "_on_tag", [tag]))
-			_section().add_child(f)
+		# 道具标签显示在图鉴标题下的类别行（menu_codex 扩展）
 		var chain = related_chain(item)
 		if chain.size() > 0:
 			var box = _section(tr("BC_RELATED"))
