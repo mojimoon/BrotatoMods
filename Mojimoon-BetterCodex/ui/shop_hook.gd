@@ -61,6 +61,7 @@ func hotkey() -> int:
 # “右键或 C 跳转图鉴。”，不可掉落异变果时再加“不可掉落异变果（未诅咒道具 x/3）”；可在图鉴设置里隐藏
 func update_hint() -> void:
 	var can_drop = fruit_can_drop()
+	var preview = mutation_preview_on()
 	var text = tr("BC_SHOP_HINT" if _right_click() else "BC_SHOP_HINT_KEY").format([OS.get_scancode_string(hotkey())])
 	var fruit = fruit_text()
 	if fruit != "" and not can_drop:
@@ -69,14 +70,27 @@ func update_hint() -> void:
 	var m = _mod()
 	hint.visible = m == null or m.settings.get("shop_hint", true)
 	# 能否掉落变了：商品卡片的描述（带不带异变预览）重新生成；弹窗每次显示都会重新生成
-	if _can_drop != null and can_drop != _can_drop:
+	if _can_drop != null and preview != _can_drop:
 		for n in _all_nodes(shop):
 			if n is ShopItem and n.item_data is ItemData and n.is_visible_in_tree():
 				n._item_description.set_item(n.item_data, 0)
-	_can_drop = can_drop
+	_can_drop = preview
 
 
 # 异变果：需要 DLC2；机械路线（双进化除外）不显示；道具不足时显示进度
+# 是否显示异变预览（商店描述末尾、局内图鉴默认打开）：设置“启用异变预览”
+#   默认 = 可掉落异变果；进化 <= 0 = 有 DLC2、不是强制机械路线、进化 <= 0；关 = 不显示
+static func mutation_preview_on() -> bool:
+	var m = Engine.get_main_loop().root.get_node_or_null("ModLoader/Mojimoon-BetterCodex")
+	var mode = str(m.settings.get("mut_preview", "default")) if m != null else "default"
+	if mode == "off":
+		return false
+	if mode == "evo":
+		return "primal_dread" in ProgressData.active_update_data and not RunData.players_data.empty() \
+			and not RunData.is_meca_only(0) and RunData.get_player_effect(Keys.stat_evolution_hash, 0) <= 0
+	return fruit_can_drop()
+
+
 static func fruit_can_drop() -> bool:
 	var d = ItemService.get_dlc_data_by_id("primal_dread")
 	return fruit_text() != "" and RunData.bc_mutable_count(0) >= d.mutation_fruit_min_items

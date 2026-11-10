@@ -72,8 +72,8 @@ func reset_defaults() -> void:
 	curse_pct = int(clamp(curse_band[1], 10, 110)) if curse_band.size() > 0 else 110
 	if in_run:
 		mut_val = int(clamp(abs(RunData.get_player_effect(Keys.stat_evolution_hash, 0)), 1, Preview.mut_max()))
-		# 局内可掉落异变果：异变预览默认打开
-		mut_on = load("res://mods-unpacked/Mojimoon-BetterCodex/ui/shop_hook.gd").fruit_can_drop()
+		# 局内按设置“启用异变预览”决定是否默认打开
+		mut_on = load("res://mods-unpacked/Mojimoon-BetterCodex/ui/shop_hook.gd").mutation_preview_on()
 		atk = int(Utils.get_stat(Keys.stat_attack_speed_hash, 0))
 		stat_range = int(Utils.get_stat(Keys.stat_range_hash, 0))
 		count = int(clamp(RunData.get_player_weapons_ref(0).size(), 1, 6))

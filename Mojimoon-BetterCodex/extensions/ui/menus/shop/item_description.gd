@@ -17,7 +17,7 @@ func _bc_add_mutation_preview(item_data, player_index: int) -> void:
 		return
 	if find_parent("Shop") == null or find_parent("MenuCodex") != null:
 		return
-	if not load(BC_DIR + "ui/shop_hook.gd").fruit_can_drop():
+	if not load(BC_DIR + "ui/shop_hook.gd").mutation_preview_on():
 		return
 	var evolution = int(abs(RunData.get_player_effect(Keys.stat_evolution_hash, player_index)))
 	load(BC_DIR + "ui/mutation_view.gd").build(get_effects(), item_data, evolution, player_index)

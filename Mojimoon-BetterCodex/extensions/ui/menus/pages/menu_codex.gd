@@ -48,8 +48,7 @@ func _pop():
 		_bc_challenge_signature = _bc_csig()
 		_bc_enemy_signature = _bc_esig()
 	_bc_count_progress()
-	if _bc_setting("quick_open"):
-		_bc_skip_animation()
+	_bc_skip_animation()	# 总是快速打开（跳过开场动画）
 
 
 # ---- 快速重开：道具 / 武器列表的内容没变时不重建（原版每次打开都重建全部元素，再加上角标、筛选，是打开慢的主要原因）----
@@ -72,11 +71,8 @@ func bc_prewarm() -> void:
 		return
 	var focus = get_focus_owner()
 	var popup_before = Utils._popup if RunData.is_coop_run else null
-	var quick = _bc_setting("quick_open")
 	_pop()
 	animation_tree.active = false
-	if not quick:
-		_bc_skip_animation()
 	hide()
 	if RunData.is_coop_run:
 		Utils._popup = popup_before
@@ -216,9 +212,6 @@ func _bc_skip_animation() -> void:
 
 func _on_BackButton_pressed() -> void:
 	_bc_restore_locks()
-	if not _bc_setting("quick_open"):
-		._on_BackButton_pressed()
-		return
 	emit_signal("codex_closed")
 	animation_tree.active = false
 	if is_instance_valid(focus_before_created):
@@ -427,7 +420,7 @@ func _bc_fill_options(tab: String) -> void:
 		else:
 			for set in it.sets:
 				classes[set.my_id] = tr(set.name)
-	opts.source = [["", tr("BC_SOURCE")]]
+	opts.source = [["", tr("MENU_ITEMSET")]]
 	for s in BC_SET_ORDER:
 		if sources.has(s):
 			opts.source.push_back([s, _bc_set_name(s)])
@@ -570,10 +563,14 @@ func _bc_apply_bar_font(t) -> void:
 
 # ---- 设置 ----
 
-const BC_TOGGLES = [["badge_price", "BC_BADGE_PRICE", true], ["badge_limit", "BC_BADGE_LIMIT", true], ["badge_source", "BC_BADGE_SOURCE", true], ["unlock_all", "BC_UNLOCK_ALL", false], ["quick_open", "BC_QUICK_OPEN", true], ["shop_hint", "BC_SHOW_SHOP_HINT", true], ["right_click", "BC_RIGHT_CLICK", true]]
+# 设置分两组：图鉴 / 商店（组名用游戏自己的词）
+const BC_TOGGLES_CODEX = [["badge_price", "BC_BADGE_PRICE", true], ["badge_limit", "BC_BADGE_LIMIT", true], ["badge_source", "BC_BADGE_SOURCE", true], ["unlock_all", "BC_UNLOCK_ALL", false]]
+const BC_TOGGLES_SHOP = [["shop_hint", "BC_SHOW_SHOP_HINT", true], ["right_click", "BC_RIGHT_CLICK", true]]
+const BC_MUT_MODES = ["default", "evo", "off"]	# 启用异变预览：默认（可掉落异变果）/ 进化 <= 0 / 关
 
 var _bc_settings_popup: PopupPanel
 var _bc_hotkey_btn: Button
+var _bc_mut_btn: Button
 var _bc_capturing := false
 
 
@@ -590,30 +587,63 @@ func _bc_open_settings() -> void:
 		sb.content_margin_right = 4
 		sb.content_margin_top = 2
 		sb.content_margin_bottom = 2
-		for t in BC_TOGGLES:
-			var cb = CheckBox.new()
-			cb.name = t[0]
-			cb.text = tr(t[1])
-			cb.add_font_override("font", font)
-			for st in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
-				cb.add_stylebox_override(st, sb)
-			for k in ["font_color", "font_color_pressed", "font_color_focus"]:
-				cb.add_color_override(k, Color.white)
-			for k in ["font_color_hover", "font_color_hover_pressed"]:
-				cb.add_color_override(k, Color("#8fd3ff"))
-			cb.pressed = _bc_setting(t[0], t[2])
-			cb.connect("toggled", self, "_bc_on_setting", [t[0]])
-			box.add_child(cb)
-		_bc_hotkey_btn = Button.new()
-		_bc_hotkey_btn.add_font_override("font", font)
-		_bc_hotkey_btn.connect("pressed", self, "_bc_on_hotkey_pressed")
-		_bc_hotkey_btn.connect("gui_input", self, "_bc_on_hotkey_input")
-		box.add_child(_bc_hotkey_btn)
+		for group in [["MENU_CODEX", BC_TOGGLES_CODEX], ["MENU_SHOP", BC_TOGGLES_SHOP]]:
+			var head = Label.new()
+			head.text = tr(group[0])
+			head.add_font_override("font", font)
+			head.add_color_override("font_color", Color(0.92, 0.89, 0.69))
+			box.add_child(head)
+			for t in group[1]:
+				box.add_child(_bc_setting_checkbox(t, font, sb))
+			if group[0] == "MENU_SHOP":
+				_bc_hotkey_btn = Button.new()
+				_bc_hotkey_btn.add_font_override("font", font)
+				_bc_hotkey_btn.connect("pressed", self, "_bc_on_hotkey_pressed")
+				_bc_hotkey_btn.connect("gui_input", self, "_bc_on_hotkey_input")
+				box.add_child(_bc_hotkey_btn)
+				_bc_mut_btn = Button.new()
+				_bc_mut_btn.add_font_override("font", font)
+				_bc_mut_btn.connect("pressed", self, "_bc_on_mut_mode")
+				box.add_child(_bc_mut_btn)
 		_bc_settings_popup.add_child(box)
 		$root.add_child(_bc_settings_popup)
 	_bc_capturing = false
 	_bc_update_hotkey_text()
+	_bc_update_mut_text()
 	_bc_settings_popup.popup_centered()
+
+
+func _bc_setting_checkbox(t: Array, font, sb) -> CheckBox:
+	var cb = CheckBox.new()
+	cb.name = t[0]
+	cb.text = tr(t[1])
+	cb.add_font_override("font", font)
+	for st in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
+		cb.add_stylebox_override(st, sb)
+	for k in ["font_color", "font_color_pressed", "font_color_focus"]:
+		cb.add_color_override(k, Color.white)
+	for k in ["font_color_hover", "font_color_hover_pressed"]:
+		cb.add_color_override(k, Color("#8fd3ff"))
+	cb.pressed = _bc_setting(t[0], t[2])
+	cb.connect("toggled", self, "_bc_on_setting", [t[0]])
+	return cb
+
+
+func _bc_update_mut_text() -> void:
+	var mode = str(_bc_setting("mut_preview", "default"))
+	var value = tr("BC_DEFAULT") if mode == "default" else ("%s <= 0" % tr("STAT_EVOLUTION")) if mode == "evo" else tr("BC_OFF")
+	_bc_mut_btn.text = "%s: %s" % [tr("BC_MUT_PREVIEW"), value]
+
+
+# 三项循环：默认 → 进化 <= 0 → 关
+func _bc_on_mut_mode() -> void:
+	var i = BC_MUT_MODES.find(str(_bc_setting("mut_preview", "default")))
+	_bc_set_setting("mut_preview", BC_MUT_MODES[(i + 1) % BC_MUT_MODES.size()])
+	_bc_update_mut_text()
+	var scene = get_tree().current_scene
+	var hook = scene.get_node_or_null("BCShopHook") if scene != null else null
+	if hook != null:
+		hook.update_hint()	# 商品卡片的描述随之刷新
 
 
 func _bc_update_hotkey_text() -> void:

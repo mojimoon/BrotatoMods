@@ -571,7 +571,6 @@ func test_settings_unlock_quick():
 	ProgressData.items_bought = {}
 	m.settings.unlock_all = true
 	m.settings.badge_price = false
-	m.settings.quick_open = true
 	var codex = yield(_open_codex(), "completed")
 	var t = codex._bc_tabs.items
 	_check(not codex.animation_tree.active and codex.get_node("root").rect_position == Vector2.ZERO, "quick open")
@@ -797,7 +796,7 @@ func test_codex_mutation_cursed():
 	_check(not has_remove, "no removable when cursed")
 	_check(t.extras._mut_box.get_child_count() > 0 and before > 0, "mutation preview present")
 	codex._bc_open_settings()
-	var cb = codex.get_node("root/BCSettings").find_node("quick_open", true, false)
+	var cb = codex.get_node("root/BCSettings").find_node("unlock_all", true, false)
 	_check(cb.get_stylebox("hover") == cb.get_stylebox("normal"), "checkbox hover style same as normal")
 	_close(codex)
 
@@ -967,3 +966,29 @@ func test_mutation_threshold_view():
 			found = true
 	_check(found, "no scale after 'can't copy'")
 	box.free()
+
+
+
+# 启用异变预览：默认 = 可掉落异变果；进化 <= 0 = 不看道具数；关 = 不显示
+func test_mutation_preview_modes() -> void:
+	if not "primal_dread" in ProgressData.active_update_data:
+		return
+	var Hook = load(DIR + "ui/shop_hook.gd")
+	var c = RunData.players_data[0].current_character
+	RunData.players_data[0].items = [c]
+	RunData.bc_reset_mutable_counts()
+	m.settings.mut_preview = "default"
+	_check(not Hook.mutation_preview_on(), "default: off when the fruit can't drop")
+	m.settings.mut_preview = "evo"
+	_check(Hook.mutation_preview_on(), "evo <= 0: on without enough items")
+	_set_stat(Keys.stat_evolution_hash, 5)
+	_check(not Hook.mutation_preview_on(), "evo > 0: off")
+	_set_stat(Keys.stat_evolution_hash, 0)
+	for id in ["item_alien_eyes", "item_baby_elephant", "item_coffee"]:
+		RunData.add_item(_item(id), 0)
+	m.settings.mut_preview = "off"
+	_check(not Hook.mutation_preview_on(), "off")
+	m.settings.mut_preview = "default"
+	_check(Hook.mutation_preview_on(), "default: on when the fruit can drop")
+	RunData.players_data[0].items = [c]
+	RunData.bc_reset_mutable_counts()

@@ -16,8 +16,8 @@
 
 **Codex list**
 
-- **Badges** on every entry: base price (top left), item limit (top right; red = unique, orange = limited) and source (bottom right: the colored item set icon, or the meca part / mutation fruit icon for Primal Dread's meca and mutant items). Each badge can be turned off in Settings.
-- **Search and filters**: rarity, item tag, source (base game / DLC / update), special (fossils, meca items, mutant items); for weapons: type (melee / ranged), class and source. Long lists open as a compact grid.
+- **Badges** on every entry: base price (top left), item limit (top right; red = unique, orange = limited) and item set (bottom right: the colored item set icon, or the meca part / mutation fruit icon for Primal Dread's meca and mutant items). Each badge can be turned off in Settings.
+- **Search and filters**: rarity, item tag, item set (base game / DLC / update), special (fossils, meca items, mutant items); for weapons: type (melee / ranged), class and source. Long lists open as a compact grid.
 - In a run, **items banned for P1 are greyed out** (the character's banned items and the ones banned with ban tokens).
 
 **Details**
@@ -42,9 +42,10 @@
 
 **Settings** (the Settings button in the codex)
 
-- Toggle each badge, change the shop hotkey, **unlock the whole codex without touching your save**, open the codex without its animation (on by default), hide the shop hint, turn off right-click in the shop (only the hotkey then; right-clicks are left untouched for other mods).
+- Codex: price / limit / item set badges, **unlock the whole codex without touching your save**.
+- Shop: bottom-left hint, right-click to open the codex (turn off to use only the hotkey; right-clicks are then left untouched for other mods), the codex hotkey, and **Mutation preview**: Default (when a mutation fruit can drop) / Evolution <= 0 (DLC2 owned, not forced onto the meca path, evolution <= 0) / Off.
 
-**Faster codex**: the codex is built in the background and reused while nothing changes, so it usually opens in about 10 ms.
+**Faster codex**: no opening animation; the codex is built in the background and reused while nothing changes, so it usually opens in about 10 ms.
 
 Supports all 13 game languages. All added text follows the game's font size setting.
 
@@ -63,8 +64,8 @@ Supports all 13 game languages. All added text follows the game's font size sett
 
 **图鉴列表**
 
-- **角标**：基础价格（左上）、数量上限（右上；红色为独特，橙色为限制）、来源（右下：物品套组的彩色图标，史前惧兽的机械 / 异变道具显示机械部件 / 异变果图标）。每种角标都可以在设置里关掉。
-- **搜索与筛选**：稀有度、道具标签、来源（本体 / DLC / 更新）、特殊（化石、机械道具、异变道具）；武器为类型（近战 / 远程）、武器类别、来源。长列表以网格弹出。
+- **角标**：基础价格（左上）、数量上限（右上；红色为独特，橙色为限制）、物品套组（右下：物品套组的彩色图标，史前惧兽的机械 / 异变道具显示机械部件 / 异变果图标）。每种角标都可以在设置里关掉。
+- **搜索与筛选**：稀有度、道具标签、物品套组（本体 / DLC / 更新）、特殊（化石、机械道具、异变道具）；武器为类型（近战 / 远程）、武器类别、来源。长列表以网格弹出。
 - 局内打开时，**P1 被禁用的道具会变灰**（角色自带禁用和消耗禁用次数禁掉的）。
 
 **详情**
@@ -89,9 +90,10 @@ Supports all 13 game languages. All added text follows the game's font size sett
 
 **设置**（图鉴里的“设置”按钮）
 
-- 分别开关各种角标、修改商店快捷键、**解锁全部图鉴（不修改存档）**、快速打开图鉴（跳过动画，默认开启）、隐藏商店提示、关掉商店里的右键打开（只用快捷键，右键完全留给其他 mod）。
+- 图鉴：价格 / 数量上限 / 物品套组角标、**解锁全部图鉴（不修改存档）**。
+- 商店：左下角提示、右键跳转图鉴（关掉后只用快捷键，右键完全留给其他 mod）、跳转图鉴快捷键，以及**启用异变预览**：默认（可掉落异变果时）/ 进化 <= 0（有 DLC2、不是强制机械路线、进化 <= 0）/ 关。
 
-**更快的图鉴**：图鉴会在后台预先构建，内容不变时直接复用，通常约 10 毫秒就能打开。
+**更快的图鉴**：跳过开场动画；图鉴会在后台预先构建，内容不变时直接复用，通常约 10 毫秒就能打开。
 
 支持游戏的全部 13 种语言，新增的文字都跟随设置里的字体大小。
 
