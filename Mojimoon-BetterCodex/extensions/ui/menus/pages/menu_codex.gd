@@ -121,11 +121,11 @@ func _bc_unlock_begin() -> void:
 	var bought = ProgressData.items_bought.duplicate()
 	for it in ItemService.items:
 		items.push_back(it.my_id_hash)
-		bought[it.my_id_hash] = max(bought.get(it.my_id_hash, 0), 99)
+		bought[it.my_id_hash] = max(bought.get(it.my_id_hash, 0), it.unlock_codex_descr_after_get_it)
 	for w in ItemService.weapons:
 		if not weapons.has(w.weapon_id_hash):
 			weapons.push_back(w.weapon_id_hash)
-		bought[w.my_id_hash] = max(bought.get(w.my_id_hash, 0), 99)
+		bought[w.my_id_hash] = max(bought.get(w.my_id_hash, 0), w.unlock_codex_descr_after_get_it)
 	ProgressData.items_unlocked = items
 	ProgressData.weapons_unlocked = weapons
 	ProgressData.items_bought = bought
@@ -669,18 +669,31 @@ func _bc_header(tab: String, desc, it) -> void:
 	if it == null:
 		return
 	var parts = []
-	if tab == "weapons":
-		parts.push_back(_bc_link("type:%d" % it.type, tr("BC_MELEE") if it.type == WeaponData.Type.MELEE else tr("BC_RANGED")))
+	if tab == "weapons":	# 近战 / 远程已在属性的范围一行里
 		for set in it.sets:
 			parts.push_back(_bc_link("set:" + set.my_id, tr(set.name)))
 	else:
-		if cat.text != "":
-			parts.push_back("[color=#%s]%s[/color]" % [cat.get_color("font_color").to_html(false), cat.text])
+		# 代替原来的类别文字：独特的 / 限制 (X) / 构筑物（同样式、不是链接；宠物由同名标签显示）+ 标签链接
 		var Extras = load(BC_DIR + "ui/extras.gd")
 		var tags = it.tags.duplicate()
 		tags.sort()
+		var tag_texts = []
 		for tag in tags:
-			parts.push_back(_bc_link("tag:" + tag, Extras.tag_name(tag)))
+			tag_texts.push_back(Extras.tag_name(tag))
+		var plain = []
+		if it.max_nb == 1:
+			plain.push_back(tr("UNIQUE"))
+		elif it.max_nb > 1:
+			plain.push_back("%s (%d)" % [tr("BC_LIMITED"), it.max_nb])
+		if it.is_structure_item():
+			plain.push_back(tr("STRUCTURE"))
+		for t in plain:
+			if not tag_texts.has(t):
+				parts.push_back("[color=#8fd3ff]%s[/color]" % t)
+		for i in tags.size():
+			parts.push_back(_bc_link("tag:" + tags[i], tag_texts[i]))
+		if parts.empty():
+			parts.push_back("[color=#%s]%s[/color]" % [cat.get_color("font_color").to_html(false), cat.text])
 	box.bbcode_text = "[center]" + "  ·  ".join(parts) + "[/center]"
 
 

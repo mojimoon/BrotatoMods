@@ -329,7 +329,8 @@ func test_codex_weapon_detail():
 	var header = w.desc._category.get_parent().get_node_or_null("BCCategory")
 	_check(header != null and header.visible and not w.desc._category.visible, "type / class header")
 	if header != null:
-		_eq(header.bbcode_text.count("[url="), 1 + w.current.sets.size(), "header links")
+		_eq(header.bbcode_text.count("[url="), w.current.sets.size(), "header links (classes only)")
+		_check(header.bbcode_text.find(tr("BC_RANGED")) < 0, "no melee / ranged in header")
 		header.emit_signal("meta_clicked", "type:%d" % WeaponData.Type.RANGED)
 		yield(_wait(), "completed")
 		for e in w.inv.get_children():
@@ -373,6 +374,9 @@ func test_codex_item_detail():
 	_check(header != null and header.visible and not t.desc._category.visible, "item header")
 	if header != null and it.tags.size() > 0:
 		_eq(header.bbcode_text.count("[url="), it.tags.size(), "tag links in header")
+		if it.max_nb == 1:
+			_check(header.bbcode_text.find(tr("UNIQUE")) >= 0, "unique shown: " + header.bbcode_text)
+		_check(header.bbcode_text.find(t.desc._category.text) < 0 or t.desc._category.text == "", "original category replaced")
 		header.emit_signal("meta_clicked", "tag:" + it.tags[0])
 		yield(_wait(), "completed")
 		_eq(t.f.tag, it.tags[0], "header tag filter")
@@ -560,6 +564,10 @@ func test_settings_unlock_quick():
 	var t = codex._bc_tabs.items
 	_check(not codex.animation_tree.active and codex.get_node("root").rect_position == Vector2.ZERO, "quick open")
 	_eq(ProgressData.items_unlocked.size(), 0, "save list untouched")
+	codex._bc_unlock_begin()
+	var it0 = ItemService.items[0]
+	_eq(ProgressData.items_bought[it0.my_id_hash], it0.unlock_codex_descr_after_get_it, "fake purchases = just enough to unlock")
+	codex._bc_unlock_end()
 	var locked = 0
 	var priced = 0
 	for e in t.all:
