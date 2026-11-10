@@ -350,7 +350,7 @@ func _refresh_mutation() -> void:
 	if not mut_on:
 		return
 	var info = Preview.mutation(item, mut_val)
-	_mut_box.add_child(_label("%s x%s" % [tr("BC_MUT_SCALE"), str(stepify(Preview.mut_scale(mut_val), 0.01))], DIM_COLOR))
+	# _mut_box.add_child(_label("%s x%s" % [tr("BC_MUT_SCALE"), str(stepify(Preview.mut_scale(mut_val), 0.01))], DIM_COLOR))
 	if info.copy.empty():
 		_mut_box.add_child(_label(tr("BC_NO_MUT_COPY"), DIM_COLOR))
 	else:
