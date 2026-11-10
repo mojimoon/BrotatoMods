@@ -1,7 +1,7 @@
 {
     "name": "BetterCodex",
     "namespace": "Mojimoon",
-    "version_number": "1.1.16",
+    "version_number": "1.2.0",
     "description": "增强游戏内图鉴：列表角标、搜索与筛选、标签 / 关联道具跳转，诅咒 / 机械化 / 异变预览、攻速计算器（实际冷却）、价格计算；武器 / 难度选择界面显示角色偏好标签、禁用道具与异变预览。Better in-game codex: badges, search & filters, tag / related links, curse / mecha / mutation previews, attack speed calculator (actual cooldown), price calculator; character tags, banned items and mutation preview on weapon / difficulty selection.",
     "website_url": "",
     "dependencies": [],

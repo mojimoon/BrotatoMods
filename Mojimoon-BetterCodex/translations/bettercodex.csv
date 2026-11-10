@@ -15,7 +15,7 @@ BC_CURSE,诅咒,Curse,Malédiction,呪い,저주,詛咒,Проклятие,Kląt
 BC_MECHA,机械化,Mecha,Méca,メカ化,기계화,機械化,Механизация,Mechanizacja,Mecanizar,Mecanizar,Mecha,Mekanik,Meccanizza
 BC_MUTATION,异变,Mutation,Mutation,変異,돌연변이,異變,Мутация,Mutacja,Mutación,Mutação,Mutation,Mutasyon,Mutazione
 BC_NO_MUT_COPY,异变无法复制,Mutation can't copy,Non copiable par Mutation,変異でコピー不可,돌연변이 복제 불가,異變無法複製,Мутация не копирует,Mutacja nie kopiuje,Mutación no copia,Mutação não copia,Mutation kopiert nicht,Mutasyon kopyalayamaz,Mutazione non copia
-BC_ATTACK_SPEED_CALC,攻速计算器,Attack Speed Calculator,Calculateur de vitesse d'attaque,攻撃速度計算機,공격 속도 계산기,攻速計算機,Калькулятор скорости атаки,Kalkulator szybkości ataku,Calculadora de velocidad de ataque,Calculadora de velocidade de ataque,Angriffsgeschwindigkeitsrechner,Saldırı hızı hesaplayıcı,Calcolatore velocità d'attacco
+BC_ATTACK_SPEED_CALC,攻速,Attack Speed,Vitesse d'attaque,攻撃速度,공격 속도,攻速,Скорость атаки,Szybkość ataku,Velocidad de ataque,Velocidade de ataque,Angriffsgeschwindigkeit,Saldırı hızı,Velocità d'attacco
 BC_ATTACK_SPEED,攻速,A.Spd,Vit. Atq,攻速,공속,攻速,Ск. атаки,Szyb. atk,Vel. Atq,Vel. Atq,Angr.-Tempo,Sal. Hız,Vel. Att
 BC_STAT_RANGE,范围,Range,Portée,射程,사거리,範圍,Дальность,Zasięg,Alcance,Alcance,Reichweite,Menzil,Gittata
 BC_WEAPON_COUNT,武器数量,#Weapon,#Arme,武器数,무기 수,武器數量,№ Оружие,#Bronie,#Arma,#Arma,#Waffe,#Silah,#Arma
