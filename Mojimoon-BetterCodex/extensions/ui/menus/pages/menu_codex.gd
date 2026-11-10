@@ -12,7 +12,6 @@ const BC_SPECIALS = ["fossil", "meca", "mutant"]
 var _bc_tabs = {}	# "items" / "weapons" -> {inv, desc, all, current, extras, f（筛选值）, ui（控件）}
 var _bc_origin = {}	# my_id_hash -> [物品套组 id, DLC2 进化路线 "" / meca / mutant / both]
 var _bc_temp = null	# 临时筛选 {"title", "ids"}
-var _bc_badge_font = null
 var _bc_extras_script = null
 var _bc_icon_script = null
 var _bc_updates = {}	# 物品套组 id -> UpdateData（图标 + 颜色）
@@ -41,6 +40,11 @@ func _pop():
 		_bc_setup()
 		_bc_unlock_end()
 		_bc_last_signature = sig
+		for tab in _bc_tabs:
+			_bc_apply_bar_font(_bc_tabs[tab])
+		if _bc_settings_popup != null:	# 设置弹窗按新的字体大小重建
+			_bc_settings_popup.queue_free()
+			_bc_settings_popup = null
 		_bc_challenge_signature = _bc_csig()
 		_bc_enemy_signature = _bc_esig()
 	_bc_count_progress()
@@ -104,7 +108,7 @@ func _bc_signature() -> Array:
 	for v in ProgressData.items_bought.values():
 		bought += v
 	return [ItemService.items.size(), ItemService.weapons.size(), ProgressData.items_unlocked.size(), ProgressData.weapons_unlocked.size(),
-		ProgressData.items_bought.size(), bought, _bc_setting("unlock_all", false), TranslationServer.get_locale(), str(ProgressData.active_update_data)]
+		ProgressData.items_bought.size(), bought, _bc_setting("unlock_all", false), TranslationServer.get_locale(), str(ProgressData.active_update_data), ProgressData.settings.get("font_size", 1.0)]
 
 
 # 原版 _pop 去掉道具 / 武器列表的重建（敌人列表的击杀数会变，照原版重建）
@@ -281,8 +285,6 @@ func _bc_free_detached() -> void:
 func _bc_setup() -> void:
 	_bc_clean_frame()
 	if _bc_tabs.empty():
-		_bc_badge_font = load("res://resources/fonts/actual/base/font_26_outline.tres").duplicate()
-		_bc_badge_font.size = 18
 		_bc_build_tab("items", inventory_items, $"%codex_item_description")
 		_bc_build_tab("weapons", inventory_weapons, $"%codex_weapon_description")
 	_bc_build_origin()
@@ -393,10 +395,7 @@ func _bc_build_tab(tab: String, inv, desc) -> void:
 	t.ui.badges = badges
 	t.ui.temp_row = row3
 	t.ui.temp_label = temp_label
-	var font = load("res://resources/fonts/actual/base/font_22.tres")
-	temp_label.add_font_override("font", font)
-	for b in [clear, badges, temp_clear]:
-		b.add_font_override("font", font)
+	_bc_apply_bar_font(t)
 	column.add_child(bar)
 	column.move_child(bar, 1)
 
@@ -558,6 +557,17 @@ func _bc_apply(tab: String) -> void:
 			t.ui.temp_label.text = "%s: %s" % [tr("BC_TEMP_FILTER"), _bc_temp.title]
 
 
+# 筛选栏的字体（跟随设置里的字体大小）
+func _bc_apply_bar_font(t) -> void:
+	var font = load("res://mods-unpacked/Mojimoon-BetterCodex/ui/fonts.gd").font(22)
+	for c in [t.ui.search, t.ui.badges, t.ui.temp_label] + t.ui.temp_row.get_children() + t.ui.search.get_parent().get_children():
+		c.add_font_override("font", font)
+	for key in t.ui:
+		if t.ui[key] is OptionButton:
+			t.ui[key].add_font_override("font", font)
+			t.ui[key].get_popup().add_font_override("font", font)
+
+
 # ---- 角标 ----
 
 # ---- 设置 ----
@@ -571,7 +581,7 @@ var _bc_capturing := false
 
 func _bc_open_settings() -> void:
 	if _bc_settings_popup == null:
-		var font = load("res://resources/fonts/actual/base/font_22.tres")
+		var font = load("res://mods-unpacked/Mojimoon-BetterCodex/ui/fonts.gd").font(22)
 		_bc_settings_popup = PopupPanel.new()
 		_bc_settings_popup.name = "BCSettings"
 		var box = VBoxContainer.new()
@@ -684,7 +694,7 @@ func _bc_grey_banned(tab: String) -> void:
 func _bc_badge_label(text: String, color: Color, align: int, valign: int) -> Label:
 	var l = Label.new()
 	l.text = text
-	l.add_font_override("font", _bc_badge_font)
+	l.add_font_override("font", load("res://mods-unpacked/Mojimoon-BetterCodex/ui/fonts.gd").font(18, true, true))	# 角标不随字体大小缩放：列表元素大小固定
 	l.add_color_override("font_color", color)
 	l.align = align
 	l.valign = valign
@@ -815,7 +825,7 @@ func _bc_header(tab: String, desc, it) -> void:
 		box.bbcode_enabled = true
 		box.fit_content_height = true
 		box.scroll_active = false
-		box.add_font_override("normal_font", load("res://resources/fonts/actual/base/font_26.tres"))
+		box.add_font_override("normal_font", load("res://mods-unpacked/Mojimoon-BetterCodex/ui/fonts.gd").font(26))
 		box.connect("meta_clicked", self, "_bc_on_header_link", [], CONNECT_DEFERRED)	# 处理点击时不能改自己的文本（会崩溃）
 		box.name = "BCCategory"
 		cat.get_parent().add_child_below_node(cat, box)

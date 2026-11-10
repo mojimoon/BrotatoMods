@@ -8,6 +8,8 @@ func _initialize() -> void:
 	var out = OS.get_environment("BC_SHOT_DIR")
 	var cases = load("res://mods/tests/BetterCodex/test_cases.gd").new()
 	cases.tree = self
+	if OS.get_environment("BC_SHOT_FONT") != "":
+		root.get_node("ProgressData").set_font_size(float(OS.get_environment("BC_SHOT_FONT")))
 	cases._unlock_everything()
 	cases._setup_player()
 	var codex = load("res://ui/menus/pages/menu_codex.tscn").instance()

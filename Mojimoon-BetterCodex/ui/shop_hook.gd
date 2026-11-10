@@ -4,7 +4,7 @@ extends Node
 # 不改动物品弹窗（其他 mod 会往弹窗里加按钮、改焦点链，例如 ItemRefund），只监听输入。
 # 左下角显示跳转图鉴的提示，不可掉落异变果时附带道具数量（设置里可隐藏）；异变预览本身加在描述末尾（extensions/ui/menus/shop/item_description.gd）。
 
-const FONT = preload("res://resources/fonts/actual/base/font_22.tres")
+const Fonts = preload("res://mods-unpacked/Mojimoon-BetterCodex/ui/fonts.gd")
 
 var shop
 var codex
@@ -15,7 +15,7 @@ var _can_drop = null
 func _ready() -> void:
 	hint = Label.new()
 	hint.name = "BCShopHint"
-	hint.add_font_override("font", FONT)
+	hint.add_font_override("font", Fonts.font(22))
 	hint.add_color_override("font_color", Color(1, 1, 1, 0.75))
 	hint.add_color_override("font_outline_modulate", Color.black)
 	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE

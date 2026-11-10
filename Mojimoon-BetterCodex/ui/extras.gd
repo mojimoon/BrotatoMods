@@ -14,11 +14,12 @@ const Calc = preload("res://mods-unpacked/Mojimoon-BetterCodex/calc.gd")
 const Preview = preload("res://mods-unpacked/Mojimoon-BetterCodex/preview.gd")
 const RangeSlider = preload("res://mods-unpacked/Mojimoon-BetterCodex/ui/range_slider.gd")
 const EFFECT_LINE = preload("res://items/global/effect_line.tscn")
-const FONT = preload("res://resources/fonts/actual/base/font_22.tres")
+const Fonts = preload("res://mods-unpacked/Mojimoon-BetterCodex/ui/fonts.gd")	# 跟随设置里的字体大小
 const TITLE_COLOR = Color(0.92, 0.89, 0.69)
 const DIM_COLOR = Color(0.65, 0.65, 0.65)
 const CURSE_COLOR = Color("#b75cff")
 const MECA_COLOR = Color("#3fcafc")
+const MECA_DARK = Color("#0b7fb0")	# 按钮文字用：浅底上浅蓝看不清
 const MUTANT_COLOR = Color("#d2ff5e")
 const MUTANT_DARK = Color("#5a8a00")	# 按钮文字用：按下 / 聚焦时浅底上黄绿色看不清
 const PRICE_WAVES = [1, 5, 10, 15, 19]
@@ -182,7 +183,7 @@ static func related_chain(it) -> Array:
 func _label(text: String, color = null) -> Label:
 	var l = Label.new()
 	l.text = text
-	l.add_font_override("font", FONT)
+	l.add_font_override("font", Fonts.font(22))
 	l.autowrap = true
 	if color != null:
 		l.add_color_override("font_color", color)
@@ -195,14 +196,14 @@ func _rich() -> RichTextLabel:
 	r.fit_content_height = true
 	r.scroll_active = false
 	r.size_flags_horizontal = SIZE_EXPAND_FILL
-	r.add_font_override("normal_font", FONT)
+	r.add_font_override("normal_font", Fonts.font(22))
 	return r
 
 
 func _button(text: String, method: String, args: Array = []) -> Button:
 	var b = Button.new()
 	b.text = text
-	b.add_font_override("font", FONT)
+	b.add_font_override("font", Fonts.font(22))
 	b.connect("pressed", self, method, args)
 	return b
 
@@ -273,7 +274,7 @@ func _toggle(text: String, on: bool, method: String, color: Color) -> Button:
 	b.text = text
 	b.toggle_mode = true
 	b.pressed = on
-	b.add_font_override("font", FONT)
+	b.add_font_override("font", Fonts.font(22))
 	for k in ["font_color_pressed", "font_color_hover_pressed"]:
 		b.add_color_override(k, color)
 	b.connect("toggled", self, method)
@@ -333,7 +334,7 @@ func _build_curse() -> void:
 
 func _build_meca() -> void:
 	var box = _section()
-	_meca_btn = _toggle(tr("BC_MECHA"), meca_on, "_on_meca_toggled", MECA_COLOR)
+	_meca_btn = _toggle(tr("BC_MECHA"), meca_on, "_on_meca_toggled", MECA_DARK)
 	_slider_row(box, _meca_btn, "meca", 1, MECA_MAX, meca_power, "_on_meca_slid")
 
 
@@ -376,10 +377,7 @@ func _refresh_calc() -> void:
 	var t = Calc.timing(s, a, stat_range, count)
 	var every = tr("BC_EVERY_SHOTS").replace("{shots}", str(t.shots))
 	var dim = "[color=#%s]" % DIM_COLOR.to_html(false)
-	var txt = "%s: %s" % [tr("BC_TOOLTIP_CD"), Calc.cooldown_str(t.tooltip)]
-	if t.shots > 0:
-		txt += " %s/ %s %s[/color]" % [dim, every, Calc.cooldown_str(t.reload_tooltip)]
-	txt += "\n%s: [color=#ffffff]%s[/color] %s(%d-%d %s)[/color]" % [tr("BC_ACTUAL_CD"), Calc.actual_str(t.avg), dim, t.min, t.max, tr("BC_FRAMES")]
+	var txt = "%s: [color=#ffffff]%s[/color] %s(%d-%d %s)[/color]" % [tr("BC_ACTUAL_CD"), Calc.actual_str(t.avg), dim, t.min, t.max, tr("BC_FRAMES")]
 	if t.shots > 0:
 		txt += " %s/ %s %s / %s %s[/color]" % [dim, every, Calc.actual_str(t.reload), tr("BC_EQUIV"), Calc.cooldown_str(Calc.effective_seconds(t))]
 	var pct = Calc.dps_change(s, a, stat_range, count)

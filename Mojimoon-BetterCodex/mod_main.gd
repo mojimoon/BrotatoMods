@@ -10,6 +10,7 @@ const MOD_ID = "Mojimoon-BetterCodex"
 const MOD_DIR = "res://mods-unpacked/Mojimoon-BetterCodex/"
 const SETTINGS_PATH = "user://Mojimoon-BetterCodex.json"
 
+var font_cache := {}	# ui/fonts.gd：按字号缓存的字体
 var settings := {"badge_price": true, "badge_limit": true, "badge_source": true, "unlock_all": false, "quick_open": true, "shop_hint": true, "hotkey": KEY_C}
 
 
