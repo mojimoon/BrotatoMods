@@ -20,6 +20,7 @@ const DIM_COLOR = Color(0.65, 0.65, 0.65)
 const CURSE_COLOR = Color("#b75cff")
 const MECA_COLOR = Color("#3fcafc")
 const MUTANT_COLOR = Color("#d2ff5e")
+const MUTANT_DARK = Color("#5a8a00")	# 按钮文字用：按下 / 聚焦时浅底上黄绿色看不清
 const PRICE_WAVES = [1, 5, 10, 15, 19]
 const MECA_MAX = 80
 
@@ -271,7 +272,8 @@ func _toggle(text: String, on: bool, method: String, color: Color) -> Button:
 	b.toggle_mode = true
 	b.pressed = on
 	b.add_font_override("font", FONT)
-	b.add_color_override("font_color_pressed", color)
+	for k in ["font_color_pressed", "font_color_hover_pressed"]:
+		b.add_color_override(k, color)
 	b.connect("toggled", self, method)
 	return b
 
@@ -335,7 +337,7 @@ func _build_meca() -> void:
 
 func _build_mutation() -> void:
 	var box = _section()
-	_slider_row(box, _toggle(tr("BC_MUTATION"), mut_on, "_on_mut_toggled", MUTANT_COLOR), "mut", 1, Preview.mut_max(), mut_val, "_on_mut_slid")
+	_slider_row(box, _toggle(tr("BC_MUTATION"), mut_on, "_on_mut_toggled", MUTANT_DARK), "mut", 1, Preview.mut_max(), mut_val, "_on_mut_slid")
 	_mut_box = VBoxContainer.new()
 	box.add_child(_mut_box)
 	_refresh_mutation()

@@ -235,7 +235,9 @@ func _bc_build_tab(tab: String, inv, desc) -> void:
 	search.connect("text_changed", self, "_bc_on_search", [tab])
 	row1.add_child(search)
 	var clear = Button.new()
-	clear.text = tr("BC_CLEAR")
+	clear.text = "X"	# 游戏字体没有 × 字形
+	clear.rect_min_size.x = 40
+	clear.hint_tooltip = tr("BC_CLEAR")
 	clear.connect("pressed", self, "_bc_on_clear", [tab])
 	row1.add_child(clear)
 	var badges = Button.new()
