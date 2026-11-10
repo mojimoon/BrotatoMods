@@ -32,8 +32,47 @@ func _pop():
 	._pop()
 	_bc_setup()
 	_bc_unlock_end()
+	_bc_count_progress()
 	if _bc_setting("quick_open"):
 		_bc_skip_animation()
+
+
+# 进度按真实存档计算（解锁全部时图鉴里看到的是临时数据）
+func _bc_count_progress() -> void:
+	unlocked_items = 0
+	unlocked_weapons = 0
+	for e in _bc_tabs.items.all:
+		if e.item != null and ProgressData.items_bought.has(e.item.my_id_hash):
+			unlocked_items += 1
+	for e in _bc_tabs.weapons.all:
+		if e.item != null and ProgressData.items_bought.has(e.item.my_id_hash):
+			unlocked_weapons += 1
+
+
+# 边框贴图（画在内容上面）上的涂鸦有一部分伸进内容区：把贴图里内容区范围内的像素清掉
+const BC_CONTENT_RECT = Rect2(247, 201, 1426, 750)	# BetterTabContainer 在 1920×1080 贴图中的位置
+var _bc_frame_cleaned := false
+
+
+func _bc_clean_frame() -> void:
+	if _bc_frame_cleaned:
+		return
+	_bc_frame_cleaned = true
+	var shelf = $root/shelf
+	if shelf.texture == null:
+		return
+	var img = shelf.texture.get_data()
+	if img == null or img.get_size() != Vector2(1920, 1080):
+		return
+	if img.is_compressed():
+		img.decompress()
+	img.convert(Image.FORMAT_RGBA8)
+	var clear = Image.new()
+	clear.create(int(BC_CONTENT_RECT.size.x), int(BC_CONTENT_RECT.size.y), false, Image.FORMAT_RGBA8)
+	img.blit_rect(clear, Rect2(Vector2.ZERO, BC_CONTENT_RECT.size), BC_CONTENT_RECT.position)
+	var tex = ImageTexture.new()
+	tex.create_from_image(img, shelf.texture.flags)
+	shelf.texture = tex
 
 
 func _exit_tree():
@@ -121,6 +160,7 @@ func _bc_free_detached() -> void:
 
 
 func _bc_setup() -> void:
+	_bc_clean_frame()
 	if _bc_tabs.empty():
 		_bc_badge_font = load("res://resources/fonts/actual/base/font_26_outline.tres").duplicate()
 		_bc_badge_font.size = 18
@@ -518,40 +558,31 @@ func _bc_add_badges(e, tab: String) -> void:
 		root.add_child(_bc_badge_label(str(it.value), Color("#ffd75e"), Label.ALIGN_LEFT, Label.VALIGN_TOP))
 	if tab == "items" and it.max_nb > 0 and _bc_setting("badge_limit"):
 		root.add_child(_bc_badge_label(str(it.max_nb), Color("#ff6b6b") if it.max_nb == 1 else Color("#ffa94d"), Label.ALIGN_RIGHT, Label.VALIGN_TOP))
-	var evo = _bc_evo_of(it) if _bc_setting("badge_source") else ""
-	if evo != "":
-		var box = HBoxContainer.new()
-		box.mouse_filter = MOUSE_FILTER_IGNORE
-		box.add_constant_override("separation", 0)
-		box.set_anchors_and_margins_preset(PRESET_BOTTOM_LEFT)
-		box.margin_top = -24
-		box.margin_left = 3
-		for k in (["mutant", "meca"] if evo == "both" else [evo]):
-			if ResourceLoader.exists(BC_EVO_ICONS[k]):
-				var icon = TextureRect.new()
-				icon.texture = load(BC_EVO_ICONS[k])
-				icon.expand = true
-				icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-				icon.rect_min_size = Vector2(22, 22)
-				icon.mouse_filter = MOUSE_FILTER_IGNORE
+	# 右下角来源图标（带描边）：机械 / 异变道具用机械部件 / 异变果图标，其他用物品套组图标（按物品套组栏的颜色着色）
+	if _bc_setting("badge_source"):
+		var Icon = load(BC_DIR + "ui/outlined_icon.gd")
+		var icons = []
+		var evo = _bc_evo_of(it)
+		if evo != "":
+			for k in (["mutant", "meca"] if evo == "both" else [evo]):
+				if ResourceLoader.exists(BC_EVO_ICONS[k]):
+					icons.push_back(Icon.new(load(BC_EVO_ICONS[k])))
+		else:
+			var s = _bc_set_of(it)
+			if _bc_updates.has(s) and _bc_updates[s].icon != null:
+				icons.push_back(Icon.new(_bc_updates[s].icon, _bc_updates[s].color))
+		if not icons.empty():
+			var box = HBoxContainer.new()
+			box.mouse_filter = MOUSE_FILTER_IGNORE
+			box.add_constant_override("separation", 0)
+			box.set_anchors_and_margins_preset(PRESET_BOTTOM_RIGHT)
+			box.grow_horizontal = GROW_DIRECTION_BEGIN
+			box.grow_vertical = GROW_DIRECTION_BEGIN
+			box.margin_right = -3
+			box.margin_bottom = -3
+			for icon in icons:
 				box.add_child(icon)
-		root.add_child(box)
-	else:
-		var s = _bc_set_of(it) if _bc_setting("badge_source") else ""
-		if _bc_updates.has(s) and _bc_updates[s].icon != null:
-			# 右下角：物品套组图标，按物品套组栏的颜色着色
-			var icon = TextureRect.new()
-			icon.texture = _bc_updates[s].icon
-			icon.modulate = _bc_updates[s].color
-			icon.expand = true
-			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			icon.mouse_filter = MOUSE_FILTER_IGNORE
-			icon.set_anchors_and_margins_preset(PRESET_BOTTOM_RIGHT)
-			icon.margin_left = -26
-			icon.margin_top = -26
-			icon.margin_right = -4
-			icon.margin_bottom = -4
-			root.add_child(icon)
+			root.add_child(box)
 	e.add_child(root)
 
 
@@ -624,50 +655,47 @@ func _bc_header(tab: String, desc, it) -> void:
 	var cat = desc._category
 	var box = cat.get_parent().get_node_or_null("BCCategory")
 	if box == null:
-		if tab == "weapons":
-			box = HBoxContainer.new()
-			box.alignment = BoxContainer.ALIGN_CENTER
-		else:
-			# 道具：居中、可换行的一行文字，标签是可点击的链接
-			box = RichTextLabel.new()
-			box.bbcode_enabled = true
-			box.fit_content_height = true
-			box.scroll_active = false
-			box.add_font_override("normal_font", load("res://resources/fonts/actual/base/font_26.tres"))
-			box.connect("meta_clicked", self, "bc_filter_tag", [], CONNECT_DEFERRED)	# 处理点击时不能改自己的文本（会崩溃）
+		# 居中、可换行的一行文字，类型 / 类别 / 标签是可点击的链接
+		box = RichTextLabel.new()
+		box.bbcode_enabled = true
+		box.fit_content_height = true
+		box.scroll_active = false
+		box.add_font_override("normal_font", load("res://resources/fonts/actual/base/font_26.tres"))
+		box.connect("meta_clicked", self, "_bc_on_header_link", [], CONNECT_DEFERRED)	# 处理点击时不能改自己的文本（会崩溃）
 		box.name = "BCCategory"
 		cat.get_parent().add_child_below_node(cat, box)
-	if box is HBoxContainer:	# RichTextLabel 的子节点是它自己的滚动条，不能删
-		for c in box.get_children():
-			box.remove_child(c)
-			c.queue_free()
 	box.visible = it != null
 	cat.visible = it == null
 	if it == null:
 		return
-	var font = load("res://resources/fonts/actual/base/font_26.tres")
-	if tab == "weapons":
-		_bc_header_button(box, tr("BC_MELEE") if it.type == WeaponData.Type.MELEE else tr("BC_RANGED"), font, "_bc_filter_type", [it.type])
-		for set in it.sets:
-			_bc_header_button(box, tr(set.name), font, "_bc_filter_set", [set.my_id])
-		return
 	var parts = []
-	if cat.text != "":
-		parts.push_back("[color=#%s]%s[/color]" % [cat.get_color("font_color").to_html(false), cat.text])
-	var Extras = load(BC_DIR + "ui/extras.gd")
-	var tags = it.tags.duplicate()
-	tags.sort()
-	for tag in tags:
-		parts.push_back("[url=%s][color=#8fd3ff]%s[/color][/url]" % [tag, Extras.tag_name(tag)])
+	if tab == "weapons":
+		parts.push_back(_bc_link("type:%d" % it.type, tr("BC_MELEE") if it.type == WeaponData.Type.MELEE else tr("BC_RANGED")))
+		for set in it.sets:
+			parts.push_back(_bc_link("set:" + set.my_id, tr(set.name)))
+	else:
+		if cat.text != "":
+			parts.push_back("[color=#%s]%s[/color]" % [cat.get_color("font_color").to_html(false), cat.text])
+		var Extras = load(BC_DIR + "ui/extras.gd")
+		var tags = it.tags.duplicate()
+		tags.sort()
+		for tag in tags:
+			parts.push_back(_bc_link("tag:" + tag, Extras.tag_name(tag)))
 	box.bbcode_text = "[center]" + "  ·  ".join(parts) + "[/center]"
 
 
-func _bc_header_button(box: Control, text: String, font, method: String, args: Array) -> void:
-	var b = Button.new()
-	b.text = text
-	b.add_font_override("font", font)
-	b.connect("pressed", self, method, args)
-	box.add_child(b)
+static func _bc_link(meta: String, text: String) -> String:
+	return "[url=%s][color=#8fd3ff]%s[/color][/url]" % [meta, text]
+
+
+func _bc_on_header_link(meta) -> void:
+	var m = str(meta)
+	if m.begins_with("type:"):
+		_bc_filter_type(int(m.substr(5)))
+	elif m.begins_with("set:"):
+		_bc_filter_set(m.substr(4))
+	elif m.begins_with("tag:"):
+		bc_filter_tag(m.substr(4))
 
 
 func _bc_filter_type(type: int) -> void:

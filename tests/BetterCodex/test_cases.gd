@@ -324,8 +324,8 @@ func test_codex_weapon_detail():
 	var header = w.desc._category.get_parent().get_node_or_null("BCCategory")
 	_check(header != null and header.visible and not w.desc._category.visible, "type / class header")
 	if header != null:
-		_eq(header.get_child_count(), 1 + w.current.sets.size(), "header buttons")
-		header.get_child(0).emit_signal("pressed")
+		_eq(header.bbcode_text.count("[url="), 1 + w.current.sets.size(), "header links")
+		header.emit_signal("meta_clicked", "type:%d" % WeaponData.Type.RANGED)
 		yield(_wait(), "completed")
 		for e in w.inv.get_children():
 			_eq(e.item.type, WeaponData.Type.RANGED, "type filter from header")
@@ -368,18 +368,31 @@ func test_codex_item_detail():
 	_check(header != null and header.visible and not t.desc._category.visible, "item header")
 	if header != null and it.tags.size() > 0:
 		_eq(header.bbcode_text.count("[url="), it.tags.size(), "tag links in header")
-		header.emit_signal("meta_clicked", it.tags[0])
+		header.emit_signal("meta_clicked", "tag:" + it.tags[0])
 		yield(_wait(), "completed")
 		_eq(t.f.tag, it.tags[0], "header tag filter")
 		codex.bc_focus_item(it, "items")
 		yield(_wait(), "completed")
 	var icons = 0
+	var evo_icons = 0
 	for e in t.all:
 		if e.has_node("BCBadges"):
 			for c in e.get_node("BCBadges").get_children():
-				if c is TextureRect and c.anchor_left == 1.0:
+				if c is HBoxContainer and c.anchor_left == 1.0:
 					icons += 1
-	_check(icons > 50, "item set icons bottom-right: %d" % icons)
+					if c.get_child(0).texture.resource_path.find("consumables") >= 0:
+						evo_icons += 1
+	_check(icons > 50, "source icons bottom-right: %d" % icons)
+	_check(evo_icons > 5, "meca / mutant icons bottom-right: %d" % evo_icons)
+	# 关联里当前道具（disabled）的图标与其他一样大
+	for b in _all(t.extras):
+		if b is Button and b.disabled and b.icon != null:
+			_check(b.get_stylebox("disabled") == b.get_stylebox("normal"), "disabled style same as normal")
+	# 边框涂鸦：内容区内的边框贴图像素被清掉
+	var img = codex.get_node("root/shelf").texture.get_data()
+	img.lock()
+	_eq(img.get_pixel(260, 500).a, 0.0, "frame cleared inside content")
+	img.unlock()
 	t.extras._on_mut_toggled(true)
 	t.extras._on_mut_slid(30)
 	_check(t.extras._mut_box.get_child_count() > 0, "mutation lines")
@@ -609,3 +622,22 @@ func test_fruit_hint() -> void:
 	_set_stat(Keys.stat_evolution_hash, 10)
 	_eq(Hook.fruit_text(), "", "meca route hides")
 	_set_stat(Keys.stat_evolution_hash, 0)
+
+
+# 真实切换场景进商店（与升级后进入商店相同的路径），检查期间的任何脚本错误（watch begin/end）
+func test_shop_scene_change():
+	var w = _weapon("weapon_pistol_1")
+	RunData.players_data[0].weapons = [w]
+	RunData.current_wave = 2
+	ItemService.init_unlocked_pool()
+	print("watch begin")
+	tree.change_scene("res://ui/menus/shop/shop.tscn")
+	yield(_wait(30), "completed")
+	var shop = tree.current_scene
+	_check(shop != null and shop.name == "Shop", "in shop")
+	if shop != null:
+		_check(shop.get_node_or_null("BCShopHook") != null, "hook")
+		_check(shop.get_node_or_null("BCShopHint") != null, "hint")
+	yield(_wait(40), "completed")
+	print("watch end")
+	RunData.players_data[0].weapons = []

@@ -38,6 +38,7 @@ var count := Calc.DEFAULT_WEAPON_COUNT
 var wave := 0
 var nightmare := false
 
+var icon_size := 44	# 关联 / 禁用道具的图标按钮大小
 var _syncing := false
 var _curse_btn: Button
 var _meca_btn: Button
@@ -207,11 +208,11 @@ func _icon_button(it, method: String, args: Array) -> Button:
 	var b = Button.new()
 	b.icon = it.get_icon()
 	b.expand_icon = true
-	b.rect_min_size = Vector2(44, 44)
+	b.rect_min_size = Vector2(icon_size, icon_size)
 	b.hint_tooltip = tr(it.name)
 	var sb = StyleBoxFlat.new()
 	ItemService.change_inventory_element_stylebox_from_tier(sb, it.tier, 0.25)
-	for s in ["normal", "hover", "pressed", "focus"]:
+	for s in ["normal", "hover", "pressed", "focus", "disabled"]:	# 当前道具是 disabled：不覆盖的话主题的边距会把图标挤小
 		b.add_stylebox_override(s, sb)
 	b.connect("pressed", self, method, args)
 	return b

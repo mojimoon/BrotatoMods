@@ -39,6 +39,10 @@ run() {
 			pending = ""
 		}
 	' "$log")
+	local watched
+	watched=$(awk '/watch begin/ { on = 1; next } /watch end/ { on = 0; next } on && /SCRIPT ERROR/ { cur = $0; if ((getline nxt) > 0 && nxt !~ /cursor_manager.gd|progress_data.gd/) { print cur; print nxt } }' "$log")
+	[ -n "$watched" ] && errors="$errors
+watched: $watched"
 	echo "== $1"
 	grep -aoE "(  ran |FAIL |[0-9]+ checks|ALL TESTS PASSED|Refusing|Mod node|IT loaded).*" "$log"
 	if [ -n "$errors" ]; then echo; echo "Script errors:"; echo "$errors" | head -40; st=1; fi

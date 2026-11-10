@@ -25,7 +25,7 @@ func _ready() -> void:
 	shop.add_child(hint)
 	update_hint()
 	var timer = Timer.new()	# 买卖道具后刷新异变果提示
-	timer.wait_time = 0.5
+	timer.wait_time = 1
 	timer.autostart = true
 	timer.connect("timeout", self, "update_hint")
 	add_child(timer)

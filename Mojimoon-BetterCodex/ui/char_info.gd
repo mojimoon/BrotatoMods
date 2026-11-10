@@ -27,6 +27,7 @@ func setup(character) -> void:
 	scroll.add_child(extras)
 	extras.reset_defaults()
 	extras.mut_on = true
+	extras.icon_size = 50	# 300 宽的面板一行放 5 个
 	extras.show_item(character)
 	extras.connect("tag_pressed", self, "_on_tag")
 	extras.connect("banned_pressed", self, "_on_banned")
