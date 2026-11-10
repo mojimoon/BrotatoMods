@@ -903,6 +903,24 @@ func test_shop_hotkey_after_prewarm():
 	yield(_wait(3), "completed")
 	_check(hook.codex.visible, "C opens the codex (focus %s)" % shop.get_focus_owner())
 	hook.codex.hide()
+	# 关掉右键：右键事件完全不处理（不打开、不标记已处理），快捷键照常；提示只写快捷键
+	m.settings.right_click = false
+	hook.update_hint()
+	_eq(hook.hint.text.begins_with(tr("BC_SHOP_HINT_KEY").format(["C"])), true, "hint without right-click: " + hook.hint.text)
+	var rc = InputEventMouseButton.new()
+	rc.button_index = BUTTON_RIGHT
+	rc.pressed = true
+	rc.position = el.get_global_rect().get_center()
+	rc.global_position = rc.position
+	var calls = [0]
+	hook._input(rc)
+	yield(_wait(2), "completed")
+	_check(not hook.codex.visible, "right-click ignored when disabled")
+	tree.input_event(ev)
+	yield(_wait(3), "completed")
+	_check(hook.codex.visible, "hotkey still works")
+	hook.codex.hide()
+	m.settings.right_click = true
 	tree.current_scene = prev
 	tree.root.remove_child(shop)
 	shop.queue_free()

@@ -42,7 +42,7 @@
 
 **Settings** (the Settings button in the codex)
 
-- Toggle each badge, change the shop hotkey, **unlock the whole codex without touching your save**, open the codex without its animation (on by default), hide the shop hint.
+- Toggle each badge, change the shop hotkey, **unlock the whole codex without touching your save**, open the codex without its animation (on by default), hide the shop hint, turn off right-click in the shop (only the hotkey then; right-clicks are left untouched for other mods).
 
 **Faster codex**: the codex is built in the background and reused while nothing changes, so it usually opens in about 10 ms.
 
@@ -89,7 +89,7 @@ Supports all 13 game languages. All added text follows the game's font size sett
 
 **设置**（图鉴里的“设置”按钮）
 
-- 分别开关各种角标、修改商店快捷键、**解锁全部图鉴（不修改存档）**、快速打开图鉴（跳过动画，默认开启）、隐藏商店提示。
+- 分别开关各种角标、修改商店快捷键、**解锁全部图鉴（不修改存档）**、快速打开图鉴（跳过动画，默认开启）、隐藏商店提示、关掉商店里的右键打开（只用快捷键，右键完全留给其他 mod）。
 
 **更快的图鉴**：图鉴会在后台预先构建，内容不变时直接复用，通常约 10 毫秒就能打开。
 

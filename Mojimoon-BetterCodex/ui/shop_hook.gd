@@ -47,6 +47,12 @@ func _mod():
 	return get_node_or_null("/root/ModLoader/Mojimoon-BetterCodex")
 
 
+# 设置里可关掉右键（只留快捷键）：关掉时完全不处理右键事件，避免与其他 mod 冲突
+func _right_click() -> bool:
+	var m = _mod()
+	return m == null or m.settings.get("right_click", true)
+
+
 func hotkey() -> int:
 	var m = _mod()
 	return int(m.settings.get("hotkey", KEY_C)) if m != null else KEY_C
@@ -55,7 +61,7 @@ func hotkey() -> int:
 # “右键或 C 跳转图鉴。”，不可掉落异变果时再加“不可掉落异变果（未诅咒道具 x/3）”；可在图鉴设置里隐藏
 func update_hint() -> void:
 	var can_drop = fruit_can_drop()
-	var text = tr("BC_SHOP_HINT").format([OS.get_scancode_string(hotkey())])
+	var text = tr("BC_SHOP_HINT" if _right_click() else "BC_SHOP_HINT_KEY").format([OS.get_scancode_string(hotkey())])
 	var fruit = fruit_text()
 	if fruit != "" and not can_drop:
 		text += " " + fruit
@@ -95,7 +101,9 @@ static func fruit_text() -> String:
 
 func _input(event: InputEvent) -> void:
 	var use_mouse = false
-	if event is InputEventMouseButton and event.pressed and event.button_index == BUTTON_RIGHT:
+	if event is InputEventMouseButton:
+		if not (event.pressed and event.button_index == BUTTON_RIGHT and _right_click()):
+			return
 		use_mouse = true
 	elif event is InputEventKey and event.pressed and not event.echo and (event.scancode == hotkey() or event.physical_scancode == hotkey()):	# 物理键位也认：输入法 / 键盘布局可能改变 scancode
 		use_mouse = true
