@@ -445,11 +445,23 @@ func _bc_open_settings() -> void:
 		_bc_settings_popup.name = "BCSettings"
 		var box = VBoxContainer.new()
 		box.add_constant_override("separation", 8)
+		# 各状态用同一个样式：游戏主题的悬停样式边距不同，文字会左移、压到勾上（同 BroEditor 的 _checkbox）
+		var sb = StyleBoxEmpty.new()
+		sb.content_margin_left = 4
+		sb.content_margin_right = 4
+		sb.content_margin_top = 2
+		sb.content_margin_bottom = 2
 		for t in BC_TOGGLES:
 			var cb = CheckBox.new()
 			cb.name = t[0]
 			cb.text = tr(t[1])
 			cb.add_font_override("font", font)
+			for st in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
+				cb.add_stylebox_override(st, sb)
+			for k in ["font_color", "font_color_pressed", "font_color_focus"]:
+				cb.add_color_override(k, Color.white)
+			for k in ["font_color_hover", "font_color_hover_pressed"]:
+				cb.add_color_override(k, Color("#8fd3ff"))
 			cb.pressed = _bc_setting(t[0], t[2])
 			cb.connect("toggled", self, "_bc_on_setting", [t[0]])
 			box.add_child(cb)

@@ -59,10 +59,16 @@ func _initialize() -> void:
 	diff.queue_free()
 	root.get_node("ItemService").init_unlocked_pool()
 	root.get_node("RunData").current_wave = 4
+	for id in ["item_alien_eyes", "item_baby_elephant", "item_coffee"]:
+		root.get_node("RunData").add_item(cases._item(id), 0)
 	var shop = load("res://ui/menus/shop/shop.tscn").instance()
 	root.add_child(shop)
 	current_scene = shop
 	yield(_shot(out + "/shop.png"), "completed")
+	for n in cases._all(shop):
+		if n.get("item") != null and n.item.get("my_id") == "item_alien_eyes" and n.has_method("silouhette_if_hidden_in_codex"):
+			shop._get_item_popup(0).display_item_data(n.item, n, true)
+	yield(_shot(out + "/shop_popup.png"), "completed")
 	quit()
 
 

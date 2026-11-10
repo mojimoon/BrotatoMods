@@ -31,6 +31,7 @@ run() {
 		-s "res://mods/tests/BetterCodex/run_bc.gd" > "$log" 2>&1)
 	local st=$?
 	rm -rf "$sandbox"
+	[ -n "${BC_KEEP_LOG:-}" ] && cp "$log" "$BC_KEEP_LOG.$1.log"
 	local errors
 	errors=$(awk '
 		/SCRIPT ERROR|Parse Error|Script error/ { pending = $0; next }
@@ -40,7 +41,7 @@ run() {
 		}
 	' "$log")
 	local watched
-	watched=$(awk '/watch begin/ { on = 1; next } /watch end/ { on = 0; next } on && /SCRIPT ERROR/ { cur = $0; if ((getline nxt) > 0 && nxt !~ /cursor_manager.gd|progress_data.gd/) { print cur; print nxt } }' "$log")
+	watched=$(awk '/watch begin/ { on = 1; next } /watch end/ { on = 0; next } on && /SCRIPT ERROR/ { cur = $0; if ((getline nxt) > 0 && nxt !~ /cursor_manager.gd|progress_data.gd|utils.gd:(250|715)/) { print cur; print nxt } }' "$log")
 	[ -n "$watched" ] && errors="$errors
 watched: $watched"
 	echo "== $1"

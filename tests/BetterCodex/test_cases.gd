@@ -86,6 +86,7 @@ func _setup_player(char_id: String = "") -> void:
 	RunData.current_wave = 1
 	RunData.current_difficulty = 0
 	Utils.reset_stat_caches()
+	RunData.bc_reset_mutable_counts()
 
 
 func _set_stat(key: int, v) -> void:
@@ -630,9 +631,10 @@ func test_fruit_hint() -> void:
 		_eq(Hook.fruit_text(), "", "no dlc2")
 		return
 	RunData.players_data[0].items = [RunData.players_data[0].current_character]
+	RunData.bc_reset_mutable_counts()
 	_check(Hook.fruit_text().find("0/3") >= 0, "not enough items: " + Hook.fruit_text())
 	for id in ["item_alien_eyes", "item_baby_elephant", "item_coffee"]:
-		RunData.players_data[0].items.push_back(_item(id))
+		RunData.add_item(_item(id), 0)
 	_check(Hook.fruit_text() != "" and Hook.fruit_text().find("/3") < 0, "can drop: " + Hook.fruit_text())
 	_set_stat(Keys.stat_evolution_hash, 10)
 	_eq(Hook.fruit_text(), "", "meca route hides")
@@ -666,6 +668,7 @@ func test_shop_mutation_preview():
 	RunData.players_data[0].items = [c]
 	for id in ["item_alien_eyes", "item_baby_elephant", "item_coffee"]:
 		RunData.players_data[0].items.push_back(_item(id))
+	RunData.bc_reset_mutable_counts()
 	RunData.current_wave = 3
 	ItemService.init_unlocked_pool()
 	var shop = load("res://ui/menus/shop/shop.tscn").instance()
@@ -674,31 +677,114 @@ func test_shop_mutation_preview():
 	tree.current_scene = shop
 	yield(_wait(10), "completed")
 	var hook = shop.get_node("BCShopHook")
-	hook.update_hint()
 	var popup = shop._get_item_popup(0)
 	var el = null
 	for n in _all(shop):
 		if n is InventoryElement and n.item != null and n.item.my_id == "item_alien_eyes" and n.is_visible_in_tree():
 			el = n
 	_check(el != null, "item element")
+	# 商品卡片（道具）：描述末尾有分割线 + 异变预览
+	var card = null
+	for n in _all(shop):
+		if n is ShopItem and n.item_data is ItemData and n.is_visible_in_tree():
+			card = n
+			break
+	if card != null:
+		_check(_has_mut_preview(card._item_description), "shop card description has mutation preview")
 	if el != null:
 		popup.display_item_data(el.item, el, true)
 		yield(_wait(3), "completed")
-		_check(hook.mut_panel.visible, "mutation preview shown")
-		_check(hook.mut_panel.get_child_count() > 0 and hook.mut_panel.get_child(0).get_child_count() >= 2, "preview content")
-		_check(not hook.mut_panel.get_global_rect().intersects(popup.get_global_rect()), "beside the popup")
+		var desc = _desc_in(popup)
+		_check(desc != null and _has_mut_preview(desc), "popup description has mutation preview")
 		popup.hide()
-		yield(_wait(2), "completed")
-		_check(not hook.mut_panel.visible, "hidden with popup")
-		# 道具不足 3 个：不可掉落 → 不显示
-		RunData.players_data[0].items = [c, _item("item_alien_eyes")]
+		# 道具不足 3 个：不可掉落 → 没有预览；商品卡片也随之刷新
+		RunData.remove_item(_item("item_coffee"), 0)
+		RunData.remove_item(_item("item_baby_elephant"), 0)
 		RunData.emit_signal("gold_changed", 0, 0)	# 买卖道具时会触发：提示随之刷新
 		yield(_wait(2), "completed")
 		_check(hook.hint.text.find("/3") >= 0, "hint refreshed on gold change: " + hook.hint.text)
+		if card != null:
+			_check(not _has_mut_preview(card._item_description), "card refreshed without preview")
 		popup.display_item_data(el.item, el, true)
 		yield(_wait(3), "completed")
-		_check(not hook.mut_panel.visible, "no preview when fruit can't drop")
+		_check(not _has_mut_preview(_desc_in(popup)), "no preview when fruit can't drop")
 	tree.current_scene = prev
 	tree.root.remove_child(shop)
 	shop.queue_free()
 	yield(_wait(3), "completed")
+
+
+func _desc_in(node):
+	for n in _all(node):
+		if n is ItemDescription and n.is_visible_in_tree():
+			return n
+	return null
+
+
+func _has_mut_preview(desc) -> bool:
+	for n in desc.get_effects().get_children():
+		if n is HSeparator and n.get_stylebox("separator") is StyleBoxLine and not n.is_queued_for_deletion():
+			return true
+	return false
+
+
+# 可异变道具计数：增量更新与重新数的结果一致（替换品、没找到、诅咒道具、角色）
+func test_mutable_count_incremental() -> void:
+	var c = RunData.players_data[0].current_character
+	RunData.players_data[0].items = [c]
+	RunData.bc_reset_mutable_counts()
+	_eq(RunData.bc_mutable_count(0), 0, "character not counted")
+	var a = _item("item_alien_eyes")
+	var b = _item("item_coffee")
+	RunData.add_item(a, 0)
+	RunData.add_item(b, 0)
+	RunData.add_item(a, 0)
+	_eq(RunData.bc_mutable_count(0), 3, "after adds")
+	if Preview.dlc(Preview.DLC1) != null:
+		RunData.add_item(Preview.cursed(b, 50), 0)
+		_eq(RunData.bc_mutable_count(0), 3, "cursed item not mutable")
+	RunData.remove_item(a, 0)
+	_eq(RunData.bc_mutable_count(0), 2, "after remove")
+	RunData.remove_item(_item("item_baby_elephant"), 0)
+	_eq(RunData.bc_mutable_count(0), 2, "removing a missing item")
+	var chained = null
+	for x in ItemService.items:
+		if x.replaced_by != null and ItemService.can_item_be_mutated(x):
+			chained = x
+			break
+	RunData.add_item(chained, 0)
+	RunData.remove_item(chained, 0)	# 加入替换品
+	var counted = RunData.bc_mutable_count(0)
+	RunData.bc_reset_mutable_counts()
+	_eq(counted, RunData.bc_mutable_count(0), "incremental == recount (replacement)")
+	RunData.players_data[0].items = [c]
+	RunData.bc_reset_mutable_counts()
+
+
+# 图鉴：开诅咒时异变复制的基础值取诅咒后的；诅咒道具不能被异变，没有可清除
+func test_codex_mutation_cursed():
+	if not Preview.can_mutate() or Preview.dlc(Preview.DLC1) == null:
+		return
+	var it = _item("item_alien_eyes")
+	var plain = Preview.mutation(it, 100)
+	var cursed = Preview.mutation(Preview.cursed(it, 100), 100)
+	_check(plain.copy.size() > 0 and cursed.copy.size() > 0, "copyable both ways")
+	_check(abs(cursed.copy[0].value) >= abs(plain.copy[0].value), "copied from cursed value: %s vs %s" % [cursed.copy[0].value, plain.copy[0].value])
+	var codex = yield(_open_codex(), "completed")
+	var t = codex._bc_tabs.items
+	codex.bc_focus_item(it, "items")
+	yield(_wait(), "completed")
+	t.extras._on_mut_toggled(true)
+	var before = t.extras._mut_box.get_child_count()
+	t.extras._curse_btn.pressed = true
+	yield(_wait(), "completed")
+	var has_remove = false
+	for n in t.extras._mut_box.get_children():
+		if n is Label and n.text == tr("BC_MUT_REMOVE"):
+			has_remove = true
+	_check(not has_remove, "no removable when cursed")
+	_check(t.extras._mut_box.get_child_count() > 0 and before > 0, "mutation preview present")
+	codex._bc_open_settings()
+	var cb = codex.get_node("root/BCSettings").find_node("quick_open", true, false)
+	_check(cb.get_stylebox("hover") == cb.get_stylebox("normal"), "checkbox hover style same as normal")
+	_close(codex)

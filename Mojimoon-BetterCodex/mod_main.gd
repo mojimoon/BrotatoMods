@@ -16,6 +16,8 @@ var settings := {"badge_price": true, "badge_limit": true, "badge_source": true,
 func _init() -> void:
 	var dir = MOD_DIR + "extensions/"
 	ModLoaderMod.install_script_extension(dir + "ui/menus/pages/menu_codex.gd")
+	ModLoaderMod.install_script_extension(dir + "singletons/run_data.gd")
+	ModLoaderMod.install_script_extension(dir + "ui/menus/shop/item_description.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/run/weapon_selection.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/run/difficulty_selection/difficulty_selection.gd")
 	ModLoaderLog.info("extensions installed", MOD_ID)

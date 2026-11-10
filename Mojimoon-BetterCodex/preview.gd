@@ -80,7 +80,7 @@ static func mut_scale(evolution: float) -> float:
 
 
 # 异变值为 evolution 时：可被复制的效果（已缩放的副本）、可被移除的负面效果、需要更高异变才能复制的效果 [效果, 最低异变]
-static func mutation(item, evolution: int) -> Dictionary:
+static func mutation(item, evolution: int, with_later: bool = true) -> Dictionary:
 	var out = {"copy": [], "remove": [], "later": []}
 	if not can_mutate():
 		return out
@@ -100,6 +100,8 @@ static func mutation(item, evolution: int) -> Dictionary:
 			if d.mutation_marker_text_keys.has(c.key_hash):
 				c.text_key = d.mutation_marker_text_keys[c.key_hash]
 			out.copy.push_back(c)
+			continue
+		if not with_later:
 			continue
 		for v in range(evolution + 1, mut_max() + 1):
 			effects[key] = v

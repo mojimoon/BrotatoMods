@@ -349,7 +349,8 @@ func _refresh_mutation() -> void:
 		c.queue_free()
 	if not mut_on:
 		return
-	var info = Preview.mutation(item, mut_val)
+	var shown = display_item(item)	# 开着诅咒时：复制的基础值取诅咒后的
+	var info = Preview.mutation(shown, mut_val)
 	# _mut_box.add_child(_label("%s x%s" % [tr("BC_MUT_SCALE"), str(stepify(Preview.mut_scale(mut_val), 0.01))], DIM_COLOR))
 	if info.copy.empty():
 		_mut_box.add_child(_label(tr("BC_NO_MUT_COPY"), DIM_COLOR))
@@ -359,7 +360,7 @@ func _refresh_mutation() -> void:
 			_add_effect(_mut_box, e)
 	for pair in info.later:
 		_add_effect(_mut_box, pair[0], false, " [color=#%s](%s)[/color]" % [DIM_COLOR.to_html(false), tr("BC_MUT_NEED").format([pair[1]])])
-	if not item is CharacterData and not info.remove.empty():
+	if not item is CharacterData and ItemService.can_item_be_mutated(shown) and not info.remove.empty():
 		_mut_box.add_child(_label(tr("BC_MUT_REMOVE"), MUTANT_COLOR))
 		for e in info.remove:
 			_add_effect(_mut_box, e, true)
@@ -456,6 +457,7 @@ func _on_curse_toggled(on: bool) -> void:
 		meca_on = false
 		_sync(_meca_btn, false)
 	emit_signal("display_changed")
+	_refresh_mutation()
 
 
 func _on_meca_toggled(on: bool) -> void:
@@ -481,6 +483,7 @@ func _on_curse_slid(v: float) -> void:
 	_set_value_label("curse", curse_pct)
 	if curse_on:
 		emit_signal("display_changed")
+		_refresh_mutation()
 
 
 func _on_meca_slid(v: float) -> void:
