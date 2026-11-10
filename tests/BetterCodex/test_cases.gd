@@ -321,6 +321,15 @@ func test_codex_weapon_detail():
 		_check(text.find(Calc.actual_str(t.avg)) >= 0, "actual cooldown %s shown: %s (vanilla %s)" % [Calc.actual_str(t.avg), text, vanilla])
 	_check(w.extras._calc_text != null and w.extras._calc_text.bbcode_text.find("DPS") >= 0, "calculator")
 	_check(w.extras._price_text != null, "price section")
+	var header = w.desc._category.get_parent().get_node_or_null("BCCategory")
+	_check(header != null and header.visible and not w.desc._category.visible, "type / class header")
+	if header != null:
+		_eq(header.get_child_count(), 1 + w.current.sets.size(), "header buttons")
+		header.get_child(0).emit_signal("pressed")
+		yield(_wait(), "completed")
+		for e in w.inv.get_children():
+			_eq(e.item.type, WeaponData.Type.RANGED, "type filter from header")
+		yield(_select_weapon(codex, "weapon_pistol_1"), "completed")
 	# 诅咒：描述显示被诅咒的武器
 	if w.extras._curse_btn != null:
 		w.extras._curse_btn.pressed = true
@@ -384,7 +393,7 @@ func test_codex_in_run_defaults():
 	e.reset_defaults()
 	_check(e.in_run, "in run")
 	_eq(e.wave, 11, "wave")
-	_eq(e.difficulty, 5, "difficulty")
+	_check(e.nightmare, "nightmare")
 	_eq(e.atk, 35, "attack speed")
 	if Preview.dlc(Preview.DLC1) != null:
 		_eq(e.curse_pct, 60, "curse median at wave 11")
@@ -417,7 +426,13 @@ func test_selection_panel():
 			info._on_tag(c.wanted_tags[0])
 			yield(_wait(), "completed")
 			_check(info.codex != null and info.codex.visible, "codex opened")
-			_eq(info.codex._bc_tabs.items.f.tag, c.wanted_tags[0], "tag filter")
+			var want = 0
+			for it in ItemService.items:
+				for t in it.tags:
+					if c.wanted_tags.has(t):
+						want += 1
+						break
+			_eq(info.codex._bc_tabs.items.inv.get_child_count(), want, "wanted tags temp filter (all tags)")
 		info._on_banned(c, null)
 		yield(_wait(), "completed")
 		_check(info.codex._bc_temp != null, "banned temp filter")
@@ -489,3 +504,92 @@ func _all(node: Node) -> Array:
 	for c in node.get_children():
 		out += _all(c)
 	return out
+
+
+
+func test_translations_loaded() -> void:
+	_check(tr("BC_SETTINGS") != "BC_SETTINGS", "csv loaded")
+	_eq(tr("BC_FRAMES"), "f", "frames unit")
+
+
+func test_settings_unlock_quick():
+	var real_items = ProgressData.items_unlocked
+	var real_bought = ProgressData.items_bought
+	ProgressData.items_unlocked = []
+	ProgressData.items_bought = {}
+	m.settings.unlock_all = true
+	m.settings.badge_price = false
+	m.settings.quick_open = true
+	var codex = yield(_open_codex(), "completed")
+	var t = codex._bc_tabs.items
+	_check(not codex.animation_tree.active and codex.get_node("root").rect_position == Vector2.ZERO, "quick open")
+	_eq(ProgressData.items_unlocked.size(), 0, "save list untouched")
+	var locked = 0
+	var priced = 0
+	for e in t.all:
+		if e.item.is_locked:
+			locked += 1
+		if e.has_node("BCBadges"):
+			for l in e.get_node("BCBadges").get_children():
+				if l is Label and l.align == Label.ALIGN_LEFT and l.valign == Label.VALIGN_TOP:
+					priced += 1
+	_eq(locked, 0, "everything unlocked in codex")
+	_eq(priced, 0, "price badges off")
+	codex._on_InventoryItems_element_pressed(t.all[0])
+	yield(_wait(), "completed")
+	_check(t.current != null, "description unlocked")
+	codex._bc_open_settings()
+	_check(codex.get_node("root/BCSettings").visible, "settings popup")
+	codex._on_BackButton_pressed()
+	_check(not codex.visible, "quick close")
+	_check(ItemService.items[0].is_locked, "is_locked restored")
+	m.settings.unlock_all = false
+	m.settings.badge_price = true
+	ProgressData.items_unlocked = real_items
+	ProgressData.items_bought = real_bought
+	_close(codex)
+
+
+func test_banned_grey_in_run():
+	var c = null
+	for x in ItemService.characters:
+		if x.banned_item_groups.size() > 0 or x.banned_items.size() > 0:
+			c = x
+			break
+	_setup_player(c.my_id)
+	RunData.current_wave = 5
+	var token = ItemService.items[0]
+	RunData.players_data[0].banned_items = [token.my_id_hash]
+	var main = Node.new()
+	main.name = "Main"
+	tree.root.add_child(main)
+	var prev = tree.current_scene
+	tree.current_scene = main
+	var codex = yield(_open_codex(), "completed")
+	var grey = {}
+	for e in codex._bc_tabs.items.all:
+		if e.modulate.r < 0.5:
+			grey[e.item.my_id_hash] = true
+	_check(grey.has(token.my_id_hash), "ban token greyed")
+	for it in Extras.banned_items(c):
+		_check(grey.has(it.my_id_hash), "character ban greyed " + it.my_id)
+	_eq(grey.size(), Extras.banned_items(c).size() + (0 if Extras.banned_items(c).has(token) else 1), "only banned greyed")
+	tree.current_scene = prev
+	main.free()
+	RunData.players_data[0].banned_items = []
+	_close(codex)
+
+
+func test_fruit_hint() -> void:
+	var Hook = load(DIR + "ui/shop_hook.gd")
+	if not "primal_dread" in ProgressData.active_update_data:
+		_eq(Hook.fruit_text(), "", "no dlc2")
+		return
+	RunData.players_data[0].items = [RunData.players_data[0].current_character]
+	_check(Hook.fruit_text().find("0/3") >= 0, "not enough items: " + Hook.fruit_text())
+	for id in ["item_alien_eyes", "item_baby_elephant", "item_coffee"]:
+		RunData.players_data[0].items.push_back(_item(id))
+	_check(Hook.fruit_text() != "" and Hook.fruit_text().find("/3") < 0, "can drop: " + Hook.fruit_text())
+	_set_stat(Keys.stat_evolution_hash, 10)
+	_eq(Hook.fruit_text(), "", "meca route hides")
+	_set_stat(Keys.stat_evolution_hash, 0)

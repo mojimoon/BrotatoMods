@@ -10,7 +10,7 @@ var codex
 
 func setup(character) -> void:
 	name = "BCCharacterInfo"
-	rect_min_size.x = 400
+	rect_min_size.x = 300
 	size_flags_vertical = SIZE_EXPAND_FILL
 	var sb = StyleBoxFlat.new()
 	sb.bg_color = Color(0, 0, 0, 0.55)
@@ -41,8 +41,16 @@ func _codex():
 	return codex
 
 
-func _on_tag(tag: String) -> void:
-	_codex().bc_filter_tag(tag)
+# 偏好标签：一个临时筛选，包含带任一偏好标签的道具
+func _on_tag(_tag: String) -> void:
+	var c = extras.item
+	var items = []
+	for it in ItemService.items:
+		for t in it.tags:
+			if c.wanted_tags.has(t):
+				items.push_back(it)
+				break
+	_codex().bc_temp_filter("%s · %s" % [tr(c.name), tr("BC_PREFERRED_TAGS")], items)
 
 
 func _on_banned(character, item) -> void:

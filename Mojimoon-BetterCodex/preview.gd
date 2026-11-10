@@ -45,6 +45,34 @@ static func meca(weapon, power: int):
 	return w
 
 
+# 异变的阈值 / 公式直接取游戏的（1.2.0.2-beta 起最高值与公式会变）
+static func mut_max() -> int:
+	var d = dlc(DLC2)
+	if d == null:
+		return 150
+	return int(d.get_script().get_script_constant_map().get("MUTATION_SCALE_MAX_EVOLUTION", 150.0))
+
+
+static func _with_evolution(evolution: float, obj: Object, method: String, args: Array):
+	var effects: Dictionary = RunData.players_data[0].effects
+	var key = Keys.stat_evolution_hash
+	var had = effects.has(key)
+	var old = effects.get(key)
+	effects[key] = evolution
+	var r = obj.callv(method, args)
+	if had:
+		effects[key] = old
+	else:
+		effects.erase(key)
+	return r
+
+
+static func mut_scale(evolution: float) -> float:
+	if not can_mutate():
+		return 1.0
+	return _with_evolution(evolution, dlc(DLC2), "get_mutation_scale", [0])
+
+
 # 异变值为 evolution 时：可被复制的效果（已缩放的副本）、可被移除的负面效果、需要更高异变才能复制的效果 [效果, 最低异变]
 static func mutation(item, evolution: int) -> Dictionary:
 	var out = {"copy": [], "remove": [], "later": []}
@@ -67,7 +95,7 @@ static func mutation(item, evolution: int) -> Dictionary:
 				c.text_key = d.mutation_marker_text_keys[c.key_hash]
 			out.copy.push_back(c)
 			continue
-		for v in range(evolution + 1, int(d.MUTATION_SCALE_MAX_EVOLUTION) + 1):
+		for v in range(evolution + 1, mut_max() + 1):
 			effects[key] = v
 			if d.can_effect_be_copied_by_mutation(e, 0):
 				out.later.push_back([e, v])

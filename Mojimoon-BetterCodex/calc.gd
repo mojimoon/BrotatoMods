@@ -1,6 +1,6 @@
 extends Reference
 
-# 纯计算：攻击冷却（复刻网页图鉴 codexStore.js，1.2 无头逐帧实测过）、价格、诅咒强度范围、异变缩放。
+# 纯计算：攻击冷却（复刻网页图鉴 codexStore.js，1.2 无头逐帧实测过）、价格、诅咒强度范围。
 # 冷却以帧为单位（60 帧 / 秒）；atk = 攻速 / 100。
 
 const FPS = 60.0
@@ -8,10 +8,6 @@ const MIN_COOLDOWN = 2	# WeaponService.MIN_COOLDOWN
 const MIN_RANGE = 25	# WeaponService.MIN_RANGE
 const BASE_ATK_DURATION = 0.2	# MeleeShootingData.BASE_ATK_DURATION
 const DEFAULT_WEAPON_COUNT = 6
-# DLC2Data
-const MUTATION_SCALE_BASE = 0.1
-const MUTATION_SCALE_MAX_EVOLUTION = 150.0
-const MUTATION_SCALE_EXPONENT = 0.5
 const NIGHTMARE_DIFFICULTY = 5	# 难度 5 起物价通胀 +10%（difficulty_6_effect_9：inflation_modifier 10）
 
 
@@ -168,8 +164,3 @@ static func curse_range(dlc1, wave: int) -> Array:
 	var rnd = dlc1.cursed_item_random_percent_modifier
 	return [max(0, mid - rnd), mid, mid + rnd]
 
-
-# DLC2Data.get_mutation_scale
-static func mutation_scale(evolution: float) -> float:
-	var progress = min(abs(evolution) / MUTATION_SCALE_MAX_EVOLUTION, 1.0)
-	return MUTATION_SCALE_BASE + (1.0 - MUTATION_SCALE_BASE) * pow(progress, MUTATION_SCALE_EXPONENT)

@@ -20,9 +20,8 @@ const DIM_COLOR = Color(0.65, 0.65, 0.65)
 const CURSE_COLOR = Color("#b75cff")
 const MECA_COLOR = Color("#3fcafc")
 const MUTANT_COLOR = Color("#d2ff5e")
-const PRICE_WAVES = [1, 5, 10, 15, 20]
+const PRICE_WAVES = [1, 5, 10, 15, 19]
 const MECA_MAX = 80
-const MUT_MAX = 150
 
 var item = null
 var in_run := false
@@ -32,12 +31,12 @@ var curse_band := []	# [低, 中位, 高]：当前波次可能的诅咒强度
 var meca_on := false
 var meca_power := 1
 var mut_on := false
-var mut_val := MUT_MAX
+var mut_val := 150
 var atk := 0
 var stat_range := 0
 var count := Calc.DEFAULT_WEAPON_COUNT
 var wave := 0
-var difficulty := 0
+var nightmare := false
 
 var _syncing := false
 var _curse_btn: Button
@@ -69,19 +68,19 @@ func reset_defaults() -> void:
 	curse_band = Calc.curse_range(dlc1, RunData.current_wave) if in_run and dlc1 != null else []
 	curse_pct = int(clamp(curse_band[1], 10, 110)) if curse_band.size() > 0 else 110
 	if in_run:
-		mut_val = int(clamp(abs(RunData.get_player_effect(Keys.stat_evolution_hash, 0)), 1, MUT_MAX))
+		mut_val = int(clamp(abs(RunData.get_player_effect(Keys.stat_evolution_hash, 0)), 1, Preview.mut_max()))
 		atk = int(Utils.get_stat(Keys.stat_attack_speed_hash, 0))
 		stat_range = int(Utils.get_stat(Keys.stat_range_hash, 0))
 		count = int(clamp(RunData.get_player_weapons_ref(0).size(), 1, 6))
 		wave = RunData.current_wave
-		difficulty = RunData.current_difficulty
+		nightmare = RunData.current_difficulty >= Calc.NIGHTMARE_DIFFICULTY
 	else:
-		mut_val = MUT_MAX
+		mut_val = Preview.mut_max()
 		atk = 0
 		stat_range = 0
 		count = Calc.DEFAULT_WEAPON_COUNT
 		wave = 0
-		difficulty = 0
+		nightmare = false
 
 
 # 描述里实际显示的物品（应用诅咒 / 机械化）
@@ -208,7 +207,7 @@ func _icon_button(it, method: String, args: Array) -> Button:
 	var b = Button.new()
 	b.icon = it.get_icon()
 	b.expand_icon = true
-	b.rect_min_size = Vector2(52, 52)
+	b.rect_min_size = Vector2(44, 44)
 	b.hint_tooltip = tr(it.name)
 	var sb = StyleBoxFlat.new()
 	ItemService.change_inventory_element_stylebox_from_tier(sb, it.tier, 0.25)
@@ -237,21 +236,23 @@ func _section(title: String = "") -> VBoxContainer:
 func _slider_row(parent: Control, head: Control, key: String, lo: int, hi: int, value: int, method: String, suffix: String = ""):
 	var row = HBoxContainer.new()
 	row.add_constant_override("separation", 10)
-	head.rect_min_size.x = 110
+	head.rect_min_size.x = 90
+	if head is Label:
+		head.autowrap = false
 	row.add_child(head)
 	var s = RangeSlider.new()
 	s.min_value = lo
 	s.max_value = hi
 	s.step = 1
 	s.value = value
-	s.rect_min_size = Vector2(200, 28)
+	s.rect_min_size = Vector2(110, 28)
 	s.size_flags_horizontal = SIZE_EXPAND_FILL
 	s.size_flags_vertical = SIZE_SHRINK_CENTER
 	s.connect("value_changed", self, method)
 	row.add_child(s)
 	var v = _label(str(value) + suffix)
 	v.autowrap = false
-	v.rect_min_size.x = 64
+	v.rect_min_size.x = 48
 	row.add_child(v)
 	_value_labels[key] = [v, suffix]
 	parent.add_child(row)
@@ -301,11 +302,7 @@ func _build_links() -> void:
 				f.add_child(_icon_button(it, "_on_banned", [it]))
 			box.add_child(f)
 	elif item is WeaponData:
-		if item.sets.size() > 0:
-			var f = _flow()
-			for s in item.sets:
-				f.add_child(_button(tr(s.name), "_on_set", [s.my_id]))
-			_section().add_child(f)
+		pass	# 武器类型 / 类别显示在图鉴标题下（menu_codex 扩展）
 	else:
 		if item.tags.size() > 0:
 			var f = _flow()
@@ -343,7 +340,7 @@ func _build_meca() -> void:
 
 func _build_mutation() -> void:
 	var box = _section()
-	_slider_row(box, _toggle(tr("BC_MUTATION"), mut_on, "_on_mut_toggled", MUTANT_COLOR), "mut", 1, MUT_MAX, mut_val, "_on_mut_slid")
+	_slider_row(box, _toggle(tr("BC_MUTATION"), mut_on, "_on_mut_toggled", MUTANT_COLOR), "mut", 1, Preview.mut_max(), mut_val, "_on_mut_slid")
 	_mut_box = VBoxContainer.new()
 	box.add_child(_mut_box)
 	_refresh_mutation()
@@ -358,7 +355,7 @@ func _refresh_mutation() -> void:
 	if not mut_on:
 		return
 	var info = Preview.mutation(item, mut_val)
-	_mut_box.add_child(_label("%s x%s" % [tr("BC_MUT_SCALE"), str(stepify(Calc.mutation_scale(mut_val), 0.01))], DIM_COLOR))
+	_mut_box.add_child(_label("%s x%s" % [tr("BC_MUT_SCALE"), str(stepify(Preview.mut_scale(mut_val), 0.01))], DIM_COLOR))
 	if info.copy.empty():
 		_mut_box.add_child(_label(tr("BC_NO_MUT_COPY"), DIM_COLOR))
 	else:
@@ -367,13 +364,10 @@ func _refresh_mutation() -> void:
 			_add_effect(_mut_box, e)
 	for pair in info.later:
 		_add_effect(_mut_box, pair[0], false, " [color=#%s](%s)[/color]" % [DIM_COLOR.to_html(false), tr("BC_MUT_NEED").format([pair[1]])])
-	if not item is CharacterData:
-		if info.remove.empty():
-			_mut_box.add_child(_label(tr("BC_NO_MUT_REMOVE"), DIM_COLOR))
-		else:
-			_mut_box.add_child(_label(tr("BC_MUT_REMOVE"), MUTANT_COLOR))
-			for e in info.remove:
-				_add_effect(_mut_box, e, true)
+	if not item is CharacterData and not info.remove.empty():
+		_mut_box.add_child(_label(tr("BC_MUT_REMOVE"), MUTANT_COLOR))
+		for e in info.remove:
+			_add_effect(_mut_box, e, true)
 
 
 func _build_calc() -> void:
@@ -414,11 +408,13 @@ func _refresh_calc() -> void:
 
 
 func _build_price() -> void:
-	var box = _section("%s: %d" % [tr("BC_BASE_PRICE"), item.value])
+	var box = _section(tr("BC_PRICE"))
 	_price_text = _rich()
 	box.add_child(_price_text)
 	_slider_row(box, _label(tr("BC_WAVE")), "wave", 0, 40, wave, "_on_wave_slid")
-	_slider_row(box, _label(tr("DIFFICULTY")), "diff", 0, 5, difficulty, "_on_diff_slid")
+	var nm = _toggle(tr("BC_NIGHTMARE"), nightmare, "_on_nightmare_toggled", Color("#ff6b6b"))
+	nm.size_flags_horizontal = 0
+	box.add_child(nm)
 	_refresh_price()
 
 
@@ -426,6 +422,7 @@ func _refresh_price() -> void:
 	if _price_text == null:
 		return
 	var v = item.value
+	var difficulty = Calc.NIGHTMARE_DIFFICULTY if nightmare else 0
 	var dim = "[color=#%s]" % DIM_COLOR.to_html(false)
 	var txt = "%s %d: [color=#ffffff]%d[/color] %s(+%s%s)[/color]" % [tr("BC_WAVE"), wave, Calc.price(v, wave, difficulty), dim, str(stepify(Calc.price_increment(v, difficulty), 0.01)), tr("BC_PER_WAVE")]
 	var parts = []
@@ -533,7 +530,6 @@ func _on_wave_slid(v: float) -> void:
 	_refresh_price()
 
 
-func _on_diff_slid(v: float) -> void:
-	difficulty = int(v)
-	_set_value_label("diff", difficulty)
+func _on_nightmare_toggled(on: bool) -> void:
+	nightmare = on
 	_refresh_price()

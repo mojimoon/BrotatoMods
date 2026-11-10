@@ -20,15 +20,96 @@ func _bc_mod():
 	return get_node_or_null("/root/ModLoader/Mojimoon-BetterCodex")
 
 
+func _bc_setting(key: String, default = true):
+	var m = _bc_mod()
+	return m.settings.get(key, default) if m != null else default
+
+
 func _pop():
 	_bc_free_detached()
 	_bc_temp = null
+	_bc_unlock_begin()
 	._pop()
 	_bc_setup()
+	_bc_unlock_end()
+	if _bc_setting("quick_open"):
+		_bc_skip_animation()
 
 
 func _exit_tree():
 	_bc_free_detached()
+	_bc_restore_locks()
+
+
+# 快速打开：跳过开场动画，直接设为动画结束时的状态
+func _bc_skip_animation() -> void:
+	animation_tree.active = false
+	$root.rect_position = Vector2.ZERO
+	$root.rect_scale = Vector2.ONE
+	$Cache.self_modulate = Color.white
+	$root/shelf/cable.rect_scale = Vector2.ONE
+	$root/shelf/cable.rect_rotation = 0.0
+	$root/BetterTabContainer.modulate = Color.white
+
+
+func _on_BackButton_pressed() -> void:
+	_bc_restore_locks()
+	if not _bc_setting("quick_open"):
+		._on_BackButton_pressed()
+		return
+	emit_signal("codex_closed")
+	animation_tree.active = false
+	if is_instance_valid(focus_before_created):
+		_focus_control(focus_before_created)
+	hide()
+	if RunData.is_coop_run:
+		Utils._popup = null
+
+
+# ---- 解锁全部图鉴（不修改存档）：只在图鉴读取解锁状态的调用期间临时替换 ProgressData 的列表 ----
+
+var _bc_saved_progress = null
+var _bc_unlock_depth := 0	# 可嵌套：只在最外层替换 / 恢复
+
+
+func _bc_unlock_begin() -> void:
+	_bc_unlock_depth += 1
+	if _bc_unlock_depth > 1 or not _bc_setting("unlock_all", false):
+		return
+	_bc_saved_progress = [ProgressData.items_unlocked, ProgressData.weapons_unlocked, ProgressData.items_bought]
+	var items = []
+	var weapons = []
+	var bought = ProgressData.items_bought.duplicate()
+	for it in ItemService.items:
+		items.push_back(it.my_id_hash)
+		bought[it.my_id_hash] = max(bought.get(it.my_id_hash, 0), 99)
+	for w in ItemService.weapons:
+		if not weapons.has(w.weapon_id_hash):
+			weapons.push_back(w.weapon_id_hash)
+		bought[w.my_id_hash] = max(bought.get(w.my_id_hash, 0), 99)
+	ProgressData.items_unlocked = items
+	ProgressData.weapons_unlocked = weapons
+	ProgressData.items_bought = bought
+
+
+func _bc_unlock_end() -> void:
+	_bc_unlock_depth = max(0, _bc_unlock_depth - 1)
+	if _bc_unlock_depth > 0 or _bc_saved_progress == null:
+		return
+	ProgressData.items_unlocked = _bc_saved_progress[0]
+	ProgressData.weapons_unlocked = _bc_saved_progress[1]
+	ProgressData.items_bought = _bc_saved_progress[2]
+	_bc_saved_progress = null
+
+
+# 图鉴会改资源上的 is_locked（原版每次打开都重算）；解锁全部时关闭后恢复真实值
+func _bc_restore_locks() -> void:
+	if not _bc_setting("unlock_all", false):
+		return
+	for it in ItemService.items:
+		it.is_locked = not ProgressData.items_unlocked.has(it.my_id_hash)
+	for w in ItemService.weapons:
+		w.is_locked = not ProgressData.weapons_unlocked.has(w.weapon_id_hash)
 
 
 func _bc_free_detached() -> void:
@@ -54,6 +135,7 @@ func _bc_setup() -> void:
 		t.extras.show_item(null)
 		for e in t.all:
 			_bc_add_badges(e, tab)
+		_bc_grey_banned(tab)
 		_bc_reset_filters(tab)
 		_bc_fill_options(tab)
 	_bc_apply_all()
@@ -116,10 +198,8 @@ func _bc_build_tab(tab: String, inv, desc) -> void:
 	clear.connect("pressed", self, "_bc_on_clear", [tab])
 	row1.add_child(clear)
 	var badges = Button.new()
-	badges.text = tr("BC_BADGES")
-	badges.toggle_mode = true
-	badges.pressed = _bc_badges_on()
-	badges.connect("toggled", self, "_bc_on_badges")
+	badges.text = tr("BC_SETTINGS")
+	badges.connect("pressed", self, "_bc_open_settings")
 	row1.add_child(badges)
 	bar.add_child(row1)
 
@@ -308,22 +388,104 @@ func _bc_apply(tab: String) -> void:
 
 # ---- 角标 ----
 
-func _bc_badges_on() -> bool:
-	var m = _bc_mod()
-	return m == null or m.settings.get("badges", true)
+# ---- 设置 ----
+
+const BC_TOGGLES = [["badge_price", "BC_BADGE_PRICE", true], ["badge_limit", "BC_BADGE_LIMIT", true], ["badge_source", "BC_BADGE_SOURCE", true], ["unlock_all", "BC_UNLOCK_ALL", false], ["quick_open", "BC_QUICK_OPEN", true]]
+
+var _bc_settings_popup: PopupPanel
+var _bc_hotkey_btn: Button
+var _bc_capturing := false
 
 
-func _bc_on_badges(on: bool) -> void:
+func _bc_open_settings() -> void:
+	if _bc_settings_popup == null:
+		var font = load("res://resources/fonts/actual/base/font_22.tres")
+		_bc_settings_popup = PopupPanel.new()
+		_bc_settings_popup.name = "BCSettings"
+		var box = VBoxContainer.new()
+		box.add_constant_override("separation", 8)
+		for t in BC_TOGGLES:
+			var cb = CheckBox.new()
+			cb.name = t[0]
+			cb.text = tr(t[1])
+			cb.add_font_override("font", font)
+			cb.pressed = _bc_setting(t[0], t[2])
+			cb.connect("toggled", self, "_bc_on_setting", [t[0]])
+			box.add_child(cb)
+		_bc_hotkey_btn = Button.new()
+		_bc_hotkey_btn.add_font_override("font", font)
+		_bc_hotkey_btn.connect("pressed", self, "_bc_on_hotkey_pressed")
+		_bc_hotkey_btn.connect("gui_input", self, "_bc_on_hotkey_input")
+		box.add_child(_bc_hotkey_btn)
+		_bc_settings_popup.add_child(box)
+		$root.add_child(_bc_settings_popup)
+	_bc_capturing = false
+	_bc_update_hotkey_text()
+	_bc_settings_popup.popup_centered()
+
+
+func _bc_update_hotkey_text() -> void:
+	var key = OS.get_scancode_string(_bc_setting("hotkey", KEY_C))
+	_bc_hotkey_btn.text = "%s: %s" % [tr("BC_HOTKEY"), tr("BC_PRESS_KEY") if _bc_capturing else key]
+
+
+func _bc_on_hotkey_pressed() -> void:
+	_bc_capturing = true
+	_bc_update_hotkey_text()
+
+
+func _bc_on_hotkey_input(event: InputEvent) -> void:
+	if not _bc_capturing or not event is InputEventKey or not event.pressed or event.scancode == KEY_ESCAPE:
+		return
+	_bc_capturing = false
+	_bc_set_setting("hotkey", event.scancode)
+	_bc_update_hotkey_text()
+	_bc_hotkey_btn.accept_event()
+
+
+func _bc_set_setting(key: String, value) -> void:
 	var m = _bc_mod()
 	if m != null:
-		m.settings.badges = on
+		m.settings[key] = value
 		m.save_settings()
-	for t in _bc_tabs.values():
-		if t.ui.badges.pressed != on:
-			t.ui.badges.pressed = on
-		for e in t.all:
-			if is_instance_valid(e) and e.has_node("BCBadges"):
-				e.get_node("BCBadges").visible = on
+
+
+func _bc_on_setting(on: bool, key: String) -> void:
+	_bc_set_setting(key, on)
+	if key == "unlock_all":
+		if not on:
+			for it in ItemService.items:
+				it.is_locked = not ProgressData.items_unlocked.has(it.my_id_hash)
+			for w in ItemService.weapons:
+				w.is_locked = not ProgressData.weapons_unlocked.has(w.weapon_id_hash)
+		_pop()	# 重新生成列表
+	elif key.begins_with("badge_"):
+		for t in _bc_tabs.values():
+			for e in t.all:
+				if is_instance_valid(e) and e.has_node("BCBadges"):
+					var b = e.get_node("BCBadges")
+					e.remove_child(b)
+					b.free()
+		for tab in _bc_tabs:
+			for e in _bc_tabs[tab].all:
+				_bc_add_badges(e, tab)
+
+
+# 局内：P1 的禁用道具变灰（角色禁用只在非无尽波次生效，与商店一致；加上消耗禁用次数禁掉的）
+func _bc_grey_banned(tab: String) -> void:
+	if not load(BC_DIR + "ui/extras.gd").scene_in_run(get_tree()) or RunData.players_data.empty():
+		return
+	var banned = RunData.players_data[0].banned_items
+	var char_banned = []
+	if RunData.current_wave < RunData.nb_of_waves:
+		for it in load(BC_DIR + "ui/extras.gd").banned_items(RunData.get_player_character(0)):
+			char_banned.push_back(it.my_id_hash)
+	for e in _bc_tabs[tab].all:
+		var it = e.item
+		if it == null:
+			continue
+		if char_banned.has(it.my_id_hash) or banned.has(it.my_id_hash) or (it is WeaponData and banned.has(it.weapon_id_hash)):
+			e.modulate = Color(0.35, 0.35, 0.35)
 
 
 func _bc_badge_label(text: String, color: Color, align: int, valign: int) -> Label:
@@ -351,11 +513,11 @@ func _bc_add_badges(e, tab: String) -> void:
 	root.mouse_filter = MOUSE_FILTER_IGNORE
 	root.set_anchors_and_margins_preset(PRESET_WIDE)
 	var Extras = load(BC_DIR + "ui/extras.gd")
-	if Extras.has_price(it):
+	if Extras.has_price(it) and _bc_setting("badge_price"):
 		root.add_child(_bc_badge_label(str(it.value), Color("#ffd75e"), Label.ALIGN_LEFT, Label.VALIGN_TOP))
-	if tab == "items" and it.max_nb > 0:
+	if tab == "items" and it.max_nb > 0 and _bc_setting("badge_limit"):
 		root.add_child(_bc_badge_label(str(it.max_nb), Color("#ff6b6b") if it.max_nb == 1 else Color("#ffa94d"), Label.ALIGN_RIGHT, Label.VALIGN_TOP))
-	var evo = _bc_evo_of(it)
+	var evo = _bc_evo_of(it) if _bc_setting("badge_source") else ""
 	if evo != "":
 		var box = HBoxContainer.new()
 		box.mouse_filter = MOUSE_FILTER_IGNORE
@@ -374,21 +536,23 @@ func _bc_add_badges(e, tab: String) -> void:
 				box.add_child(icon)
 		root.add_child(box)
 	else:
-		var s = _bc_set_of(it)
+		var s = _bc_set_of(it) if _bc_setting("badge_source") else ""
 		if BC_SET_ABBR.has(s):
 			root.add_child(_bc_badge_label(BC_SET_ABBR[s], Color(BC_SET_COLORS[s]).lightened(0.25), Label.ALIGN_LEFT, Label.VALIGN_BOTTOM))
-	root.visible = _bc_badges_on()
 	e.add_child(root)
 
 
 # ---- 详情 ----
 
 func _on_InventoryItems_element_pressed(element: InventoryElement):
+	_bc_unlock_begin()
 	._on_InventoryItems_element_pressed(element)
 	_bc_select("items", _bc_visible_item(element.item))
+	_bc_unlock_end()
 
 
 func _on_InventoryWeapons_element_pressed(element: InventoryElement):
+	_bc_unlock_begin()
 	._on_InventoryWeapons_element_pressed(element)
 	# 等级按钮原本直接连到描述的 set_item：改连到这里，才能套用诅咒 / 机械化与附加区块
 	var desc = $"%codex_weapon_description"
@@ -400,6 +564,7 @@ func _on_InventoryWeapons_element_pressed(element: InventoryElement):
 				b.disconnect("pressed", desc, "set_item")
 				b.connect("pressed", self, "_bc_select_tier", [c.binds[0]])
 	_bc_select("weapons", _bc_visible_item(element.item))
+	_bc_unlock_end()
 
 
 # 未解锁或图鉴描述未解锁（买得不够多）的物品不显示附加区块，与原版图鉴一致
@@ -408,8 +573,10 @@ static func _bc_visible_item(it):
 
 
 func _bc_select_tier(w) -> void:
+	_bc_unlock_begin()
 	$"%codex_weapon_description".set_item(w, 0)
 	_bc_select("weapons", _bc_visible_item(w))
+	_bc_unlock_end()
 
 
 func _bc_select(tab: String, it) -> void:
@@ -417,8 +584,12 @@ func _bc_select(tab: String, it) -> void:
 		return
 	var t = _bc_tabs[tab]
 	t.current = it
+	_bc_unlock_begin()
 	t.extras.show_item(it)
 	_bc_redisplay(tab, false)
+	_bc_unlock_end()
+	if tab == "weapons":
+		_bc_weapon_header(t.desc, it)
 
 
 # 诅咒 / 机械化后的描述 + 实际冷却
@@ -428,9 +599,51 @@ func _bc_redisplay(tab: String, reset: bool = true) -> void:
 		return
 	var shown = t.extras.display_item(t.current)
 	if reset or shown != t.current:
+		_bc_unlock_begin()
 		t.desc.set_item(shown, 0)
+		_bc_unlock_end()
+		if tab == "weapons":
+			_bc_weapon_header(t.desc, t.current)
 	if shown is WeaponData:
 		_bc_fix_cooldown(t.desc, shown)
+
+
+# 图鉴标题下：武器类型与类别改为可点击的按钮（点击筛选），代替原来的类别文字
+func _bc_weapon_header(desc, w) -> void:
+	var cat = desc._category
+	var box = cat.get_parent().get_node_or_null("BCCategory")
+	if box == null:
+		box = HBoxContainer.new()
+		box.name = "BCCategory"
+		box.alignment = BoxContainer.ALIGN_CENTER
+		cat.get_parent().add_child_below_node(cat, box)
+	for c in box.get_children():
+		box.remove_child(c)
+		c.queue_free()
+	box.visible = w != null
+	cat.visible = w == null
+	if w == null:
+		return
+	var font = load("res://resources/fonts/actual/base/font_26.tres")
+	var type_btn = Button.new()
+	type_btn.text = tr("BC_MELEE") if w.type == WeaponData.Type.MELEE else tr("BC_RANGED")
+	type_btn.add_font_override("font", font)
+	type_btn.connect("pressed", self, "_bc_filter_type", [w.type])
+	box.add_child(type_btn)
+	for set in w.sets:
+		var b = Button.new()
+		b.text = tr(set.name)
+		b.add_font_override("font", font)
+		b.connect("pressed", self, "_bc_filter_set", [set.my_id])
+		box.add_child(b)
+
+
+func _bc_filter_type(type: int) -> void:
+	_bc_reset_filters("weapons")
+	_bc_tabs.weapons.f.type = type
+	_bc_fill_options("weapons")
+	_bc_apply("weapons")
+	_bc_focus_first("weapons")
 
 
 # 武器属性里的冷却（游戏 tooltip 算法）替换为实际平均冷却；ImprovedTooltips 已替换过时找不到原文，保持不动

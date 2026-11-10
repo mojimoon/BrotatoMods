@@ -33,6 +33,9 @@ func _initialize() -> void:
 			codex._on_InventoryWeapons_element_pressed(e)
 	yield(_wait(5), "completed")
 	yield(_shot(out + "/weapons.png"), "completed")
+	codex._bc_open_settings()
+	yield(_shot(out + "/settings.png"), "completed")
+	codex._bc_settings_popup.hide()
 	var sc = codex.get_node("root/BetterTabContainer/TabContainer/tab_weapons/HBoxContainer/VBoxContainer/scroll_right_weapons")
 	sc.scroll_vertical = 2000
 	yield(_shot(out + "/weapons2.png"), "completed")
@@ -48,8 +51,18 @@ func _initialize() -> void:
 	root.add_child(scene)
 	current_scene = scene
 	yield(_shot(out + "/weapon_selection.png"), "completed")
-	scene.find_node("BCCharacterInfo", true, false)._on_banned(c, null)
-	yield(_shot(out + "/banned.png"), "completed")
+	scene.queue_free()
+	var diff = load("res://ui/menus/run/difficulty_selection/difficulty_selection.tscn").instance()
+	root.add_child(diff)
+	current_scene = diff
+	yield(_shot(out + "/difficulty.png"), "completed")
+	diff.queue_free()
+	root.get_node("ItemService").init_unlocked_pool()
+	root.get_node("RunData").current_wave = 4
+	var shop = load("res://ui/menus/shop/shop.tscn").instance()
+	root.add_child(shop)
+	current_scene = shop
+	yield(_shot(out + "/shop.png"), "completed")
 	quit()
 
 

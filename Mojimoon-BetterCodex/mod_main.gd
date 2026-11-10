@@ -10,7 +10,7 @@ const MOD_ID = "Mojimoon-BetterCodex"
 const MOD_DIR = "res://mods-unpacked/Mojimoon-BetterCodex/"
 const SETTINGS_PATH = "user://Mojimoon-BetterCodex.json"
 
-var settings := {"badges": true}
+var settings := {"badge_price": true, "badge_limit": true, "badge_source": true, "unlock_all": false, "quick_open": true, "hotkey": KEY_C}
 
 
 func _init() -> void:
@@ -72,7 +72,8 @@ func _load_translations() -> void:
 		t.locale = header[i]
 		tables.push_back(t)
 	var en = Array(header).find("en")
-	while not f.eof_reached():
+	# 从 zip 读取时 eof_reached() 不会变 true（游戏启动卡死），按位置判断
+	while f.get_position() < f.get_len():
 		var row = f.get_csv_line()
 		if row.size() < header.size() or row[0] == "":
 			continue

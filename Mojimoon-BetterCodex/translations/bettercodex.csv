@@ -11,13 +11,11 @@ BC_BASE_GAME,本体,Base Game,Jeu de base,基本ゲーム,기본 게임,本體,�
 BC_TAG,道具标签,Tag,Étiquette,タグ,태그,標籤,Тег,Tag,Etiqueta,Etiqueta,Tag,Etiket,Etichetta
 BC_SPECIAL,特殊,Special,Spécial,特殊,특수,特殊,Особые,Specjalne,Especial,Especial,Spezial,Özel,Speciale
 BC_FOSSIL,化石,Fossils,Fossiles,化石,화석,化石,Окаменелости,Skamieliny,Fósiles,Fósseis,Fossilien,Fosiller,Fossili
-BC_BADGES,角标,Badges,Badges,バッジ,배지,角標,Значки,Odznaki,Insignias,Selos,Abzeichen,Rozetler,Badge
 BC_CLEAR,清除筛选,Clear Filters,Effacer les filtres,フィルターをクリア,필터 지우기,清除篩選,Очистить фильтры,Wyczyść filtry,Borrar filtros,Limpar filtros,Filter löschen,Filtreleri temizle,Cancella filtri
 BC_CURSE,诅咒,Curse,Malédiction,呪い,저주,詛咒,Проклятие,Klątwa,Maldición,Maldição,Fluch,Lanet,Maledizione
 BC_MECHA,机械化,Mecha,Méca,メカ化,기계화,機械化,Механизация,Mechanizacja,Mecanizar,Mecanizar,Mecha,Mekanik,Meccanizza
 BC_MUTATION,异变,Mutation,Mutation,変異,돌연변이,異變,Мутация,Mutacja,Mutación,Mutação,Mutation,Mutasyon,Mutazione
 BC_NO_MUT_COPY,异变无法复制,Mutation can't copy,Non copiable par Mutation,変異でコピー不可,돌연변이 복제 불가,異變無法複製,Мутация не копирует,Mutacja nie kopiuje,Mutación no copia,Mutação não copia,Mutation kopiert nicht,Mutasyon kopyalayamaz,Mutazione non copia
-BC_NO_MUT_REMOVE,异变无法清除,Mutation can't remove,Non retirable par Mutation,変異で除去不可,돌연변이 제거 불가,異變無法清除,Мутация не убирает,Mutacja nie usuwa,Mutación no elimina,Mutação não remove,Mutation entfernt nicht,Mutasyon kaldıramaz,Mutazione non rimuove
 BC_MUT_NEED,需异变≥{0},Needs Mutation ≥ {0},Mutation ≥ {0} requise,変異≥{0}が必要,돌연변이 ≥ {0} 필요,需異變≥{0},Нужна Мутация ≥ {0},Wymaga Mutacji ≥ {0},Requiere Mutación ≥ {0},Requer Mutação ≥ {0},Benötigt Mutation ≥ {0},Mutasyon ≥ {0} gerekir,Richiede Mutazione ≥ {0}
 BC_ATTACK_SPEED_CALC,攻速计算器,Attack Speed Calculator,Calculateur de vitesse d'attaque,攻撃速度計算機,공격 속도 계산기,攻速計算機,Калькулятор скорости атаки,Kalkulator szybkości ataku,Calculadora de velocidad de ataque,Calculadora de velocidade de ataque,Angriffsgeschwindigkeitsrechner,Saldırı hızı hesaplayıcı,Calcolatore velocità d'attacco
 BC_ATTACK_SPEED,攻速,A.Spd,Vit. Atq,攻速,공속,攻速,Ск. атаки,Szyb. atk,Vel. Atq,Vel. Atq,Angr.-Tempo,Sal. Hız,Vel. Att
@@ -28,7 +26,6 @@ BC_ACTUAL_CD,实际冷却,Actual Cooldown,Récupération (réelle),実際のク�
 BC_BREAKPOINTS,攻速断点,A.Spd Breakpoints,Seuils de vit. atq,攻撃速度ブレイクポイント,공격 속도 분기점,攻速斷點,Контрольные точки скорости атаки,Punkty szybkości ataku,Puntos de vel. atq,Pontos de vel. atq,Angriffsschwellen,Saldırı hızı kırılım noktaları,Soglie vel. att
 BC_EVERY_SHOTS,每发射{shots}次:,every {shots} shots:,toutes les {shots} attaques :,リロード毎{shots}回:,장전 {shots}회마다:,每發射{shots}次:,каждые {shots} выстрелов:,co {shots} strzałów:,cada {shots} disparos:,a cada {shots} tiros:,alle {shots} Schüsse:,her {shots} atışta:,ogni {shots} colpi:
 BC_EQUIV,等效,equiv,équiv,相当,상당,等效,экв,odpow,equiv,equiv,äquiv,eşdeğ,equiv
-BC_BASE_PRICE,基础价格,Base Price,Prix de base,基本価格,기본 가격,基礎價格,Базовая цена,Cena bazowa,Precio base,Preço base,Basispreis,Temel fiyat,Prezzo base
 BC_PER_WAVE,/波,/wave,/vague,/ウェーブ,/웨이브,每波,/волна,/fala,/ronda,/onda,/Welle,/dalga,/onda
 BC_WAVE,波次,Wave,Vague,ウェーブ,웨이브,波次,Волна,Fala,Ronda,Onda,Welle,Dalga,Onda
 BC_RELATED,关联内容,Related,Contenu lié,関連,관련 항목,關聯內容,Связанное,Powiązane,Relacionado,Relacionado,Verwandt,İlgili,Correlati
@@ -36,8 +33,8 @@ BC_PREFERRED_TAGS,偏好标签,Preferred Tags,Étiquettes préférées,推奨タ
 BC_BANNED_ITEMS,禁用道具,Banned Items,Objets exclus,出現しないアイテム,금지 아이템,禁用道具,Запрещённые предметы,Zablokowane przedmioty,Objetos excluidos,Itens excluídos,Gesperrte Gegenstände,Yasaklı eşyalar,Oggetti esclusi
 BC_UNIQUE,独特,Unique,Unique,ユニーク,고유,獨特,Уникальный,Unikalny,Único,Único,Einzigartig,Benzersiz,Unico
 BC_LIMITED,限制,Limited,Limité,制限,제한,限制,Ограниченный,Ograniczony,Limitado,Limitado,Begrenzt,Sınırlı,Limitato
-BC_FRAMES,帧数,Frames,Frames,フレーム,프레임,幀數,Кадры,Klatki,Fotogramas,Quadros,Frames,Kareler,Fotogrammi
-BC_TEMP_FILTER,临时筛选,Temporary filter,Filtre temporaire,一時フィルター,임시 필터,臨時篩選,Временный фильтр,Filtr tymczasowy,Filtro temporal,Filtro temporário,Temporärer Filter,Geçici filtre,Filtro temporaneo
+BC_FRAMES,f,f,f,f,f,f,f,f,f,f,f,f,f
+BC_TEMP_FILTER,筛选,Filter,Filtre,フィルター,필터,篩選,Фильтр,Filtr,Filtro,Filtro,Filter,Filtre,Filtro
 BC_MUT_COPY,可复制,Copyable,Copiable,コピー可能,복사 가능,可複製,Копируется,Do skopiowania,Copiable,Copiável,Kopierbar,Kopyalanabilir,Copiabile
 BC_MUT_REMOVE,可清除,Removable,Supprimable,除去可能,제거 가능,可清除,Удаляется,Do usunięcia,Eliminable,Removível,Entfernbar,Kaldırılabilir,Rimovibile
 BC_MUT_SCALE,缩放,Scale,Échelle,倍率,배율,縮放,Масштаб,Skala,Escala,Escala,Skalierung,Ölçek,Scala
@@ -76,3 +73,16 @@ BC_TAG_STAT_SPEED,%速度,% Speed,% Vitesse,移動速度(%),% 속도,%速度,% �
 BC_TAG_STRUCTURE,构筑物(偏好),Structure (Preference),Structure (Préférence),構造物(好み),구조물(선호),構築物(偏好),Структура (предпочтение),Struktura (preferencja),Estructura (Preferencia),Estrutura (Preferência),Struktur (Präferenz),Yapı (Tercih),Struttura (Preferenza)
 BC_TAG_STRUCTURE_REAL,构筑物,Structure,Structure,建造物,구조,結構物,Постройка,Struktura,Estructura,Estrutura,Konstruktion,Yapı,Struttura
 BC_TAG_XP_GAIN,获得%经验,% XP Gain,% Gain d'XP,経験値の獲得量(%),% XP 획득,獲得%XP,% бонусного опыта,Zdobywany % PD,% de XP recibida,% de EXP ganha,% XP-Gewinn,% TP Kazanımı,% di guadagno PE
+BC_PRICE,价格,Price,Prix,価格,가격,價格,Цена,Cena,Precio,Preço,Preis,Fiyat,Prezzo
+BC_NIGHTMARE,噩梦,Nightmare,Cauchemar,ナイトメア,나이트메어,噩夢,Кошмар,Koszmar,Pesadilla,Pesadelo,Albtraum,Kâbus,Incubo
+BC_SETTINGS,设置,Settings,Paramètres,設定,설정,設定,Настройки,Ustawienia,Ajustes,Configurações,Einstellungen,Ayarlar,Impostazioni
+BC_BADGE_PRICE,价格角标,Price badge,Badge de prix,価格バッジ,가격 배지,價格角標,Значок цены,Znacznik ceny,Insignia de precio,Selo de preço,Preis-Abzeichen,Fiyat rozeti,Badge prezzo
+BC_BADGE_LIMIT,数量上限角标,Limit badge,Badge de limite,上限バッジ,제한 배지,數量上限角標,Значок лимита,Znacznik limitu,Insignia de límite,Selo de limite,Limit-Abzeichen,Sınır rozeti,Badge limite
+BC_BADGE_SOURCE,来源角标,Source badge,Badge d'origine,出典バッジ,출처 배지,來源角標,Значок источника,Znacznik źródła,Insignia de origen,Selo de origem,Quellen-Abzeichen,Kaynak rozeti,Badge origine
+BC_UNLOCK_ALL,解锁全部图鉴（不修改存档）,Unlock entire codex (save untouched),Débloquer tout le codex (sauvegarde intacte),図鑑をすべて解放（セーブは変更しない）,도감 전체 해금 (세이브 변경 없음),解鎖全部圖鑑（不修改存檔）,Открыть весь кодекс (сохранение не меняется),Odblokuj cały kodeks (bez zmian w zapisie),Desbloquear todo el códice (sin tocar la partida),Desbloquear todo o códice (sem alterar o save),Ganzen Kodex freischalten (Spielstand bleibt),Tüm kodeksi aç (kayıt değişmez),Sblocca tutto il codice (salvataggio intatto)
+BC_QUICK_OPEN,快速打开图鉴（跳过动画）,Quick open (skip animation),Ouverture rapide (sans animation),高速で開く（アニメーション省略）,빠르게 열기 (애니메이션 생략),快速打開圖鑑（跳過動畫）,Быстрое открытие (без анимации),Szybkie otwieranie (bez animacji),Apertura rápida (sin animación),Abertura rápida (sem animação),Schnell öffnen (ohne Animation),Hızlı aç (animasyonu atla),Apertura rapida (senza animazione)
+BC_HOTKEY,商店跳转图鉴快捷键,Shop codex hotkey,Raccourci codex (boutique),ショップ図鑑キー,상점 도감 단축키,商店跳轉圖鑑快捷鍵,Клавиша кодекса в магазине,Klawisz kodeksu w sklepie,Atajo del códice en tienda,Atalho do códice na loja,Kodex-Taste im Shop,Mağaza kodeks kısayolu,Tasto codice nel negozio
+BC_PRESS_KEY,请按键…,Press a key…,Appuyez sur une touche…,キーを押してください…,키를 누르세요…,請按鍵…,Нажмите клавишу…,Naciśnij klawisz…,Pulsa una tecla…,Pressione uma tecla…,Taste drücken…,Bir tuşa basın…,Premi un tasto…
+BC_SHOP_HINT,右键或 {0} 跳转图鉴。,Right-click or {0}: open in codex.,Clic droit ou {0} : ouvrir dans le codex.,右クリックか {0} で図鑑へ。,우클릭 또는 {0}: 도감 열기.,右鍵或 {0} 跳轉圖鑑。,ПКМ или {0}: открыть в кодексе.,PPM lub {0}: otwórz w kodeksie.,Clic derecho o {0}: abrir en el códice.,Botão direito ou {0}: abrir no códice.,Rechtsklick oder {0}: im Kodex öffnen.,Sağ tık veya {0}: kodekste aç.,Clic destro o {0}: apri nel codice.
+BC_FRUIT_YES,可掉落{0},{0} can drop,{0} peut tomber,{0}がドロップ可能,{0} 드롭 가능,可掉落{0},{0} может выпасть,{0} może wypaść,{0} puede caer,{0} pode cair,{0} kann fallen,{0} düşebilir,{0} può cadere
+BC_FRUIT_NO,不可掉落{0}（未诅咒道具 {1}/{2}）,{0} can't drop (uncursed items {1}/{2}),{0} ne peut pas tomber (objets non maudits {1}/{2}),{0}はドロップしない（呪われていないアイテム {1}/{2}）,{0} 드롭 불가 (저주받지 않은 아이템 {1}/{2}),不可掉落{0}（未詛咒道具 {1}/{2}）,{0} не выпадет (непрокл. предметы {1}/{2}),{0} nie wypadnie (nieprzeklęte przedmioty {1}/{2}),{0} no puede caer (objetos sin maldición {1}/{2}),{0} não pode cair (itens sem maldição {1}/{2}),{0} fällt nicht (unverfluchte Gegenstände {1}/{2}),{0} düşemez (lanetsiz eşyalar {1}/{2}),{0} non può cadere (oggetti non maledetti {1}/{2})
