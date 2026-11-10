@@ -73,6 +73,23 @@ static func _with_evolution(evolution: float, obj: Object, method: String, args:
 	return _with_effects({Keys.stat_evolution_hash: evolution}, obj, method, args)
 
 
+# 异变阈值：缩放达到 MUTATION_ENTITY_MIN_SCALE（生成实体的效果可被复制）的最小异变值；最大值 150 时为 67，100 时为 40
+static func mut_threshold() -> int:
+	var d = dlc(DLC2)
+	if d == null:
+		return 0
+	var min_scale = d.get_script().get_script_constant_map().get("MUTATION_ENTITY_MIN_SCALE", 0.7)
+	var hi = mut_max()
+	var lo = 0
+	while lo < hi:	# 缩放随异变单调增加：二分
+		var mid = (lo + hi) / 2
+		if mut_scale(mid) >= min_scale:
+			hi = mid
+		else:
+			lo = mid + 1
+	return lo
+
+
 static func mut_scale(evolution: float) -> float:
 	if not can_mutate():
 		return 1.0
@@ -89,6 +106,7 @@ static func mutation(item, evolution: int, with_later: bool = true) -> Dictionar
 	var key = Keys.stat_evolution_hash
 	var had = effects.has(key)
 	var old = effects.get(key)
+	var threshold = mut_threshold() if with_later else 0
 	for e in item.effects:
 		if e is EffectOption:
 			continue
@@ -101,13 +119,11 @@ static func mutation(item, evolution: int, with_later: bool = true) -> Dictionar
 				c.text_key = d.mutation_marker_text_keys[c.key_hash]
 			out.copy.push_back(c)
 			continue
-		if not with_later:
-			continue
-		for v in range(evolution + 1, mut_max() + 1):
-			effects[key] = v
+		# 需要更高异变才能复制的效果（目前都是生成实体的效果，统一按 mut_threshold 判断）
+		if with_later and evolution < threshold:
+			effects[key] = threshold
 			if d.can_effect_be_copied_by_mutation(e, 0):
-				out.later.push_back([e, v])
-				break
+				out.later.push_back(e)
 	if had:
 		effects[key] = old
 	else:

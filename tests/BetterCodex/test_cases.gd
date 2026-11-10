@@ -703,6 +703,7 @@ func test_shop_mutation_preview():
 		RunData.emit_signal("gold_changed", 0, 0)	# 买卖道具时会触发：提示随之刷新
 		yield(_wait(2), "completed")
 		_check(hook.hint.text.find("/3") >= 0, "hint refreshed on gold change: " + hook.hint.text)
+		_check(hook.hint.visible, "hint shown when fruit can't drop")
 		if card != null:
 			_check(not _has_mut_preview(card._item_description), "card refreshed without preview")
 		popup.display_item_data(el.item, el, true)
@@ -845,7 +846,7 @@ func test_shop_codex_single_mutation_view():
 	_eq(seps, 1, "one mutation view with its separator")
 	var label_ok = false
 	for n in _all(t.extras._mut_box):
-		if n is Label and (n.text.begins_with(tr("BC_MUT_COPY") + " x") or n.text.begins_with(tr("BC_NO_MUT_COPY") + " x")):
+		if n is Label and (n.text.begins_with(tr("BC_MUT_COPY") + " x") or n.text == tr("BC_NO_MUT_COPY") or n.text.begins_with(tr("BC_MUT_LOW").split("(")[0])):
 			label_ok = true
 	_check(label_ok, "merged header '%s x…'" % tr("BC_MUT_COPY"))
 	hook.codex.hide()
@@ -887,3 +888,44 @@ func test_shop_hotkey_after_prewarm():
 	shop.queue_free()
 	yield(_wait(3), "completed")
 	RunData.players_data[0].weapons = []
+
+
+
+# 异变阈值：缩放达到生成实体所需最小缩放的最小异变值（150 → 67，100 → 40）；不足时显示“异变不足 (X/阈值)”，无法复制时不显示倍率
+func test_mutation_threshold_view():
+	if not Preview.can_mutate():
+		return
+	var t = Preview.mut_threshold()
+	var d = Preview.dlc(Preview.DLC2)
+	var min_scale = d.get_script().get_script_constant_map()["MUTATION_ENTITY_MIN_SCALE"]
+	_check(Preview.mut_scale(t) >= min_scale and Preview.mut_scale(t - 1) < min_scale, "threshold %d" % t)
+	_eq(t, {150: 67, 100: 40}.get(Preview.mut_max(), t), "known thresholds")
+	var pet = null
+	for x in ItemService.items:
+		if Preview.mutation(x, 1).later.size() > 0:
+			pet = x
+			break
+	var box = VBoxContainer.new()
+	tree.root.add_child(box)
+	load(DIR + "ui/mutation_view.gd").build(box, pet, 1, 0)
+	var texts = []
+	for n in box.get_children():
+		if n is Label:
+			texts.push_back(n.text)
+	_check(texts.has(tr("BC_MUT_LOW").format([1, t])), "low line: %s" % str(texts))
+	box.free()
+	var none = null
+	for x in ItemService.items:
+		var m = Preview.mutation(x, 1)
+		if m.copy.empty() and m.later.empty():
+			none = x
+			break
+	box = VBoxContainer.new()
+	tree.root.add_child(box)
+	load(DIR + "ui/mutation_view.gd").build(box, none, 1, 0)
+	var found = false
+	for n in box.get_children():
+		if n is Label and n.text == tr("BC_NO_MUT_COPY"):
+			found = true
+	_check(found, "no scale after 'can't copy'")
+	box.free()
