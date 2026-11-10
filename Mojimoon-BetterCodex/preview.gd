@@ -53,18 +53,24 @@ static func mut_max() -> int:
 	return int(d.get_script().get_script_constant_map().get("MUTATION_SCALE_MAX_EVOLUTION", 150.0))
 
 
-static func _with_evolution(evolution: float, obj: Object, method: String, args: Array):
+# 临时把 P1 的若干效果设为指定值，调用游戏函数后恢复（用游戏自己的公式算预览值）
+static func _with_effects(values: Dictionary, obj: Object, method: String, args: Array):
 	var effects: Dictionary = RunData.players_data[0].effects
-	var key = Keys.stat_evolution_hash
-	var had = effects.has(key)
-	var old = effects.get(key)
-	effects[key] = evolution
+	var saved = {}
+	for k in values:
+		saved[k] = [effects.has(k), effects.get(k)]
+		effects[k] = values[k]
 	var r = obj.callv(method, args)
-	if had:
-		effects[key] = old
-	else:
-		effects.erase(key)
+	for k in saved:
+		if saved[k][0]:
+			effects[k] = saved[k][1]
+		else:
+			effects.erase(k)
 	return r
+
+
+static func _with_evolution(evolution: float, obj: Object, method: String, args: Array):
+	return _with_effects({Keys.stat_evolution_hash: evolution}, obj, method, args)
 
 
 static func mut_scale(evolution: float) -> float:
@@ -107,3 +113,28 @@ static func mutation(item, evolution: int) -> Dictionary:
 	for i in d._get_removable_negative_effect_indexes(item):
 		out.remove.push_back(item.effects[i])
 	return out
+
+
+# ---- 价格：ItemService.get_value，去掉 P1 的价格效果；噩梦 = 噩梦难度数据里的 inflation_modifier ----
+
+static func nightmare_inflation() -> int:
+	for d in ItemService.difficulties:
+		for e in d.effects:
+			if e.key_hash == Keys.inflation_modifier_hash and e.value > 0:
+				return int(e.value)
+	return 0
+
+
+static func price(base: int, wave: int, nightmare: bool, is_weapon: bool) -> int:
+	if RunData.players_data.empty():
+		return base
+	var values = {
+		Keys.weapons_price_hash: 0, Keys.items_price_hash: 0, Keys.specific_items_price_hash: [],
+		Keys.inflation_modifier_hash: nightmare_inflation() if nightmare else 0,
+	}
+	return _with_effects(values, ItemService, "get_value", [wave, base, 0, true, is_weapon, Keys.empty_hash])
+
+
+# 每波涨价（显示用）：前 20 波（无无尽加成）的平均值
+static func price_increment(base: int, nightmare: bool, is_weapon: bool) -> float:
+	return (price(base, 20, nightmare, is_weapon) - price(base, 0, nightmare, is_weapon)) / 20.0

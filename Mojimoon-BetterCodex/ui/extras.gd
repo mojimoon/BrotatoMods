@@ -74,7 +74,7 @@ func reset_defaults() -> void:
 		stat_range = int(Utils.get_stat(Keys.stat_range_hash, 0))
 		count = int(clamp(RunData.get_player_weapons_ref(0).size(), 1, 6))
 		wave = RunData.current_wave
-		nightmare = RunData.current_difficulty >= Calc.NIGHTMARE_DIFFICULTY
+		nightmare = RunData.get_player_effect(Keys.inflation_modifier_hash, 0) > 0
 	else:
 		mut_val = Preview.mut_max()
 		atk = 0
@@ -417,12 +417,12 @@ func _refresh_price() -> void:
 	if _price_text == null:
 		return
 	var v = item.value
-	var difficulty = Calc.NIGHTMARE_DIFFICULTY if nightmare else 0
+	var w_ = item is WeaponData
 	var dim = "[color=#%s]" % DIM_COLOR.to_html(false)
-	var txt = "%s %d: [color=#ffffff]%d[/color] %s(+%s%s)[/color]" % [tr("BC_WAVE"), wave, Calc.price(v, wave, difficulty), dim, str(stepify(Calc.price_increment(v, difficulty), 0.01)), tr("BC_PER_WAVE")]
+	var txt = "%s %d: [color=#ffffff]%d[/color] %s(+%s%s)[/color]" % [tr("BC_WAVE"), wave, Preview.price(v, wave, nightmare, w_), dim, str(stepify(Preview.price_increment(v, nightmare, w_), 0.01)), tr("BC_PER_WAVE")]
 	var parts = []
 	for w in PRICE_WAVES:
-		parts.push_back("%d: %d" % [w, Calc.price(v, w, difficulty)])
+		parts.push_back("%d: %d" % [w, Preview.price(v, w, nightmare, w_)])
 	txt += "\n" + dim + "   ".join(parts) + "[/color]"
 	if in_run:
 		var cur = ItemService.get_value(RunData.current_wave, v, 0, true, item is WeaponData, item.my_id_hash)

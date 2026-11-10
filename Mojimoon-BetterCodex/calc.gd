@@ -1,6 +1,6 @@
 extends Reference
 
-# 纯计算：攻击冷却（复刻网页图鉴 codexStore.js，1.2 无头逐帧实测过）、价格、诅咒强度范围。
+# 纯计算：攻击冷却（复刻网页图鉴 codexStore.js，1.2 无头逐帧实测过）、诅咒强度范围。价格与异变用游戏函数（preview.gd）。
 # 冷却以帧为单位（60 帧 / 秒）；atk = 攻速 / 100。
 
 const FPS = 60.0
@@ -8,7 +8,6 @@ const MIN_COOLDOWN = 2	# WeaponService.MIN_COOLDOWN
 const MIN_RANGE = 25	# WeaponService.MIN_RANGE
 const BASE_ATK_DURATION = 0.2	# MeleeShootingData.BASE_ATK_DURATION
 const DEFAULT_WEAPON_COUNT = 6
-const NIGHTMARE_DIFFICULTY = 5	# 难度 5 起物价通胀 +10%（difficulty_6_effect_9：inflation_modifier 10）
 
 
 # WeaponService.apply_attack_speed_mod_to_cooldown
@@ -145,17 +144,6 @@ static func cooldown_str(seconds: float) -> String:
 
 static func actual_str(frames: float) -> String:
 	return cooldown_str(frames / FPS)
-
-
-# ItemService.get_value 去掉玩家价格效果：floor((基础 + 波次 + 基础 × 波次 × 通胀) × (1 + 无尽系数))
-static func price(base: int, wave: int, difficulty: int) -> int:
-	var inflation = 0.11 if difficulty >= NIGHTMARE_DIFFICULTY else 0.1
-	var endless = RunData.get_endless_factor(wave) / 5.0 if wave > 20 else 0.0
-	return int(max(1.0, (base + wave + base * wave * inflation) * (1.0 + endless)))
-
-
-static func price_increment(base: int, difficulty: int) -> float:
-	return base * (0.11 if difficulty >= NIGHTMARE_DIFFICULTY else 0.1) + 1.0
 
 
 # DLC1Data._get_cursed_item_effect_modifier 的取值范围（%）：[中位 - 随机, 中位 + 随机]，中位 = 基础 + 每波增量 × min(20, 波次 - 1)

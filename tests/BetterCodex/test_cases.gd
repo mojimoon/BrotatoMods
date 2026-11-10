@@ -149,15 +149,20 @@ func test_calc_frames() -> void:
 		_eq(Calc.dps_change(pistol.stats, 0, 0, 6), 0.0, "zero change at 0")
 
 
-# 价格与 ItemService.get_value 一致（玩家无价格效果；难度 5 = 通胀 +10%）
-func test_price_matches_game() -> void:
+# 价格：去掉玩家价格效果后与原始公式一致（噩梦通胀取自难度数据），且不改动玩家效果
+func test_price_preview() -> void:
 	var effects = RunData.players_data[0].effects
-	for diff in [0, 5]:
-		effects[Keys.inflation_modifier_hash] = 10 if diff == 5 else 0
+	effects[Keys.items_price_hash] = -30
+	_eq(Preview.nightmare_inflation(), 10, "nightmare inflation from difficulty data")
+	for nm in [false, true]:
+		var infl = 0.11 if nm else 0.1
 		for base in [10, 37, 90]:
-			for wave in [0, 1, 7, 19, 25]:
-				_eq(Calc.price(base, wave, diff), ItemService.get_value(wave, base, 0, true, false), "price %d w%d d%d" % [base, wave, diff])
-	effects[Keys.inflation_modifier_hash] = 0
+			for wave in [0, 1, 7, 19]:
+				_eq(Preview.price(base, wave, nm, false), int(max(1.0, base + wave + base * wave * infl)), "price %d w%d nm%s" % [base, wave, nm])
+	_check(Preview.price(30, 25, false, false) > int(30 + 25 + 30 * 25 * 0.1), "endless factor applied")
+	_eq(effects[Keys.items_price_hash], -30, "player effect restored")
+	effects[Keys.items_price_hash] = 0
+	_check(abs(Preview.price_increment(20, false, false) - 3.0) < 0.06, "increment ~ base*0.1+1")
 
 
 func test_curse_range() -> void:
@@ -419,6 +424,7 @@ func test_codex_in_run_defaults():
 	RunData.current_wave = 11
 	RunData.current_difficulty = 5
 	_set_stat(Keys.stat_attack_speed_hash, 35)
+	RunData.players_data[0].effects[Keys.inflation_modifier_hash] = 10
 	e.reset_defaults()
 	_check(e.in_run, "in run")
 	_eq(e.wave, 11, "wave")
@@ -429,6 +435,7 @@ func test_codex_in_run_defaults():
 	tree.current_scene = prev
 	main.free()
 	e.free()
+	RunData.players_data[0].effects[Keys.inflation_modifier_hash] = 0
 	_set_stat(Keys.stat_attack_speed_hash, 0)
 
 
@@ -641,3 +648,49 @@ func test_shop_scene_change():
 	yield(_wait(40), "completed")
 	print("watch end")
 	RunData.players_data[0].weapons = []
+
+
+# 商店：可掉落异变果时，悬停已有道具 / 角色显示异变预览；道具不足时不显示
+func test_shop_mutation_preview():
+	if not "primal_dread" in ProgressData.active_update_data:
+		return
+	var c = RunData.players_data[0].current_character
+	RunData.players_data[0].items = [c]
+	for id in ["item_alien_eyes", "item_baby_elephant", "item_coffee"]:
+		RunData.players_data[0].items.push_back(_item(id))
+	RunData.current_wave = 3
+	ItemService.init_unlocked_pool()
+	var shop = load("res://ui/menus/shop/shop.tscn").instance()
+	var prev = tree.current_scene
+	tree.root.add_child(shop)
+	tree.current_scene = shop
+	yield(_wait(10), "completed")
+	var hook = shop.get_node("BCShopHook")
+	hook.update_hint()
+	var popup = shop._get_item_popup(0)
+	var el = null
+	for n in _all(shop):
+		if n is InventoryElement and n.item != null and n.item.my_id == "item_alien_eyes" and n.is_visible_in_tree():
+			el = n
+	_check(el != null, "item element")
+	if el != null:
+		popup.display_item_data(el.item, el, true)
+		yield(_wait(3), "completed")
+		_check(hook.mut_panel.visible, "mutation preview shown")
+		_check(hook.mut_panel.get_child_count() > 0 and hook.mut_panel.get_child(0).get_child_count() >= 2, "preview content")
+		_check(not hook.mut_panel.get_global_rect().intersects(popup.get_global_rect()), "beside the popup")
+		popup.hide()
+		yield(_wait(2), "completed")
+		_check(not hook.mut_panel.visible, "hidden with popup")
+		# 道具不足 3 个：不可掉落 → 不显示
+		RunData.players_data[0].items = [c, _item("item_alien_eyes")]
+		RunData.emit_signal("gold_changed", 0, 0)	# 买卖道具时会触发：提示随之刷新
+		yield(_wait(2), "completed")
+		_check(hook.hint.text.find("/3") >= 0, "hint refreshed on gold change: " + hook.hint.text)
+		popup.display_item_data(el.item, el, true)
+		yield(_wait(3), "completed")
+		_check(not hook.mut_panel.visible, "no preview when fruit can't drop")
+	tree.current_scene = prev
+	tree.root.remove_child(shop)
+	shop.queue_free()
+	yield(_wait(3), "completed")
