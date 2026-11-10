@@ -10,7 +10,7 @@ const MOD_ID = "Mojimoon-BetterCodex"
 const MOD_DIR = "res://mods-unpacked/Mojimoon-BetterCodex/"
 const SETTINGS_PATH = "user://Mojimoon-BetterCodex.json"
 
-var settings := {"badge_price": true, "badge_limit": true, "badge_source": true, "unlock_all": false, "quick_open": true, "hotkey": KEY_C}
+var settings := {"badge_price": true, "badge_limit": true, "badge_source": true, "unlock_all": false, "quick_open": true, "shop_hint": true, "hotkey": KEY_C}
 
 
 func _init() -> void:

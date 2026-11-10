@@ -2,7 +2,7 @@ extends Node
 
 # 商店：右键点商品 / 已有武器 / 道具，或悬停 / 聚焦时按快捷键（默认 C，可在图鉴设置里改；手柄 R3），打开图鉴并定位到它。
 # 不改动物品弹窗（其他 mod 会往弹窗里加按钮、改焦点链，例如 ItemRefund），只监听输入。
-# 左下角在不可掉落异变果时显示道具数量提示；异变预览本身加在描述末尾（extensions/ui/menus/shop/item_description.gd）。
+# 左下角显示跳转图鉴的提示，不可掉落异变果时附带道具数量（设置里可隐藏）；异变预览本身加在描述末尾（extensions/ui/menus/shop/item_description.gd）。
 
 const FONT = preload("res://resources/fonts/actual/base/font_22.tres")
 
@@ -52,12 +52,16 @@ func hotkey() -> int:
 	return int(m.settings.get("hotkey", KEY_C)) if m != null else KEY_C
 
 
-# 只在不可掉落异变果时显示（“不可掉落异变果（未诅咒道具 x/3）”）；可掉落或与异变果无关时隐藏
+# “右键或 C 跳转图鉴。”，不可掉落异变果时再加“不可掉落异变果（未诅咒道具 x/3）”；可在图鉴设置里隐藏
 func update_hint() -> void:
-	var fruit = fruit_text()
 	var can_drop = fruit_can_drop()
-	hint.text = fruit
-	hint.visible = fruit != "" and not can_drop
+	var text = tr("BC_SHOP_HINT").format([OS.get_scancode_string(hotkey())])
+	var fruit = fruit_text()
+	if fruit != "" and not can_drop:
+		text += " " + fruit
+	hint.text = text
+	var m = _mod()
+	hint.visible = m == null or m.settings.get("shop_hint", true)
 	# 能否掉落变了：商品卡片的描述（带不带异变预览）重新生成；弹窗每次显示都会重新生成
 	if _can_drop != null and can_drop != _can_drop:
 		for n in _all_nodes(shop):

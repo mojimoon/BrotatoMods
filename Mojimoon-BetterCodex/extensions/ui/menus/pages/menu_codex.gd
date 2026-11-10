@@ -562,7 +562,7 @@ func _bc_apply(tab: String) -> void:
 
 # ---- 设置 ----
 
-const BC_TOGGLES = [["badge_price", "BC_BADGE_PRICE", true], ["badge_limit", "BC_BADGE_LIMIT", true], ["badge_source", "BC_BADGE_SOURCE", true], ["unlock_all", "BC_UNLOCK_ALL", false], ["quick_open", "BC_QUICK_OPEN", true]]
+const BC_TOGGLES = [["badge_price", "BC_BADGE_PRICE", true], ["badge_limit", "BC_BADGE_LIMIT", true], ["badge_source", "BC_BADGE_SOURCE", true], ["unlock_all", "BC_UNLOCK_ALL", false], ["quick_open", "BC_QUICK_OPEN", true], ["shop_hint", "BC_SHOW_SHOP_HINT", true]]
 
 var _bc_settings_popup: PopupPanel
 var _bc_hotkey_btn: Button
@@ -643,6 +643,11 @@ func _bc_on_setting(on: bool, key: String) -> void:
 			for w in ItemService.weapons:
 				w.is_locked = not ProgressData.weapons_unlocked.has(w.weapon_id_hash)
 		_pop()	# 重新生成列表
+	elif key == "shop_hint":
+		var scene = get_tree().current_scene	# 暂停菜单里的图鉴不是商店的直接子节点
+		var hint = scene.get_node_or_null("BCShopHint") if scene != null else null
+		if hint != null:
+			hint.visible = on
 	elif key.begins_with("badge_"):
 		for t in _bc_tabs.values():
 			for e in t.all:
