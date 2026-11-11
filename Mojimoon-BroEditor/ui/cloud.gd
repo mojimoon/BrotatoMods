@@ -476,17 +476,21 @@ func open_view(p: Dictionary):
 	copy.connect("pressed", self, "_on_copy_id", [id])
 	id_row.add_child(copy)
 	col.add_child(ui._label(_info(p) + ("  ·  v" + str(p.mod_ver) if str(p.get("mod_ver", "")) != "" else ""), ui.FONT_DESC, ui.C_ACCENT_2))
-	if str(p.get("desc", "")) != "":
-		var d = ui._desc(str(p.desc))
-		d.add_color_override("font_color", ui.C_TEXT)
-		col.add_child(d)
 	var sc = ui._scroll()
 	sc.rect_min_size = Vector2(0, 460)
 	m.body.add_child(sc)
+	var inner = VBoxContainer.new()
+	inner.size_flags_horizontal = SIZE_EXPAND_FILL
+	inner.add_constant_override("separation", 10)
+	sc.add_child(inner)
+	if str(p.get("desc", "")) != "":
+		var d = ui._desc(str(p.desc))
+		d.add_color_override("font_color", ui.C_TEXT)
+		inner.add_child(d)
 	var list = VBoxContainer.new()
 	list.size_flags_horizontal = SIZE_EXPAND_FILL
 	list.add_constant_override("separation", 6)
-	sc.add_child(list)
+	inner.add_child(list)
 	if _mod.packs.has(id):
 		_fill_contents(list, _mod.packs[id].data)
 		if outdated(id):

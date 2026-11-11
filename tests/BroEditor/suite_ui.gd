@@ -508,6 +508,16 @@ func test_154_field_controls() -> void:
 	yield(tree, "idle_frame")
 
 
+func _find_scroll(n: Node):
+	if n is ScrollContainer:
+		return n
+	for c in n.get_children():
+		var r = _find_scroll(c)
+		if r != null:
+			return r
+	return null
+
+
 func _find_label(n: Node, t: String):
 	if (n is Label or n is RichTextLabel) and n.text == t:
 		return n
@@ -1503,7 +1513,7 @@ func test_195_share_tab() -> void:
 	var it = isvc.items[3].my_id
 	var ui = yield(_open_ui(CH), "completed")
 	ui.test_clipboard = ""
-	var pack = {"id": "abcdefghij", "title": "T Pack", "author": "me", "kinds": "item", "contents": "X", "n": 1, "thumb": 0, "created": 0, "downloads": 3, "desc": "d"}
+	var pack = {"id": "abcdefghij", "title": "T Pack", "author": "me", "kinds": "item", "contents": "X", "n": 1, "thumb": 0, "created": 0, "downloads": 3, "desc": "pack intro"}
 	var code = m.ALL_PREFIX + m.pack({"items": {it: {"price": 7}}})
 	ui.test_cloud = {
 		"GET /packs?kind=&q=&sort=new&offset=0": [200, JSON.print({"packs": [pack], "more": false})],
@@ -1518,6 +1528,8 @@ func test_195_share_tab() -> void:
 	_check(_tree_has_text(c, "T Pack"), "list shows the pack")
 	var vm = c.open_view(pack)
 	_check(_tree_has_text(vm, "abcdefghij"), "view shows the id")
+	var vsc = _find_scroll(vm)
+	_check(vsc != null and _tree_has_text(vsc, "pack intro"), "long description scrolls with the contents")
 	_check(_tree_has_text(vm, tr(m.find_target("item", it).name)), "view lists the pack contents")
 	c._on_copy_id("abcdefghij")
 	_eq(ui.test_clipboard, "abcdefghij", "id copied")
