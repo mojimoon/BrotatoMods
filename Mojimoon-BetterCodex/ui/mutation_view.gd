@@ -20,8 +20,8 @@ static func build(box: Control, item, evolution: int, player_index: int, with_la
 	sep.add_constant_override("separation", 14)
 	box.add_child(sep)
 
-	var info = Preview.mutation(item, evolution, with_later)
-	var scale = " x" + str(stepify(Preview.mut_scale(evolution), 0.01))
+	var info = Preview.mutation(item, evolution, with_later, player_index)
+	var scale = " x" + str(stepify(Preview.mut_scale(evolution, player_index), 0.01))
 	if info.copy.empty() and info.later.empty():
 		box.add_child(_label(TranslationServer.translate("BC_NO_MUT_COPY"), DIM_COLOR))
 	elif not info.copy.empty():

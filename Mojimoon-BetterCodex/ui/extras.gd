@@ -26,6 +26,7 @@ const PRICE_WAVES = [1, 5, 10, 15, 19]
 const MECA_MAX = 80
 
 var item = null
+var player := 0	# 局内显示哪个玩家的数值（多人：打开图鉴的玩家，由图鉴设置）
 var in_run := false
 var curse_on := false
 var curse_pct := 110
@@ -63,6 +64,8 @@ static func scene_in_run(tree: SceneTree) -> bool:
 # 每次打开图鉴：局内用当前值（诅咒取本波中位数），局外用网页图鉴的默认值
 func reset_defaults() -> void:
 	in_run = scene_in_run(get_tree()) and not RunData.players_data.empty()
+	if not in_run or player >= RunData.players_data.size():
+		player = 0
 	curse_on = false
 	meca_on = false
 	mut_on = false
@@ -71,14 +74,14 @@ func reset_defaults() -> void:
 	curse_band = Calc.curse_range(dlc1, RunData.current_wave) if in_run and dlc1 != null else []
 	curse_pct = int(clamp(curse_band[1], 10, 110)) if curse_band.size() > 0 else 110
 	if in_run:
-		mut_val = int(clamp(abs(RunData.get_player_effect(Keys.stat_evolution_hash, 0)), 1, Preview.mut_max()))
+		mut_val = int(clamp(abs(RunData.get_player_effect(Keys.stat_evolution_hash, player)), 1, Preview.mut_max()))
 		# 局内按设置“启用异变预览”决定是否默认打开
-		mut_on = load("res://mods-unpacked/Mojimoon-BetterCodex/ui/shop_hook.gd").mutation_preview_on()
-		atk = int(Utils.get_stat(Keys.stat_attack_speed_hash, 0))
-		stat_range = int(Utils.get_stat(Keys.stat_range_hash, 0))
-		count = int(clamp(RunData.get_player_weapons_ref(0).size(), 1, 6))
+		mut_on = load("res://mods-unpacked/Mojimoon-BetterCodex/ui/shop_hook.gd").mutation_preview_on(player)
+		atk = int(Utils.get_stat(Keys.stat_attack_speed_hash, player))
+		stat_range = int(Utils.get_stat(Keys.stat_range_hash, player))
+		count = int(clamp(RunData.get_player_weapons_ref(player).size(), 1, 6))
 		wave = RunData.current_wave
-		nightmare = RunData.get_player_effect(Keys.inflation_modifier_hash, 0) > 0
+		nightmare = RunData.get_player_effect(Keys.inflation_modifier_hash, player) > 0
 	else:
 		mut_val = Preview.mut_max()
 		atk = 0
@@ -95,7 +98,7 @@ func display_item(base):
 	if meca_on and Preview.can_meca(base):
 		return Preview.meca(base, meca_power)
 	if curse_on and Preview.can_curse(base):
-		return Preview.cursed(base, curse_pct)
+		return Preview.cursed(base, curse_pct, player)
 	return base
 
 
@@ -355,7 +358,7 @@ func _refresh_mutation() -> void:
 	if not mut_on:
 		return
 	# 开着诅咒时：复制的基础值取诅咒后的；与商店描述末尾的异变预览同样的显示
-	load("res://mods-unpacked/Mojimoon-BetterCodex/ui/mutation_view.gd").build(_mut_box, display_item(item), mut_val, 0, true)
+	load("res://mods-unpacked/Mojimoon-BetterCodex/ui/mutation_view.gd").build(_mut_box, display_item(item), mut_val, player, true)
 
 
 func _build_calc() -> void:
@@ -409,10 +412,10 @@ func _refresh_price() -> void:
 	var v = item.value
 	var w_ = item is WeaponData
 	var dim = "[color=#%s]" % DIM_COLOR.to_html(false)
-	var txt = "%s %d: [color=#ffffff]%d[/color] %s(+%s%s)[/color]" % [tr("BC_WAVE"), wave, Preview.price(v, wave, nightmare, w_), dim, str(stepify(Preview.price_increment(v, nightmare, w_), 0.01)), tr("BC_PER_WAVE")]
+	var txt = "%s %d: [color=#ffffff]%d[/color] %s(+%s%s)[/color]" % [tr("BC_WAVE"), wave, Preview.price(v, wave, nightmare, w_, player), dim, str(stepify(Preview.price_increment(v, nightmare, w_, player), 0.01)), tr("BC_PER_WAVE")]
 	var parts = []
 	for w in PRICE_WAVES:
-		parts.push_back("%d: %d" % [w, Preview.price(v, w, nightmare, w_)])
+		parts.push_back("%d: %d" % [w, Preview.price(v, w, nightmare, w_, player)])
 	txt += "\n" + dim + "   ".join(parts) + "[/color]"
 	if in_run:
 		var cur = ItemService.get_value(RunData.current_wave, v, 0, true, item is WeaponData, item.my_id_hash)

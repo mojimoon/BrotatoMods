@@ -519,7 +519,7 @@ func test_shop_open_codex():
 				el = n
 		_check(el != null, "owned weapon element")
 		if el != null:
-			_eq(hook._item_at(shop, el.get_global_rect().get_center()), owned, "hit test")
+			_eq(hook._item_of(hook._node_at(shop, el.get_global_rect().get_center())), owned, "hit test")
 			hook.open(owned)
 			yield(_wait(5), "completed")
 			var t = hook.codex._bc_tabs.weapons
@@ -991,4 +991,56 @@ func test_mutation_preview_modes() -> void:
 	m.settings.mut_preview = "default"
 	_check(Hook.mutation_preview_on(), "default: on when the fruit can drop")
 	RunData.players_data[0].items = [c]
+	RunData.bc_reset_mutable_counts()
+
+
+# 多人：图鉴 / 商店按操作的玩家取数值（P2 的攻速、P2 的异变果条件、P2 的商品卡片）
+func test_coop():
+	var c = RunData.players_data[0].current_character
+	RunData.set_player_count(2)
+	RunData.set_coop_run(true)
+	RunData.players_data[1].current_character = c
+	RunData.players_data[1].items = [c]
+	RunData.players_data[1].effects[Keys.stat_attack_speed_hash] = 77
+	Utils.reset_stat_caches()
+	RunData.bc_reset_mutable_counts()
+	var Hook = load(DIR + "ui/shop_hook.gd")
+	if "primal_dread" in ProgressData.active_update_data:
+		_check(not Hook.fruit_can_drop(0), "coop: no items, no fruit")
+		for id in ["item_alien_eyes", "item_baby_elephant", "item_coffee"]:
+			RunData.add_item(_item(id), 1)
+		_eq(Hook.fruit_count(), 3, "coop: count is the max over players")
+		_check(Hook.fruit_can_drop(0), "coop: P2's items let the fruit drop for P1 too")
+	RunData.current_wave = 3
+	ItemService.init_unlocked_pool()
+	var shop = load("res://ui/menus/shop/coop_shop.tscn").instance()
+	var prev = tree.current_scene
+	tree.root.add_child(shop)
+	tree.current_scene = shop
+	yield(_wait(10), "completed")
+	var hook = shop.get_node_or_null("BCShopHook")
+	_check(hook != null, "coop: hook attached")
+	var card = null
+	for n in _all(shop):
+		if n is ShopItem and n.player_index == 1 and n.item_data is WeaponData and n.is_visible_in_tree():
+			card = n
+			break
+	_check(card != null, "coop: P2 weapon card")
+	if hook != null and card != null:
+		_eq(hook._player_of(card), 1, "coop: card player")
+		hook.open(card.item_data, hook._player_of(card))
+		yield(_wait(5), "completed")
+		var t = hook.codex._bc_tabs.weapons
+		_eq(hook.codex.bc_player, 1, "coop: codex player")
+		_eq(t.extras.player, 1, "coop: extras player")
+		_eq(t.extras.atk, int(Utils.get_stat(Keys.stat_attack_speed_hash, 1)), "coop: P2 attack speed")
+		_check(t.extras.atk != int(Utils.get_stat(Keys.stat_attack_speed_hash, 0)), "coop: differs from P1")
+		hook.codex._on_BackButton_pressed()
+	tree.current_scene = prev
+	tree.root.remove_child(shop)
+	shop.queue_free()
+	yield(_wait(3), "completed")
+	RunData.set_coop_run(false)
+	RunData.set_player_count(1)
+	Utils.reset_stat_caches()
 	RunData.bc_reset_mutable_counts()

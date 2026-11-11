@@ -60,54 +60,65 @@ func hotkey() -> int:
 
 # “右键或 C 跳转图鉴。”，不可掉落异变果时再加“不可掉落异变果（未诅咒道具 x/3）”；可在图鉴设置里隐藏
 func update_hint() -> void:
-	var can_drop = fruit_can_drop()
-	var preview = mutation_preview_on()
 	var text = tr("BC_SHOP_HINT" if _right_click() else "BC_SHOP_HINT_KEY").format([OS.get_scancode_string(hotkey())])
-	var fruit = fruit_text()
-	if fruit != "" and not can_drop:
+	var preview = []
+	var fruit = ""
+	for i in RunData.get_player_count():
+		preview.push_back(mutation_preview_on(i))
+		if fruit == "":
+			fruit = fruit_text(i)	# 多人：数量是所有玩家共用的条件，显示第一个能获得异变果的玩家即可
+	if fruit != "" and not fruit_can_drop():
 		text += " " + fruit
 	hint.text = text
 	var m = _mod()
 	hint.visible = m == null or m.settings.get("shop_hint", true)
 	# 能否掉落变了：商品卡片的描述（带不带异变预览）重新生成；弹窗每次显示都会重新生成
-	if _can_drop != null and preview != _can_drop:
+	if _can_drop != null and str(preview) != _can_drop:
 		for n in _all_nodes(shop):
 			if n is ShopItem and n.item_data is ItemData and n.is_visible_in_tree():
-				n._item_description.set_item(n.item_data, 0)
-	_can_drop = preview
+				n._item_description.set_item(n.item_data, n.player_index)
+	_can_drop = str(preview)
 
 
 # 异变果：需要 DLC2；机械路线（双进化除外）不显示；道具不足时显示进度
 # 是否显示异变预览（商店描述末尾、局内图鉴默认打开）：设置“启用异变预览”
 #   默认 = 可掉落异变果；进化 <= 0 = 有 DLC2、不是强制机械路线、进化 <= 0；关 = 不显示
-static func mutation_preview_on() -> bool:
+static func mutation_preview_on(p: int = 0) -> bool:
 	var m = Engine.get_main_loop().root.get_node_or_null("ModLoader/Mojimoon-BetterCodex")
 	var mode = str(m.settings.get("mut_preview", "default")) if m != null else "default"
 	if mode == "off":
 		return false
 	if mode == "evo":
-		return "primal_dread" in ProgressData.active_update_data and not RunData.players_data.empty() \
-			and not RunData.is_meca_only(0) and RunData.get_player_effect(Keys.stat_evolution_hash, 0) <= 0
-	return fruit_can_drop()
+		return "primal_dread" in ProgressData.active_update_data and p < RunData.players_data.size() \
+			and not RunData.is_meca_only(p) and RunData.get_player_effect(Keys.stat_evolution_hash, p) <= 0
+	return fruit_can_drop(p)
 
 
-static func fruit_can_drop() -> bool:
+static func fruit_can_drop(p: int = 0) -> bool:
 	var d = ItemService.get_dlc_data_by_id("primal_dread")
-	return fruit_text() != "" and RunData.bc_mutable_count(0) >= d.mutation_fruit_min_items
+	return fruit_text(p) != "" and fruit_count() >= d.mutation_fruit_min_items
+
+
+# 同 DLC2Data._has_enough_items_for_mutation_fruit：任一玩家的可异变道具达到数量就可以掉落（多人共用）
+static func fruit_count() -> int:
+	var n = 0
+	for i in RunData.get_player_count():
+		n = max(n, RunData.bc_mutable_count(i))
+	return n
 
 
 # 数量用 RunData 扩展里增量维护的值（不每次遍历道具）；判断同 DLC2Data._has_enough_items_for_mutation_fruit（单人）
-static func fruit_text() -> String:
-	if not "primal_dread" in ProgressData.active_update_data or RunData.players_data.empty():
+static func fruit_text(p: int = 0) -> String:
+	if not "primal_dread" in ProgressData.active_update_data or p >= RunData.players_data.size():
 		return ""
 	var d = ItemService.get_dlc_data_by_id("primal_dread")
 	if d == null or d.mutation_fruit == null:
 		return ""
-	var dual = RunData.is_dual_evolution(0)
-	if not dual and (RunData.is_meca_only(0) or RunData.get_player_effect(Keys.stat_evolution_hash, 0) > ItemService.EVOLUTION_CAMP_LOCK_THRESHOLD):
+	var dual = RunData.is_dual_evolution(p)
+	if not dual and (RunData.is_meca_only(p) or RunData.get_player_effect(Keys.stat_evolution_hash, p) > ItemService.EVOLUTION_CAMP_LOCK_THRESHOLD):
 		return ""
 	var name = TranslationServer.translate(d.mutation_fruit.name)
-	var count = RunData.bc_mutable_count(0)
+	var count = fruit_count()
 	if count >= d.mutation_fruit_min_items:
 		return TranslationServer.translate("BC_FRUIT_YES").format([name])
 	return TranslationServer.translate("BC_FRUIT_NO").format([name, count, d.mutation_fruit_min_items])
@@ -125,19 +136,42 @@ func _input(event: InputEvent) -> void:
 		return
 	if codex != null and is_instance_valid(codex) and codex.visible:
 		return
-	var it = null
+	var node = null
 	if use_mouse:
-		it = _item_at(shop, shop.get_global_mouse_position())
-	if it == null and not (event is InputEventMouseButton):
-		it = _item_of(shop.get_focus_owner())
+		node = _node_at(shop, shop.get_global_mouse_position())
+	if node == null and not (event is InputEventMouseButton):
+		node = _focused_node(event)
+	var it = _item_of(node)
 	if it == null or it is CharacterData:
 		return
 	get_tree().set_input_as_handled()
-	open(it)
+	open(it, _player_of(node))
 
 
-func open(it) -> void:
+# 多人：每个玩家有自己的 FocusEmulator，按键盘 / 手柄找到按键的玩家，取他聚焦的控件
+func _focused_node(event: InputEvent):
+	if not RunData.is_coop_run:
+		return shop.get_focus_owner()
+	var fallback = null
+	for i in RunData.get_player_count():
+		var pad = CoopService.is_player_using_gamepad(i)
+		if pad != (event is InputEventJoypadButton):
+			continue
+		var fe = Utils.get_focus_emulator(i)
+		var c = fe.focused_control if fe != null else null
+		if _item_of(c) == null:
+			continue
+		if not pad or CoopService.get_remapped_player_device(i) == event.device:
+			return c
+		if fallback == null:
+			fallback = c
+	return fallback
+
+
+func open(it, player: int = 0) -> void:
 	_ensure_codex()
+	codex.bc_player = player
+	codex.player_index = player	# 原版：手柄右摇杆滚动、LB / RB 图标
 	codex._pop()
 	codex.bc_open_item(it)
 
@@ -158,26 +192,38 @@ static func _all_nodes(node: Node) -> Array:
 	return out
 
 
-# 控件（或其祖先）对应的物品：商品卡片 ShopItem.item_data / 背包元素 InventoryElement.item
-static func _item_of(node):
+# 控件或其祖先中的商品卡片 ShopItem / 背包元素 InventoryElement
+static func _entry_of(node):
 	while node != null and node is Control:
-		if node is ShopItem:
-			return node.item_data
-		if node is InventoryElement:
-			return node.item if node.item is ItemParentData else null
+		if node is ShopItem or node is InventoryElement:
+			return node
 		node = node.get_parent()
 	return null
 
 
-static func _item_at(node: Node, pos: Vector2):
+# 对应的物品：ShopItem.item_data / InventoryElement.item
+static func _item_of(node):
+	var e = _entry_of(node)
+	if e is ShopItem:
+		return e.item_data
+	if e is InventoryElement and e.item is ItemParentData:
+		return e.item
+	return null
+
+
+# 所属玩家（多人商店里每个玩家各有一组商品 / 背包）
+static func _player_of(node) -> int:
+	var e = _entry_of(node)
+	return e.player_index if e != null else 0
+
+
+static func _node_at(node: Node, pos: Vector2):
 	for c in node.get_children():
 		if c is CanvasItem and not c.visible:
 			continue
-		if (c is ShopItem or c is InventoryElement) and c.get_global_rect().has_point(pos):
-			var it = _item_of(c)
-			if it != null:
-				return it
-		var found = _item_at(c, pos)
+		if (c is ShopItem or c is InventoryElement) and c.get_global_rect().has_point(pos) and _item_of(c) != null:
+			return c
+		var found = _node_at(c, pos)
 		if found != null:
 			return found
 	return null

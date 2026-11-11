@@ -15,6 +15,7 @@ var _bc_temp = null	# 临时筛选 {"title", "ids"}
 var _bc_extras_script = null
 var _bc_icon_script = null
 var _bc_updates = {}	# 物品套组 id -> UpdateData（图标 + 颜色）
+var bc_player := 0	# 局内显示哪个玩家的数值：商店里由 shop_hook 设为操作的玩家，暂停菜单里取菜单当前显示的玩家
 
 
 func _bc_mod():
@@ -28,6 +29,13 @@ func _bc_setting(key: String, default = true):
 
 func _pop():
 	_bc_temp = null
+	var pause = find_parent("PauseMenu")
+	if pause != null and "_main_menu" in pause:
+		bc_player = pause._main_menu.player_index
+	if bc_player >= RunData.players_data.size():
+		bc_player = 0
+	for tab in _bc_tabs:
+		_bc_tabs[tab].extras.player = bc_player
 	var sig = _bc_signature()
 	if not _bc_tabs.empty() and sig == _bc_last_signature:
 		_bc_unlock_begin()
@@ -328,6 +336,7 @@ static func _bc_set_name(id: String) -> String:
 
 func _bc_build_tab(tab: String, inv, desc) -> void:
 	var extras = load(BC_DIR + "ui/extras.gd").new()
+	extras.player = bc_player
 	desc.get_effects().get_parent().add_child(extras)	# 紧接在效果列表后面
 	extras.connect("tag_pressed", self, "bc_filter_tag")
 	extras.connect("set_pressed", self, "_bc_filter_set")
@@ -698,7 +707,7 @@ func _bc_on_setting(on: bool, key: String) -> void:
 				_bc_add_badges(e, tab)
 
 
-# 局内：P1 的禁用道具变灰（角色禁用只在非无尽波次生效，与商店一致；加上消耗禁用次数禁掉的）
+# 局内：当前玩家的禁用道具变灰（角色禁用只在非无尽波次生效，与商店一致；加上消耗禁用次数禁掉的）
 func _bc_grey_banned(tab: String) -> void:
 	for e in _bc_tabs[tab].all:
 		if not e.has_meta("bc_modulate"):
@@ -706,10 +715,10 @@ func _bc_grey_banned(tab: String) -> void:
 		e.modulate = e.get_meta("bc_modulate")
 	if not load(BC_DIR + "ui/extras.gd").scene_in_run(get_tree()) or RunData.players_data.empty():
 		return
-	var banned = RunData.players_data[0].banned_items
+	var banned = RunData.players_data[bc_player].banned_items
 	var char_banned = []
 	if RunData.current_wave < RunData.nb_of_waves:
-		for it in load(BC_DIR + "ui/extras.gd").banned_items(RunData.get_player_character(0)):
+		for it in load(BC_DIR + "ui/extras.gd").banned_items(RunData.get_player_character(bc_player)):
 			char_banned.push_back(it.my_id_hash)
 	for e in _bc_tabs[tab].all:
 		var it = e.item
@@ -805,13 +814,18 @@ func _on_InventoryWeapons_element_pressed(element: InventoryElement):
 
 
 # 未解锁或图鉴描述未解锁（买得不够多）的物品不显示附加区块，与原版图鉴一致
+# 局外（标题界面）总是 0；局内为当前玩家
+func _bc_p() -> int:
+	return bc_player if load(BC_DIR + "ui/extras.gd").scene_in_run(get_tree()) else 0
+
+
 static func _bc_visible_item(it):
 	return null if it == null or it.is_locked or it._is_locked_in_codex() else it
 
 
 func _bc_select_tier(w) -> void:
 	_bc_unlock_begin()
-	$"%codex_weapon_description".set_item(w, 0)
+	$"%codex_weapon_description".set_item(w, _bc_p())
 	_bc_select("weapons", _bc_visible_item(w))
 	_bc_unlock_end()
 
@@ -834,9 +848,9 @@ func _bc_redisplay(tab: String, reset: bool = true) -> void:
 	if t.current == null:
 		return
 	var shown = t.extras.display_item(t.current)
-	if reset or shown != t.current:
+	if reset or shown != t.current or _bc_p() != 0:	# 原版聚焦时按玩家 0 生成描述：多人时按当前玩家重新生成
 		_bc_unlock_begin()
-		t.desc.set_item(shown, 0)
+		t.desc.set_item(shown, _bc_p())
 		_bc_unlock_end()
 		_bc_header(tab, t.desc, t.current)
 	if shown is WeaponData:
@@ -923,23 +937,24 @@ func _bc_fix_cooldown(desc, w) -> void:
 	args.sets = w.sets
 	args.effects = w.effects
 	var cur
+	var p = _bc_p()
 	if w.type == WeaponData.Type.MELEE:
-		cur = WeaponService.init_melee_stats(w.stats, 0, args)
+		cur = WeaponService.init_melee_stats(w.stats, p, args)
 	else:
-		cur = WeaponService.init_ranged_stats(w.stats, 0, false, args)
+		cur = WeaponService.init_ranged_stats(w.stats, p, false, args)
 	var in_run = load(BC_DIR + "ui/extras.gd").scene_in_run(get_tree())
-	var count = int(clamp(RunData.get_player_weapons_ref(0).size(), 1, 6)) if in_run else Calc.DEFAULT_WEAPON_COUNT
-	var atk = (Utils.get_stat(Keys.stat_attack_speed_hash, 0) + cur.attack_speed_mod) / 100.0
-	var timing = Calc.timing(w.stats, atk, Utils.get_stat(Keys.stat_range_hash, 0), count)
+	var count = int(clamp(RunData.get_player_weapons_ref(p).size(), 1, 6)) if in_run else Calc.DEFAULT_WEAPON_COUNT
+	var atk = (Utils.get_stat(Keys.stat_attack_speed_hash, p) + cur.attack_speed_mod) / 100.0
+	var timing = Calc.timing(w.stats, atk, Utils.get_stat(Keys.stat_range_hash, p), count)
 	var text = label.bbcode_text
 	var from = max(0, text.find(tr("COOLDOWN")))
-	var at = text.find(Calc.cooldown_str(cur.get_cooldown_value(0, 1.0)), from)
+	var at = text.find(Calc.cooldown_str(cur.get_cooldown_value(p, 1.0)), from)
 	if at >= 0:
-		var old = Calc.cooldown_str(cur.get_cooldown_value(0, 1.0))
+		var old = Calc.cooldown_str(cur.get_cooldown_value(p, 1.0))
 		text = text.substr(0, at) + Calc.actual_str(timing.avg) + text.substr(at + old.length())
 		from = at + 1
 	if timing.shots > 0:
-		var old_r = Calc.cooldown_str(cur.get_cooldown_value(0, cur.additional_cooldown_multiplier))
+		var old_r = Calc.cooldown_str(cur.get_cooldown_value(p, cur.additional_cooldown_multiplier))
 		var at_r = text.find(old_r, from)
 		if at_r >= 0:
 			text = text.substr(0, at_r) + Calc.actual_str(timing.reload) + text.substr(at_r + old_r.length())
