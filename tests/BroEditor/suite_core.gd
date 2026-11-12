@@ -2779,3 +2779,56 @@ func test_324_object_lock() -> void:
 	m.kind_enabled.weapon = false
 	m.apply_all()
 	_check(m.is_unlocked("weapon", w.weapon_id), "tab switch off lifts the lock")
+
+
+# 未拥有 DLC（available_dlc_ids 里没有）与拥有但在游戏里关闭套组（deactivated_update_data）是两种状态：
+# 两种状态下诅咒 / 异变选项与锁定都不报错，原版也不会异变（扩展的 dlc_2_data 不会被调用）
+func test_325_options_without_dlc() -> void:
+	var pd = tree.root.get_node("ProgressData")
+	var dlcs = ["abyssal_terrors", "primal_dread"]
+	var iid = m.create_custom_item(_plain_item().my_id, "nodlc")
+	var p = m.item_profiles[iid]
+	p.effects = [{"set": {"key": "stat_armor", "value": 5}, "mut_copy": 2}, {"set": {"key": "stat_speed", "value": -3}, "mut_keep": true}]
+	p.no_curse = true
+	p.lock = true
+	var skull = "item_fossil_skull"
+	var skull_was = m.is_unlocked("item", skull)
+	for mode in ["unowned", "disabled"]:
+		var owned = pd.available_dlc_ids.duplicate()
+		var off = pd.deactivated_update_data.duplicate()
+		for id in dlcs:
+			if mode == "unowned":
+				pd.available_dlc_ids.erase(id)
+			elif not id in pd.deactivated_update_data:
+				pd.deactivated_update_data.push_back(id)
+		pd.refresh_active_update_data()
+		m._lists_changed()
+		m.obj_locks = {}
+		m.apply_all()
+		_check(not "primal_dread" in pd.active_update_data, mode + ": DLC2 inactive")
+		var it = m.find_target("item", iid)
+		_check(it != null and not m.is_unlocked("item", iid), mode + ": lock applies")
+		m.set_obj_locked("item", iid, false)
+		_check(m.is_unlocked("item", iid), mode + ": unlock works")
+		_check(not isvc.can_item_be_cursed(it), mode + ": no_curse flag")
+		_setup_player(CH)
+		rd.add_item(it, 0)
+		rd.players_data[0].effects[Keys.stat_evolution_hash] = -5
+		_eq(rd.mutate_random_item(0), null, mode + ": vanilla does not mutate")
+		_check(_find_effect(it.effects, "stat_armor") != null and _find_effect(it.effects, "stat_speed") != null, mode + ": effects untouched")
+		_eq(m.mutation_flags(it, _find_effect(it.effects, "stat_armor")), [2, false], mode + ": flags still resolve")
+		_check(not m.library().empty() and not m.library(true).empty(), mode + ": library builds")
+		for s in m._library_sources():
+			_check(not s[3], mode + ": DLC / vanilla source is not a mod: " + str(s[0]))
+		# DLC 道具（此时不在原版列表里）：锁定 / 解锁不报错，名称退回 id 或原名
+		m.set_obj_locked("item", skull, true)
+		_check(m.lock_target_name("item:" + skull) != "", mode + ": lock target name")
+		m.set_obj_locked("item", skull, false)
+		pd.available_dlc_ids = owned
+		pd.deactivated_update_data = off
+		pd.refresh_active_update_data()
+		m._lists_changed()
+	m.obj_locks = {}
+	m.apply_all()
+	_eq(m.is_unlocked("item", skull), skull_was, "DLC item unlock record unchanged afterwards")
+	m.delete_custom_item(iid)
