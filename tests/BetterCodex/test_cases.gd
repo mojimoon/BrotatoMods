@@ -542,12 +542,16 @@ func test_shop_open_codex():
 			yield(_wait(5), "completed")
 			var tab = "weapons" if card.item_data is WeaponData else "items"
 			var cur = hook.codex._bc_tabs[tab].current
-			_check(cur != null and cur.my_id_hash == card.item_data.my_id_hash, "shop item selected")
+			_check(cur != null and cur.my_id_hash == card.item_data.my_id_hash, "shop item selected: %s -> %s" % [card.item_data.my_id, cur.my_id if cur else "null"])
 			hook.codex.hide()
 	tree.current_scene = prev
 	tree.root.remove_child(shop)
 	shop.queue_free()
 	yield(_wait(3), "completed")
+	# 跳转用的图鉴跨波次保留：离开商店后移出场景树，列表还在
+	var sc = m._shop_codex
+	_check(is_instance_valid(sc) and not sc.is_inside_tree(), "shop codex kept out of the tree")
+	_check(is_instance_valid(sc) and sc._bc_tabs.weapons.all.size() > 50 and sc._bc_tabs.items.all.size() > 100, "shop codex keeps its lists")
 	RunData.players_data[0].weapons = []
 
 
@@ -818,11 +822,20 @@ func test_codex_prewarm_and_reuse():
 	_check(is_instance_valid(first) and codex._bc_tabs.items.all[0] == first, "elements reused")
 	_check(reopen_ms < 100, "reopen fast: %d ms" % reopen_ms)
 	codex._on_BackButton_pressed()
+	# 再买一次已解锁描述的道具：列表不变，不重建（每波都买东西，商店里的图鉴不能因此每波重建）
 	var it = ItemService.items[5]
 	ProgressData.items_bought[it.my_id_hash] = ProgressData.items_bought.get(it.my_id_hash, 0) + 1
 	codex._pop()
 	yield(_wait(2), "completed")
-	_check(not is_instance_valid(first) or codex._bc_tabs.items.all[0] != first, "rebuilt after a purchase")
+	_check(is_instance_valid(first) and codex._bc_tabs.items.all[0] == first, "not rebuilt after buying an already unlocked item")
+	codex._on_BackButton_pressed()
+	# 第一次买到（剪影 → 图标）：重建
+	var n = ProgressData.items_bought[it.my_id_hash]
+	ProgressData.items_bought.erase(it.my_id_hash)
+	codex._pop()
+	yield(_wait(2), "completed")
+	_check(not is_instance_valid(first) or codex._bc_tabs.items.all[0] != first, "rebuilt when an item becomes bought / unbought")
+	ProgressData.items_bought[it.my_id_hash] = n
 	_close(codex)
 
 

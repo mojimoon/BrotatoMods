@@ -39,6 +39,17 @@ func _ready() -> void:
 	# add_child(timer)
 
 
+# 图鉴跨波次保留：离开商店时如果还开着就关掉（不留在下一个场景上）
+func _exit_tree() -> void:
+	if codex != null and is_instance_valid(codex) and codex.get("bc_persistent"):
+		if codex.is_connected("codex_closed", self, "update_hint"):
+			codex.disconnect("codex_closed", self, "update_hint")
+		if codex.visible:
+			codex._on_BackButton_pressed()
+		if _mod() != null:
+			_mod().call_deferred("shop_codex_detach")
+
+
 func _on_gold_changed(_value, _player_index) -> void:
 	call_deferred("update_hint")	# 买下的道具在扣钱之后才加入背包
 
@@ -170,19 +181,30 @@ func _focused_node(event: InputEvent):
 
 func open(it, player: int = 0) -> void:
 	_ensure_codex()
+	if _mod() != null:
+		codex = _mod().shop_codex()	# 放回场景树
 	codex.bc_player = player
 	codex.player_index = player	# 原版：手柄右摇杆滚动、LB / RB 图标
 	codex._pop()
 	codex.bc_open_item(it)
 
 
-# 先建好图鉴节点：它进树后会在后台预先构建，第一次打开就很快
+# 取跨波次保留的图鉴（mod_main.shop_codex），在进商店那一帧预先构建（内容没变时什么都不做），之后打开很快。
+# 构建放在切换场景的加载帧里，不在玩家操作时卡顿
 func _ensure_codex() -> void:
 	if codex == null or not is_instance_valid(codex):
-		codex = load("res://ui/menus/pages/menu_codex.tscn").instance()
-		codex.name = "MenuCodex"
-		shop.add_child(codex)
-		codex.connect("codex_closed", self, "update_hint")
+		var m = _mod()
+		if m != null:
+			codex = m.shop_codex()
+		else:
+			codex = load("res://ui/menus/pages/menu_codex.tscn").instance()
+			codex.name = "MenuCodex"
+			shop.add_child(codex)
+		if not codex.is_connected("codex_closed", self, "update_hint"):
+			codex.connect("codex_closed", self, "update_hint")
+		codex.bc_prewarm()
+		if m != null:
+			m.call_deferred("shop_codex_detach")	# 构建时排队的延迟调用先执行，再移出树
 
 
 static func _all_nodes(node: Node) -> Array:

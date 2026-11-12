@@ -19,7 +19,7 @@ var bc_player := 0	# 局内显示哪个玩家的数值：商店里由 shop_hook 
 
 
 func _bc_mod():
-	return get_node_or_null("/root/ModLoader/Mojimoon-BetterCodex")
+	return Engine.get_main_loop().root.get_node_or_null("ModLoader/Mojimoon-BetterCodex")	# 商店跳转用的图鉴可能不在场景树里
 
 
 func _bc_setting(key: String, default = true):
@@ -66,10 +66,13 @@ const BC_PREWARM_DELAY = 1.0
 
 
 # 预先构建：图鉴进树约 1 秒后在后台做一次完整构建（同一帧里打开再隐藏：不绘制、不播放动画与音效，焦点还原），
-# 之后第一次打开就走快速重开。战斗中（Main 场景）不做，避免卡顿。
+# 之后第一次打开就走快速重开。局内（战斗 / 商店）的暂停菜单图鉴不做：一次构建约 250 ms，会在商店里卡一下；
+# 商店跳转用的图鉴（bc_persistent，跨波次保留）由 shop_hook 在进商店那一帧构建。
+var bc_persistent := false
+
+
 func _ready() -> void:
-	var scene = get_tree().current_scene
-	if scene != null and scene.name == "Main":
+	if bc_persistent or find_parent("PauseMenu") != null or load(BC_DIR + "ui/extras.gd").scene_in_run(get_tree()):
 		return
 	get_tree().create_timer(BC_PREWARM_DELAY + randf()).connect("timeout", self, "bc_prewarm")	# 错开同一场景里的多个图鉴
 
@@ -108,11 +111,14 @@ static func _bc_sum(d: Dictionary) -> int:
 
 # 决定列表内容的状态：物品集合、解锁、获得次数（图鉴描述是否解锁）、解锁全部、语言
 func _bc_signature() -> Array:
-	var bought = 0
-	for v in ProgressData.items_bought.values():
-		bought += v
+	# 购买次数只影响剪影（买过一次）与描述是否解锁（达到 unlock_codex_descr_after_get_it）；次数本身在描述里实时生成。
+	# 不直接用次数之和：每买一件就变，商店里的图鉴每波都得重建
+	var descr_unlocked = 0
+	for x in ItemService.items + ItemService.weapons:
+		if ProgressData.items_bought.get(x.my_id_hash, 0) >= x.unlock_codex_descr_after_get_it:
+			descr_unlocked += 1
 	return [ItemService.items.size(), ItemService.weapons.size(), ProgressData.items_unlocked.size(), ProgressData.weapons_unlocked.size(),
-		ProgressData.items_bought.size(), bought, _bc_setting("unlock_all", false), TranslationServer.get_locale(), str(ProgressData.active_update_data), ProgressData.settings.get("font_size", 1.0)]
+		ProgressData.items_bought.size(), descr_unlocked, _bc_setting("unlock_all", false), TranslationServer.get_locale(), str(ProgressData.active_update_data), ProgressData.settings.get("font_size", 1.0)]
 
 
 # 原版 _pop 去掉道具 / 武器列表的重建（敌人列表的击杀数会变，照原版重建）
@@ -202,9 +208,14 @@ func _bc_clean_frame() -> void:
 	shelf.texture = tex
 
 
+# 商店跳转用的图鉴不用时会移出场景树（mod_main.shop_codex_detach），列表要保留：被筛选掉的元素只在图鉴销毁时释放
 func _exit_tree():
-	_bc_free_detached()
 	_bc_restore_locks()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		_bc_free_detached()
 
 
 # 快速打开：跳过开场动画，直接设为动画结束时的状态
@@ -220,6 +231,8 @@ func _bc_skip_animation() -> void:
 
 func _on_BackButton_pressed() -> void:
 	_bc_restore_locks()
+	if bc_persistent and _bc_mod() != null:
+		_bc_mod().call_deferred("shop_codex_detach")
 	emit_signal("codex_closed")
 	animation_tree.active = false
 	if is_instance_valid(focus_before_created):
@@ -649,7 +662,7 @@ func _bc_on_mut_mode() -> void:
 	var i = BC_MUT_MODES.find(str(_bc_setting("mut_preview", "default")))
 	_bc_set_setting("mut_preview", BC_MUT_MODES[(i + 1) % BC_MUT_MODES.size()])
 	_bc_update_mut_text()
-	var scene = get_tree().current_scene
+	var scene = Engine.get_main_loop().current_scene
 	var hook = scene.get_node_or_null("BCShopHook") if scene != null else null
 	if hook != null:
 		hook.update_hint()	# 商品卡片的描述随之刷新
@@ -691,7 +704,7 @@ func _bc_on_setting(on: bool, key: String) -> void:
 				w.is_locked = not ProgressData.weapons_unlocked.has(w.weapon_id_hash)
 		_pop()	# 重新生成列表
 	elif key in ["shop_hint", "right_click"]:
-		var scene = get_tree().current_scene	# 暂停菜单里的图鉴不是商店的直接子节点
+		var scene = Engine.get_main_loop().current_scene	# 暂停菜单里的图鉴不是商店的直接子节点
 		var hook = scene.get_node_or_null("BCShopHook") if scene != null else null
 		if hook != null:
 			hook.update_hint()
@@ -965,14 +978,14 @@ func _bc_fix_cooldown(desc, w) -> void:
 func _on_but_tab_items_pressed():
 	if _bc_tabs.has("items") and _bc_tabs.items.all.size() > 0:
 		_update_progress_bar(float(unlocked_items) / _bc_tabs.items.all.size())
-	else:
+	elif inventory_items.get_child_count() > 0:	# 还没构建（局内暂停菜单的图鉴不预先构建）：原版会除以 0
 		._on_but_tab_items_pressed()
 
 
 func _on_but_tab_weapons_pressed():
 	if _bc_tabs.has("weapons") and _bc_tabs.weapons.all.size() > 0:
 		_update_progress_bar(float(unlocked_weapons) / _bc_tabs.weapons.all.size())
-	else:
+	elif inventory_weapons.get_child_count() > 0:
 		._on_but_tab_weapons_pressed()
 
 

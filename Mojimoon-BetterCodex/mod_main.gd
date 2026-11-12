@@ -37,6 +37,37 @@ func _on_node_added(node: Node) -> void:
 		call_deferred("_attach_shop", node)
 
 
+# 商店跳转用的图鉴：由本节点持有、跨波次保留，内容没变就不重建；用时放进 CanvasLayer（画在场景之上）。
+# 不用时移出场景树：建好的图鉴有 1 万多个节点，留在树里时某些全树操作会按节点数变慢（实测进商店约 0.2 秒时的一次卡顿多出几百 ms）
+var _shop_codex = null
+var _codex_layer: CanvasLayer
+
+
+func shop_codex():
+	if _codex_layer == null:
+		_codex_layer = CanvasLayer.new()
+		_codex_layer.name = "BCCodexLayer"
+		_codex_layer.pause_mode = Node.PAUSE_MODE_PROCESS
+		add_child(_codex_layer)
+	if _shop_codex == null or not is_instance_valid(_shop_codex):
+		_shop_codex = load("res://ui/menus/pages/menu_codex.tscn").instance()
+		_shop_codex.name = "MenuCodex"
+		_shop_codex.bc_persistent = true
+	if _shop_codex.get_parent() == null:
+		_codex_layer.add_child(_shop_codex)
+	return _shop_codex
+
+
+func shop_codex_detach() -> void:
+	if is_instance_valid(_shop_codex) and _shop_codex.get_parent() == _codex_layer and not _shop_codex.visible:
+		_codex_layer.remove_child(_shop_codex)
+
+
+func _exit_tree() -> void:
+	if is_instance_valid(_shop_codex) and _shop_codex.get_parent() == null:
+		_shop_codex.free()
+
+
 func _attach_shop(shop: Node) -> void:
 	if not is_instance_valid(shop) or shop.has_node("BCShopHook"):
 		return

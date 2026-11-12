@@ -10,9 +10,9 @@ ROOT=$(cd "$HERE/../../.." && pwd)
 PROJECT=${BROTATO_GAME:-$ROOT/1.2}
 MOD=Mojimoon-BetterCodex
 IT=_wl-ImprovedTooltips
-IT_ZIP=${BC_IT_ZIP:-/d/SteamLibrary/steamapps/workshop/content/1942280/3019195689/_wl-ImprovedTooltips-1.10.4.zip}
+IT_ZIP=${BC_IT_ZIP:-$(ls /d/SteamLibrary/steamapps/workshop/content/1942280/3019195689/_wl-ImprovedTooltips-*.zip 2>/dev/null | sort -V | tail -1)}	# 创意工坊更新后版本号会变：取目录里最新的
 RF=RefundTools-ItemRefund
-RF_ZIP=${BC_RF_ZIP:-/d/SteamLibrary/steamapps/workshop/content/1942280/3834897339/ItemRefund-1.0.3.zip}
+RF_ZIP=${BC_RF_ZIP:-$(ls /d/SteamLibrary/steamapps/workshop/content/1942280/3834897339/ItemRefund-*.zip 2>/dev/null | sort -V | tail -1)}
 SEL=${1:-normal}
 GODOT=${GODOT:-/d/env/godot_3.7-dev1/Godot_v3.7-dev1_win64.exe}
 
@@ -60,6 +60,8 @@ if [ "$SEL" = "normal" ] || [ "$SEL" = "all" ]; then
 	run normal || STATUS=1
 fi
 if [ "$SEL" = "compat" ] || [ "$SEL" = "all" ]; then
+	if [ ! -f "$IT_ZIP" ] || [ ! -f "$RF_ZIP" ]; then echo "compat: zip not found (IT=$IT_ZIP RF=$RF_ZIP)"; exit 1; fi
+	echo "compat: $(basename "$IT_ZIP") + $(basename "$RF_ZIP")"
 	TMPZ=$(mktemp -d)
 	unzip -q "$IT_ZIP" -d "$TMPZ"
 	unzip -q -o "$RF_ZIP" -d "$TMPZ"
