@@ -889,7 +889,7 @@ func test_shop_codex_single_mutation_view():
 
 
 # 商店：快捷键 C（真实输入事件，图鉴预先构建之后）打开图鉴
-func test_shop_hotkey_after_prewarm():
+func test_shop_hotkey():
 	RunData.players_data[0].weapons = [_weapon("weapon_pistol_1")]
 	RunData.current_wave = 3
 	ItemService.init_unlocked_pool()
@@ -899,8 +899,7 @@ func test_shop_hotkey_after_prewarm():
 	tree.current_scene = shop
 	yield(_wait(10), "completed")
 	var hook = shop.get_node("BCShopHook")
-	yield(tree.create_timer(2.5), "timeout")	# 预先构建（1–2 秒）
-	_check(hook.codex != null and not hook.codex._bc_tabs.empty(), "shop codex prewarmed")
+	_check(hook.codex == null, "shop codex not created before the first jump")
 	var el = null
 	for n in _all(shop):
 		if n is InventoryElement and n.item is WeaponData and n.is_visible_in_tree():

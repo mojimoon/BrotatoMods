@@ -31,7 +31,6 @@ func _ready() -> void:
 	update_hint()
 	# 买道具（以及其他 mod 的回收）都会改变材料：随 gold_changed 刷新异变果提示
 	RunData.connect("gold_changed", self, "_on_gold_changed")
-	call_deferred("_ensure_codex")
 	# var timer = Timer.new()
 	# timer.wait_time = 5.0
 	# timer.autostart = true
@@ -189,8 +188,8 @@ func open(it, player: int = 0) -> void:
 	codex.bc_open_item(it)
 
 
-# 取跨波次保留的图鉴（mod_main.shop_codex），在进商店那一帧预先构建（内容没变时什么都不做），之后打开很快。
-# 构建放在切换场景的加载帧里，不在玩家操作时卡顿
+# 取跨波次保留的图鉴（mod_main.shop_codex）。不预先构建：第一次跳转时才构建（约 250 ms），
+# 之后列表内容不变就不重建，打开很快；没用过跳转的玩家完全没有额外开销
 func _ensure_codex() -> void:
 	if codex == null or not is_instance_valid(codex):
 		var m = _mod()
@@ -202,9 +201,6 @@ func _ensure_codex() -> void:
 			shop.add_child(codex)
 		if not codex.is_connected("codex_closed", self, "update_hint"):
 			codex.connect("codex_closed", self, "update_hint")
-		codex.bc_prewarm()
-		if m != null:
-			m.call_deferred("shop_codex_detach")	# 构建时排队的延迟调用先执行，再移出树
 
 
 static func _all_nodes(node: Node) -> Array:
