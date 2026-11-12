@@ -114,6 +114,7 @@ var _head_info: Label
 var _enable_switch: CheckButton
 var _reset_btn: Button
 var _disable_switch: CheckButton
+var _lock_switch: CheckButton
 var _tier_box: HBoxContainer
 var _aspd_label: Label
 # 当前页面里各属性名称的标签（按键名），数值改动时变色
@@ -200,7 +201,7 @@ func _isvc():
 
 
 func _sig() -> String:
-	return JSON.print([_mod.profiles, _mod.item_profiles, _mod.weapon_profiles, _mod.kind_enabled, _mod.weapon_families, _mod.disabled, _mod.weapon_sets, _mod.groups])
+	return JSON.print([_mod.profiles, _mod.item_profiles, _mod.weapon_profiles, _mod.kind_enabled, _mod.weapon_families, _mod.disabled, _mod.weapon_sets, _mod.groups, _mod.obj_locks])
 
 
 func _profiles() -> Dictionary:
@@ -770,6 +771,9 @@ func _build_right(body: Control) -> void:
 	_disable_switch = _switch(tr("BE_OBJ_DISABLE"), false)
 	_disable_switch.connect("toggled", self, "_on_disable_toggled")
 	head.add_child(_disable_switch)
+	_lock_switch = _switch(tr("BE_OBJ_LOCK"), false)
+	_lock_switch.connect("toggled", self, "_on_lock_toggled")
+	head.add_child(_lock_switch)
 	# 页签
 	_tabs_row = HBoxContainer.new()
 	_tabs_row.add_constant_override("separation", 8)
@@ -903,6 +907,8 @@ func _refresh_header() -> void:
 		info += "  ·  " + tr("BE_WEAPON_INCOMPLETE")
 	elif _mod.is_disabled(_kind, _obj_key()):
 		info += "  ·  " + tr("BE_OBJ_DISABLED_TAG")
+	if _mod.is_obj_locked(_kind, _obj_key()):
+		info += "  ·  " + tr("BE_OBJ_LOCKED_TAG")
 	if not _mod.kind_enabled[_kind]:
 		info += "  ·  " + tr("BE_KIND_OFF")
 	_head_info.text = info
@@ -916,6 +922,9 @@ func _refresh_header() -> void:
 	_disable_switch.pressed = incomplete or _obj_key() in _mod.disabled[_kind]
 	_disable_switch.disabled = incomplete
 	_disable_switch.set_block_signals(false)
+	_lock_switch.set_block_signals(true)
+	_lock_switch.pressed = _mod.is_obj_locked(_kind, _obj_key())
+	_lock_switch.set_block_signals(false)
 	_refresh_tier_box()
 	if _delete_btn != null:
 		_delete_btn.disabled = not _look_custom()
@@ -979,6 +988,14 @@ func _on_delete_tier() -> void:
 
 func _on_disable_toggled(pressed: bool) -> void:
 	_mod.set_disabled(_kind, _obj_key(), pressed)
+	_changed()
+
+
+# 锁定（原版解锁记录）：写入档案的初始状态，并清掉蓝图 / 解锁条件留下的状态
+func _on_lock_toggled(pressed: bool) -> void:
+	_look_p().lock = pressed
+	_mod.obj_locks.erase(_kind + ":" + _obj_key())
+	_mod._after_lock_change()
 	_changed()
 
 
@@ -1048,7 +1065,12 @@ func _is_modified(id: String) -> bool:
 	if _kind == "weapon":
 		var r = _mod.find_target("weapon", id)
 		var f = _mod.weapon_families.get(r.weapon_id if r != null else "", null)
-		return f != null and not f.custom and (f.name != "" or f.sets is Array)
+		if f == null or f.custom:
+			return false
+		for k in FAMILY_EXTRA:
+			if JSON.print(f[k]) != JSON.print(BEMain.new_family()[k]):
+				return true
+		return f.name != "" or f.sets is Array
 	return false
 
 
@@ -1155,6 +1177,9 @@ func _build_overview() -> void:
 		_weapon_users_section(left)
 	_source_section(left)
 	_group_section(left)
+	_lock_section(left)
+	if _kind != "character":
+		_evolve_section(left)
 	_preview_card(cols)
 
 
@@ -1932,6 +1957,98 @@ func _on_weapon_users_copied(from_wid: String, users: Array, m) -> void:
 	_mod.set_weapon_users(_obj_key(), users, tiers)
 	_changed()
 	_build_page()
+
+
+# ============================================================
+# 锁定：说明（锁定时在选角界面 / 图鉴显示）与解锁条件；道具 / 武器另有"不可被诅咒 / 异变 / 机械化"
+# 这些字段在外观档案里（武器 = 家族档案）
+# ============================================================
+const FAMILY_EXTRA = ["lock", "lock_note", "unlock", "no_curse", "no_evolve"]
+
+
+func _lock_section(left: Control) -> void:
+	var look = _look_view()
+	var box = _section(left, "BE_SEC_LOCK", C_ACCENT_2)
+	box.add_child(_desc(tr("BE_LOCK_DESC")))
+	var note = _line_edit(tr("BE_LOCK_NOTE"))
+	note.text = look.lock_note
+	note.connect("text_changed", self, "_on_lock_note")
+	box.add_child(note)
+	var row = HBoxContainer.new()
+	row.add_constant_override("separation", 8)
+	box.add_child(row)
+	row.add_child(_label(tr("BE_UNLOCK_COND"), FONT_SMALL, C_TEXT))
+	var u = look.unlock
+	var items = [[tr("BE_UNLOCK_NONE"), ""]]
+	for t in BEMain.UNLOCK_TYPES:
+		items.push_back([tr("BE_UNLOCK_OPT_" + t.to_upper()), t])
+	var type = _search_select(items, str(u.get("type", "")))
+	type.connect("selected", self, "_on_unlock_changed", ["type"])
+	row.add_child(type)
+	if u.empty():
+		return
+	if u.type == "stat":
+		var stat = _stat_option(str(u.stat), Catalog.graph_stat_keys())
+		stat.connect("selected", self, "_on_unlock_changed", ["stat"])
+		row.add_child(stat)
+	var n = _spin(0, 9999999, 1)
+	n.value = int(u.n)
+	n.rect_min_size = Vector2(150, 0)
+	n.connect("value_changed", self, "_on_unlock_changed", ["n"])
+	row.add_child(n)
+
+
+func _on_lock_note(text: String) -> void:
+	_look_p().lock_note = text.substr(0, BEMain.MAX_DESC)
+	_changed()
+
+
+func _on_unlock_changed(value, field: String) -> void:
+	var p = _look_p()
+	if field == "type":
+		p.unlock = {} if str(value) == "" else {"type": str(value), "stat": str(p.unlock.get("stat", "stat_max_hp")), "n": int(p.unlock.get("n", 0))}
+	elif not p.unlock.empty():
+		p.unlock[field] = int(value) if field == "n" else str(value)
+	_changed()
+	if field == "type":
+		_build_page()
+
+
+func _evolve_section(left: Control) -> void:
+	var look = _look_view()
+	var box = _section(left, "BE_SEC_EVOLVE", C_CUSTOM_2)
+	var grid = GridContainer.new()
+	grid.columns = 4
+	grid.add_constant_override("hseparation", 6)
+	box.add_child(grid)
+	for d in [["no_curse", "BE_NO_CURSE"], ["no_evolve", "BE_NO_MECA" if _kind == "weapon" else "BE_NO_MUTATE"]]:
+		var b = _chip(tr(d[1]), d[0], look[d[0]], C_CUSTOM_2)
+		b.connect("pressed", self, "_on_evolve_flag", [d[0]])
+		grid.add_child(b)
+	box.add_child(_desc(tr("BE_EVOLVE_DESC")))
+
+
+func _on_evolve_flag(field: String) -> void:
+	var p = _look_p()
+	p[field] = not p[field]
+	_changed()
+	_build_page()
+
+
+# 蓝图"解锁 / 锁定对象"的可选对象：角色、道具、武器家族（值为 "种类:id"）
+func lockable_select_items() -> Array:
+	var out = []
+	for c in _isvc().characters:
+		if c != null:
+			out.push_back([tr(c.name), "character:" + c.my_id])
+	for it in item_select_items():
+		out.push_back([it[0], "item:" + it[1]])
+	var seen = {}
+	for w in _isvc().weapons:
+		if w != null and not seen.has(w.weapon_id):
+			seen[w.weapon_id] = true
+			out.push_back([tr(w.name), "weapon:" + w.weapon_id])
+	return out
 
 
 # ============================================================
@@ -3353,6 +3470,26 @@ func _build_effect_fields(col: Control, i: int, spec: Dictionary) -> void:
 		grid.add_child(det)
 		grid.add_child(Control.new())
 	_effect_field_rows(grid, e, "_on_field_option", [i])
+	# 异变（史前惧兽）：这条效果能否被复制到肿瘤上 / 被异变清除（武器不会异变）
+	if _kind != "weapon":
+		for d in [["mut_copy", ["BE_MUT_ALLOW", "BE_MUT_MIN", "BE_MUT_NEVER"]], ["mut_keep", ["BE_MUT_ALLOW", "BE_MUT_NEVER"]]]:
+			grid.add_child(_label(tr("BE_FIELD_" + d[0].to_upper()), FONT_DESC, C_TEXT_DIM))
+			var items = []
+			for k in d[1].size():
+				items.push_back([tr(d[1][k]), k])
+			var opt = _search_select(items, int(spec.get(d[0], 0)))
+			opt.connect("selected", self, "_on_spec_flag", [i, d[0]])
+			grid.add_child(opt)
+
+
+func _on_spec_flag(value, i: int, field: String) -> void:
+	var specs = _edit_specs()
+	if i >= specs.size():
+		return
+	specs[i].erase(field)
+	if int(value) != 0:
+		specs[i][field] = int(value) if field == "mut_copy" else true
+	_changed()
 
 
 # 效果的可编辑字段（标签 + 控件）；修改时调用 self.method(值, binds..., 字段名)
@@ -4318,6 +4455,10 @@ func _do_reset() -> void:
 		var f = _mod.weapon_families[_obj_key()]
 		f.name = ""
 		f.sets = null
+		for k in FAMILY_EXTRA:
+			f[k] = BEMain.new_family()[k]
+	_mod.obj_locks.erase(_kind + ":" + _obj_key())
+	_mod._after_lock_change()
 	_expanded = -1
 	_changed()
 	_build_page()

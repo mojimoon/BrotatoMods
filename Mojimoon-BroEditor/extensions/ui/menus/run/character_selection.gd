@@ -28,3 +28,17 @@ func _get_unlocked_elements(player_index: int) -> Array:
 	var out = ._get_unlocked_elements(player_index)
 	var m = BEMain.get_mod()
 	return m.without(out, m.disabled_character_hashes()) if m != null else out
+
+
+# 被本模组单独锁定的角色：锁定面板显示解锁条件与说明（原版显示解锁它的挑战，没有时为 NOT_SET）
+func _update_locked_panel(element: InventoryElement, player_index: int) -> void:
+	._update_locked_panel(element, player_index)
+	var m = BEMain.get_mod()
+	var panels = _get_locked_panels()
+	if m == null or player_index < 0 or player_index >= panels.size() or not panels[player_index].visible:
+		return
+	if element.item == null or not element.item.is_locked:
+		return
+	var text = m.lock_text("character", element.item.my_id)
+	if text != "":
+		panels[player_index].set_description(text)

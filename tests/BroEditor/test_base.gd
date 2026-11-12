@@ -97,6 +97,7 @@ func _reset() -> void:
 			m._link_family(wid)
 	m.weapon_families = {}
 	m.disabled = {"character": [], "item": [], "weapon": []}
+	m.obj_locks = {}
 	m.profiles = {}
 	m.item_profiles = {}
 	m.weapon_profiles = {}

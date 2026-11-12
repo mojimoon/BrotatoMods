@@ -64,6 +64,9 @@ func end_wave() -> void:
 		rec.u = []
 	_timed_list = []
 	_flush_transforms()
+	# 中途退出（_exit_tree）不算打完这一波
+	if mod != null and is_inside_tree():
+		mod.check_unlocks()
 	main = null
 
 
@@ -128,6 +131,32 @@ func fire(event: String, player_index: int, pos = null, target = null, info = nu
 		for n in en.g.get("nodes", []):
 			if n.kind == event and (event != "steps" or _every_n_steps(en, n)):
 				_walk(en, int(n.id), player_index, ctx, 0)
+
+
+# 扳机"获得时"：蓝图效果被应用（获得持有者）后延迟调用，只触发这一个蓝图。
+# 同一帧里最多 MAX_GAIN 次：互相"获得道具"的蓝图不会无限循环
+const MAX_GAIN = 100
+var _gain_frame := -1
+var _gain_count := 0
+
+
+func fire_gain(effect, player_index: int) -> void:
+	if player_index < 0 or player_index >= RunData.get_player_count():
+		return
+	if Engine.get_idle_frames() != _gain_frame:
+		_gain_frame = Engine.get_idle_frames()
+		_gain_count = 0
+	_gain_count += 1
+	if _gain_count > MAX_GAIN:
+		return
+	rebuild_all()
+	for en in entries[player_index]:
+		if en.effect == effect:
+			var ctx = {"pos": null, "target": null, "hold": null, "info": {}}
+			for n in en.g.get("nodes", []):
+				if n.kind == "gain":
+					_walk(en, int(n.id), player_index, ctx, 0)
+			return
 
 
 # 扳机"每走 N 步"：每个扳机节点单独计数
@@ -391,6 +420,10 @@ func _execute(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> void:
 		"group_unlock", "group_lock":
 			if mod != null:
 				mod.set_group_locked(str(_param(n, "group", "")), n.kind == "group_lock")
+		"obj_unlock", "obj_lock":
+			var key = str(_param(n, "target", ""))
+			if mod != null and key.find(":") > 0:
+				mod.set_obj_locked(key.get_slice(":", 0), key.substr(key.find(":") + 1), n.kind == "obj_lock")
 		"var_set":
 			_var_set(n, p, v)
 		"meca_parts":

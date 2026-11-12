@@ -39,7 +39,8 @@ static func make(g: Dictionary) -> Effect:
 
 # 诅咒系数（未诅咒为 0；旧存档里 value = 0 也视为未诅咒）。异变复制出的蓝图不会被诅咒（原版不诅咒异变物品）
 func curse_modifier() -> float:
-	if added_by_mutation:
+	# ponytail: 不受诅咒的蓝图被诅咒后再被异变复制时，复制品的强度仍带着诅咒系数（value 是原版放大的）
+	if added_by_mutation or graph.get("no_curse", false):
 		return 0.0
 	return max(0.0, float(value) / CURSE_PROBE - 1.0) if value > CURSE_PROBE else 0.0
 
@@ -82,6 +83,12 @@ func apply(player_index: int) -> void:
 		for t in once_tokens():
 			tokens.push_back(t)
 	_mark_dirty()
+	# 扳机"获得时"：等持有者进了玩家的道具 / 武器列表后触发（异变换回的副本不算再次获得）
+	if mod != null and mod.runtime != null and not mod.is_mutating():
+		for n in graph.get("nodes", []):
+			if n.kind == "gain":
+				mod.runtime.call_deferred("fire_gain", self, player_index)
+				break
 
 
 func unapply(player_index: int) -> void:
@@ -424,6 +431,10 @@ static func _payload_text(n: Dictionary, trigger_kind: String, colored: bool) ->
 			var m = _mod()
 			var gid = str(_p(n, "group", ""))
 			return _tr("BE_PX_" + n.kind.to_upper()).replace("{0}", m.group_name(gid) if m != null else gid)
+		"obj_unlock", "obj_lock":
+			var m = _mod()
+			var key = str(_p(n, "target", ""))
+			return _tr("BE_PX_" + n.kind.to_upper()).replace("{0}", m.lock_target_name(key) if m != null and key != "" else "-")
 		"charm":
 			return _tr("BE_PX_CHARM").replace("{0}", str(int(_p(n, "secs", Utils.CHARM_DURATION))))
 		"spawn":

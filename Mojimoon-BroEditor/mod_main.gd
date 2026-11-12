@@ -80,6 +80,8 @@ var next_id: int = 1
 var debug := false
 # 隐藏自定义对象图标右下角的编号（使用原版图标时才有编号）
 var hide_numbers := false
+var obj_locks: Dictionary = {}	# 单个对象的锁定状态覆盖（蓝图 / 解锁条件改的）："种类:id" -> 是否锁定；没有记录时取档案的 lock
+var lock_applied: Array = []	# 由单个对象的锁定移出原版解锁记录的对象（"种类:id"）：不再锁定时加回
 var groups: Dictionary = {}	# 内容分组：分组 id -> {"name", "members": [[种类, id]...], "locked"}
 var weapon_sets: Dictionary = {}	# 武器套装：套装 id -> 档案（见 new_set）
 var custom_tags: Dictionary = {}	# 自定义标签：键名 -> 名称（所有道具 / 角色可用；随 profiles.json 保存）
@@ -125,6 +127,8 @@ func _init() -> void:
 	ModLoaderMod.install_script_extension(dir + "singletons/run_data.gd")
 	ModLoaderMod.install_script_extension(dir + "singletons/weapon_service.gd")
 	ModLoaderMod.install_script_extension(dir + "main.gd")
+	ModLoaderMod.install_script_extension(dir + "dlcs/dlc_2/dlc_2_data.gd")
+	ModLoaderMod.install_script_extension(dir + "ui/menus/pages/menu_codex.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/run/character_selection.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/run/weapon_selection.gd")
 	ModLoaderMod.install_script_extension(dir + "ui/menus/run/difficulty_selection/difficulty_selection.gd")
@@ -217,6 +221,14 @@ static func new_profile() -> Dictionary:
 		"scaling": null,
 		# 自定义对象的图标编号
 		"num": 0,
+		# 单个对象的锁定（角色 / 道具；武器在家族档案里）：lock = 初始锁定，lock_note = 锁定时显示的说明，
+		# unlock = 解锁条件 {type: gold / stat / wave, stat, n}（空 = 无）
+		"lock": false,
+		"lock_note": "",
+		"unlock": {},
+		# 道具：不可被诅咒 / 不可被异变
+		"no_curse": false,
+		"no_evolve": false,
 	}
 
 
@@ -265,6 +277,7 @@ static func normalize_profile(p) -> Dictionary:
 	if out.graph != null:
 		_int_ids(out.graph)
 	out.num = int(out.num)
+	_normalize_lock(out)
 	out.price = int(out.price)
 	out.tier = int(out.tier)
 	out.max_nb = int(out.max_nb)
@@ -318,8 +331,24 @@ static func normalize_set(s) -> Dictionary:
 	return out
 
 
+# lock / lock_note / unlock 同 new_profile；no_curse / no_evolve = 不可被诅咒 / 不可被机械化（全部等级）
 static func new_family() -> Dictionary:
-	return {"custom": false, "base": "", "name": "", "icon": "", "sets": null, "tiers": [], "num": 0}
+	return {"custom": false, "base": "", "name": "", "icon": "", "sets": null, "tiers": [], "num": 0,
+		"lock": false, "lock_note": "", "unlock": {}, "no_curse": false, "no_evolve": false}
+
+
+const UNLOCK_TYPES = ["gold", "stat", "wave"]
+
+
+# 锁定 / 进化开关字段的类型修正（档案与家族档案共用）
+static func _normalize_lock(out: Dictionary) -> void:
+	for k in ["lock", "no_curse", "no_evolve"]:
+		out[k] = bool(out[k])
+	out.lock_note = str(out.lock_note).strip_edges().substr(0, MAX_DESC)
+	var u = out.unlock
+	out.unlock = {}
+	if u is Dictionary and str(u.get("type", "")) in UNLOCK_TYPES:
+		out.unlock = {"type": str(u.type), "stat": str(u.get("stat", "")), "n": int(u.get("n", 0))}
 
 
 # 保存 / 分享时去掉与默认值相同的字段（读取时 normalize_* 会补齐）
@@ -365,6 +394,7 @@ static func normalize_family(f) -> Dictionary:
 			out[k] = f[k]
 	out.custom = bool(f.get("custom", false))
 	out.num = int(f.get("num", 0))
+	_normalize_lock(out)
 	out.sets = null
 	if f.get("sets") is Array:
 		out.sets = []
@@ -489,6 +519,8 @@ func load_profiles() -> void:
 	custom_tags = {}
 	weapon_sets = {}
 	groups = {}
+	obj_locks = {}
+	lock_applied = []
 	sources = {}
 	_load_main_file()
 	_load_custom_files()
@@ -524,6 +556,14 @@ func _load_main_file() -> void:
 	if src is Dictionary:
 		for k in src:
 			sources[str(k)] = str(src[k])
+	var ol = parsed.result.get("obj_locks", {})
+	if ol is Dictionary:
+		for k in ol:
+			obj_locks[str(k)] = bool(ol[k])
+	var la = parsed.result.get("lock_applied", [])
+	if la is Array:
+		for k in la:
+			lock_applied.push_back(str(k))
 	var gs = parsed.result.get("groups", {})
 	if gs is Dictionary:
 		for k in gs:
@@ -637,6 +677,8 @@ func _write_profiles() -> void:
 	main["tags"] = custom_tags
 	main["sets"] = compact_all(weapon_sets, new_set())
 	main["groups"] = groups
+	main["obj_locks"] = obj_locks
+	main["lock_applied"] = lock_applied
 	main["sources"] = sources
 	var file = File.new()
 	if file.open(SAVE_PATH, File.WRITE) != OK:
@@ -2036,6 +2078,7 @@ func apply_all() -> void:
 	_weapon_library = null
 	_stat_text_keys = null
 	_good_dirs = null
+	_mut_flags = {}
 	_ban_cache.clear()
 	_global_ban = null
 	_lists_changed()
@@ -2413,9 +2456,140 @@ func _after_lock_change() -> void:
 	save_profiles()
 
 
-# 锁定所有锁定分组的成员；返回是否有锁定分组
+# 对象的"外观档案"：角色 / 道具 = 档案，武器 = 家族档案（id 为 weapon_id）；没有或未生效（关闭了"应用修改" / 本栏）时为 null
+func look_profile(kind: String, id: String):
+	if kind == "weapon":
+		var f = weapon_families.get(id)
+		return f if f != null and (f.custom or kind_enabled.weapon) else null
+	var p = profiles_of(kind).get(id)
+	return p if p != null and (p.custom or (p.enabled and kind_enabled[kind])) else null
+
+
+# 道具 / 武器的开关（no_curse / no_evolve）
+func obj_flag(res, flag: String) -> bool:
+	if res == null or not "my_id" in res:
+		return false
+	var kind = kind_of(res)
+	var p = look_profile(kind, res.weapon_id if kind == "weapon" else res.my_id)
+	return p != null and bool(p.get(flag, false))
+
+
+# ---------------- 单个对象的锁定 ----------------
+# 档案里的 lock 是初始状态（随对象分享）；蓝图"解锁 / 锁定对象"与解锁条件改的是 obj_locks（只在本机）。
+# 同分组锁定一样使用原版的解锁记录
+func is_obj_locked(kind: String, id: String) -> bool:
+	var k = kind + ":" + id
+	if obj_locks.has(k):
+		return obj_locks[k]
+	var p = look_profile(kind, id)
+	return p != null and p.lock
+
+
+func set_obj_locked(kind: String, id: String, locked: bool) -> void:
+	if not kind in KINDS or id == "":
+		return
+	obj_locks[kind + ":" + id] = locked
+	_after_lock_change()
+
+
+func _lock_keys() -> Array:
+	var out = obj_locks.keys()
+	for pair in [["character", profiles], ["item", item_profiles], ["weapon", weapon_families]]:
+		for id in pair[1]:
+			if pair[1][id].lock and not pair[0] + ":" + id in out:
+				out.push_back(pair[0] + ":" + id)
+	return out
+
+
+# "种类:id"（蓝图参数）的名称
+func lock_target_name(key: String) -> String:
+	var kind = key.get_slice(":", 0)
+	var id = key.substr(kind.length() + 1)
+	if kind == "weapon":
+		var ms = family_members(id)
+		return tr(ms[0].name) if not ms.empty() else id
+	var r = find_target(kind, id) if kind in KINDS else null
+	return tr(r.name) if r != null else id
+
+
+func unlock_text(u: Dictionary) -> String:
+	if u.empty():
+		return ""
+	return tr("BE_UNLOCK_" + str(u.type).to_upper()).replace("{0}", str(int(u.n))).replace("{1}", stat_name(str(u.stat)))
+
+
+# 锁定的对象在选角界面 / 图鉴里显示的文字：解锁条件 + 说明（没有锁定或都没填时为空）
+func lock_text(kind: String, id: String) -> String:
+	var p = look_profile(kind, id)
+	if p == null or not is_obj_locked(kind, id):
+		return ""
+	var parts = []
+	for t in [unlock_text(p.unlock), p.lock_note]:
+		if t != "":
+			parts.push_back(t)
+	return PoolStringArray(parts).join("\n")
+
+
+# 解锁条件：每波结束时检查（任一玩家满足即可）
+func check_unlocks() -> void:
+	var rd = _autoload("RunData")
+	var changed = false
+	for k in _lock_keys():
+		var kind = k.get_slice(":", 0)
+		var id = k.substr(kind.length() + 1)
+		var p = look_profile(kind, id)
+		if p == null or p.unlock.empty() or not is_obj_locked(kind, id):
+			continue
+		for i in rd.get_player_count():
+			if _unlock_met(p.unlock, i):
+				obj_locks[k] = false
+				changed = true
+				break
+	if changed:
+		_after_lock_change()
+
+
+func _unlock_met(u: Dictionary, i: int) -> bool:
+	var rd = _autoload("RunData")
+	match str(u.type):
+		"gold":
+			return rd.get_player_gold(i) >= int(u.n)
+		"stat":
+			return Utils.get_stat(Keys.generate_hash(str(u.stat)), i) >= int(u.n)
+		"wave":
+			return rd.current_wave >= int(u.n)
+	return false
+
+
+# 单个对象的锁定写入解锁记录：不再锁定的加回；新锁定的只接管当前已解锁的对象（本来就没解锁的不动）
+func _apply_obj_locks() -> bool:
+	var want = {}
+	for k in _lock_keys():
+		var kind = k.get_slice(":", 0)
+		if kind in KINDS and is_obj_locked(kind, k.substr(kind.length() + 1)):
+			want[k] = true
+	var changed = false
+	for k in lock_applied.duplicate():
+		if not want.has(k):
+			lock_applied.erase(k)
+			var kind = k.get_slice(":", 0)
+			_set_unlocked(kind, k.substr(kind.length() + 1), true)
+			changed = true
+	for k in want:
+		var kind = k.get_slice(":", 0)
+		var id = k.substr(kind.length() + 1)
+		if not k in lock_applied:
+			if not is_unlocked(kind, id):
+				continue
+			lock_applied.push_back(k)
+		_set_unlocked(kind, id, false)
+		changed = true
+	return changed
+
+
+# 锁定所有锁定分组的成员与单独锁定的对象；返回解锁记录是否可能有变化
 func apply_group_locks() -> bool:
-	var any = false
+	var any = _apply_obj_locks()
 	for gid in groups:
 		if groups[gid].locked:
 			any = true
@@ -3306,12 +3480,24 @@ func library(with_weapons: bool = false) -> Array:
 					continue
 				seen[w.my_id] = true
 				if w != null and not w.effects.empty() and not _custom_weapons.has(w.my_id):
-					sources.push_back([w.my_id, orig_name(w), orig_effects(w.my_id)])
-			_weapon_library = Catalog.build_library(sources, library_dedup)
+					sources.push_back([w.my_id, orig_name(w), orig_effects(w.my_id), source_of(w) == "mod"])
+			_weapon_library = Catalog.build_library(_vanilla_first(sources), library_dedup)
 		return _weapon_library
 	if _library == null:
-		_library = Catalog.build_library(_library_sources(), library_dedup)
+		_library = Catalog.build_library(_vanilla_first(_library_sources()), library_dedup)
 	return _library
+
+
+# 原版（含 DLC）的来源排在其他 mod 的前面：去重时同一个效果保留原版的那条（卸载 mod 后效果不会丢失）
+static func _vanilla_first(sources: Array) -> Array:
+	var out = []
+	var mods = []
+	for s in sources:
+		if s[3]:
+			mods.push_back(s)
+		else:
+			out.push_back(s)
+	return out + mods
 
 
 # ============================================================
@@ -3493,6 +3679,64 @@ func scale_graph(g: Dictionary, f: float) -> Dictionary:
 	return out
 
 
+# ---------------- 效果的异变选项 ----------------
+# spec.mut_copy：0 = 可被异变复制，1 = 异变强度 ≥ 0.7 时才可复制（同原版 mutation_min_scale），2 = 不可复制；
+# spec.mut_keep：true = 不会被异变清除。蓝图：graph.no_copy。
+# 原版按效果实例判断、读档后实例是新建的：按"所在道具 + 效果签名（脚本 / key / custom_key / text_key）"查档案
+const MUT_MIN_SCALE = 0.7
+var _mut_flags: Dictionary = {}	# 道具 id -> {签名: [mut_copy, mut_keep]}（apply_all 时清空）
+
+
+static func _effect_sig(e) -> String:
+	var script = e.get_script().resource_path if e.get_script() != null else ""
+	return JSON.print([script, e.key, e.custom_key, str(e.text_key).to_lower()])
+
+
+func mutation_flags(item, e) -> Array:
+	if e is GraphEffect:
+		return [2 if e.graph.get("no_copy", false) else 0, false]
+	if item == null or e == null or not "key" in e or item is WeaponData:
+		return [0, false]
+	var id: String = item.my_id
+	if not _mut_flags.has(id):
+		var flags = {}
+		var p = look_profile(kind_of(item), id)
+		if p != null and p.effects is Array:
+			for spec in p.effects:
+				if spec is Dictionary and (int(spec.get("mut_copy", 0)) != 0 or spec.get("mut_keep", false)):
+					var se = make_effect(spec)
+					if se != null:
+						_rekey_self(se, spec, id)
+						flags[_effect_sig(se)] = [int(spec.get("mut_copy", 0)), bool(spec.get("mut_keep", false))]
+		_mut_flags[id] = flags
+	return _mut_flags[id].get(_effect_sig(e), [0, false]) if not _mut_flags[id].empty() else [0, false]
+
+
+# extensions/dlcs/dlc_2/dlc_2_data.gd：原版选出的可复制效果 / 可清除的负面效果下标，去掉档案里不允许的
+func filter_mutation_copies(cands: Array, mutated_item, p: int, scale: float) -> Array:
+	var owner = {}
+	var rd = _autoload("RunData")
+	for it in rd.get_player_items(p) + [mutated_item]:
+		if it != null:
+			for e in it.effects:
+				owner[e] = it
+	var out = []
+	for e in cands:
+		var f = mutation_flags(owner.get(e), e)
+		if f[0] == 2 or (f[0] == 1 and scale < MUT_MIN_SCALE):
+			continue
+		out.push_back(e)
+	return out
+
+
+func filter_mutation_removals(indexes: Array, item) -> Array:
+	var out = []
+	for i in indexes:
+		if not mutation_flags(item, item.effects[i])[1]:
+			out.push_back(i)
+	return out
+
+
 # 异变期间（RunData._is_mutating）卸下的蓝图的"仅一次"令牌：[玩家] -> [令牌列表...]。异变后加回的同一张图
 # 消耗这里的记录、不重新发放；异变结束后没被认领的（持有者没有被换回来）按原版卸下处理
 var _mutation_tokens: Array = [[], [], [], []]
@@ -3590,7 +3834,7 @@ func _library_sources() -> Array:
 			if r == null or seen.has(r.my_id) or is_custom(r.my_id):
 				continue
 			seen[r.my_id] = true
-			sources.push_back([r.my_id, orig_name(r), orig_effects(r.my_id)])
+			sources.push_back([r.my_id, orig_name(r), orig_effects(r.my_id), source_of(r) == "mod"])
 	return sources
 
 

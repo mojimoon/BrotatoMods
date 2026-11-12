@@ -119,3 +119,21 @@ func _get_rand_item_for_wave(wave: int, player_index: int, type: int, args: GetR
 	var item = ._get_rand_item_for_wave(wave, player_index, type, args)
 	banned.resize(n)
 	return item
+
+
+# 道具 / 武器档案的"不可被诅咒 / 不可被异变 / 不可被机械化"
+func can_item_be_cursed(item: ItemParentData) -> bool:
+	return .can_item_be_cursed(item) and not _be_flag(item, "no_curse")
+
+
+func can_item_be_mutated(item: ItemParentData) -> bool:
+	return .can_item_be_mutated(item) and not _be_flag(item, "no_evolve")
+
+
+func can_weapon_be_mechanized(weapon) -> bool:
+	return .can_weapon_be_mechanized(weapon) and not _be_flag(weapon, "no_evolve")
+
+
+func _be_flag(res, flag: String) -> bool:
+	var m = BEMain.get_mod()
+	return m != null and m.obj_flag(res, flag)

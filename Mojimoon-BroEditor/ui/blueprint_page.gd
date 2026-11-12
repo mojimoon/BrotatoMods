@@ -93,6 +93,15 @@ func build(p_ui, parent: Control) -> void:
 	_hide_desc = ui._desc(ui.tr("BE_GRAPH_HIDE_TEXT_DESC"))
 	_hide_desc.visible = hide.pressed
 	box.add_child(_hide_desc)
+	# 整张蓝图不受诅咒 / 不会被异变复制到肿瘤上
+	var flags = HBoxContainer.new()
+	flags.add_constant_override("separation", 10)
+	box.add_child(flags)
+	for d in [["no_curse", "BE_GRAPH_NO_CURSE"], ["no_copy", "BE_GRAPH_NO_COPY"]]:
+		var cb = ui._checkbox(ui.tr(d[1]), ui.FONT_DESC)
+		cb.pressed = bool(_graph().get(d[0], false))
+		cb.connect("toggled", self, "_on_graph_flag", [d[0]])
+		flags.add_child(cb)
 	var scroll = ui._scroll()
 	box.add_child(scroll)
 	preview = RichTextLabel.new()
@@ -134,6 +143,15 @@ func _on_hide_text(on: bool) -> void:
 		g.hide_text = true
 	else:
 		g.erase("hide_text")
+	_changed()
+
+
+func _on_graph_flag(on: bool, key: String) -> void:
+	var g = _edit_graph()
+	if on:
+		g[key] = true
+	else:
+		g.erase(key)
 	_changed()
 
 
@@ -231,11 +249,13 @@ func _param_control(n: Dictionary, p: Array) -> Control:
 		return opt
 	if ptype == "items" or ptype == "goods":
 		return _items_control(n, p[0], cur if cur is Array else [], ui.goods_select_items() if ptype == "goods" else ui.item_select_items())
-	if ptype in ["tag", "set", "group", "owned"]:
+	if ptype in ["tag", "set", "group", "owned", "lockable"]:
 		var items = []
 		match ptype:
 			"owned":
 				items = ui.owned_select_items()
+			"lockable":
+				items = ui.lockable_select_items()
 			"tag":
 				for t in ui._all_tags():
 					items.push_back([ui._tag_name(t), t])

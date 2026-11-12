@@ -2601,3 +2601,181 @@ func test_310_evolution_colors() -> void:
 		GE.add_link(g, t, GE.add_node(g, "perm_stat", Vector2.ZERO, {"stat": "stat_evolution", "value": v}))
 		var txt = GE.graph_text(g, true)
 		_check(txt.find(meca if v > 0 else mutant) >= 0, "graph evolution color: " + txt)
+
+
+# ---------------- 反馈 1：蓝图扳机"获得时"、去重原版优先、诅咒 / 异变选项、单个对象的锁定 ----------------
+func test_320_gain_trigger() -> void:
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	var t = GE.add_node(g, "gain", Vector2.ZERO)
+	GE.add_link(g, t, GE.add_node(g, "perm_stat", Vector2.ZERO, {"stat": "stat_armor", "value": 3}))
+	GE.add_link(g, t, GE.add_node(g, "gain_item", Vector2.ZERO, {"items": ["item_coupon"]}))
+	_graph_char(GE.new_graph())
+	m.runtime.end_wave()
+	var p = m.new_profile()
+	p.graph = g
+	m.item_profiles["item_alien_eyes"] = p
+	m.apply_all()
+	var a0 = _armor()
+	rd.add_item(m.find_target("item", "item_alien_eyes"), 0)
+	yield(_frames(2), "completed")
+	_eq(_armor(), a0 + 3, "gain fires once when the item is obtained")
+	var ids = []
+	for x in rd.get_player_items_ref(0):
+		ids.push_back(x.my_id)
+	_eq(ids.count("item_coupon"), 1, "gain -> gain item right away (shop phase): " + str(ids))
+	m.runtime.start_wave(null)
+	m.runtime.fire("wave_start", 0)
+	m.runtime.end_wave()
+	_eq(_armor(), a0 + 3, "not again on later events")
+	_check(GE.graph_text(g, false).find(tr("BE_TX_GAIN").strip_edges()) >= 0, "gain text: " + GE.graph_text(g, false))
+	# 互相获得的蓝图不会卡死
+	var g2 = GE.new_graph()
+	GE.add_link(g2, GE.add_node(g2, "gain", Vector2.ZERO), GE.add_node(g2, "gain_item", Vector2.ZERO, {"items": ["item_alien_eyes"]}))
+	p.graph = g2
+	m.apply_all()
+	rd.add_item(m.find_target("item", "item_alien_eyes"), 0)
+	yield(_frames(2), "completed")
+	_check(rd.get_player_items_ref(0).size() < 2 * m.runtime.MAX_GAIN + 20, "self-gain loop is capped: %d items" % rd.get_player_items_ref(0).size())
+
+
+func test_321_library_vanilla_first() -> void:
+	var out = m._vanilla_first([["mod_a", "", [], true], ["van_a", "", [], false], ["mod_b", "", [], true], ["van_b", "", [], false]])
+	var ids = []
+	for s in out:
+		ids.push_back(s[0])
+	_eq(ids, ["van_a", "van_b", "mod_a", "mod_b"], "vanilla sources first, order kept")
+	for s in m._library_sources():
+		_check(not s[3], "vanilla source is not a mod: " + str(s[0]))
+
+
+func test_322_no_curse_no_evolve() -> void:
+	var it = _plain_item()
+	_check(isvc.can_item_be_cursed(it) and isvc.can_item_be_mutated(it), "allowed by default")
+	var p = m.new_profile()
+	p.no_curse = true
+	p.no_evolve = true
+	m.item_profiles[it.my_id] = p
+	m.apply_all()
+	_check(not isvc.can_item_be_cursed(it) and not isvc.can_item_be_mutated(it), "item flags block curse / mutation")
+	var dlc = isvc.get_dlc_data_by_id("abyssal_terrors")
+	if dlc != null:
+		_check(dlc.curse_item(it, 0, true, 0.5) == it, "curse_item leaves the item alone")
+	p.enabled = false
+	_check(isvc.can_item_be_cursed(it) and isvc.can_item_be_mutated(it), "disabled profile: flags off")
+	var w = isvc.weapons[0]
+	_check(isvc.can_weapon_be_mechanized(w) and isvc.can_item_be_cursed(w), "weapon allowed by default")
+	var f = m.new_family()
+	f.no_curse = true
+	f.no_evolve = true
+	m.weapon_families[w.weapon_id] = f
+	_check(not isvc.can_weapon_be_mechanized(w) and not isvc.can_item_be_cursed(w), "family flags block curse / mechanizing")
+	_eq(m.normalize_family(JSON.parse(JSON.print(f)).result).no_evolve, true, "family flags survive save / load")
+	# 蓝图：不受诅咒
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	GE.add_link(g, GE.add_node(g, "kill", Vector2.ZERO), GE.add_node(g, "perm_stat", Vector2.ZERO, {"stat": "stat_armor", "value": 2}))
+	var ge = GE.make(g)
+	ge.value = int(GE.CURSE_PROBE * 1.5)
+	_check(ge.curse_modifier() > 0.4, "cursed blueprint")
+	g["no_curse"] = true
+	ge = GE.make(g)
+	ge.value = int(GE.CURSE_PROBE * 1.5)
+	_eq(ge.curse_modifier(), 0.0, "no_curse blueprint ignores the curse")
+
+
+func test_323_mutation_options() -> void:
+	var dlc = isvc.get_dlc_data_by_id("primal_dread")
+	if dlc == null:
+		return
+	var iid = m.create_custom_item(_plain_item().my_id, "muttest")
+	var p = m.item_profiles[iid]
+	p.effects = [{"set": {"key": "stat_armor", "value": 5}}, {"set": {"key": "stat_speed", "value": -3}}]
+	m.apply_all()
+	var it = m.find_target("item", iid)
+	rd.add_item(it, 0)
+	var armor = _find_effect(it.effects, "stat_armor")
+	_check(armor in dlc._get_copy_candidates(it, 0), "positive effect is a copy candidate")
+	_check(it.effects.find(_find_effect(it.effects, "stat_speed")) in dlc._get_removable_negative_effect_indexes(it), "negative effect is removable")
+	p.effects[0]["mut_copy"] = 2
+	p.effects[1]["mut_keep"] = true
+	m.apply_all()
+	armor = _find_effect(it.effects, "stat_armor")
+	_check(armor != null and not armor in dlc._get_copy_candidates(it, 0), "mut_copy = never: not copied")
+	_check(not it.effects.find(_find_effect(it.effects, "stat_speed")) in dlc._get_removable_negative_effect_indexes(it), "mut_keep: not removed")
+	# 读档后的实例（新建的效果）同样生效
+	_eq(m.mutation_flags(it, armor.duplicate()), [2, false], "flags found by signature")
+	p.effects[0]["mut_copy"] = 1
+	m.apply_all()
+	armor = _find_effect(it.effects, "stat_armor")
+	_eq(m.mutation_flags(it, armor)[0], 1, "min-scale mode")
+	_eq(armor in dlc._get_copy_candidates(it, 0), dlc.get_mutation_scale(0) >= m.MUT_MIN_SCALE, "mut_copy = min scale follows the mutation strength")
+	# 蓝图
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	GE.add_link(g, GE.add_node(g, "kill", Vector2.ZERO), GE.add_node(g, "perm_stat", Vector2.ZERO, {"stat": "stat_armor", "value": 2}))
+	_eq(m.mutation_flags(it, GE.make(g))[0], 0, "blueprint copyable by default")
+	g["no_copy"] = true
+	_eq(m.mutation_flags(it, GE.make(g))[0], 2, "no_copy blueprint")
+	m.delete_custom_item(iid)
+
+
+func test_324_object_lock() -> void:
+	var it = _plain_item()
+	var id = it.my_id
+	_check(m.is_unlocked("item", id), "unlocked at start")
+	var p = m.new_profile()
+	p.lock = true
+	p.lock_note = "hello"
+	p.unlock = {"type": "gold", "stat": "", "n": 50}
+	m.item_profiles[id] = m.normalize_profile(JSON.parse(JSON.print(p)).result)
+	m.apply_all()
+	_check(m.is_obj_locked("item", id) and not m.is_unlocked("item", id), "profile lock uses the unlock records")
+	var text = m.lock_text("item", id)
+	_check(text.find("hello") >= 0 and text.find("50") >= 0, "lock text has the condition and the note: " + text)
+	rd.players_data[0].gold = 10
+	m.check_unlocks()
+	_check(not m.is_unlocked("item", id), "condition not met")
+	rd.players_data[0].gold = 60
+	m.check_unlocks()
+	_check(m.is_unlocked("item", id) and not m.is_obj_locked("item", id), "unlocked by the condition")
+	_eq(m.lock_text("item", id), "", "no lock text once unlocked")
+	m.apply_all()
+	_check(m.is_unlocked("item", id), "stays unlocked after re-applying")
+	# 蓝图：锁定 / 解锁对象
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	GE.add_link(g, GE.add_node(g, "kill", Vector2.ZERO), GE.add_node(g, "obj_lock", Vector2.ZERO, {"target": "item:" + id}))
+	GE.add_link(g, GE.add_node(g, "crit", Vector2.ZERO), GE.add_node(g, "obj_unlock", Vector2.ZERO, {"target": "item:" + id}))
+	rd.players_data[0].gold = 0
+	_graph_char(g)
+	m.runtime.fire("kill", 0)
+	_check(not m.is_unlocked("item", id), "blueprint locks one object")
+	m.runtime.fire("crit", 0)
+	_check(m.is_unlocked("item", id), "blueprint unlocks one object")
+	_check(GE.graph_text(g, false).find(tr(it.name)) >= 0, "lock text names the object")
+	m.runtime.end_wave()
+	# 档案没了：加回解锁记录
+	m.set_obj_locked("item", id, true)
+	m.item_profiles.erase(id)
+	m.obj_locks = {}
+	m.apply_all()
+	_check(m.is_unlocked("item", id) and m.lock_applied.empty(), "removing the lock unlocks again")
+	# 本来就没解锁的对象不接管（之后也不会被"加回"）
+	m._set_unlocked("item", id, false)
+	m.set_obj_locked("item", id, true)
+	_check(m.lock_applied.empty(), "never takes over an object the player has not unlocked")
+	m.obj_locks = {}
+	m.apply_all()
+	_check(not m.is_unlocked("item", id), "left locked")
+	m._set_unlocked("item", id, true)
+	# 武器按家族
+	var w = isvc.weapons[0]
+	var f = m.new_family()
+	f.lock = true
+	m.weapon_families[w.weapon_id] = f
+	m.apply_all()
+	_check(not m.is_unlocked("weapon", w.weapon_id), "weapon family locked")
+	m.kind_enabled.weapon = false
+	m.apply_all()
+	_check(m.is_unlocked("weapon", w.weapon_id), "tab switch off lifts the lock")

@@ -431,6 +431,8 @@ class FieldSorter:
 #   状态扳机（still / moving / low_hp / full_hp / always）：按路径轮询，扳机状态与路径上的状态条件（STATE_CONDS）都满足时进入并执行，
 #   任一不满足时撤销"本波属性"与"本波获得"
 #   transform（道具变为）：只对道具上的蓝图有效；gain_item / lose_item（获得 / 失去道具）同样等到敌袭结束再执行
+#   gain（获得时）：获得持有者（道具 / 武器 / 角色）时立即执行一次（graph_effect.apply -> runtime.fire_gain；异变换回的副本、读档不算）
+#   obj_unlock / obj_lock：解锁 / 锁定单个角色、道具或武器家族（参数 "种类:id"，同分组锁定写入原版解锁记录）
 #   shop_add / shop_remove：本局商店（及箱子）中可以出现 / 不再出现某些道具（可解除"禁用"），随一局存档保存
 #   charm：魅惑目标敌人（同浪漫之人）；spawn：生成敌人；break：持有者是武器时损坏（同砖块）
 #   var_set / var_cmp：整数变量（按名称在玩家的全部蓝图间共享，初始为 0，整局保留、随存档保存；不受诅咒）
@@ -440,6 +442,7 @@ class FieldSorter:
 #   meca_parts（机械部件）、mutate（本波结束时多异变 n 次）、slow_time（敌人与敌方投射物减速，同怀表 / 时间扭曲者）
 # ============================================================
 const NODES = [
+	["gain", "trigger", []],
 	["wave_start", "trigger", []],
 	["wave_end", "trigger", []],
 	["half_wave", "trigger", []],
@@ -528,6 +531,8 @@ const NODES = [
 	["shop_force", "effect", [["items", "goods", []]]],
 	["group_unlock", "effect", [["group", "group", ""]]],
 	["group_lock", "effect", [["group", "group", ""]]],
+	["obj_unlock", "effect", [["target", "lockable", ""]]],
+	["obj_lock", "effect", [["target", "lockable", ""]]],
 	["var_set", "effect", [["var", "var", "x"], ["op", "mode:add|sub|set|mul|div", "add"], ["value", "int", 1]]],
 	["meca_parts", "effect", [["value", "int", 1]]],
 	["mutate", "effect", [["n", "int", 1]]],
@@ -547,7 +552,7 @@ const STATE_TRIGGERS = ["still", "moving", "low_hp", "full_hp", "in_puddle", "al
 # 状态条件：在状态扳机的路径上持续检查（全部满足时进入，任一不满足时撤销）；其余条件只在进入时检查一次
 const STATE_CONDS = ["hp_below", "hp_above", "wave_min", "wave_max", "diff_min", "diff_max", "stat_min", "stat_max", "if_moving", "if_still", "own_tag", "own_set", "own_item", "weapon_kinds", "var_cmp", "evo_camp"]
 # 不在敌袭中触发的扳机（商店、波次结束后的异变、升级界面的机械化）
-const SHOP_TRIGGERS = ["reroll", "buy", "mutated", "meca_upgrade"]
+const SHOP_TRIGGERS = ["reroll", "buy", "mutated", "meca_upgrade", "gain"]
 
 # 不是普通 Effect 脚本、但也可以拆解的扳机（徒步旅行者的步数在 value2；浪漫之人 / 长笛的魅惑由 split_native 单独处理）
 const SPLIT_ANY_SCRIPT = ["gain_stat_for_every_step_after_equip", "charm_on_hit"]

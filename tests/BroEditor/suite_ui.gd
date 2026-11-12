@@ -1745,3 +1745,57 @@ func _node_note_count(bp, n: Dictionary, note: String) -> int:
 		elif nd is RichTextLabel and nd.text == note:
 			c += 1
 	return c
+
+
+# 反馈 1：锁定开关 / 说明 / 解锁条件、诅咒与进化开关、效果的异变选项、蓝图开关与"解锁对象"参数
+func test_199_lock_and_evolve_ui() -> void:
+	var it = _plain_item()
+	var ui = yield(_open_ui(CH), "completed")
+	ui.set_kind("item")
+	ui._select(it.my_id)
+	yield(tree, "idle_frame")
+	ui._on_lock_toggled(true)
+	_check(m.item_profiles[it.my_id].lock and not m.is_unlocked("item", it.my_id), "lock switch locks")
+	_check(ui._lock_switch.pressed and ui._head_info.text.find(tr("BE_OBJ_LOCKED_TAG")) >= 0, "header shows locked")
+	ui._on_lock_note("note")
+	ui._on_unlock_changed("stat", "type")
+	ui._on_unlock_changed("stat_armor", "stat")
+	ui._on_unlock_changed(12.0, "n")
+	yield(tree, "idle_frame")
+	_eq(m.item_profiles[it.my_id].unlock, {"type": "stat", "stat": "stat_armor", "n": 12}, "unlock condition edited")
+	_check(m.lock_text("item", it.my_id).find("12") >= 0, "condition text")
+	ui._on_unlock_changed("", "type")
+	_eq(m.item_profiles[it.my_id].unlock, {}, "condition cleared")
+	ui._on_evolve_flag("no_curse")
+	_check(m.item_profiles[it.my_id].no_curse, "no_curse chip")
+	ui._on_lock_toggled(false)
+	_check(m.is_unlocked("item", it.my_id), "lock switch unlocks")
+	# 效果的异变选项
+	ui._on_tab_pressed("effects")
+	ui._on_effect_edit(0)
+	yield(tree, "idle_frame")
+	ui._on_spec_flag(2, 0, "mut_copy")
+	ui._on_spec_flag(1, 0, "mut_keep")
+	var spec = m.item_profiles[it.my_id].effects[0]
+	_check(spec.get("mut_copy") == 2 and spec.get("mut_keep") == true, "effect mutation options stored: " + str(spec))
+	ui._on_spec_flag(0, 0, "mut_copy")
+	_check(not m.item_profiles[it.my_id].effects[0].has("mut_copy"), "default not stored")
+	# 蓝图
+	ui._on_tab_pressed("blueprint")
+	yield(tree, "idle_frame")
+	ui.blueprint._on_graph_flag(true, "no_curse")
+	ui.blueprint._on_graph_flag(true, "no_copy")
+	_check(m.item_profiles[it.my_id].graph.no_curse and m.item_profiles[it.my_id].graph.no_copy, "graph flags")
+	ui.blueprint.add_node_kind("gain")
+	ui.blueprint.add_node_kind("obj_unlock")
+	yield(tree, "idle_frame")
+	_check(not ui.lockable_select_items().empty(), "lockable list")
+	# 武器：家族档案
+	ui.set_kind("weapon")
+	yield(tree, "idle_frame")
+	ui._on_evolve_flag("no_evolve")
+	_check(m.weapon_families[ui._obj_key()].no_evolve and ui._is_modified(ui._id), "weapon family flag marks it modified")
+	ui._do_reset()
+	_check(not m.weapon_families[ui._obj_key()].no_evolve, "reset clears family flags")
+	ui.queue_free()
+	yield(tree, "idle_frame")
