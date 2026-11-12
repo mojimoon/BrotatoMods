@@ -180,6 +180,26 @@ static func get_mod() -> Node:
 	return tree.root.get_node_or_null("/root/ModLoader/" + MOD_ID)
 
 
+# 本脚本在 mod 的 _init 阶段编译：这里按名字引用界面 / 实体类（CharacterSelection、UpgradesUI、ItemEnemy…）会让
+# 原版 unit.gd / turret.gd / main.gd 等提前编译，其他 mod 之后给它们装的扩展就接不上子类（lrueckert-DmgMeter 的
+# turret.gd 扩展：BuilderTurret 失去基类，正式版里悬停炮塔道具直接崩溃）。所以只按脚本路径在运行时判断
+const CHAR_SELECTION_SCRIPT = "res://ui/menus/run/character_selection.gd"
+const WEAPON_SELECTION_SCRIPT = "res://ui/menus/run/weapon_selection.gd"
+const DIFFICULTY_SELECTION_SCRIPT = "res://ui/menus/run/difficulty_selection/difficulty_selection.gd"
+const FOCUS_EMULATOR_SCRIPT = "res://ui/menus/global/focus_emulator.gd"
+const UPGRADES_UI_SCRIPT = "res://ui/menus/ingame/upgrades_ui.gd"
+
+
+# obj 的脚本（含各层扩展与基类）里有没有 path
+static func _is_a(obj, path: String) -> bool:
+	var sc = obj.get_script() if obj != null else null
+	while sc != null:
+		if sc.resource_path == path:
+			return true
+		sc = sc.get_base_script()
+	return false
+
+
 static func _autoload(name_: String) -> Node:
 	var tree: SceneTree = Engine.get_main_loop() as SceneTree
 	if tree == null or tree.root == null:
@@ -2863,7 +2883,7 @@ static func _set_contains(s, res) -> bool:
 		return res in s.weapons
 	if res in s.items:
 		return true
-	return s is PrimalDreadItemSetData and (res in s.meca_items or res in s.mutant_items or res in s.evolution_items)
+	return "meca_items" in s and (res in s.meca_items or res in s.mutant_items or res in s.evolution_items)
 
 
 # ============================================================
@@ -3846,11 +3866,11 @@ func _dlcs() -> Array:
 	if isvc == null or pd == null:
 		return out
 	for u in isvc.update_data_list:
-		if u == null or u.item_set == null or u.update_type != UpdateData.UpdateType.DLC or pd.is_dlc_available(u.id):
+		if u == null or u.item_set == null or u.update_type != u.UpdateType.DLC or pd.is_dlc_available(u.id):
 			continue
 		var s = u.item_set
 		var items = s.items.duplicate()
-		if s is PrimalDreadItemSetData:
+		if "meca_items" in s:
 			items += s.meca_items + s.mutant_items + s.evolution_items
 		out.push_back({"characters": s.characters, "items": items, "weapons": s.weapons})
 	return out
@@ -3980,7 +4000,7 @@ func enemy_list() -> Array:
 		_enemies = []
 		var isvc = _isvc()
 		for e in isvc.entities if isvc != null else []:
-			if e is ItemEnemy and not e.is_boss and not e.is_elite and e.icon != null:
+			if "is_boss" in e and "is_elite" in e and not e.is_boss and not e.is_elite and e.icon != null:
 				var path = e.icon.resource_path.get_base_dir() + "/" + e.my_id + ".tscn"
 				if ResourceLoader.exists(path):
 					_enemies.push_back({"id": e.my_id, "name": e.name, "icon": e.icon, "scene": path})
@@ -4122,7 +4142,7 @@ func _block_input(on: bool) -> void:
 		var scene = get_tree().current_scene
 		while not stack.empty():
 			var n = stack.pop_back()
-			if (n is FocusEmulator or n == scene) and n.is_processing_input():
+			if (_is_a(n, FOCUS_EMULATOR_SCRIPT) or n == scene) and n.is_processing_input():
 				n.set_process_input(false)
 				_input_blocked.push_back(n)
 			for c in n.get_children():
@@ -4283,9 +4303,9 @@ func effect_text(e, colored: bool = true) -> String:
 
 func _screen_character_id(screen: Node) -> String:
 	var rd = _autoload("RunData")
-	if not screen is CharacterSelection and rd != null and rd.players_data.size() > 0 and rd.players_data[0].current_character != null:
+	if not _is_a(screen, CHAR_SELECTION_SCRIPT) and rd != null and rd.players_data.size() > 0 and rd.players_data[0].current_character != null:
 		return rd.players_data[0].current_character.my_id
-	if screen is CharacterSelection and "_info_panel" in screen and screen._info_panel != null:
+	if _is_a(screen, CHAR_SELECTION_SCRIPT) and "_info_panel" in screen and screen._info_panel != null:
 		var id = str(screen._info_panel.character_currently_displayed) if "character_currently_displayed" in screen._info_panel else ""
 		if id != "":
 			return id
@@ -4301,9 +4321,9 @@ func on_editor_closed(changed: bool) -> void:
 	var tree = get_tree()
 	var scene = tree.current_scene
 	var rd = _autoload("RunData")
-	if scene is CharacterSelection:
+	if _is_a(scene, CHAR_SELECTION_SCRIPT):
 		tree.call_deferred("reload_current_scene")
-	elif scene is WeaponSelection:
+	elif _is_a(scene, WEAPON_SELECTION_SCRIPT):
 		var chars = []
 		for pd in rd.players_data:
 			chars.push_back(pd.current_character)
@@ -4311,7 +4331,7 @@ func on_editor_closed(changed: bool) -> void:
 		for i in chars.size():
 			rd.add_character(chars[i], i)
 		tree.call_deferred("reload_current_scene")
-	elif scene is DifficultySelection:
+	elif _is_a(scene, DIFFICULTY_SELECTION_SCRIPT):
 		rd.reset(true)
 
 
@@ -4393,7 +4413,7 @@ func apply_pending_start(main: Node) -> void:
 			if data == null:
 				continue
 			for _c in pend[k[0]]:
-				var ctp = UpgradesUI.ConsumableToProcess.new()
+				var ctp = load(UPGRADES_UI_SCRIPT).ConsumableToProcess.new()
 				ctp.consumable_data = data
 				ctp.player_index = i
 				main._consumables_to_process[i].push_back(ctp)
