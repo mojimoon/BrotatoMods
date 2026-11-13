@@ -87,7 +87,7 @@ BE_FIELD_TO_VALUE,转换数值,Converted value,Valeur convertie,変換後の数�
 BE_FIELD_PCT_CONVERTED,转换比例,Conversion %,% converti,変換率,변환 비율,轉換比例,% преобразования,% zamiany,% convertido,% convertido,Umwandlung %,Dönüşüm %,% convertita
 BE_FIELD_SCALING_STAT,缩放属性,Scaling stat,Stat d'échelle,スケールステータス,비례 능력치,縮放屬性,Характеристика масштабирования,Statystyka skalowania,Estadística de escala,Atributo de escala,Skalierungswert,Ölçek istatistiği,Statistica di scala
 BE_FIELD_DAMAGE,伤害,Damage,Dégâts,ダメージ,대미지,傷害,Урон,Obrażenia,Daño,Dano,Schaden,Hasar,Danni
-BE_FIELD_SCALE,缩放,Scale,Échelle,スケール,배율,縮放,Масштаб,Skala,Escala,Escala,Skalierung,Ölçek,Scala
+BE_FIELD_SCALE,爆炸范围,Explosion size,Taille d’explosion,爆発範囲,폭발 크기,爆炸範圍,Размер взрыва,Wielkość wybuchu,Tamaño de explosión,Área da explosão,Explosionsgröße,Patlama büyüklüğü,Dimensioni esplosione
 BE_FIELD_SPREAD,散布,Spread,Dispersion,拡散,확산,散布,Разброс,Rozrzut,Dispersión,Dispersão,Streuung,Saçılma,Dispersione
 BE_FIELD_TRACKING_KEY,统计键,Tracking key,Clé de suivi,記録キー,기록 키,統計鍵,Ключ учёта,Klucz śledzenia,Clave de seguimiento,Chave de rastreio,Tracking-Schlüssel,Takip anahtarı,Chiave di tracciamento
 BE_FIELD_SET_ID,套装,Class,Classe,クラス,클래스,類別,Класс,Klasa,Clase,Classe,Klasse,Sınıf,Classe
