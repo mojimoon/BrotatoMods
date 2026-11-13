@@ -1942,3 +1942,43 @@ func test_175_weapons_independent_of_items_and_shiv_growth() -> void:
 			if ts.size() > 1 and bounces[f][ts[-1]] > bounces[f][ts[0]]:
 				grew += 1
 	_check(grew > 0, "some shiv-effect family gains bounces on upgrade (%d)" % grew)
+
+
+# 读档：启动时存档先于本 mod 注册被反序列化，武器上的触发条款丢失；读档后按模板补回
+func test_166_weapon_trigger_clause_survives_resume() -> void:
+	m.cfg_weapons = true
+	m.cfg_weapon_mode = "deep"
+	m.cfg_w_item_effects = true
+	m.start_new_run()
+	var victim = null
+	for w in isvc.weapons:
+		for e in w.effects:
+			if e is TriggerEffect and victim == null:
+				victim = w
+	_check(victim != null, "some reassembled weapon has a trigger clause")
+	if victim != null:
+		var owned = rd.add_weapon(victim, 0)
+		var n = owned.effects.size()
+		var saved = JSON.parse(JSON.print({"aa_state": rd.get_state().aa_state})).result
+		var ser = JSON.parse(JSON.print(rd.players_data[0].serialize())).result
+		m.on_menu_reset()
+		isvc.effects.erase(TriggerEffect)
+		m._effect_registered = false
+		var pd = PlayerRunData.new().deserialize(ser)
+		var lost = true
+		for e in pd.weapons[0].effects:
+			if e is TriggerEffect:
+				lost = false
+		_check(lost, "clause is lost when the save is read before the mod registers its effect")
+		rd.players_data[0] = pd
+		m.on_resume({"aa_state": saved.aa_state, "shop_items": [[], [], [], []]})
+		var back = 0
+		for e in pd.weapons[0].effects:
+			if e is TriggerEffect:
+				back += 1
+		_eq(back, 1, "held weapon repaired with its trigger clause")
+		_eq(pd.weapons[0].effects.size(), n, "no other effect duplicated")
+	m.on_menu_reset()
+	m.cfg_weapons = false
+	m.cfg_weapon_mode = "effects"
+	m.cfg_w_item_effects = false

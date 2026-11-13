@@ -722,3 +722,46 @@ func test_135_no_triggers_after_wave_end() -> void:
 	main._cleaning_up = true
 	rd.remove_item(holder, 0)
 	m.on_menu_reset()
+
+
+# 武器 / 道具上的"每杀死 N 个敌人，+X% 爆炸范围"：属性真的加上，并作用到爆炸的实际大小
+func test_136_kill_clause_on_weapon_explosion_size() -> void:
+	m.start_new_run()
+	var pistol = isvc.get_element_safe(isvc.weapons, "weapon_pistol_1").duplicate()
+	pistol.effects = pistol.effects + [TriggerEffect.make({"trigger": "kill", "param": 3, "payload": "temp_stat", "stat": "explosion_size", "value": 10})]
+	var _w = rd.add_weapon(pistol, 0)
+	var holder = _item("item_potato").duplicate()
+	holder.effects = [TriggerEffect.make({"trigger": "kill", "param": 3, "payload": "temp_stat", "stat": "explosion_size", "value": 100})]
+	rd.add_item(holder, 0)
+	rd.current_wave = 1
+	TempStats.reset()
+	var _e = tree.change_scene("res://main.tscn")
+	yield(_wait_frames(10), "completed")
+	var main = tree.current_scene
+	var rt = main.get_node_or_null("AutoAnthonyRuntime") if main != null else null
+	_check(rt != null, "runtime in battle")
+	if rt == null:
+		return
+	main._players[0].disable_hurtbox()
+	main._wave_timer.start(600)
+	_eq(rt.entries[0].size(), 2, "weapon and item clauses both collected")
+	var s0 = Utils.get_stat(Keys.explosion_size_hash, 0)
+	for i in 3:
+		var en = yield(_wait_enemy(main), "completed")
+		if en != null:
+			var _k = en.take_damage(999999, TakeDamageArgs.new(0))
+		yield(_wait_frames(3), "completed")
+	_eq(int(Utils.get_stat(Keys.explosion_size_hash, 0) - s0), 110, "3 kills -> weapon (+10) and item (+100) explosion size")
+	var args = WeaponServiceExplodeArgs.new()
+	args.pos = main._players[0].global_position
+	args.damage = 1
+	args.burning_data = BurningData.new()
+	args.scaling_stats = []
+	args.from_player_index = 0
+	args.damage_tracking_key_hash = Keys.empty_hash
+	var fx = load(rt.EXPLOSION_EFFECT_PATH)
+	var inst = WeaponService.explode(fx, args)
+	_check(abs(inst.scale.x - fx.scale * (1.0 + (s0 + 110) / 100.0)) < 0.01, "explosion scale uses the gained size: %s" % inst.scale.x)
+	main._cleaning_up = true
+	rd.remove_item(holder, 0)
+	m.on_menu_reset()

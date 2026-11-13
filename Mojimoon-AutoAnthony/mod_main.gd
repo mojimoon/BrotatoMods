@@ -899,14 +899,17 @@ func _repair_loaded(state: Dictionary) -> void:
 	for pd in rd.players_data:
 		for it in pd.items:
 			_repair_item(it)
+		# 武器上的触发条款（引入道具效果）同样会在读档时丢失
+		for w in pd.weapons:
+			_repair_item(w)
 	for list in rd.locked_shop_items:
 		for entry in list:
-			if entry[0] is ItemData:
+			if entry[0] is ItemParentData:
 				_repair_item(entry[0])
 	if state.has("shop_items") and state.shop_items is Array:
 		for list in state.shop_items:
 			for entry in list:
-				if entry is Array and entry.size() > 0 and entry[0] is ItemData:
+				if entry is Array and entry.size() > 0 and entry[0] is ItemParentData:
 					_repair_item(entry[0])
 	triggers_dirty = true
 
@@ -919,7 +922,7 @@ func _repair_item(it) -> void:
 	if it.has_meta("aa_mutation_record"):
 		return
 	it.name = tmpl.name
-	if not it is CharacterData:
+	if it is ItemData and not it is CharacterData:
 		it.tags = tmpl.tags
 		it.value = tmpl.value
 		it.tracking_text = tmpl.tracking_text
