@@ -18,3 +18,12 @@ func buy_item(item_data: ItemData, player_index: int) -> void:
 	var m = BEMain.get_mod()
 	if m != null:
 		m.fire_shop("buy", player_index)
+
+
+# 蓝图扳机"锁定并离开商店时" / "锁定的商品被诅咒时"（原版鱼钩在这里诅咒锁定的商品）
+func _on_tree_exited() -> void:
+	var m = BEMain.get_mod()
+	var snap = m.runtime.locked_leave() if m != null and m.runtime != null else null
+	._on_tree_exited()
+	if snap != null:
+		m.runtime.locked_cursed(snap)

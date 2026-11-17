@@ -20,7 +20,7 @@ const STAT_GROUPS = [
 		"burning_spread", "burning_cooldown_reduction", "structure_attack_speed", "structure_percent_damage",
 		"structure_range", "accuracy", "harvesting_growth", "weapon_slot", "stat_curse", "chance_double_gold",
 		"item_box_gold", "heal_when_pickup_gold", "burning_cooldown_increase", "hit_protection", "lose_hp_per_second",
-		"bonus_crit_damage", "fire_puddle_size", "time_shift_on_hit",
+		"bonus_crit_damage", "fire_puddle_size", "time_shift_on_hit", "be_time_shift_secs",
 	]],
 	# 史前惧兽（DLC2）：进化（正 = 机械、负 = 异变）与相关机制；最后是进化相关的规则开关（EVOLUTION_RULES）
 	["BE_GRP_EVOLUTION", [
@@ -62,6 +62,9 @@ const STAT_GROUPS = [
 		"weapon_set_bonus",
 	]],
 ]
+# 本模组加进玩家效果表的 key（extensions/singletons/run_data.gd 在建表 / 读档后补上，默认 0）：
+#   be_time_shift_secs：时间扭曲（time_shift_on_hit）的持续时间增减（原版固定 3 秒，见 extensions/main.gd）
+const EXTRA_KEYS = ["be_time_shift_secs"]
 # 规则（蓝图不可用）：规则 / 特殊规则分组的全部，以及进化分组里的规则开关
 const EVOLUTION_RULES = ["meca_only", "mutant_only", "dual_evolution", "effect_mutate_end_of_wave"]
 
@@ -301,7 +304,7 @@ const CURSE_EFFECT_PARAMS = {
 	"heal_hp": ["value"], "add_gold": ["value"], "xp": ["value"], "damage": ["pct", "damage"], "explode": ["pct", "damage"],
 	"hp_dmg": ["pct"], "ignite": ["value"], "slow": ["pct"], "rand_stats": ["value"], "fruit": ["value"],
 	"vuln": ["pct", "secs"],
-	"meca_parts": ["value"], "slow_time": ["pct", "secs"],
+	"meca_parts": ["value"], "slow_time": ["pct", "secs"], "weapon_dmg": ["value"],
 }
 # 百分比参数的上限
 const CURSE_MAX = {"chance": {"pct": 100}, "hp_below": {"pct": 100}, "slow_time": {"pct": 95}}
@@ -437,6 +440,13 @@ class FieldSorter:
 #   charm：魅惑目标敌人（同浪漫之人）；spawn：生成敌人；break：持有者是武器时损坏（同砖块）
 #   var_set / var_cmp：整数变量（按名称在玩家的全部蓝图间共享，初始为 0，整局保留、随存档保存；不受诅咒）
 #   效果节点之后可以继续连接；一个节点的多条出线按目标节点在画布上的纵坐标从上到下执行
+#   整数参数可以填公式（字符串，见 graph/formula.gd）：变量、属性等取值与算式，每次用到时现算；填了公式的参数不受诅咒 / 异变缩放
+#   变量名以 _ 开头的是本蓝图的局部变量；var_set 的时效（mode）：永久 / 直至敌袭结束 / 持续 N 秒（到时撤销这次的改变量）
+#   任何条件都可以取反（params.not = true）；or（或门）：同一次触发里只放行第一次到达，几条路径汇到它后面的效果只执行一次
+#   扳机节点按画布位置从上到下（同高从左到右）依次触发
+#   lock_leave：离开商店时每件锁定的商品触发一次（curse_locked 诅咒这件商品，同原版鱼钩）；locked_cursed：锁定的商品在离开商店时被诅咒后
+#   curse_self / evolve_self：持有者（道具 / 武器）被诅咒 / 进化（道具异变、武器机械化），敌袭中触发时等到敌袭结束；obj_state：这件商品 / 持有者已被诅咒 / 已进化
+#   weapon_dmg：武器基础伤害（原版 weapon_type_bonus，同原版"近战武器伤害 +X"）
 #   史前惧兽（DLC2）：evolved_kill / meca_kill / mutant_kill（杀死进化敌人）、mutated（自己的道具异变后，波次结束时）、
 #   meca_upgrade（机械化武器后，商店 / 升级界面）；evo_camp（自己的进化方向）、target_evolved（目标是进化敌人）；
 #   meca_parts（机械部件）、mutate（本波结束时多异变 n 次）、slow_time（敌人与敌方投射物减速，同怀表 / 时间扭曲者）
@@ -479,6 +489,8 @@ const NODES = [
 	["in_puddle", "trigger", []],
 	["always", "trigger", []],
 	["tick", "trigger", []],
+	["lock_leave", "trigger", []],
+	["locked_cursed", "trigger", []],
 	["chance", "cond", [["pct", "int", 25]]],
 	["stat_chance", "cond", [["base", "int", 0], ["stat", "stat", "stat_max_hp"], ["pct", "int", 50]]],
 	["every", "cond", [["n", "int", 5]]],
@@ -505,6 +517,8 @@ const NODES = [
 	["own_set", "cond", [["set", "set", ""], ["cmp", "mode:at_least|at_most|exactly", "at_least"], ["n", "int", 2]]],
 	["weapon_kinds", "cond", [["cmp", "mode:at_least|at_most|exactly", "at_least"], ["n", "int", 3]]],
 	["var_cmp", "cond", [["var", "var", "x"], ["cmp", "mode:at_least|at_most|exactly", "at_least"], ["n", "int", 2]]],
+	["obj_state", "cond", [["state", "mode:cursed|evolved", "cursed"]]],
+	["or", "cond", []],
 	["temp_stat", "effect", [["stat", "stat", "stat_percent_damage"], ["value", "int", 5]]],
 	["perm_stat", "effect", [["stat", "stat", "stat_max_hp"], ["value", "int", 1]]],
 	["timed_stat", "effect", [["stat", "stat", "stat_attack_speed"], ["value", "int", 20], ["secs", "int", 3]]],
@@ -533,7 +547,11 @@ const NODES = [
 	["group_lock", "effect", [["group", "group", ""]]],
 	["obj_unlock", "effect", [["target", "lockable", ""]]],
 	["obj_lock", "effect", [["target", "lockable", ""]]],
-	["var_set", "effect", [["var", "var", "x"], ["op", "mode:add|sub|set|mul|div", "add"], ["value", "int", 1]]],
+	["var_set", "effect", [["var", "var", "x"], ["op", "mode:add|sub|set|mul|div", "add"], ["value", "int", 1], ["mode", "mode:perm|temp|timed", "perm"], ["secs", "int", 5]]],
+	["weapon_dmg", "effect", [["value", "int", 5], ["scope", "mode:all_weapons|melee|ranged", "all_weapons"], ["mode", "mode:temp|timed|perm", "temp"], ["secs", "int", 5]]],
+	["curse_locked", "effect", []],
+	["curse_self", "effect", []],
+	["evolve_self", "effect", []],
 	["meca_parts", "effect", [["value", "int", 1]]],
 	["mutate", "effect", [["n", "int", 1]]],
 	["slow_time", "effect", [["pct", "int", 50], ["secs", "int", 3]]],
@@ -547,12 +565,12 @@ const NODE_DETAILS = {
 	"ignite": [],
 }
 # 只在某个参数取某值时显示的参数：[节点, 参数] -> [条件参数, 值]
-const PARAM_SHOW_IF = {"grant:secs": ["mode", "timed"]}
+const PARAM_SHOW_IF = {"grant:secs": ["mode", "timed"], "var_set:secs": ["mode", "timed"], "weapon_dmg:secs": ["mode", "timed"]}
 const STATE_TRIGGERS = ["still", "moving", "low_hp", "full_hp", "in_puddle", "always"]
 # 状态条件：在状态扳机的路径上持续检查（全部满足时进入，任一不满足时撤销）；其余条件只在进入时检查一次
-const STATE_CONDS = ["hp_below", "hp_above", "wave_min", "wave_max", "diff_min", "diff_max", "stat_min", "stat_max", "if_moving", "if_still", "own_tag", "own_set", "own_item", "weapon_kinds", "var_cmp", "evo_camp"]
+const STATE_CONDS = ["hp_below", "hp_above", "wave_min", "wave_max", "diff_min", "diff_max", "stat_min", "stat_max", "if_moving", "if_still", "own_tag", "own_set", "own_item", "weapon_kinds", "var_cmp", "evo_camp", "obj_state"]
 # 不在敌袭中触发的扳机（商店、波次结束后的异变、升级界面的机械化）
-const SHOP_TRIGGERS = ["reroll", "buy", "mutated", "meca_upgrade", "gain"]
+const SHOP_TRIGGERS = ["reroll", "buy", "mutated", "meca_upgrade", "gain", "lock_leave", "locked_cursed"]
 
 # 不是普通 Effect 脚本、但也可以拆解的扳机（徒步旅行者的步数在 value2；浪漫之人 / 长笛的魅惑由 split_native 单独处理）
 const SPLIT_ANY_SCRIPT = ["gain_stat_for_every_step_after_equip", "charm_on_hit"]
@@ -611,6 +629,15 @@ static func node_def(kind: String):
 static func node_type(kind: String) -> String:
 	var d = node_def(kind)
 	return d[1] if d != null else ""
+
+
+static func is_int_param(kind: String, key: String) -> bool:
+	var d = node_def(kind)
+	if d != null:
+		for p in d[2]:
+			if p[0] == key:
+				return p[1] == "int"
+	return false
 
 
 # 新节点的默认参数
@@ -732,6 +759,7 @@ const STAT_ICON_PATHS = {
 	"harvesting_growth": ["character_farmer", "item_crown"],
 	"fire_puddle_size": ["weapon_molotov_1"],
 	"time_shift_on_hit": ["character_time_shifter"],
+	"be_time_shift_secs": ["character_time_shifter"],
 	"weapons_price": ["character_arms_dealer"],
 	"no_melee_weapons": ["character_ranger"],
 	"no_ranged_weapons": ["character_gladiator"],

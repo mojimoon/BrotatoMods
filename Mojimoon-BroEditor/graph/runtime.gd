@@ -10,6 +10,7 @@ extends Node
 const Catalog = preload("res://mods-unpacked/Mojimoon-BroEditor/catalog.gd")
 const GraphEffect = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/graph_effect.gd")
 const EnemyBehavior = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/enemy_behavior.gd")
+const Formula = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/formula.gd")
 const EXPLOSION_EFFECT_PATH = "res://items/all/00_base_game/rip_and_tear/rip_and_tear_effect_1.tres"
 const MAX_DEPTH = 24
 
@@ -37,6 +38,12 @@ func start_wave(p_main: Node) -> void:
 	_elapsed = 0.0
 	_wave_serial += 1
 	rebuild_all()
+	# 时间扭曲的持续时间（原版固定为计时器的 3 秒）：加上 be_time_shift_secs
+	for p in RunData.get_player_count():
+		var extra = RunData.get_player_effects(p).get(Keys.generate_hash("be_time_shift_secs"), 0)
+		var pl = _player(p)
+		if extra != 0 and pl != null and "_shift_timer" in pl and pl._shift_timer != null:
+			pl._shift_timer.wait_time = max(0.2, pl._shift_timer.wait_time + float(extra))
 
 
 func end_wave() -> void:
@@ -92,7 +99,7 @@ func rebuild_all() -> void:
 						var en = old.get(e.get_instance_id())
 						if en == null:
 							var g = e.live_graph()
-							en = {"effect": e, "g": g, "by_id": GraphEffect.nodes_by_id(g), "st": {}, "granted": [], "src": src, "sp": {}}
+							en = {"effect": e, "g": g, "nodes": GraphEffect.sorted_nodes(g), "by_id": GraphEffect.nodes_by_id(g), "st": {}, "granted": [], "src": src, "sp": {}}
 						list.push_back(en)
 		entries[p] = list
 
@@ -128,8 +135,8 @@ func fire(event: String, player_index: int, pos = null, target = null, info = nu
 	for en in entries[player_index]:
 		if ctx.info.has("weapon_pos") and en.src is WeaponData and RunData.get_player_weapons_ref(player_index).find(en.src) != int(ctx.info.weapon_pos):
 			continue
-		for n in en.g.get("nodes", []):
-			if n.kind == event and (event != "steps" or _every_n_steps(en, n)):
+		for n in en.nodes:
+			if n.kind == event and (event != "steps" or _every_n_steps(en, _resolved(en, n, player_index, ctx))):
 				_walk(en, int(n.id), player_index, ctx, 0)
 
 
@@ -153,7 +160,7 @@ func fire_gain(effect, player_index: int) -> void:
 	for en in entries[player_index]:
 		if en.effect == effect:
 			var ctx = {"pos": null, "target": null, "hold": null, "info": {}}
-			for n in en.g.get("nodes", []):
+			for n in en.nodes:
 				if n.kind == "gain":
 					_walk(en, int(n.id), player_index, ctx, 0)
 			return
@@ -198,10 +205,117 @@ func _param(n: Dictionary, k: String, default = 0):
 	return n.get("params", {}).get(k, default)
 
 
+# 整数参数里的公式（见 graph/formula.gd）：算出数值后的节点副本；没有公式时就是原节点
+var _int_keys: Dictionary = {}	# 节点类型 -> [整数参数名]
+var _formulas: Dictionary = {}	# 公式文本 -> 编译结果（null = 不合法）
+
+
+func _resolved(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> Dictionary:
+	if not _int_keys.has(n.kind):
+		var keys = []
+		var d = Catalog.node_def(n.kind)
+		for prm in d[2] if d != null else []:
+			if prm[1] == "int":
+				keys.push_back(prm[0])
+		_int_keys[n.kind] = keys
+	var out = n
+	for k in _int_keys[n.kind]:
+		var v = n.get("params", {}).get(k)
+		if v is String:
+			if out == n:
+				out = {"id": n.id, "kind": n.kind, "params": n.params.duplicate()}
+			out.params[k] = eval_formula(v, p, en, ctx)
+	return out
+
+
+func eval_formula(text: String, p: int, en: Dictionary, ctx: Dictionary) -> int:
+	if not _formulas.has(text):
+		_formulas[text] = Formula.compile(text)
+	var c = _formulas[text]
+	if c == null:
+		return 0
+	var values = []
+	for ref in c.refs:
+		values.push_back(_ref_value(ref, p, en, ctx))
+	return Formula.run(c, values)
+
+
+func _ref_value(ref: String, p: int, en: Dictionary, ctx: Dictionary) -> int:
+	if not ref.begins_with("@"):
+		return GraphEffect.get_var(p, _var_key(en, ref))
+	var k = ref.substr(1)
+	var src = en.get("src")
+	match k:
+		"gold":
+			return RunData.get_player_gold(p)
+		"wave":
+			return RunData.current_wave
+		"level":
+			return RunData.get_player_level(p)
+		"hp":
+			var pl = _player(p)
+			return int(pl.current_stats.health) if pl != null else RunData.get_player_current_health(p)
+		"max_hp":
+			return RunData.get_player_max_health(p)
+		"hp_pct":
+			return int(_hp_pct(p))
+		"enemies":
+			return main._entity_spawner.get_all_enemies(false).size() if main != null and is_instance_valid(main) else 0
+		"weapons":
+			return RunData.get_player_weapons_ref(p).size()
+		"items":
+			return RunData.get_player_items_ref(p).size()
+		"difficulty":
+			return RunData.current_difficulty
+		"time":
+			return int(_elapsed)
+		"meca_parts":
+			return RunData.get_player_meca_parts(p)
+		"tier":
+			return int(src.tier) if src != null else 0
+		"name":
+			# 持有者的名称当作整数（"0021" -> 21；不是数字为 0）
+			return tr(str(src.name)).to_int() if src != null else 0
+		"target_hp":
+			var hp = _target_hp(ctx)
+			return int(hp) if hp != null else 0
+	if k.begins_with("count:") or k.begins_with("tag:"):
+		var id = k.substr(k.find(":") + 1)
+		var c = 0
+		for it in RunData.get_player_items(p):
+			if (id in it.tags) if k.begins_with("tag:") else it.my_id == id:
+				c += 1
+		if k.begins_with("count:"):
+			for w in RunData.get_player_weapons(p):
+				if w.weapon_id == id or w.my_id == id:
+					c += 1
+		return c
+	var h = Keys.generate_hash(k)
+	if Utils.is_stat_key(h):
+		return int(Utils.get_stat(h, p))
+	var v = RunData.get_player_effects(p).get(h)
+	return int(v) if typeof(v) in [TYPE_INT, TYPE_REAL] else 0
+
+
+# 变量名 -> 存储用的名称：以 _ 开头的是本蓝图的局部变量（同内容的蓝图共用，同"仅一次"令牌）
+func _var_key(en: Dictionary, name: String) -> String:
+	name = name.strip_edges()
+	if not name.begins_with("_"):
+		return name
+	if not en.has("scope"):
+		en.scope = en.effect.once_token(0)
+	return name + "#" + str(en.scope)
+
+
+# 任何条件都可以取反（params.not）
 func _pass(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> bool:
 	# 不认识的条件（来自更新的版本）不放行
 	if Catalog.node_def(n.kind) == null:
 		return false
+	return _pass_raw(en, _resolved(en, n, p, ctx), p, ctx) != bool(_param(n, "not", false))
+
+
+func _pass_raw(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> bool:
 	var st = _state(en, int(n.id))
 	match n.kind:
 		"chance":
@@ -255,7 +369,7 @@ func _pass(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> bool:
 			var hp = _target_hp(ctx)
 			return hp != null and hp < float(_param(n, "pct", 50))
 		"dmg_type":
-			return str(_param(n, "stat", "")) in ctx.info.get("stats", [])
+			return str(_param(n, "stat", "")) in ctx.get("info", {}).get("stats", [])
 		"target_evolved":
 			var t = ctx.target
 			if t == null or not is_instance_valid(t) or not "_is_meca" in t:
@@ -287,7 +401,25 @@ func _pass(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> bool:
 					c += 1
 			return _cmp(n, c)
 		"var_cmp":
-			return _cmp(n, GraphEffect.get_var(p, str(_param(n, "var", ""))))
+			return _cmp(n, GraphEffect.get_var(p, _var_key(en, str(_param(n, "var", "")))))
+		"obj_state":
+			# 锁定商品的扳机下是那件商品，否则是持有者
+			var o = _good(ctx)
+			if o == null:
+				o = en.get("src")
+			if o == null:
+				return false
+			return o.is_cursed if str(_param(n, "state", "cursed")) == "cursed" else (o.is_meca or o.is_mutant)
+		"or":
+			# 或门：同一次触发里只放行第一次到达
+			# ponytail: 状态扳机按路径分别轮询，或门在那里不合并（每条路径各执行一次）；要合并需按节点而不是按路径记录进入状态
+			if not ctx.has("seen"):
+				ctx["seen"] = {}
+			var k = str(en.effect.get_instance_id()) + ":" + str(n.id)
+			if ctx.seen.has(k):
+				return false
+			ctx.seen[k] = true
+			return true
 		"weapon_kinds":
 			var kinds = {}
 			for w in RunData.get_player_weapons(p):
@@ -331,9 +463,9 @@ func _cmp(n: Dictionary, c: int) -> bool:
 
 # 目标敌人的生命百分比：命中事件为命中前，其余为当前；没有目标敌人为 null
 func _target_hp(ctx: Dictionary):
-	if ctx.info.has("hp_pct"):
+	if ctx.get("info", {}).has("hp_pct"):
 		return float(ctx.info.hp_pct)
-	var t = ctx.target
+	var t = ctx.get("target")
 	if t != null and is_instance_valid(t) and "current_stats" in t:
 		return 100.0 * t.current_stats.health / max(1.0, float(t.max_stats.health))
 	return null
@@ -350,6 +482,7 @@ func _hp_pct(p: int) -> float:
 # 效果
 # ============================================================
 func _execute(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> void:
+	n = _resolved(en, n, p, ctx)
 	var hp_before = RunData.get_player_max_health(p)
 	var stat = str(_param(n, "stat", ""))
 	var h = Keys.generate_hash(stat) if stat != "" else Keys.empty_hash
@@ -425,7 +558,16 @@ func _execute(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> void:
 			if mod != null and key.find(":") > 0:
 				mod.set_obj_locked(key.get_slice(":", 0), key.substr(key.find(":") + 1), n.kind == "obj_lock")
 		"var_set":
-			_var_set(n, p, v)
+			_var_set(en, n, p, v, ctx)
+		"weapon_dmg":
+			_weapon_dmg(en, n, p, v, ctx)
+		"curse_locked":
+			var good = ctx.get("info", {}).get("good")
+			var dlc = _dlc("abyssal_terrors")
+			if _good(ctx) != null and dlc != null:
+				good[0][good[1]][0] = dlc.curse_item(good[0][good[1]][0], p)
+		"curse_self", "evolve_self":
+			_evolve_self(en, p, "curse" if n.kind == "curse_self" else "evolve")
 		"meca_parts":
 			if v < 0:
 				RunData.remove_meca_parts(-v, p)
@@ -441,10 +583,131 @@ func _execute(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary) -> void:
 	_sync_lost_max_hp(p, hp_before)
 
 
-# 修改变量（不随状态扳机撤销；除以 0 时不变）
-func _var_set(n: Dictionary, p: int, v: int) -> void:
-	var name = str(_param(n, "var", ""))
+# 锁定商品的扳机（lock_leave / locked_cursed）里的那件商品；没有为 null
+func _good(ctx: Dictionary):
+	var good = ctx.get("info", {}).get("good")
+	if good is Array and good[1] < good[0].size():
+		return good[0][good[1]][0]
+	return null
+
+
+func _dlc(id: String):
+	return ItemService.get_dlc_data_by_id(id) if mod != null and mod.set_active(id) else null
+
+
+# 时效：永久不记录；持续 N 秒到时撤销；直至敌袭结束随状态扳机 / 波次结束撤销
+func _keep(en: Dictionary, n: Dictionary, p: int, ctx: Dictionary, u: Array, default_mode: String) -> void:
+	match str(_param(n, "mode", default_mode)):
+		"perm":
+			pass
+		"timed":
+			_timed(p, [u], _param(n, "secs", 5))
+		_:
+			if ctx.get("hold") != null:
+				ctx.hold.push_back(u)
+			else:
+				en.granted.push_back(u)
+
+
+# 武器基础伤害：原版 weapon_type_bonus 表里加一行（同原版"近战 / 远程武器伤害 +X"）
+func _weapon_dmg(en: Dictionary, n: Dictionary, p: int, v: int, ctx: Dictionary) -> void:
+	var list = RunData.get_player_effects(p).get(Keys.weapon_type_bonus_hash)
+	if v == 0 or not list is Array:
+		return
+	var scope = str(_param(n, "scope", "all_weapons"))
+	var rows = []
+	for t in [0, 1]:	# WeaponType.MELEE / RANGED
+		if scope == "all_weapons" or (scope == "melee") == (t == 0):
+			rows.push_back([t, Keys.generate_hash("damage"), v])
+	list.append_array(rows)
+	_refresh(p)
+	_keep(en, n, p, ctx, ["wb", rows], "temp")
+
+
+# 持有者（道具 / 武器，角色除外）被诅咒 / 进化：同道具变化，敌袭中等到敌袭结束
+func _evolve_self(en: Dictionary, p: int, op: String) -> void:
+	var src = en.get("src")
+	if src == null or src is CharacterData:
+		return
+	for t in _transforms:
+		if t.src == src and t.p == p:
+			return
+	_transforms.push_back({"p": p, "src": src, "id": "", "self": true, "op": op})
+	if wave_over:
+		_flush_transforms()
+
+
+func _do_evolve(t: Dictionary) -> void:
+	var p: int = t.p
+	var src = t.src
+	var is_weapon = src is WeaponData
+	var owned: Array = RunData.get_player_weapons_ref(p) if is_weapon else RunData.get_player_items_ref(p)
+	if not src in owned:
+		return
+	var new_data = null
+	if t.op == "curse":
+		var dlc = _dlc("abyssal_terrors")
+		if dlc != null and ItemService.can_item_be_cursed(src):
+			new_data = dlc.curse_item(src, p)
+	elif _dlc("primal_dread") == null:
+		return
+	elif is_weapon:
+		if ItemService.can_weapon_be_mechanized(src):
+			new_data = _dlc("primal_dread").meca_item(src, p, true)
+	elif ItemService.can_item_be_mutated(src):
+		# 原版异变（含复制效果到肿瘤）
+		mod.after_mutation(p, RunData.mutate_item(src, p))
+		return
+	if new_data == null or new_data == src:
+		return
+	# 换成新的副本：同原版异变，不算再次获得（"获得时"不触发、"仅一次"令牌沿用）
+	RunData._is_mutating = true
+	if is_weapon:
+		var i = owned.find(src)
+		var tracked = RunData.remove_weapon(src, p)
+		var w = RunData.add_weapon(new_data, p)
+		if i >= 0 and i < owned.size() - 1:
+			owned.erase(w)
+			owned.insert(i, w)
+		w.tracked_value = tracked
+		w.dmg_dealt_last_wave = src.dmg_dealt_last_wave
+	else:
+		RunData.remove_item(src, p, false, false)
+		RunData.add_item(new_data, p)
+	RunData._is_mutating = false
+	mod.after_mutation(p, null)
+
+
+# 离开商店时（extensions/ui/menus/shop）：每件锁定的商品触发一次 lock_leave；返回各商品此前是否已被诅咒
+func locked_leave() -> Array:
+	if wave_over:
+		rebuild_all()
+	var snap = []
+	for p in RunData.get_player_count():
+		var list: Array = RunData.locked_shop_items[p]
+		var flags = []
+		for g in list:
+			flags.push_back(g[0].is_cursed)
+		snap.push_back(flags)
+		for i in list.size():
+			fire("lock_leave", p, null, null, {"good": [list, i]})
+	return snap
+
+
+# 原版（鱼钩）处理完之后：本次离开商店时被诅咒的锁定商品各触发一次 locked_cursed
+func locked_cursed(snap: Array) -> void:
+	for p in min(snap.size(), RunData.get_player_count()):
+		var list: Array = RunData.locked_shop_items[p]
+		for i in min(list.size(), snap[p].size()):
+			if list[i][0].is_cursed and not snap[p][i]:
+				fire("locked_cursed", p, null, null, {"good": [list, i]})
+
+
+# 修改变量（除以 0 时不变）。时效不是永久时，到时撤销这次的改变量
+func _var_set(en: Dictionary, n: Dictionary, p: int, v: int, ctx: Dictionary) -> void:
+	var name = _var_key(en, str(_param(n, "var", "")))
 	var cur = GraphEffect.get_var(p, name)
+	var old = cur
 	match str(_param(n, "op", "add")):
 		"set":
 			cur = v
@@ -458,6 +721,7 @@ func _var_set(n: Dictionary, p: int, v: int) -> void:
 		_:
 			cur += v
 	GraphEffect.set_var(p, name, cur)
+	_keep(en, n, p, ctx, ["var", name, cur - old], "perm")
 
 
 # 道具变为：持有者是道具时，换成列表中随机一件；列表为空时移除它（原版 remove_item 换成"移除后变成"的道具）
@@ -516,7 +780,9 @@ func _flush_transforms() -> void:
 		var target = mod.find_target("item", t.id) if mod != null and t.id != "" else null
 		if (t.id != "" and target == null) or t.p >= RunData.get_player_count():
 			continue
-		if t.src != null:
+		if t.get("op", "") != "":
+			_do_evolve(t)
+		elif t.src != null:
 			if not t.src in RunData.get_player_items_ref(t.p):
 				continue
 			# 道具变为：没有指定道具时由原版换成"移除后变成"；指定了道具时只换成该道具
@@ -533,6 +799,8 @@ func _flush_transforms() -> void:
 			var gear = scene._get_gear_container(t.p)
 			if gear != null:
 				gear.set_items_data(RunData.get_player_items(t.p))
+				if t.src is WeaponData:
+					gear.set_weapons_data(RunData.get_player_weapons(t.p))
 
 
 # 魅惑（同浪漫之人：原版魅惑行为，每名玩家最多同时 5 个）；敌人身上没有魅惑行为时补上
@@ -644,7 +912,7 @@ func _on_timed_out(rec: Dictionary) -> void:
 	rec.u = []
 
 
-# 撤销：["temp", hash, 数值] / ["eff", hash, 数值] / ["grant", 效果]
+# 撤销：["temp", hash, 数值] / ["eff", hash, 数值] / ["var", 名称, 改变量] / ["wb", weapon_type_bonus 的行] / ["grant", 效果]
 func _revert(p: int, undo: Array) -> void:
 	if undo.empty() or p >= RunData.get_player_count():
 		return
@@ -655,6 +923,12 @@ func _revert(p: int, undo: Array) -> void:
 				TempStats.remove_stat(u[1], u[2], p)
 			"eff":
 				_add_effect(u[1], -u[2], p)
+			"var":
+				GraphEffect.set_var(p, u[1], GraphEffect.get_var(p, u[1]) - u[2])
+			"wb":
+				var list = RunData.get_player_effects(p).get(Keys.weapon_type_bonus_hash)
+				for row in u[1]:
+					list.erase(row)
 			_:
 				u[1].unapply(p)
 	_refresh(p)
@@ -846,13 +1120,14 @@ func _physics_process(delta: float) -> void:
 		if pl == null or pl.dead:
 			continue
 		for en in entries[p]:
-			for n in en.g.get("nodes", []):
+			for n in en.nodes:
 				if n.kind == "interval":
 					var st = _state(en, int(n.id))
 					st.acc += step
-					if st.acc + 0.001 >= max(0.2, float(_param(n, "secs", 1))):
+					var ictx = {"pos": null, "target": null, "hold": null, "info": {}}
+					if st.acc + 0.001 >= max(0.2, float(_param(_resolved(en, n, p, ictx), "secs", 1))):
 						st.acc = 0.0
-						_walk(en, int(n.id), p, {"pos": null, "target": null, "hold": null}, 0)
+						_walk(en, int(n.id), p, ictx, 0)
 				elif n.kind in Catalog.STATE_TRIGGERS:
 					poll_state(en, n, p, pl)
 
@@ -870,7 +1145,7 @@ func _tick() -> void:
 		if pl == null or pl.dead:
 			continue
 		for en in entries[p]:
-			for n in en.g.get("nodes", []):
+			for n in en.nodes:
 				if n.kind != "tick":
 					continue
 				if not _tick_targets(en, int(n.id)):
@@ -902,7 +1177,7 @@ func poll_state(en: Dictionary, trig: Dictionary, p: int, pl) -> void:
 	var st = _state(en, int(trig.id))
 	if not st.has("paths"):
 		st.paths = {}
-	var on = _state_holds(trig, pl)
+	var on = _state_holds(_resolved(en, trig, p, {}), pl)
 	for path in _state_paths(en, int(trig.id)):
 		var key = str(path)
 		if not st.paths.has(key):

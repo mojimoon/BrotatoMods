@@ -8,6 +8,7 @@ extends Reference
 
 const Catalog = preload("res://mods-unpacked/Mojimoon-BroEditor/catalog.gd")
 const GraphEffect = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/graph_effect.gd")
+const Formula = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/formula.gd")
 const TYPE_COLORS = {"trigger": Color(1.0, 0.72, 0.30), "cond": Color(0.40, 0.72, 1.0), "effect": Color(0.55, 0.85, 0.55)}
 const PORT_TYPE = 0
 
@@ -223,6 +224,12 @@ func _make_node(n: Dictionary) -> GraphNode:
 		lbl.rect_min_size = Vector2(70, 0)
 		row.add_child(lbl)
 		row.add_child(_param_control(n, p))
+	# 条件取反
+	if t == "cond" and n.kind != "or":
+		var neg = ui._checkbox(ui.tr("BE_P_NOT"), ui.FONT_DESC)
+		neg.pressed = bool(n.params.get("not", false))
+		neg.connect("toggled", self, "_on_not", [int(n.id)])
+		gn.add_child(neg)
 	if Catalog.NODE_DETAILS.has(n.kind):
 		var det = ui._button(ui.tr("BE_EFFECT_DETAILS"), ui.FONT_DESC)
 		ui._apply_action_style(det, ui.C_CUSTOM)
@@ -235,11 +242,7 @@ func _param_control(n: Dictionary, p: Array) -> Control:
 	var cur = n.params.get(p[0], p[2])
 	var ptype: String = p[1]
 	if ptype == "int":
-		var sb = ui._spin(-99999, 99999, 1)
-		sb.value = int(cur)
-		sb.rect_min_size = Vector2(130, 0)
-		sb.connect("value_changed", self, "_on_param", [int(n.id), p[0]])
-		return sb
+		return _int_control(n, p[0], cur)
 	if ptype == "var":
 		return _var_control(n, p[0], str(cur))
 	if ptype == "stat":
@@ -304,6 +307,96 @@ func _param_control(n: Dictionary, p: Array) -> Control:
 	det.connect("pressed", self, "_on_ref_details", [int(n.id)])
 	box.add_child(det)
 	return box
+
+
+# 整数参数：数字框，或公式（输入框 + "+" 插入变量 / 取值；写错时标红）；"f(x)" 在两者之间切换
+func _int_control(n: Dictionary, key: String, cur) -> Control:
+	var box = HBoxContainer.new()
+	box.add_constant_override("separation", 4)
+	if cur is String:
+		var le = ui._line_edit(ui.tr("BE_FORMULA_HINT"))
+		le.text = cur
+		le.rect_min_size = Vector2(190, 0)
+		_mark_formula(le)
+		le.connect("text_changed", self, "_on_formula_text", [int(n.id), key, le])
+		box.add_child(le)
+		var pick = ui._search_select(_formula_items(), null)
+		pick.fixed_text = "+"
+		pick._refresh_text()
+		pick.rect_min_size = Vector2(36, 0)
+		pick.connect("selected", self, "_on_formula_insert", [int(n.id), key])
+		box.add_child(pick)
+	else:
+		var sb = ui._spin(-99999, 99999, 1)
+		sb.value = int(cur)
+		sb.rect_min_size = Vector2(130, 0)
+		sb.connect("value_changed", self, "_on_param", [int(n.id), key])
+		box.add_child(sb)
+	var fb = ui._button("f(x)", ui.FONT_DESC)
+	fb.hint_tooltip = ui.tr("BE_FORMULA_TIP")
+	ui._apply_action_style(fb, ui.C_ACCENT if cur is String else ui.C_TEXT_DIM)
+	fb.connect("pressed", self, "_on_formula_toggle", [int(n.id), key])
+	box.add_child(fb)
+	return box
+
+
+func _mark_formula(le: LineEdit) -> void:
+	le.add_color_override("font_color", ui.C_DANGER if Formula.compile(le.text) == null else ui.C_TEXT)
+
+
+# 可插入公式的内容：用过的变量、取值来源、属性
+func _formula_items() -> Array:
+	var items = []
+	for name in _known_vars():
+		var toks = Formula.tokens(name)
+		items.push_back([ui.tr("BE_P_VAR") + ": " + name, name if toks != null and toks.size() == 1 and toks[0][0] else "{" + name + "}"])
+	for k in Formula.SOURCES:
+		items.push_back([ui.tr("BE_SRC_" + k.to_upper()), "@" + k])
+	items.push_back([ui.tr("BE_SRC_COUNT").replace("{0}", "<id>"), "@count:"])
+	for k in Catalog.graph_stat_keys():
+		if ui._is_valid_stat(k):
+			items.push_back([ui.stat_name(k), "@" + k])
+	return items
+
+
+func _on_formula_text(text: String, id: int, key: String, le: LineEdit) -> void:
+	var n = _find(_edit_graph(), id)
+	if n != null:
+		n.params[key] = text
+		_mark_formula(le)
+		_changed()
+
+
+func _on_formula_insert(value, id: int, key: String) -> void:
+	var n = _find(_edit_graph(), id)
+	if n != null:
+		n.params[key] = str(n.params.get(key, "")) + str(value)
+		_changed()
+		call_deferred("rebuild")
+
+
+func _on_formula_toggle(id: int, key: String) -> void:
+	var n = _find(_edit_graph(), id)
+	if n == null:
+		return
+	var cur = n.params.get(key, 0)
+	if cur is String:
+		n.params[key] = int(cur) if cur.strip_edges().is_valid_integer() else int(ui._mod._node_default(n.kind, key))
+	else:
+		n.params[key] = str(int(cur))
+	_changed()
+	call_deferred("rebuild")
+
+
+func _on_not(on: bool, id: int) -> void:
+	var n = _find(_edit_graph(), id)
+	if n == null:
+		return
+	if on:
+		n.params["not"] = true
+	else:
+		n.params.erase("not")
+	_changed()
 
 
 # 变量名：输入框 + "..."（从全部蓝图里用过的变量名中选）

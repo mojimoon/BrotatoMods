@@ -29,6 +29,10 @@ func _initialize() -> void:
 		yield(_cloud(out), "completed")
 		quit()
 		return
+	if OS.get_environment("BE_SHOT_FORMULA") != "":
+		yield(_formula(m, isvc, out), "completed")
+		quit()
+		return
 	if OS.get_environment("BE_SHOT_KINDS") != "":
 		yield(_kinds(m, out), "completed")
 		quit()
@@ -347,3 +351,33 @@ func _cloud_manage(out: String):
 		yield(_shot(ui, out + "/upload_edit.png"), "completed")
 	ui.queue_free()
 	yield(self, "idle_frame")
+
+
+# 蓝图：公式参数、取反、或门、新节点
+func _formula(m, isvc, out: String):
+	var ch = isvc.characters[2].my_id
+	var GE = load("res://mods-unpacked/Mojimoon-BroEditor/graph/graph_effect.gd")
+	var g = GE.new_graph()
+	var k = GE.add_node(g, "kill", Vector2(20, 20))
+	var c1 = GE.add_node(g, "chance", Vector2(300, 20), {"pct": "10 + 2 * x"})
+	var c2 = GE.add_node(g, "wave_min", Vector2(300, 250), {"n": 5, "not": true})
+	var gate = GE.add_node(g, "or", Vector2(640, 20))
+	var e1 = GE.add_node(g, "perm_stat", Vector2(900, 20), {"stat": "stat_armor", "value": "1 + @stat_luck / 10"})
+	var e2 = GE.add_node(g, "var_set", Vector2(900, 260), {"var": "_n", "op": "add", "value": 1, "mode": "timed"})
+	var e3 = GE.add_node(g, "weapon_dmg", Vector2(900, 520), {"value": "x", "scope": "melee"})
+	for l in [[k, c1], [k, c2], [c1, gate], [c2, gate], [gate, e1], [gate, e2], [gate, e3]]:
+		GE.add_link(g, l[0], l[1])
+	var ll = GE.add_node(g, "lock_leave", Vector2(20, 520))
+	var os = GE.add_node(g, "obj_state", Vector2(300, 520))
+	GE.add_link(g, ll, os)
+	GE.add_link(g, os, GE.add_node(g, "curse_locked", Vector2(600, 620)))
+	var p = m.new_profile()
+	p.graph = g
+	m.profiles[ch] = p
+	m.apply_all()
+	var ui = load("res://mods-unpacked/Mojimoon-BroEditor/ui/editor_ui.tscn").instance()
+	ui.initial_id = ch
+	root.add_child(ui)
+	ui._on_tab_pressed("blueprint")
+	yield(_shot(ui, out + "/formula.png"), "completed")
+	ui.queue_free()

@@ -6,6 +6,7 @@ extends Effect
 
 const ID = "broeditor_graph"
 const Catalog = preload("res://mods-unpacked/Mojimoon-BroEditor/catalog.gd")
+const Formula = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/formula.gd")
 const MAX_PATHS = 40
 # 条件"仅一次"（同原版"下一波"效果）：每获得一次持有者（道具 / 角色），每个"仅一次"节点在玩家效果表里记一枚令牌，
 # 条件通过时消耗一枚。令牌随一局存档保存；同内容的蓝图共用令牌（数量一致，不影响结果）
@@ -215,6 +216,17 @@ static func outgoing(g: Dictionary, id: int, by_id = null) -> Array:
 	return out
 
 
+# 节点按画布位置从上到下（同高从左到右、再按 id）：扳机的触发顺序、路径文本的顺序
+static func sorted_nodes(g: Dictionary) -> Array:
+	var out = []
+	for n in g.get("nodes", []):
+		var i = out.size()
+		while i > 0 and _before(n, int(n.id), out[i - 1], int(out[i - 1].id)):
+			i -= 1
+		out.insert(i, n)
+	return out
+
+
 static func _before(a, a_id: int, b, b_id: int) -> bool:
 	var pa = a.get("pos", [0, 0]) if a is Dictionary else [0, 0]
 	var pb = b.get("pos", [0, 0]) if b is Dictionary else [0, 0]
@@ -230,7 +242,7 @@ static func _before(a, a_id: int, b, b_id: int) -> bool:
 static func paths(g: Dictionary) -> Array:
 	var by_id = nodes_by_id(g)
 	var out = []
-	for n in g.get("nodes", []):
+	for n in sorted_nodes(g):
 		if Catalog.node_type(n.kind) == "trigger":
 			_walk_paths(g, by_id, [int(n.id)], out)
 	return out
@@ -278,7 +290,39 @@ static func _p(n: Dictionary, k: String, default = 0):
 	return n.get("params", {}).get(k, default)
 
 
+# 填了公式的整数参数：文本里先放一个占位数字（照常走各句式），最后把占位数字换成公式。
+# 返回显示用的节点副本（f = 填了公式的参数名）；没有公式时就是原节点
+const F_BASE = 7000001
+
+
+static func _shown(n: Dictionary, fx: Dictionary) -> Dictionary:
+	var out = n
+	for k in n.get("params", {}):
+		if n.params[k] is String and Catalog.is_int_param(n.kind, k):
+			if not out.has("f"):
+				out = n.duplicate(true)
+				out["f"] = []
+			var s = F_BASE + fx.size()
+			fx[str(s)] = Formula.display(n.params[k], _mod())
+			out.params[k] = s
+			out.f.push_back(k)
+	return out
+
+
+static func _is_f(n: Dictionary, k: String) -> bool:
+	return k in n.get("f", [])
+
+
+static func _neg(text: String, on: bool) -> String:
+	return _tr("BE_CX_NOT").replace("{0}", text) if on else text
+
+
 static func path_text(by_id: Dictionary, path: Array, colored: bool = true) -> String:
+	var fx = {}
+	var shown = {}
+	for id in path:
+		shown[id] = _shown(by_id[id], fx)
+	by_id = shown
 	var trig = by_id[path[0]]
 	var eff = by_id[path[-1]]
 	var chance = 100.0
@@ -291,22 +335,32 @@ static func path_text(by_id: Dictionary, path: Array, colored: bool = true) -> S
 		# 经过的效果（先执行的效果）有自己的路径文本
 		if Catalog.node_type(n.kind) == "effect":
 			continue
+		var neg = bool(_p(n, "not", false))
 		match n.kind:
+			"or":
+				pass
 			"chance":
-				chance *= float(_p(n, "pct", 100)) / 100.0
+				if _is_f(n, "pct"):
+					scaled.push_back(_neg(str(n.params.pct) + "%", neg))
+				else:
+					var pct = clamp(float(_p(n, "pct", 100)), 0.0, 100.0)
+					chance *= (100.0 - pct if neg else pct) / 100.0
 			"stat_chance":
 				var st_text = str(int(_p(n, "pct", 100))) + "% " + _stat_name(str(_p(n, "stat", "")))
 				var base = int(_p(n, "base", 0))
-				scaled.push_back(st_text if base == 0 else "(" + str(base) + "% + " + st_text + ")")
+				scaled.push_back(_neg(st_text if base == 0 else "(" + str(base) + "% + " + st_text + ")", neg))
 			"every":
-				every *= max(1, int(_p(n, "n", 1)))
+				if neg or _is_f(n, "n"):
+					suffix += _neg(_tr("BE_CX_EVERY").replace("{n}", str(int(_p(n, "n", 1)))), neg)
+				else:
+					every *= max(1, int(_p(n, "n", 1)))
 			"cap":
 				var c = int(_p(n, "n", 1))
-				suffix += _tr("BE_CAP_1") if c == 1 else _tr("BE_CAP").replace("{0}", str(c))
+				suffix += _neg(_tr("BE_CAP_1") if c == 1 else _tr("BE_CAP").replace("{0}", str(c)), neg)
 			"cooldown", "once":
-				suffix += _cond_text(n)
+				suffix += _neg(_cond_text(n), neg)
 			_:
-				conds.push_back(_cond_text(n))
+				conds.push_back(_neg(_cond_text(n), neg))
 	var t = _trigger_text(trig, every)
 	if every > 1 and _tr("BE_TX_" + trig.kind.to_upper() + "_EVERY") == "BE_TX_" + trig.kind.to_upper() + "_EVERY":
 		# 没有"每 N 次"句式的扳机：作为后缀
@@ -324,7 +378,10 @@ static func path_text(by_id: Dictionary, path: Array, colored: bool = true) -> S
 	var k_text = "" if conds.empty() else _tr("BE_COND_WRAP").replace("{0}", PoolStringArray(conds).join(_tr("BE_COND_AND")))
 	var out = _tr(k).replace("{T}", tc).replace("{t}", t).replace("{k}", k_text).replace("{p}", _payload_text(eff, trig.kind, colored)).replace("{c}", _col(c_text, true, colored))
 	# 没有扳机文本（始终）时去掉句首的分隔符
-	return out.strip_edges().lstrip(",，、").strip_edges() + suffix
+	out = out.strip_edges().lstrip(",，、").strip_edges() + suffix
+	for ph in fx:
+		out = out.replace(ph, fx[ph])
+	return out
 
 
 static func _trigger_text(trig: Dictionary, every: int) -> String:
@@ -341,6 +398,8 @@ static func _cond_text(n: Dictionary) -> String:
 	for k in ["n", "pct", "secs"]:
 		t = t.replace("{" + k + "}", str(int(_p(n, k, 0))))
 	var m = _mod()
+	if n.kind == "obj_state":
+		t = _tr("BE_CX_OBJ_STATE_" + str(_p(n, "state", "cursed")).to_upper())
 	if n.kind == "var_cmp":
 		t = t.replace("{0}", _var_name(n)).replace("{cmp}", _tr("BE_CMP_" + str(_p(n, "cmp", "at_least")).to_upper()))
 	if n.kind == "weapon_kinds":
@@ -389,7 +448,7 @@ static func _payload_text(n: Dictionary, trigger_kind: String, colored: bool) ->
 			return _tr("BE_PX_" + n.kind.to_upper()).replace("{0}", _col(pct, true, colored)).replace("{1}", stat + _extra_text(n, true))
 		"hp_dmg":
 			var pct = int(_p(n, "pct", 1))
-			return _tr("BE_PX_HP_DMG").replace("{0}", _col(str(pct) + "%", true, colored)).replace("{1}", str(stepify(pct / 10.0, 0.1)).trim_suffix(".0") + "%")
+			return _tr("BE_PX_HP_DMG").replace("{0}", _col(str(pct) + "%", true, colored)).replace("{1}", "?" if _is_f(n, "pct") else str(stepify(pct / 10.0, 0.1)).trim_suffix(".0") + "%")
 		"ignite":
 			var t = _tr("BE_PX_IGNITE").replace("{0}", _col(str(v), true, colored)).replace("{1}", str(int(_p(n, "secs", 3))))
 			t = t.replace("{2}", str(int(_p(n, "pct", 100))) + "%").replace("{3}", _stat_name(str(_p(n, "stat", "stat_elemental_damage"))) + _extra_text(n, false))
@@ -444,7 +503,14 @@ static func _payload_text(n: Dictionary, trigger_kind: String, colored: bool) ->
 		"break":
 			return _tr("BE_PX_BREAK").replace("{0}", str(v))
 		"var_set":
-			return _tr("BE_PX_VAR_" + str(_p(n, "op", "add")).to_upper()).replace("{0}", _var_name(n)).replace("{1}", str(v))
+			return _mode_text(_tr("BE_PX_VAR_" + str(_p(n, "op", "add")).to_upper()).replace("{0}", _var_name(n)).replace("{1}", str(v)), n, "perm", state)
+		"weapon_dmg":
+			var t = _tr("BE_PX_WEAPON_DMG_" + str(_p(n, "scope", "all_weapons")).to_upper()).replace("{0}", _col(_signed(v), good, colored))
+			return _mode_text(t, n, "temp", state)
+		"curse_locked":
+			return _tr("BE_PX_CURSE_LOCKED")
+		"curse_self", "evolve_self":
+			return _tr("BE_PX_" + n.kind.to_upper()) + _at_wave_end(trigger_kind)
 		"meca_parts":
 			if v < 0:
 				return _tr("BE_PX_LOSE_MECA_PARTS").replace("{0}", _col(str(-v), false, colored))
@@ -455,11 +521,21 @@ static func _payload_text(n: Dictionary, trigger_kind: String, colored: bool) ->
 			var pct = int(_p(n, "pct", 50))
 			return _tr("BE_PX_SLOW_TIME").replace("{0}", _col(str(pct) + "%", true, colored)).replace("{1}", str(int(_p(n, "secs", 3))))
 		"grant":
-			var inner = _grant_text(n, colored)
+			var inner = _grant_text(n, colored) + (" × " + str(n.params.n) if _is_f(n, "n") else "")
 			var mode = str(_p(n, "mode", "temp"))
 			var k = {"perm": "BE_PX_GRANT_PERM", "timed": "BE_PX_GRANT_TIMED"}.get(mode, "BE_PX_GRANT_STATE" if state else "BE_PX_GRANT_TEMP")
 			return _tr(k).replace("{0}", inner).replace("{1}", str(int(_p(n, "secs", 5))))
 	return ""
+
+
+# 时效（修改变量、武器伤害）：永久不加说明，其余同"获得效果"的句式
+static func _mode_text(t: String, n: Dictionary, default_mode: String, state: bool) -> String:
+	match str(_p(n, "mode", default_mode)):
+		"perm":
+			return t
+		"timed":
+			return _tr("BE_PX_GRANT_TIMED").replace("{0}", t).replace("{1}", str(int(_p(n, "secs", 5))))
+	return _tr("BE_PX_GRANT_STATE" if state else "BE_PX_GRANT_TEMP").replace("{0}", t)
 
 
 # 详细信息接在属性名后面：" + 50% 最大生命值 + 5"
@@ -490,7 +566,7 @@ static func _grant_text(n: Dictionary, colored: bool) -> String:
 	var e = m.make_effect(ref)
 	if e == null:
 		return TranslationServer.translate("BE_GRANT_NONE")
-	e.value = e.value * int(n.params.get("n", 1))
+	e.value = e.value * (1 if _is_f(n, "n") else int(n.params.get("n", 1)))
 	return m.effect_text(e, colored)
 
 

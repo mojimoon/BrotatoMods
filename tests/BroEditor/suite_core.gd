@@ -2832,3 +2832,184 @@ func test_325_options_without_dlc() -> void:
 	m.apply_all()
 	_eq(m.is_unlocked("item", skull), skull_was, "DLC item unlock record unchanged afterwards")
 	m.delete_custom_item(iid)
+
+
+# 反馈 2026-11-16：公式（变量 / 属性取值与算式）、局部变量、变量时效
+func test_326_formulas_and_var_scopes() -> void:
+	var GE = load(GraphEffectScript)
+	var F = load("res://mods-unpacked/Mojimoon-BroEditor/graph/formula.gd")
+	_check(F.compile("2 + x * 3") != null and F.compile("min({my var}, @gold) / 2") != null, "valid formulas compile")
+	for bad in ["OS.shell_open(1)", "x.y", "x(1)", "2 +", "{x", "", "2 $ 3"]:
+		_check(F.compile(bad) == null, "bad formula rejected: " + bad)
+	_eq(F.run(F.compile("7 / 2 + int(a > 1)"), [5]), 4, "integer division and comparison")
+	_eq(F.run(F.compile("1 / z"), [0]), 0, "division by zero is 0")
+	var g = GE.new_graph()
+	# 击杀 → x = 2 + 护甲 × 3（公式）→ 永久 +(x - 1) 护甲：先设变量，再按变量给属性
+	var k = GE.add_node(g, "kill", Vector2(0, 0))
+	var vs = GE.add_node(g, "var_set", Vector2(300, 0), {"var": "x", "op": "set", "value": "2 + @stat_armor * 3"})
+	var st = GE.add_node(g, "perm_stat", Vector2(600, 0), {"stat": "stat_armor", "value": "x - 1"})
+	GE.add_link(g, k, vs)
+	GE.add_link(g, vs, st)
+	# 升级 → 局部变量 _n 加 4（直至敌袭结束）→ 几率 100 × c → 材料 _n × 10
+	var lv = GE.add_node(g, "level_up", Vector2(0, 300))
+	var loc = GE.add_node(g, "var_set", Vector2(300, 300), {"var": "_n", "op": "add", "value": 4, "mode": "temp"})
+	var ch = GE.add_node(g, "chance", Vector2(600, 300), {"pct": "100 * c"})
+	var gold = GE.add_node(g, "add_gold", Vector2(900, 300), {"value": "_n * 10"})
+	GE.add_link(g, lv, loc)
+	GE.add_link(g, loc, ch)
+	GE.add_link(g, ch, gold)
+	var text = GE.graph_text(g, false)
+	_check(text.find("7000") < 0 and text.find("BE_") < 0, "no placeholder left in text: " + text)
+	_check(text.find(m.stat_name("stat_armor").strip_edges()) >= 0 and text.find("_n * 10") >= 0, "formula shown with names: " + text)
+	_graph_char(g)
+	var armor0 = _armor()
+	m.runtime.fire("kill", 0)
+	_eq(GE.get_var(0, "x"), 2 + armor0 * 3, "variable set from a stat formula")
+	_eq(_armor(), armor0 + 1 + armor0 * 3, "stat gained from a variable formula")
+	var gold0 = rd.get_player_gold(0)
+	m.runtime.fire("level_up", 0)
+	_eq(rd.get_player_gold(0), gold0, "chance 100 x 0 never passes")
+	GE.set_var(0, "c", 1)
+	m.runtime.fire("level_up", 0)
+	_eq(rd.get_player_gold(0), gold0 + 80, "local variable 8 x 10 gold")
+	_eq(GE.get_var(0, "_n"), 0, "local variable is not the global one")
+	var en = m.runtime.entries[0][0]
+	_eq(GE.get_var(0, m.runtime._var_key(en, "_n")), 8, "local variable stored per blueprint")
+	m.runtime.end_wave()
+	_eq(GE.get_var(0, m.runtime._var_key(en, "_n")), 0, "temp variable change undone at wave end")
+	# 取值来源
+	rd.current_wave = 7
+	_eq(m.runtime.eval_formula("@wave * 2 + @count:" + CH, 0, en, {}), 15, "sources: wave and owned count")
+	rd.current_wave = WAVE
+	# 公式不受诅咒 / 异变缩放，也不会被改写成数字
+	var cg = m.curse_graph(g, 0.5)
+	_eq(GE.nodes_by_id(cg)[st].params.value, "x - 1", "formula survives cursing")
+	_eq(GE.nodes_by_id(m.scale_graph(g, 2.0))[gold].params.value, "_n * 10", "formula survives mutation scaling")
+	_eq(m.import_graph(m.export_graph(g)).nodes[1].params.value, "2 + @stat_armor * 3", "formula survives the share code")
+
+
+# 反馈 2026-11-16：条件取反、或门、扳机按位置排序、武器基础伤害
+func test_327_gates_order_weapon_dmg() -> void:
+	var GE = load(GraphEffectScript)
+	var g = GE.new_graph()
+	# 两个击杀扳机：下面的先创建，上面的后创建 → 仍然是上面的先触发
+	var low = GE.add_node(g, "kill", Vector2(0, 500))
+	var high = GE.add_node(g, "kill", Vector2(0, 0))
+	GE.add_link(g, low, GE.add_node(g, "var_set", Vector2(300, 500), {"var": "o", "op": "mul", "value": 2}))
+	GE.add_link(g, high, GE.add_node(g, "var_set", Vector2(300, 0), {"var": "o", "op": "set", "value": 5}))
+	# 升级 → (波次至少 1) / (非 波次至少 999) → 或门 → y 加 1：两个条件都通过，只执行一次
+	var lv = GE.add_node(g, "level_up", Vector2(0, 900))
+	var c1 = GE.add_node(g, "wave_min", Vector2(300, 900), {"n": 1})
+	var c2 = GE.add_node(g, "wave_min", Vector2(300, 1000), {"n": 999, "not": true})
+	var gate = GE.add_node(g, "or", Vector2(600, 900))
+	GE.add_link(g, lv, c1)
+	GE.add_link(g, lv, c2)
+	GE.add_link(g, c1, gate)
+	GE.add_link(g, c2, gate)
+	GE.add_link(g, gate, GE.add_node(g, "var_set", Vector2(900, 900), {"var": "y", "op": "add", "value": 1}))
+	# 受伤 → 非 波次至少 1 → z 加 1：不通过
+	var hit = GE.add_node(g, "hit", Vector2(0, 1300))
+	var c3 = GE.add_node(g, "wave_min", Vector2(300, 1300), {"n": 1, "not": true})
+	GE.add_link(g, hit, c3)
+	GE.add_link(g, c3, GE.add_node(g, "var_set", Vector2(600, 1300), {"var": "z", "op": "add", "value": 1}))
+	# 闪避 → 近战武器基础伤害 +7（直至敌袭结束）
+	GE.add_link(g, GE.add_node(g, "dodge", Vector2(0, 1600)), GE.add_node(g, "weapon_dmg", Vector2(300, 1600), {"value": 7, "scope": "melee"}))
+	var text = GE.graph_text(g, false)
+	_check(text.find("BE_") < 0, "new node texts translated: " + text)
+	_check(text.find(tr("BE_CX_NOT").split("{0}")[0]) >= 0, "inverted condition text: " + text)
+	_graph_char(g)
+	m.runtime.fire("kill", 0)
+	_eq(GE.get_var(0, "o"), 10, "upper trigger first: set 5, then x 2")
+	m.runtime.fire("level_up", 0)
+	_eq(GE.get_var(0, "y"), 1, "OR gate runs what follows once")
+	m.runtime.fire("hit", 0)
+	_eq(GE.get_var(0, "z"), 0, "inverted condition blocks")
+	var bonus = rd.get_player_effects(0)[Keys.weapon_type_bonus_hash]
+	var n0 = bonus.size()
+	m.runtime.fire("dodge", 0)
+	_eq(bonus.size(), n0 + 1, "melee weapon damage row added")
+	_eq(bonus[-1], [0, Keys.generate_hash("damage"), 7], "vanilla weapon_type_bonus row")
+	m.runtime.end_wave()
+	_eq(bonus.size(), n0, "weapon damage removed at wave end")
+
+
+# 反馈 2026-11-16：锁定并离开商店（鱼钩拆解）、持有者被诅咒
+func test_328_locked_goods_and_self_curse() -> void:
+	var GE = load(GraphEffectScript)
+	var dlc = _dlc("abyssal_terrors")
+	if dlc == null:
+		return
+	var g = GE.new_graph()
+	# 锁定并离开商店 → 非 已被诅咒 → 诅咒这件商品；被诅咒后 → n 加 1
+	var ll = GE.add_node(g, "lock_leave", Vector2(0, 0))
+	var ns = GE.add_node(g, "obj_state", Vector2(300, 0), {"state": "cursed", "not": true})
+	GE.add_link(g, ll, ns)
+	GE.add_link(g, ns, GE.add_node(g, "curse_locked", Vector2(600, 0)))
+	GE.add_link(g, GE.add_node(g, "locked_cursed", Vector2(0, 300)), GE.add_node(g, "var_set", Vector2(300, 300), {"var": "n", "op": "add", "value": 1}))
+	_check(GE.graph_text(g, false).find("BE_") < 0, "locked item texts translated: " + GE.graph_text(g, false))
+	_graph_char(g)
+	m.runtime.end_wave()
+	var it = _plain_item()
+	rd.locked_shop_items[0] = [[it, 1], [m.find_target("item", "item_coupon"), 1]]
+	var snap = m.runtime.locked_leave()
+	_check(rd.locked_shop_items[0][0][0].is_cursed and rd.locked_shop_items[0][1][0].is_cursed, "locked goods cursed on leaving the shop")
+	_check(not it.is_cursed, "the original item data is untouched")
+	m.runtime.locked_cursed(snap)
+	_eq(GE.get_var(0, "n"), 2, "locked_cursed fired per newly cursed item")
+	snap = m.runtime.locked_leave()
+	m.runtime.locked_cursed(snap)
+	_eq(GE.get_var(0, "n"), 2, "already cursed goods: nothing new")
+	rd.locked_shop_items[0] = []
+	# 道具上的蓝图：击杀 → 本道具被诅咒（敌袭结束时）；获得时 → got 加 1
+	var g2 = GE.new_graph()
+	GE.add_link(g2, GE.add_node(g2, "kill", Vector2.ZERO), GE.add_node(g2, "curse_self", Vector2(300, 0)))
+	GE.add_link(g2, GE.add_node(g2, "gain", Vector2(0, 300)), GE.add_node(g2, "var_set", Vector2(300, 300), {"var": "got", "op": "add", "value": 1}))
+	_graph_char(GE.new_graph())
+	var p = m.new_profile()
+	p.graph = g2
+	m.item_profiles["item_alien_eyes"] = p
+	m.apply_all()
+	var eyes = m.find_target("item", "item_alien_eyes")
+	rd.add_item(eyes, 0)
+	yield(_frames(2), "completed")
+	_eq(GE.get_var(0, "got"), 1, "gain fired once")
+	m.runtime.start_wave(null)
+	m.runtime.fire("kill", 0)
+	_check(eyes in rd.get_player_items_ref(0), "kept during the wave")
+	m.runtime.end_wave()
+	var cursed = null
+	for x in rd.get_player_items_ref(0):
+		if x.my_id == "item_alien_eyes":
+			cursed = x
+	_check(cursed != null and cursed.is_cursed and not eyes in rd.get_player_items_ref(0), "holder replaced by its cursed copy at wave end")
+	yield(_frames(2), "completed")
+	_eq(GE.get_var(0, "got"), 1, "the cursed copy does not count as gained again")
+	m.item_profiles.erase("item_alien_eyes")
+	m.apply_all()
+
+
+# 反馈 2026-11-16（C）：次要属性的武器加成图标、穴居人文本、时间扭曲持续时间
+func test_329_feedback_fixes() -> void:
+	var ws = tree.root.get_node("WeaponService")
+	var t = ws.get_scaling_stats_icon_text([[Keys.generate_hash("pickup_range"), 1.0], [Keys.stat_ranged_damage_hash, 0.8]])
+	_check(t.find("100%") >= 0 and t.count("[img=") == 2 and t.find("empty.png") < 0 and t.find("[/img][/img]") < 0, "secondary scaling stat gets an icon: " + t)
+	# 穴居人：数值不是 1 时文本显示实际数值
+	var effects = m.orig_effects("character_caveman")
+	var idx = -1
+	for i in effects.size():
+		if effects[i].key == "burn_weapon_give_primitive_bonus":
+			idx = i
+	if idx >= 0:
+		var e = m.make_effect({"from": "character_caveman", "i": idx, "set": {"value": 3}})
+		_check(m.effect_text(e, false).find("24") >= 0 and m.effect_text(e, false).find("12") >= 0, "primitive bonus text scaled: " + m.effect_text(e, false))
+		var e1 = m.make_effect({"from": "character_caveman", "i": idx})
+		_eq(str(e1.text_key).to_upper(), "BURN_WEAPON_GIVE_PRIMITIVE_BONUS", "value 1 keeps the vanilla text")
+	# 时间扭曲持续时间：普通属性效果，写进玩家效果表
+	_check("be_time_shift_secs" in m.Catalog.stat_keys(), "time shift duration is an editable stat")
+	_setup_player(CH)
+	var fx = m.stat_effect("be_time_shift_secs", 2)
+	var holder = load("res://items/global/item_data.gd").new()
+	holder.effects = [fx]
+	rd.apply_item_effects(holder, 0)
+	_eq(int(rd.get_player_effect(Keys.generate_hash("be_time_shift_secs"), 0)), 2, "time shift seconds stored")
+	_check(m.effect_text(fx, false).find("BE_") < 0, "time shift seconds text: " + m.effect_text(fx, false))

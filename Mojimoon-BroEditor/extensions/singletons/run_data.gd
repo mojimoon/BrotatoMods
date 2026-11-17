@@ -5,6 +5,22 @@ extends "res://singletons/run_data.gd"
 const BEMain = preload("res://mods-unpacked/Mojimoon-BroEditor/mod_main.gd")
 
 
+# 本模组加进玩家效果表的 key（Catalog.EXTRA_KEYS）：应用效果前、读档后补上默认值 0
+func _be_extra_keys(player_index: int) -> void:
+	if player_index < 0 or player_index >= players_data.size():
+		return
+	var effects = players_data[player_index].effects
+	for k in load("res://mods-unpacked/Mojimoon-BroEditor/catalog.gd").EXTRA_KEYS:
+		var h = Keys.generate_hash(k)
+		if not effects.has(h):
+			effects[h] = 0
+
+
+func apply_item_effects(item_data: ItemParentData, player_index: int) -> void:
+	_be_extra_keys(player_index)
+	.apply_item_effects(item_data, player_index)
+
+
 func add_starting_items_and_weapons() -> void:
 	.add_starting_items_and_weapons()
 	var m = BEMain.get_mod()
@@ -32,6 +48,8 @@ func get_state() -> Dictionary:
 
 func resume_from_state(state: Dictionary) -> void:
 	.resume_from_state(state)
+	for p in players_data.size():
+		_be_extra_keys(p)
 	var m = BEMain.get_mod()
 	if m != null:
 		m.load_run_shop(state.get("broeditor_shop"))

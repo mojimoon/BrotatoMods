@@ -1737,8 +1737,66 @@ func make_effect(spec: Dictionary):
 			vals.erase("scaling_stats")
 			_set_typed(r, vals)
 			Catalog.sub_put(owner, field, r)
+	_scaled_text(e)
 	e._generate_hashes()
 	return e
+
+
+# 原版文本里写死了数值、实际按 value 成倍生效的效果（穴居人：点燃武器的原始伤害加成 [1,2,4,8] × value）：
+# value 不是 1 时换成写着实际数值的文本（动态注册，同"描述"）
+const SCALED_TEXTS = {"BURN_WEAPON_GIVE_PRIMITIVE_BONUS": [8, 4, 2, 1]}
+
+
+func _scaled_text(e) -> void:
+	var tk = str(e.text_key).to_upper()
+	var v = int(e.value)
+	if not SCALED_TEXTS.has(tk) or v == 1:
+		return
+	var text = tr(tk)
+	var i = text.find_last("[")
+	if i < 0:
+		return
+	var tail = text.substr(i)
+	for b in SCALED_TEXTS[tk]:
+		tail = tail.replace(str(b), "<" + str(b) + ">")
+	for b in SCALED_TEXTS[tk]:
+		tail = tail.replace("<" + str(b) + ">", str(b * v))
+	var key = "BE_SCALED_" + tk + "_" + str(v).replace("-", "N")
+	_set_message(key, text.substr(0, i) + tail)
+	e.text_key = key
+
+
+# 属性图标：原版属性图标；属性获取修改用对应属性的图标；其余按 cave-modtools 的对应表
+var _stat_icons: Dictionary = {}
+
+
+func stat_icon(key: String) -> Texture:
+	if _stat_icons.has(key):
+		return _stat_icons[key]
+	var base = key
+	if key.begins_with("gain_") and key != "gain_pct_gold_start_wave":
+		base = key.substr(5)
+	var tex = null
+	for src in Catalog.STAT_ICON_PATHS.get(base, []):
+		if tex != null:
+			break
+		if src.begins_with("res://"):
+			if ResourceLoader.exists(src):
+				tex = load(src)
+			continue
+		# 原版对象 id：用它的图标（未拥有的 DLC 里的对象也找得到）
+		var r = _find_any(src)
+		if r == null:
+			r = _find_dlc(src)
+		if r != null and r.icon != null:
+			tex = r.icon
+	var isvc = _isvc()
+	for k in [base, Catalog.STAT_ICON_ALIASES.get(base, "")]:
+		if k != "" and tex == null and isvc != null:
+			var st = isvc.get_stat(Keys.generate_hash(k))
+			tex = st.small_icon if st != null else null
+	_stat_icons[key] = tex
+	return tex
 
 
 # 按目标字段的类型写入（JSON 读回的数字是浮点）
@@ -3554,7 +3612,9 @@ func _effect_goodness(n: Dictionary) -> int:
 			return 0
 		var s = ge.get_sign(ge.effect_sign, ge.value)
 		return 1 if s in [0, 5] else (-1 if s == 1 else 0)
-	var v = int(params.get("value", params.get("pct", _node_default(kind, "value"))))
+	# 填了公式的数值不受诅咒 / 异变缩放
+	var raw = params.get("value", params.get("pct", _node_default(kind, "value")))
+	var v = 0 if raw is String else int(raw)
 	if v == 0:
 		return 0
 	var sv = 1 if v > 0 else -1
@@ -3624,6 +3684,8 @@ func curse_graph(g: Dictionary, modifier: float) -> Dictionary:
 				ge.resource_name = CURSE_TAG + k
 				proxies.push_back(ge)
 			continue
+		if n.params.get(pname) is String:
+			continue
 		var v = int(n.params.get(pname, _node_default(n.kind, pname)))
 		if v == 0:
 			continue
@@ -3687,6 +3749,8 @@ func scale_graph(g: Dictionary, f: float) -> Dictionary:
 				eff.params.ref = _effect_to_spec(eff.params.ref, ge)
 			continue
 		for pname in Catalog.CURSE_EFFECT_PARAMS.get(eff.kind, []):
+			if eff.params.get(pname) is String:
+				continue
 			var v = int(eff.params.get(pname, _node_default(eff.kind, pname)))
 			if v == 0:
 				continue

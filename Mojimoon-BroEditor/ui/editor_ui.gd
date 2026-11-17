@@ -2803,6 +2803,8 @@ func _is_valid_stat(key: String) -> bool:
 			if probe.has(h) and typeof(probe[h]) in [TYPE_INT, TYPE_REAL]:
 				_valid_keys[k] = true
 		_valid_keys["stat_levels"] = true
+		for k in Catalog.EXTRA_KEYS:
+			_valid_keys[k] = true
 	return _valid_keys.has(key)
 
 
@@ -2923,35 +2925,8 @@ func _stat_default(key: String) -> int:
 	return _mod.native_set_value(_id, key) if key in BEMain.SET_KEYS else 0
 
 
-# 属性图标：原版属性图标；属性获取修改用对应属性的图标；其余按 cave-modtools 的对应表
-var _icon_cache: Dictionary = {}
-
-
 func _stat_icon(key: String) -> Texture:
-	if _icon_cache.has(key):
-		return _icon_cache[key]
-	var base = key
-	if key.begins_with("gain_") and key != "gain_pct_gold_start_wave":
-		base = key.substr(5)
-	var tex = null
-	for src in Catalog.STAT_ICON_PATHS.get(base, []):
-		if tex != null:
-			break
-		if src.begins_with("res://"):
-			if ResourceLoader.exists(src):
-				tex = load(src)
-			continue
-		# 原版对象 id：用它的图标（未拥有的 DLC 里的对象也找得到）
-		var r = _mod._find_any(src)
-		if r == null:
-			r = _mod._find_dlc(src)
-		if r != null and r.icon != null:
-			tex = r.icon
-	for k in [base, Catalog.STAT_ICON_ALIASES.get(base, "")]:
-		if k != "" and tex == null:
-			tex = ItemService.get_stat_small_icon(Keys.generate_hash(k))
-	_icon_cache[key] = tex
-	return tex
+	return _mod.stat_icon(key)
 
 
 # 开局状态（同 cave-modtools）：[字段, 名称 key, 最小, 最大]

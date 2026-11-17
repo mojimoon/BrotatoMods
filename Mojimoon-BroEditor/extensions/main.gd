@@ -14,6 +14,22 @@ func _enter_tree() -> void:
 		m.apply_wave_duration()
 
 
+# 偷猎者"狩猎区域内敌人掉落材料 X%"：原版把系数封顶在 1（正数无效）。区域内没有负数、有正数时补上加成
+func get_gold_value(entity_type: int, args: Entity.DieArgs, base_value: float, unit: Unit = null) -> float:
+	var value = .get_gold_value(entity_type, args, base_value, unit)
+	if unit == null or not is_instance_valid(unit) or not "_poacher_zone_counts" in unit:
+		return value
+	var best = 0.0
+	for zi in unit._poacher_zone_counts:
+		if unit._poacher_zone_counts[zi] <= 0 or zi < 0 or zi >= RunData.get_player_count():
+			continue
+		var modifier = float(RunData.get_player_effect(Keys.poacher_zone_materials_hash, zi))
+		if modifier < 0:
+			return value
+		best = max(best, modifier)
+	return value * (1.0 + best / 100.0)
+
+
 func _be_rt():
 	var m = BEMain.get_mod()
 	return m.runtime if m != null and m.runtime != null and not m.runtime.wave_over else null
