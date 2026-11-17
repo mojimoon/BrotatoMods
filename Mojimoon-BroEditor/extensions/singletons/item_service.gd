@@ -137,3 +137,13 @@ func can_weapon_be_mechanized(weapon) -> bool:
 func _be_flag(res, flag: String) -> bool:
 	var m = BEMain.get_mod()
 	return m != null and m.obj_flag(res, flag)
+
+
+# 没有原版小图标的属性（次要属性等，如 % 拾取范围）：用本模组的属性图标。原版此时返回 null，
+# 武器属性加成的文本取 null.resource_path 出错、只显示百分比；已有原版图标的属性不经过这里
+func get_stat_small_icon(stat_hash: int) -> Resource:
+	var icon = .get_stat_small_icon(stat_hash)
+	var m = BEMain.get_mod() if icon == null else null
+	if m != null and Keys.hash_to_string.has(stat_hash):
+		icon = m.stat_icon(Keys.hash_to_string[stat_hash])
+	return icon

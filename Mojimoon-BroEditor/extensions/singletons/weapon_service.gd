@@ -19,26 +19,6 @@ func explode(effect: ExplodingEffect, args: WeaponServiceExplodeArgs) -> Node:
 	return instance
 
 
-# 武器属性加成里没有原版小图标的属性（次要属性等）：用本模组的属性图标（原版此处取不到图标，只显示百分比）
-func get_scaling_stats_icon_text(p_scaling_stats: Array, compared_scaling_stats: Array = []) -> String:
-	var m = Engine.get_main_loop().root.get_node_or_null("/root/ModLoader/Mojimoon-BroEditor")
-	var out = ""
-	for row in p_scaling_stats:
-		if ItemService.get_stat_small_icon(row[0]) != null or m == null:
-			out += .get_scaling_stats_icon_text([row], compared_scaling_stats)
-			continue
-		var icon = m.stat_icon(Keys.hash_to_string.get(row[0], ""))
-		var path = icon.resource_path if icon != null else ""
-		var color = "white" if row[1] > 0.0 else "#f6617c"
-		for c in compared_scaling_stats:
-			if c[0] == row[0] and row[1] > c[1]:
-				color = "#" + ProgressData.settings.color_positive
-		var w = 15 * ProgressData.settings.font_size
-		out += "[color=%s]%s%s%%[/color]" % [color, "+" if row[1] > 0.0 else "", str(round(row[1] * 100.0))]
-		out += "[img=%sx%s]%s[/img]" % [w, w, path if path != "" else "res://items/stats/empty.png"]
-	return out
-
-
 # 全局燃烧的属性加成：按本模组燃烧几率效果的记录重算（见 graph/burn_chance_effect.gd；与原版来源的获得顺序无关）
 func init_burning_data(base_burning_data: BurningData, player_index: int, is_structure: bool = false, is_pet: bool = false) -> BurningData:
 	var g = RunData.get_player_effect(Keys.burn_chance_hash, player_index)
