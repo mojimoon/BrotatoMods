@@ -1,6 +1,6 @@
 extends SceneTree
 
-# 商店性能（非测试）：godot --no-window --path 1.2 -s res://mods/tests/BetterCodex/prof_shop.gd
+# 商店性能（非测试）；BC_MUT=off/default/evo、BC_FEW=1（不加可异变道具，异变果未达标）、BC_REROLL_ONLY=1：godot --no-window --path 1.2 -s res://mods/tests/BetterCodex/prof_shop.gd
 # 本文件不能引用游戏的 class_name / autoload，逻辑在 prof_shop_cases.gd
 
 func _initialize() -> void:

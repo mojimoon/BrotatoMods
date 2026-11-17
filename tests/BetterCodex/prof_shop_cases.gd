@@ -46,18 +46,19 @@ func run(t):
 		tree.current_scene = s
 		tree.root.add_child(s)
 		yield(_frames(240, "VANILLA shop idle 240 frames"), "completed")
-		yield(_rerolls(s, 40, "VANILLA"), "completed")
+		yield(_rerolls(s, 100, "VANILLA"), "completed")
+		_card_cost(s)
 		return
 	cases._setup_player()
 	m.settings.mut_preview = OS.get_environment("BC_MUT") if OS.get_environment("BC_MUT") != "" else "default"
-	for id in ["item_alien_eyes", "item_baby_elephant", "item_coffee", "item_cyberball", "item_lens"]:
+	for id in ([] if OS.get_environment("BC_FEW") != "" else ["item_alien_eyes", "item_baby_elephant", "item_coffee", "item_cyberball", "item_lens"]):
 		var it = cases._item(id)
 		if it != null:
 			RunData.players_data[0].items.push_back(it)
 	RunData.bc_reset_mutable_counts()
 	RunData.current_wave = 5
 	ItemService.init_unlocked_pool()
-	print("mut_preview=%s preview_on=%s" % [m.settings.mut_preview, load("res://mods-unpacked/Mojimoon-BetterCodex/ui/shop_hook.gd").mutation_preview_on()])
+	print("mut_preview=%s preview_on=%s mutable=%d" % [m.settings.mut_preview, load("res://mods-unpacked/Mojimoon-BetterCodex/ui/shop_hook.gd").mutation_preview_on(), RunData.bc_mutable_count(0)])
 
 	# node_added 开销：统计商店加载时的调用次数
 	if OS.get_environment("BC_NOHOOK") != "":
@@ -77,7 +78,32 @@ func run(t):
 
 	yield(_frames(240, "shop idle 240 frames (prewarm inside)"), "completed")
 	yield(_frames(120, "shop idle after prewarm"), "completed")
-	yield(_rerolls(shop, 40, "MOD mut=" + m.settings.mut_preview), "completed")
+	yield(_rerolls(shop, 100, "MOD mut=" + m.settings.mut_preview), "completed")
+	_card_cost(shop)
+	var hs = load("res://mods-unpacked/Mojimoon-BetterCodex/ui/shop_hook.gd")
+	var h = shop.get_node("BCShopHook")
+	t0 = OS.get_ticks_usec()
+	for i in 1000:
+		hs.mutation_preview_on(0)
+	print("mutation_preview_on x1000: " + _ms(t0))
+	t0 = OS.get_ticks_usec()
+	for i in 100:
+		h.update_hint()
+	print("update_hint x100: " + _ms(t0))
+	var card0 = null
+	for c in cases._all(shop):
+		if c is ShopItem and c.item_data != null:
+			card0 = c
+			break
+	t0 = OS.get_ticks_usec()
+	for i in 1000:
+		card0._item_description._bc_add_mutation_preview(card0.item_data, 0)
+	print("_bc_add_mutation_preview x1000: " + _ms(t0))
+	t0 = OS.get_ticks_usec()
+	for i in 1000:
+		m._on_node_added(card0)
+	print("_on_node_added x1000: " + _ms(t0))
+	print("nodes in shop: %d" % cases._all(shop).size())
 	if OS.get_environment("BC_REROLL_ONLY") != "":
 		# 下一波：买过的道具次数增加，再进一个新商店（图鉴应保留，不重建）
 		tree.root.remove_child(shop)
@@ -183,13 +209,31 @@ func run(t):
 # 刷新商店 n 次（每次之间等 2 帧），统计刷新那一帧的耗时
 func _rerolls(shop, n: int, label: String):
 	var times = []
+	var syncs = []
 	for i in n:
 		RunData.players_data[0].gold = 100000
 		var t0 = OS.get_ticks_usec()
 		shop._on_RerollButton_pressed(0)
+		syncs.push_back((OS.get_ticks_usec() - t0) / 1000.0)
 		yield(tree, "idle_frame")
 		times.push_back((OS.get_ticks_usec() - t0) / 1000.0)
 		yield(tree, "idle_frame")
 	var sorted = times.duplicate()
 	sorted.sort()
 	print("%s reroll x%d: median %.1f ms, p90 %.1f, max %.1f" % [label, n, sorted[n / 2], sorted[int(n * 0.9)], sorted[n - 1]])
+	syncs.sort()
+	print("%s reroll call (sync): median %.2f ms, p90 %.2f, max %.2f" % [label, syncs[n / 2], syncs[int(n * 0.9)], syncs[n - 1]])
+
+
+# 单张商品卡片 set_item 的耗时（刷新时每张卡片调用一次）
+func _card_cost(shop):
+	var total = 0.0
+	var n = 0
+	for c in cases._all(shop):
+		if c is ShopItem and c.item_data != null and c.is_visible_in_tree():
+			var t0 = OS.get_ticks_usec()
+			for i in 50:
+				c._item_description.set_item(c.item_data, 0)
+			total += (OS.get_ticks_usec() - t0) / 50000.0
+			n += 1
+	print("card set_item avg over %d cards: %.3f ms" % [n, total / max(n, 1)])
