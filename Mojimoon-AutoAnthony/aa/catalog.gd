@@ -446,12 +446,12 @@ const ANCHORED_ITEMS = [
 #   肿瘤（异变把复制的效果加到它上面，按 ID 识别）、生命形态扫描仪及其用后形态（离开商店时按 ID 找到并替换）；
 #   恐龙蛋链（每波末按 ID 找到蛋并换成 replaced_by 的下一阶，重组后的蛋没有 replaced_by；蛋的效果在别的道具上不会孵化）、弹药恐龙；
 #   进化飞跃（进化值 ×2 是乘法效果，生效 / 移除时乘除当前值，与获得顺序有关；原版按 ID 排除异变）、
-#   剃须泡沫（唯一的效果"敌人进化几率"就是路线本身）；
+#   剃须泡沫（唯一的效果"敌人进化几率"就是路线本身）、奇美拉细胞（唯一的效果"获得道具时异变几率"同样是路线本身，原版限 4 件）；
 #   原版化石（重组时由普通道具生成新的化石，见 FOSSIL_*；原版化石不进商店池）
 const ANCHORED_ALWAYS = [
 	"item_tumor", "item_lifeform_scanner", "item_used_lifeform_scanner",
 	"item_dino_egg", "item_dino_egg_2", "item_dino_egg_1", "item_ammosaurus",
-	"item_meca_evolved_leap", "item_mut_evolved_leap", "item_shaving_foam_can_meca", "item_shaving_foam_can_mutant",
+	"item_meca_evolved_leap", "item_mut_evolved_leap", "item_shaving_foam_can_meca", "item_shaving_foam_can_mutant", "item_chimera_cells",
 	"item_fossil_jaw", "item_fossil_left_arm", "item_fossil_left_leg", "item_fossil_right_arm", "item_fossil_right_leg",
 	"item_fossil_skull", "item_fossil_spine", "item_fossil_tail", "item_fossil_tooth",
 ]

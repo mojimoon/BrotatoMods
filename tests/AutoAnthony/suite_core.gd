@@ -1106,6 +1106,10 @@ func test_94_other_mod_items_untouched() -> void:
 	fake.unlocked_by_default = true
 	var fake_effects = fake.effects
 	isvc.add_mod_item(fake)
+	# 原版 _rebuild_items 不补回 _mod_items（1.2 测试环境里一直靠同时加载的 BroEditor 补回）：这里手动放进列表
+	var lst = isvc.items
+	if not fake in lst:
+		lst.push_back(fake)
 	_check(not m.is_native_resource(fake), "script-created item is not native")
 	_check(m.is_native_resource(_item("item_potato")), "base item is native")
 	var dlc_item = null
@@ -1118,7 +1122,7 @@ func test_94_other_mod_items_untouched() -> void:
 	m.start_new_run()
 	_check(not m.plan.items.has("item_testmod_widget"), "mod item not reassembled")
 	_check(fake.effects == fake_effects and fake.name == "TESTMOD_WIDGET", "mod item unchanged")
-	_check(fake in isvc.items, "mod item still registered")
+	_check(isvc._mod_items.has(fake), "mod item still registered")
 	# 1.2 的商店池只从物品套组建立（add_mod_item 的道具原版本身就不进池），这里只检查重建池子不出错
 	isvc.init_unlocked_pool()
 	var pl = m.preview_plan(42)
@@ -3112,7 +3116,24 @@ func test_305_real_mutation_copies_clause() -> void:
 	var ids = []
 	for r in rec:
 		ids.push_back(r[0])
-	_check("item_tumor" in ids and "item_potato" in ids, "mutation recorded: " + str(ids))
+	# 1.2.0.2-beta1 起只复制效果时道具本身不变成异变道具（只有被移除负面效果时才会）：记录肿瘤与所有异变道具
+	var want = ["item_tumor"]
+	for x in rd.players_data[0].items:
+		if x.is_mutant and not x.my_id in want:
+			want.push_back(x.my_id)
+	for id in want:
+		_check(id in ids, "mutation recorded: %s in %s" % [id, str(ids)])
+	# 获得道具时异变（奇美拉细胞 / 异种）同样记录
+	m.active_state["mutated"] = {}
+	var it2 = _item("item_potato").duplicate()
+	it2.effects = [TriggerEffect.make({"trigger": "kill", "chance": 20, "payload": "gold", "value": 3})]
+	rd.add_item(it2, 0)
+	rd.mutate_item(it2, 0)
+	rec = m.active_state.get("mutated", {}).get("0", [])
+	ids = []
+	for r in rec:
+		ids.push_back(r[0])
+	_check("item_tumor" in ids, "on-equip mutation recorded: " + str(ids))
 	rd.players_data[0].items.clear()
 	rd.get_player_effects(0)[Keys.stat_evolution_hash] = 0
 	m.on_menu_reset()

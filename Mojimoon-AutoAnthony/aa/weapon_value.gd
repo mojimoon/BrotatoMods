@@ -67,12 +67,18 @@ const MODELED_EFFECTS = ["weapon_exploding", "weapon_burning", "weapon_projectil
 const FREE_SLOTS_REF = 2.0
 const STACK_REF = 4.0
 const MODELED_KEYS = ["reload_when_pickup_gold", "break_on_hit"]
+# 生成建筑的效果（1.2.0.4 起锥子 / 飞箭陷阱用 DartTrapEffect，get_id = "dart_trap"）
+const STRUCTURE_EFFECT_IDS = ["turret", "structure", "dart_trap"]
+# "每 X 次"型效果：X 越大越弱（大小 = 1 / X）
+const EVERY_X_KEYS = ["effect_gain_stat_every_killed_enemies", "modify_every_x_projectile", "spawn_structure_every_killed_enemies"]
 # 自伤（大镰刀"每秒受到 X 点伤害"）：每点约等于 LOSE_HP_REGEN 点生命回复的代价
 const LOSE_HP_REGEN = 10.0
 # 武器上的玩家属性行相对道具属性权重的倍率（原版武器的属性行定价约为道具的 2 倍以上；随机搜索得出）
 const STAT_LINE_MULT = 2.2
 # 捡材料时换弹（喇叭枪）：实际攻击间隔约为此值（秒）
 const GOLD_RELOAD_CD = 1.2
+# 回旋镖每程命中的敌人数（无限贯穿，按点燃的同时目标数取）
+const BOOMERANG_TARGETS = 1.5
 
 
 static func _tween(d: float) -> int:
@@ -203,6 +209,25 @@ static func effect_id(e) -> String:
 	return e.get_id() if e.has_method("get_id") else ""
 
 
+static func is_boomerang(effects: Array) -> bool:
+	for e in effects:
+		if e.text_key == "EFFECT_BOOMERANG_RETURN":
+			return true
+	return false
+
+
+# 回旋镖一次往返的飞行时间（秒，projectiles/boomerang/boomerang_projectile.gd）：
+#   去程 = 射程 / 速度 × 1.6，顶点 0.15 秒（0.25 倍速），回程从 0.25 倍速以 2 倍速 / 秒加速到 1.2 倍速，接住距离 30
+static func boomerang_flight_time(st) -> float:
+	var sp = max(1.0, float(st.projectile_speed))
+	var reach = max(50.0, float(st.max_range))
+	var back = max(0.0, reach + sp * 0.25 * 0.15 - 30.0)
+	var t1 = 0.475
+	var d1 = sp * (0.25 * t1 + t1 * t1)
+	var tb = t1 + (back - d1) / (1.2 * sp) if back > d1 else (-0.25 + sqrt(0.0625 + 4.0 * back / sp)) / 2.0
+	return reach / sp * 1.6 + 0.15 + tb
+
+
 # 等效 DPS（参考状态）；effects 中可建模的效果计入
 static func power(st, effects: Array, tier: int = 3) -> float:
 	var cd = max(0.05, cooldown_seconds(st))
@@ -212,6 +237,11 @@ static func power(st, effects: Array, tier: int = 3) -> float:
 	var hit = hit_damage(float(st.damage) + flat_damage_bonus(effects), st.scaling_stats, tier)
 	var per_hit = overkill(hit * crit_factor(st), tier) * range_factor(st)
 	var hits = hits_per_attack(st)
+	# 回旋镖：飞行期间武器冷却暂停（武器处于射击状态直到接回），所以攻击间隔 = 冷却 + 往返时间；
+	#   去程与回程各命中一次（顶点清空已命中列表），投射物不会因命中停下
+	if is_boomerang(effects):
+		cd += boomerang_flight_time(st)
+		hits *= 2.0 * BOOMERANG_TARGETS
 	var mult = 1.0
 	var extra = 0.0
 	for e in effects:
@@ -245,7 +275,7 @@ static func power(st, effects: Array, tier: int = 3) -> float:
 # ------------------------------------------------------------
 static func effect_key(e) -> String:
 	var id = effect_id(e)
-	if id == "turret" or id == "structure":
+	if id in STRUCTURE_EFFECT_IDS:
 		return "structure:" + (str(e.tracking_key) if "tracking_key" in e and str(e.tracking_key) != "" else id)
 	if e.custom_key != "":
 		return e.custom_key
@@ -264,7 +294,7 @@ static func magnitude(e) -> float:
 	match k:
 		"effect_gain_stat_every_killed_enemies":
 			return Catalog.stat_w(e.stat) / max(1.0, v)
-		"modify_every_x_projectile":
+		"modify_every_x_projectile", "spawn_structure_every_killed_enemies":
 			return 1.0 / max(1.0, v)
 		"gain_stat_for_every_step_after_equip":
 			return v / max(1.0, float(e.value2))
@@ -282,9 +312,11 @@ static func magnitude(e) -> float:
 			if effect_id(e) == "gain_stat_for_every_stat":
 				return v / max(1.0, float(e.nb_stat_scaled))
 	if k.begins_with("structure:"):
+		# 飞箭陷阱：每个陷阱的飞箭数（原版 6 枚）
+		var darts = float(e.nb_darts) / 6.0 if "nb_darts" in e else 1.0
 		if "spawn_cooldown" in e and int(e.spawn_cooldown) > 0:
-			return 1.0 / float(e.spawn_cooldown)
-		return 1.0
+			return darts / float(e.spawn_cooldown)
+		return darts
 	if v == 0:
 		return 1.0
 	return v

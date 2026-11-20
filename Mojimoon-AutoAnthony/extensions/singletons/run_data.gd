@@ -40,9 +40,10 @@ func resume_from_state(state: Dictionary) -> void:
 		m.on_resume(state)
 
 
-# 异变（史前惧兽）：记录肿瘤 / 异变道具上的触发条款，读档时补回（见 mod_main.record_mutations）
-func mutate_random_item(player_index: int):
-	var mutated = .mutate_random_item(player_index)
+# 异变（史前惧兽）：记录肿瘤 / 异变道具上的触发条款，读档时补回（见 mod_main.record_mutations）。
+# 波末异变（mutate_random_item）与获得道具时异变（奇美拉细胞、异种：try_mutate_item_on_equip）都经过 mutate_item
+func mutate_item(item_to_mutate, player_index: int):
+	var mutated = .mutate_item(item_to_mutate, player_index)
 	var m = AAMain.get_mod()
 	if m != null:
 		m.record_mutations(player_index)

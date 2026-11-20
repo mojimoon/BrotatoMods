@@ -860,6 +860,30 @@ func _t4_row(wg, st, effects: Array, w, p) -> String:
 
 
 # 审计：原版武器按特性分组的"模型价值 / 价格"相对同档中位数的偏差（<1 = 模型低估了这类特性）
+# 纯审计：原版武器的模型价值 / 价格（AA_AUDIT=1；AA_FAMILIES=awl,crowbar,... 只打印这些家族）与效果单位价值
+func test_158_audit_native_fit() -> void:
+	if OS.get_environment("AA_AUDIT") == "":
+		return
+	var WV = load(MOD_DIR + "aa/weapon_value.gd")
+	var wv = WV.new()
+	var weapons = m.native_only(isvc.weapons)
+	wv.calibrate(weapons)
+	var fams = OS.get_environment("AA_FAMILIES").split(",", false)
+	print("AUDIT k_by ", wv.k_by)
+	for r in wv.fit_rows:
+		var w = r[0]
+		var hit = fams.empty()
+		for f in fams:
+			if w.my_id.find(f) >= 0:
+				hit = true
+		if not hit:
+			continue
+		var fx = []
+		for e in w.effects:
+			fx.push_back("%s=%.1f" % [WV.effect_key(e), wv.effect_value(e)])
+		print("AUDIT fit %-28s T%d price %3d value %6.1f ratio %.2f %s" % [w.my_id, w.tier + 1, r[1], r[2], r[2] / max(1.0, r[1]), fx])
+
+
 func test_157_audit_feature_residuals() -> void:
 	# 纯审计（只打印）：AA_AUDIT=1 时才运行
 	if OS.get_environment("AA_AUDIT") == "":

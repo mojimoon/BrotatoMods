@@ -1820,7 +1820,7 @@ static func _scale_effects(effects: Array, f: float) -> Array:
 			ne.burning_data.damage = int(max(1, round(ne.burning_data.damage * f)))
 		elif id == "weapon_projectiles_on_hit":
 			ne.value = int(max(1, round(ne.value * f)))
-		elif WeaponValue.effect_key(ne) in ["effect_gain_stat_every_killed_enemies", "modify_every_x_projectile"]:
+		elif WeaponValue.effect_key(ne) in WeaponValue.EVERY_X_KEYS:
 			# "每 X 次"：X 越大越弱
 			ne.value = int(max(1, round(ne.value / max(0.05, f))))
 		elif abs(int(ne.value)) >= 2 or (f > 1.0 and int(ne.value) != 0):
@@ -1873,7 +1873,7 @@ func weapon_tags(ty: int, st, effects: Array) -> Array:
 				tags.push_back("explosive")
 			"weapon_burning":
 				tags.push_back("burning")
-			"turret", "structure":
+			"turret", "structure", "dart_trap":
 				tags.push_back("structure")
 			"weapon_gain_stat_every_killed_enemies":
 				tags.push_back("ethereal")
@@ -2122,7 +2122,7 @@ static func _scaled_effects(effects: Array, ratio: float) -> Array:
 		var v = int(ne.value)
 		if WeaponValue.is_modeled(ne):
 			pass
-		elif abs(v) >= 2 and WeaponValue.effect_key(ne) != "effect_gain_stat_every_killed_enemies" and WeaponValue.effect_key(ne) != "modify_every_x_projectile":
+		elif abs(v) >= 2 and not WeaponValue.effect_key(ne) in WeaponValue.EVERY_X_KEYS:
 			ne.value = int(sign(v) * max(1, round(abs(v) * ratio)))
 		else:
 			ne.set_meta("aa_eff_scale", ratio)
