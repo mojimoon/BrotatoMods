@@ -174,6 +174,10 @@ func generate(items: Array, all_characters: Array, selected: Array, weapons: Arr
 					if chaos_icons.has(item.my_id):
 						plan.items[item.my_id]["icon"] = chaos_icons[item.my_id]
 				item.tier = orig_tiers[item.my_id]
+		# 化石沿用被替换的原版化石的图标（究极混沌也不例外）
+		for id in fossil_icons:
+			if plan.items.has(id) and fossil_icons[id] != null:
+				plan.items[id]["icon"] = fossil_icons[id]
 	if cfg.get("characters", false):
 		for ch in selected:
 			plan.characters[ch.my_id] = generate_character(ch)
@@ -1223,6 +1227,7 @@ func _mechanic_min_value(m: Dictionary) -> float:
 # ============================================================
 var fossil_ids: Dictionary = {}
 var replaced_fossils: Array = []	# 被替换（移出商店池）的原版化石 ID
+var fossil_icons: Dictionary = {}	# 化石道具 ID -> 被它替换的原版化石图标（玩家一眼认得出化石）
 # {"per": 原版"每件化石"行, "marker": 化石计数行, "link_marker": 牙齿的"视作化石"行, "link_price": 牙齿价格}
 var _fossil_tmpl = {}
 var _fossil_per_values: Array = []	# 已生成化石的"每件化石"行：每多一件化石的价值
@@ -1232,6 +1237,7 @@ var _fossil_per_values: Array = []	# 已生成化石的"每件化石"行：每�
 # 原版牙齿（不限量、只有化石计数）的位置生成"连接化石"。返回 {道具 ID: true | "link"}
 func pick_fossil_items(items: Array, gen_items: Array, core: Dictionary) -> Dictionary:
 	fossil_ids = {}
+	fossil_icons = {}
 	replaced_fossils = []
 	_fossil_tmpl = {}
 	_fossil_per_values = []
@@ -1279,6 +1285,7 @@ func pick_fossil_items(items: Array, gen_items: Array, core: Dictionary) -> Dict
 			var k = rng.randi() % pool.size()
 			var link = native.my_id == Catalog.FOSSIL_LINK_ITEM and _fossil_tmpl.has("link_marker")
 			fossil_ids[pool[k].my_id] = "link" if link else true
+			fossil_icons[pool[k].my_id] = native.icon
 			replaced_fossils.push_back(native.my_id)
 			pool.remove(k)
 	return fossil_ids

@@ -373,6 +373,18 @@ func on_settings_closed() -> bool:
 	return false
 
 
+# 重组道具的统计行：原版本身统计这个道具 ID 的（警戒戒指……）不显示（原版仍会按 ID 往里加别的数），
+# 其余取第一条正面的可统计条款（材料 / 回复 / 伤害 / 属性），由 runtime 记录
+func aa_tracking_text(id_hash: int, effects: Array) -> String:
+	var rd = _autoload("RunData")
+	if rd != null and rd.init_tracked_items.has(id_hash):
+		return "[EMPTY]"
+	for e in effects:
+		if e is TriggerEffect and e.value > 0 and Catalog.TRACK_TEXTS.has(e.payload):
+			return Catalog.TRACK_TEXTS[e.payload]
+	return "[EMPTY]"
+
+
 # 任意初始武器：本局角色初始武器最常见的稀有度中的全部已解锁武器
 func any_start_weapons(character) -> Array:
 	if active_state == null or not bool(active_state.cfg.get("weapons", false)) or not bool(active_state.cfg.get("w_any_start", false)):
@@ -390,9 +402,19 @@ func any_start_weapons(character) -> Array:
 	var tiers = [best]
 	var isvc = _autoload("ItemService")
 	var pd = _autoload("ProgressData")
+	# 角色的武器类型限制（无法使用近战 / 远程武器）：开局同样不能选
+	var banned_types = {}
+	for e in character.effects:
+		if e.value > 0 and e.custom_key == "":
+			if e.key == "no_melee_weapons":
+				banned_types[WeaponType.MELEE] = true
+			elif e.key == "no_ranged_weapons":
+				banned_types[WeaponType.RANGED] = true
 	var out = []
 	var inactive = inactive_set_members()
 	for w in isvc.weapons:
+		if banned_types.has(w.type):
+			continue
 		if w.tier in tiers and w.can_be_looted and (pd == null or pd.weapons_unlocked.has(w.weapon_id_hash)) and (is_native_resource(w) or w in _low_weapons) and not inactive.has(w):
 			out.push_back(w)
 	out.sort_custom(self, "_sort_by_name")
@@ -548,7 +570,7 @@ func _activate(state: Dictionary) -> void:
 			_backup(res)
 			res.effects = p.effects
 			res.tags = p.tags
-			res.tracking_text = "[EMPTY]"
+			res.tracking_text = aa_tracking_text(res.my_id_hash, p.effects)
 			# 原版的"限制 (N)"/"独特"属于原道具，不继承到重组后的道具上；带设定值型角色效果的道具为独特
 			# 成长型道具带限制 (X)
 			res.max_nb = 1 if p.get("unique", false) else int(p.get("limit", -1))

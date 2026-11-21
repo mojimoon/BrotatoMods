@@ -48,31 +48,35 @@ func rebuild_all() -> void:
 
 # 收集玩家角色、道具、武器上的所有触发条款
 func rebuild(player_index: int) -> void:
+	# 条目按"来源 + 条款"区分：同一把武器买两把时，两份武器数据共用同一个效果对象（浅复制），
+	# 只按效果对象区分会让两把武器共用一个条目（重建后另一把的状态 / 本波获得的效果再也撤销不了）
 	var old = {}
 	for en in entries[player_index]:
-		old[en.effect.get_instance_id()] = en
+		old[en.key] = en
 	var list = []
+	var seen = {}
 	var sources = []
 	sources += RunData.get_player_items_ref(player_index)
 	sources += RunData.get_player_weapons_ref(player_index)
 	for src in sources:
+		var n = 0
 		for e in src.effects:
 			if e is TriggerEffect:
-				var id = e.get_instance_id()
-				if old.has(id):
-					list.push_back(old[id])
+				var key = "%d:%d:%d" % [src.get_instance_id(), e.get_instance_id(), n]
+				n += 1
+				if seen.has(key):
+					continue
+				seen[key] = true
+				if old.has(key):
+					list.push_back(old[key])
 				else:
 					var show = Valuation.raw_rate(e.to_clause()) <= FEEDBACK_MAX_RATE and not e.trigger in ["still", "moving"] and Catalog.STATS.has(e.stat)
-					list.push_back({"effect": e, "count": 0, "fired": 0, "active": false, "show": show, "stack": 0, "granted": [], "last": -INF})
+					list.push_back({"key": key, "effect": e, "count": 0, "fired": 0, "active": false, "show": show, "stack": 0, "granted": [], "last": -INF,
+						"track": _track_key(src, e, player_index)})
 	# 被移除的状态加成要撤销
 	var reverted = false
 	for id in old:
-		var still_there = false
-		for en in list:
-			if en.effect.get_instance_id() == id:
-				still_there = true
-				break
-		if not still_there:
+		if not seen.has(id):
 			if old[id].active:
 				_set_state(player_index, old[id], false)
 			if not old[id].granted.empty():
@@ -82,6 +86,27 @@ func rebuild(player_index: int) -> void:
 	# 撤销的"获得效果"可能是计数型（LinkedStats）：立即重算，不等下一次刷新
 	if reverted:
 		_refresh(player_index)
+
+
+# 统计：重组道具的说明末尾显示该道具条款带来的材料 / 回复 / 伤害 / 属性（原版的 tracked_item_effects，随存档保存）。
+# 只统计与道具统计行同类的载荷；武器的统计由各自的武器场景记录，不混入
+func _track_key(src, e, player_index: int) -> int:
+	if not src is ItemData or src is CharacterData or e.value <= 0:
+		return Keys.empty_hash
+	if Catalog.TRACK_TEXTS.get(e.payload, "") != src.tracking_text.to_upper():
+		return Keys.empty_hash
+	var d = RunData.tracked_item_effects[player_index]
+	if not d.has(src.my_id_hash):
+		d[src.my_id_hash] = 0
+	if d[src.my_id_hash] is Array:
+		return Keys.empty_hash
+	return src.my_id_hash
+
+
+func _track(en, player_index: int, v) -> void:
+	if en == null or int(en.get("track", Keys.empty_hash)) == Keys.empty_hash or int(v) <= 0:
+		return
+	RunData.add_tracked_value(player_index, en.track, int(v))
 
 
 func _check_dirty() -> void:
@@ -311,6 +336,7 @@ func _execute_inner(e, player_index: int, pos, show: bool, en, target) -> void:
 
 		"perm_stat":
 			RunData.add_stat(h, e.value, player_index)
+			_track(en, player_index, e.value)
 
 			LinkedStats.reset_player(player_index)
 		"timed_stat":
@@ -323,24 +349,26 @@ func _execute_inner(e, player_index: int, pos, show: bool, en, target) -> void:
 
 		"heal":
 			RunData.emit_signal("healing_effect", e.value, player_index, Keys.empty_hash)
+			_track(en, player_index, e.value)
 		"gold":
 			# 负值（更多双面效果的代价）：失去材料，不低于 0
 			if e.value < 0:
 				RunData.remove_gold(-e.value, player_index)
 			else:
 				RunData.add_gold(e.value, player_index)
+				_track(en, player_index, e.value)
 		"xp":
 			RunData.add_xp(e.value, player_index)
 		"damage":
-			_deal_damage(e, player_index)
+			_deal_damage(e, player_index, en)
 		"explode":
-			_explode(e, player_index, pos)
+			_explode(e, player_index, pos, en)
 		"vuln":
 			_vuln(e, target)
 		"hp_dmg":
 			_hp_damage(e, player_index, target)
 		"ignite":
-			_ignite(e, player_index, target)
+			_ignite(e, player_index, target, en)
 		"slow":
 			_slow(e, target)
 		"slow_time":
@@ -352,6 +380,7 @@ func _execute_inner(e, player_index: int, pos, show: bool, en, target) -> void:
 			for _i in max(0, e.value):
 				RunData.add_stat(RunData.get_random_primary_stats(), 1, player_index)
 			LinkedStats.reset_player(player_index)
+			_track(en, player_index, e.value)
 
 
 func _on_timed_stat_timeout(serial: int, h: int, value: int, player_index: int) -> void:
@@ -388,7 +417,7 @@ func _scaled_damage(e, player_index: int) -> int:
 	return int(max(1.0, round(base * (1.0 + Utils.get_stat(Keys.stat_percent_damage_hash, player_index) / 100.0))))
 
 
-func _deal_damage(e, player_index: int) -> void:
+func _deal_damage(e, player_index: int, en = null) -> void:
 	if main == null or not is_instance_valid(main):
 		return
 	var enemies: Array = main._entity_spawner.get_all_enemies(false)
@@ -403,10 +432,12 @@ func _deal_damage(e, player_index: int) -> void:
 	if _damage_args == null:
 		_damage_args = TakeDamageArgs.new(player_index)
 	_damage_args._init(player_index)
-	var _r = target.take_damage(dmg, _damage_args)
+	var r = target.take_damage(dmg, _damage_args)
+	if r is Array and r.size() > 1:
+		_track(en, player_index, r[1])
 
 
-func _explode(e, player_index: int, pos) -> void:
+func _explode(e, player_index: int, pos, en = null) -> void:
 	if _explosion_effect == null or main == null or not is_instance_valid(main):
 		return
 	var player = _get_player(player_index)
@@ -426,7 +457,7 @@ func _explode(e, player_index: int, pos) -> void:
 	args.burning_data = BurningData.new()
 	args.scaling_stats = []
 	args.from_player_index = player_index
-	args.damage_tracking_key_hash = Keys.empty_hash
+	args.damage_tracking_key_hash = int(en.get("track", Keys.empty_hash)) if en != null else Keys.empty_hash
 	# 爆炸延迟生成：记下当前连锁深度，"引发爆炸时"扳机从这里继续计数
 	args.set_meta("aa_depth", _depth)
 	WeaponService.call_deferred("explode", _explosion_effect, args)
@@ -438,16 +469,20 @@ func _player_pos(player_index: int):
 
 
 # 点燃目标（害怕的香肠）：3 跳 × X（+100% 元素伤害）
-func _ignite(e, player_index: int, target) -> void:
+func _ignite(e, player_index: int, target, en = null) -> void:
 	if target == null or not is_instance_valid(target) or target.dead:
 		return
 	var player = _get_player(player_index)
 	var bd = BurningData.new()
 	bd.chance = 1.0
-	bd.damage = int(max(1, e.value))
 	bd.duration = Catalog.IGNITE_TICKS
 	bd.scaling_stats = [[Keys.stat_elemental_damage_hash, 1.0]]
+	# 敌人身上的燃烧直接按 damage 跳伤害：缩放属性与 %伤害要在这里算进去（同原版 init_burning_data 的全局燃烧）
+	bd.damage = WeaponService.apply_scaling_stats_to_damage(int(max(1, e.value)), bd.scaling_stats, player_index)
+	bd.damage = WeaponService.apply_damage_bonus(bd.damage, player_index)
 	bd.from = player
+	if en != null and int(en.get("track", Keys.empty_hash)) != Keys.empty_hash:
+		bd.tracking_key_hash = en.track
 	target.apply_burning(bd)
 
 

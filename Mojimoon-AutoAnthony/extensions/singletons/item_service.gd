@@ -34,3 +34,27 @@ func init_unlocked_pool() -> void:
 					if not it.my_id in replaced:
 						kept.push_back(it)
 				tier[type] = kept
+
+
+# 属性说明弹窗（商店 / 暂停界面悬停属性）：补上面板里看不到的修正。
+# 该属性的"修改增加 / 减少 X%"（重组道具上的属性修改效果）；收获另外列出敌人掉落材料的加成
+func get_stat_description_text(stat_hash: int, value: int, player_index: int) -> String:
+	var text = .get_stat_description_text(stat_hash, value, player_index)
+	if player_index < 0 or player_index >= RunData.get_player_count() or not Keys.hash_to_string.has(stat_hash):
+		return text
+	var stat = Keys.hash_to_string[stat_hash]
+	var extra = []
+	var gain_hash = Keys.generate_hash("gain_" + stat)
+	var effects = RunData.get_player_effects(player_index)
+	if effects.has(gain_hash) and int(effects[gain_hash]) != 0:
+		var g = int(effects[gain_hash])
+		extra.push_back(Text.text("EFFECT_INCREASE_STAT_GAINS" if g > 0 else "EFFECT_REDUCE_STAT_GAINS", [tr(stat.to_upper()), str(abs(g)) + "%"]))
+	if stat_hash == Keys.stat_harvesting_hash:
+		for k in [Keys.gold_drops_hash, Keys.enemy_gold_drops_hash]:
+			if effects.has(k) and int(effects[k]) != 0:
+				var v = int(effects[k])
+				var key = "EFFECT_GOLD_DROPS" if k == Keys.gold_drops_hash else "EFFECT_ENEMY_GOLD_DROPS"
+				extra.push_back(tr(key).replace("{0}", ("+" if v > 0 else "") + str(v) + "%"))
+	if extra.empty():
+		return text
+	return text + "\n\n" + PoolStringArray(extra).join("\n")

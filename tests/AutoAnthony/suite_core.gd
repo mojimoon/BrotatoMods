@@ -2637,7 +2637,8 @@ func test_149_tier_chaos() -> void:
 	var moved = 0
 	for id in plan.items:
 		var p = plan.items[id]
-		_check(p.has("tier") and not p.has("icon"), id + " tier changed, icon kept")
+		# 化石的图标换成原版化石的图标（与混沌无关）
+		_check(p.has("tier") and (not p.has("icon") or p.get("fossil", false)), id + " tier changed, icon kept")
 		if int(p.tier) != before[id]:
 			moved += 1
 	_check(moved > plan.items.size() / 2, "most items change tier (%d)" % moved)
@@ -3292,6 +3293,16 @@ func test_308_fossils() -> void:
 	if fossil_id != "":
 		var res = _item(fossil_id)
 		_check(res.name.begins_with(tr("AA_FOSSIL_NAME_FMT").replace("{0}", "")), "fossil name: " + res.name)
+		var fossil_icons = []
+		for fid in Catalog.FOSSIL_ITEMS:
+			fossil_icons.push_back(_item(fid).icon)
+		_check(res.icon in fossil_icons, "fossil uses a vanilla fossil icon: " + fossil_id)
+		var in_pool = false
+		for t in 4:
+			for it in isvc.get_pool(t, isvc.TierData.ITEMS):
+				if it.my_id == fossil_id:
+					in_pool = true
+		_check(in_pool, "generated fossil in the shop pool: " + fossil_id)
 	for t in 4:
 		for it in isvc.get_pool(t, isvc.TierData.ITEMS):
 			_check(not it.my_id in Catalog.FOSSIL_ITEMS, "vanilla fossil out of the shop pool: " + it.my_id)
@@ -3447,3 +3458,73 @@ func test_51d_preview_fossils_and_path_items() -> void:
 				_check(card.get_child(0).get_child(1).get_child(0).get_child(1).text.find(tr(key)) >= 0, id + " card marks its path")
 				card.free()
 	ui.queue_free()
+
+
+# 同一把武器买两把：两份武器数据共用同一个条款对象（浅复制）。每把武器各有一个条目，
+# 重建后"本波获得"的效果仍然全部在波末撤销（此前两把共用一个条目，另一把获得的效果再也撤销不了）
+func test_312_shared_clause_on_duplicate_weapons() -> void:
+	m.start_new_run()
+	var w1 = isvc.get_element_safe(isvc.weapons, "weapon_knife_1").duplicate()
+	w1.effects = [TriggerEffect.make({"trigger": "kill", "payload": "grant", "value": 1, "grant": _plain("stat_armor", 2), "grant_mode": "temp", "grant_unit": 5.0})]
+	var w2 = w1.duplicate()
+	var wl = rd.players_data[0].weapons
+	wl.push_back(w1)
+	wl.push_back(w2)
+	var base = int(rd.get_player_effect(Keys.stat_armor_hash, 0))
+	var rt = Runtime.new()
+	tree.root.add_child(rt)
+	rt.mod = m
+	rt.rebuild_all()
+	_eq(rt.entries[0].size(), 2, "one entry per weapon copy")
+	rt.fire("kill", 0)
+	_eq(int(rd.get_player_effect(Keys.stat_armor_hash, 0)), base + 4, "both copies grant")
+	rt.rebuild_all()
+	rt.fire("kill", 0)
+	_eq(int(rd.get_player_effect(Keys.stat_armor_hash, 0)), base + 8, "both copies grant after a rebuild")
+	rt.on_wave_end()
+	_eq(int(rd.get_player_effect(Keys.stat_armor_hash, 0)), base, "every grant reverted at wave end")
+	rt.queue_free()
+	wl.erase(w1)
+	wl.erase(w2)
+	m.on_menu_reset()
+
+
+# 属性说明弹窗列出该属性的修改加成（重组道具上的属性修改效果在面板上看不到）与收获的材料掉落加成
+func test_313_stat_popup_shows_hidden_modifiers() -> void:
+	m.start_new_run()
+	var effects = rd.get_player_effects(0)
+	var gh = Keys.generate_hash("gain_stat_armor")
+	var before = isvc.get_stat_description_text(Keys.stat_armor_hash, 3, 0)
+	effects[gh] += 25
+	var after = isvc.get_stat_description_text(Keys.stat_armor_hash, 3, 0)
+	effects[gh] -= 25
+	_check(after.begins_with(before) and after.length() > before.length() and after.find("25%") >= 0, "armor popup lists +25%% gains: " + after.replace("\n", " | "))
+	effects[Keys.gold_drops_hash] += 20
+	var hv = isvc.get_stat_description_text(Keys.stat_harvesting_hash, 5, 0)
+	effects[Keys.gold_drops_hash] -= 20
+	_check(hv.find("+20%") >= 0, "harvesting popup lists material drops: " + hv.replace("\n", " | "))
+	m.on_menu_reset()
+
+
+# 重组道具的统计行：说明末尾显示条款带来的材料（原版统计文本），原版本身按 ID 统计的道具不显示
+func test_314_item_tracking_for_clauses() -> void:
+	m.start_new_run()
+	var clause = {"trigger": "kill", "payload": "gold", "value": 2}
+	_eq(m.aa_tracking_text(Keys.generate_hash("item_potato"), [TriggerEffect.make(clause)]), "MATERIALS_GAINED", "gold clause -> materials gained")
+	_eq(m.aa_tracking_text(Keys.generate_hash("item_bag"), [TriggerEffect.make(clause)]), "[EMPTY]", "vanilla-tracked id stays hidden")
+	_eq(m.aa_tracking_text(Keys.generate_hash("item_potato"), [_plain("stat_armor", 2)]), "[EMPTY]", "no clause -> no tracking line")
+	rd.players_data[0].items.clear()
+	var rt = _make_runtime([clause])
+	var holder = rd.players_data[0].items[-1]
+	holder.tracking_text = "MATERIALS_GAINED"
+	rt.rebuild_all()
+	rt.entries[0] = []
+	rt.rebuild_all()
+	rt.fire("kill", 0)
+	rt.fire("kill", 0)
+	_eq(int(rd.tracked_item_effects[0].get(holder.my_id_hash, -1)), 4, "materials from the clause are tracked")
+	_check(holder._get_tracking_text(0).find("4") >= 0, "tracking line shown: " + holder._get_tracking_text(0))
+	rt.queue_free()
+	rd.players_data[0].items.clear()
+	rd.tracked_item_effects[0].erase(holder.my_id_hash)
+	m.on_menu_reset()

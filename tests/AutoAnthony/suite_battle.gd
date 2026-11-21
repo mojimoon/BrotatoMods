@@ -315,6 +315,19 @@ func test_102_triggers_and_payloads_in_battle() -> void:
 	var g0 = rd.get_player_gold(0)
 	rt.execute(TriggerEffect.make({"trigger": "kill", "payload": "gold", "value": 7}), 0, null, false)
 	_eq(rd.get_player_gold(0), g0 + 7, "gold payload")
+	# 点燃：每跳伤害 = X + 100% 元素伤害，再乘 %伤害（敌人身上的燃烧直接按 damage 跳伤害）
+	var en_i = yield(_wait_enemy(main), "completed")
+	if en_i != null and is_instance_valid(en_i):
+		var eff = rd.get_player_effects(0)
+		eff[Keys.stat_elemental_damage_hash] += 20
+		Utils.reset_stat_cache(0)
+		rt.execute(TriggerEffect.make({"trigger": "hit_enemy", "payload": "ignite", "value": 3}), 0, null, false, null, en_i)
+		eff[Keys.stat_elemental_damage_hash] -= 20
+		Utils.reset_stat_cache(0)
+		var dmg = 0
+		for b in en_i._burnings.values():
+			dmg = max(dmg, int(b.damage))
+		_check(en_i.dead or dmg >= 23, "ignite payload scales with elemental damage (tick %d)" % dmg)
 	var x0 = rd.get_player_xp(0)
 	var l0 = rd.get_player_level(0)
 	rt.execute(TriggerEffect.make({"trigger": "kill", "payload": "xp", "value": 3}), 0, null, false)

@@ -236,6 +236,9 @@ const HP_DMG_MAX = 10
 const RAND_STAT_W = 1.7
 # 点燃：3 跳燃烧、元素伤害参考值；减速：每 1%、每次触发（丑牙 5% / 命中约 150 次 / 估值 12.6 反推）；水果：每个
 const IGNITE_TICKS = 3
+# 重组道具的统计行（道具说明末尾的灰字，原版文本）：取道具上第一条正面的可统计条款
+const TRACK_TEXTS = {"gold": "MATERIALS_GAINED", "heal": "HEALTH_RECOVERED", "damage": "DAMAGE_DEALT", "explode": "DAMAGE_DEALT",
+	"ignite": "DAMAGE_DEALT", "perm_stat": "STATS_GAINED", "rand_stats": "STATS_GAINED"}
 const SLOW_W = 0.017
 const SLOW_MAX = 10
 const FRUIT_W = 2.0

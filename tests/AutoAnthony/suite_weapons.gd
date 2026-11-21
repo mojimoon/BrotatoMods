@@ -190,7 +190,7 @@ func test_141_weapon_deep_reassembly() -> void:
 		_check(must_ok == must_all, "deep: the first required class is always present (%d / %d)" % [must_ok, must_all])
 		for x in wg._sets:
 			if x != "set_legendary":
-				_check(set_count.get(x, 0) >= min(3, wg._set_native_count.get(x, 0)), "deep: set %s has enough families (%d)" % [x, set_count.get(x, 0)])
+				_check(set_count.get(x, 0) >= min(min(3, wg._set_native_count.get(x, 0)), wg.set_capacity.get(x, 3)), "deep: set %s has enough families (%d, %d can have it)" % [x, set_count.get(x, 0), wg.set_capacity.get(x, 3)])
 		if sd == 3:
 			print("AUDIT deep main scaling melee %s ranged %s" % [str(mains[0]), str(mains[1])])
 			print("AUDIT deep sets %s" % str(set_count))
@@ -2006,3 +2006,79 @@ func test_166_weapon_trigger_clause_survives_resume() -> void:
 	m.cfg_weapons = false
 	m.cfg_weapon_mode = "effects"
 	m.cfg_w_item_effects = false
+
+
+# 任意初始武器：角色的"无法使用近战 / 远程武器"限制同样作用于开局可选的武器
+func test_176_any_start_respects_weapon_type_bans() -> void:
+	m.cfg_weapons = true
+	m.cfg_w_any_start = true
+	var n = 0
+	for ch in isvc.characters:
+		var ban = -1
+		for e in ch.effects:
+			if e.custom_key == "" and e.value > 0:
+				if e.key == "no_melee_weapons":
+					ban = WeaponType.MELEE
+				elif e.key == "no_ranged_weapons":
+					ban = WeaponType.RANGED
+		if ban < 0 or ch.starting_weapons.empty():
+			continue
+		_setup_player(ch.my_id)
+		m.start_new_run()
+		var list = m.any_start_weapons(ch)
+		_check(not list.empty(), ch.my_id + ": any-start list not empty")
+		for w in list:
+			_check(w.type != ban, "%s cannot start with %s" % [ch.my_id, w.my_id])
+		n += 1
+		m.on_menu_reset()
+	_check(n >= 3, "characters with weapon type bans checked (%d)" % n)
+
+
+# 名称表明特性的类别（爆炸、虚灵……）只给有对应词条的武器：深度重组全部遵守；仅重组效果时，原版因效果成立的类别在换效果后仍成立
+func test_177_sets_match_weapon_tags() -> void:
+	var WG = load(MOD_DIR + "aa/weapon_gen.gd")
+	var weapons = m.native_only(isvc.weapons)
+	var native_bad = []
+	var wg0 = WG.new(m.get_cfg(), 1)
+	for w in weapons:
+		var tags = wg0.weapon_tags(w.type, w.stats, w.effects)
+		for set in w.sets:
+			if not WG.set_fits_tags(set.my_id, tags):
+				native_bad.push_back(w.my_id + ":" + set.my_id)
+	print("AUDIT native weapons whose sets lack the tag: ", native_bad)
+	for mode in ["deep", "effects"]:
+		var bad = 0
+		var total = 0
+		for sd in [3, 17, 29]:
+			var cfg = _cfg()
+			cfg.items = false
+			cfg.weapons = true
+			cfg.weapon_mode = mode
+			var g = Generator.new(cfg, sd)
+			g.generate(m.native_only(isvc.items), m.native_only(isvc.characters), [], weapons)
+			var wg = WG.new(cfg, sd, g)
+			var out = wg.generate(weapons)
+			for w in weapons:
+				if w.tier != _lowest_tier(weapons, w) or not out.has(w.my_id):
+					continue
+				var p = out[w.my_id]
+				var sets = p.get("sets", w.sets)
+				var tags = wg.weapon_tags(w.type, p.get("stats", w.stats), p.effects)
+				var native_tags = wg.weapon_tags(w.type, w.stats, w.effects)
+				for set in sets:
+					total += 1
+					var fits = WG.set_fits_tags(set.my_id, tags)
+					if mode == "effects" and not WG.set_fits_tags(set.my_id, native_tags):
+						fits = true
+					if not fits:
+						bad += 1
+						print("AUDIT %s seed %d: %s has %s without the tag (%s)" % [mode, sd, w.my_id, set.my_id, tags])
+		_eq(bad, 0, mode + ": sets match tags (%d sets)" % total)
+
+
+func _lowest_tier(weapons: Array, w) -> int:
+	var lo = 3
+	for x in weapons:
+		if x.weapon_id == w.weapon_id:
+			lo = min(lo, x.tier)
+	return lo

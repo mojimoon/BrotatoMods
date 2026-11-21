@@ -93,7 +93,10 @@ func generate(weapons: Array) -> Dictionary:
 		families[f].tiers[w.tier] = w
 	fam_names = families.keys()
 	fam_names.sort()
-	var out = generate_deep() if str(cfg.get("weapon_mode", "effects")) == "deep" else generate_effects_only()
+	var deep = str(cfg.get("weapon_mode", "effects")) == "deep"
+	var out = generate_deep() if deep else generate_effects_only()
+	if not deep:
+		_fix_effect_mode_sets(out)
 	_no_inversion(out)
 	_name_families(out)
 	for id in out:
@@ -857,6 +860,17 @@ const TAG_SETS = {
 	"stand_still": {"may": ["set_heavy"]},
 	"less_enemy_speed": {"may": ["set_support"]},
 	"heavy": {"must": ["set_heavy"]},
+}
+# 名称就表明了某种特性的类别：只给有对应词条的武器（随机补选、每类保底家族数也遵守），
+# 避免出现没有爆炸的"爆炸"武器、没有击杀成长 / 闪避加成的"虚灵"武器
+const SET_REQUIRES = {
+	"set_explosive": ["explosive"],
+	"set_ethereal": ["ethereal", "stat_dodge"],
+	"set_musical": ["musical", "stat_luck", "consumable"],
+	"set_naval": ["stat_curse"],
+	"set_elemental": ["stat_elemental_damage", "burning", "burning_main"],
+	"set_tool": ["stat_engineering", "structure"],
+	"set_medical": ["stat_lifesteal", "stat_hp_regeneration", "stat_max_hp"],
 }
 # 只属于某一类型武器的类别
 const MELEE_ONLY_SETS = ["set_blade", "set_blunt", "set_unarmed"]
@@ -1869,7 +1883,7 @@ func weapon_tags(ty: int, st, effects: Array) -> Array:
 		var id = WeaponValue.effect_id(e)
 		var key = WeaponValue.effect_key(e)
 		match id:
-			"weapon_exploding":
+			"weapon_exploding", "weapon_delayed_exploding":
 				tags.push_back("explosive")
 			"weapon_burning":
 				tags.push_back("burning")
@@ -1904,8 +1918,19 @@ func weapon_tags(ty: int, st, effects: Array) -> Array:
 	return tags
 
 
-func _set_ok(id: String, ty: int) -> bool:
+static func set_fits_tags(id: String, tags: Array) -> bool:
+	if not SET_REQUIRES.has(id):
+		return true
+	for t in SET_REQUIRES[id]:
+		if t in tags:
+			return true
+	return false
+
+
+func _set_ok(id: String, ty: int, tags = null) -> bool:
 	if not _sets.has(id) or id == "set_legendary":
+		return false
+	if tags != null and not set_fits_tags(id, tags):
 		return false
 	if ty == 0 and id in RANGED_ONLY_SETS:
 		return false
@@ -1927,6 +1952,7 @@ func _pick_sets(fam: Dictionary, res: Dictionary) -> Array:
 	if _is_legendary(lo) and _sets.has("set_legendary"):
 		out.push_back("set_legendary")
 	var tags = weapon_tags(ty, p.stats, p.effects)
+	_fam_tags[family_of(lo)] = tags
 	var may = {}
 	var high = {}
 	for t in tags:
@@ -1952,7 +1978,7 @@ func _pick_sets(fam: Dictionary, res: Dictionary) -> Array:
 	while out.size() < n:
 		var w = {}
 		for id in _sets:
-			if _set_ok(id, ty) and not id in out:
+			if _set_ok(id, ty, tags) and not id in out:
 				w[id] = may.get(id, 0.0) + RANDOM_SET_W
 		if w.empty():
 			break
@@ -1961,6 +1987,52 @@ func _pick_sets(fam: Dictionary, res: Dictionary) -> Array:
 	for id in out:
 		sets.push_back(_sets[id])
 	return sets
+
+
+var set_capacity: Dictionary = {}	# 类别 -> 能拥有它的家族数（审计 / 测试用）
+var _fam_tags: Dictionary = {}	# 家族 -> 最低一级的词条（深度重组选类别时记下）
+
+
+# 仅重组效果：武器保留原版类别，但效果换了。原版因效果才说得通的类别（爆炸、虚灵……）在新效果下不再成立时，
+# 换成按新词条选出的类别（"必定"/"优先"/"可能"，都没有时取不需要特性的随机类别）
+func _fix_effect_mode_sets(out: Dictionary) -> void:
+	for f in fam_names:
+		var fam = families[f]
+		var lo = _closest_tier(fam.tiers, 0)
+		var p = out.get(lo.my_id)
+		if p == null:
+			continue
+		var ty: int = fam.type
+		var st = p.get("stats", lo.stats)
+		var tags = weapon_tags(ty, st, p.effects)
+		var native_tags = weapon_tags(ty, lo.stats, lo.effects)
+		var sets = []
+		var changed = false
+		for set in lo.sets:
+			if set_fits_tags(set.my_id, native_tags) and not set_fits_tags(set.my_id, tags):
+				changed = true
+			else:
+				sets.push_back(set)
+		if not changed:
+			continue
+		rng.seed = hash(str(seed_value) + "/wsets/" + f)
+		var w = {}
+		for t in tags:
+			var m = TAG_SETS.get(t, {})
+			for id in m.get("must", []) + m.get("high", []) + m.get("high", []) + m.get("may", []):
+				if _set_ok(id, ty, tags) and not _sets[id] in sets:
+					w[id] = w.get(id, 0.0) + 1.0
+		if w.empty() and sets.empty():
+			for id in _sets:
+				if _set_ok(id, ty, tags):
+					w[id] = 1.0
+		if not w.empty():
+			var id = _pick_w(w)
+			sets.push_back(_sets[id])
+		for tier in fam.tiers:
+			var wid = fam.tiers[tier].my_id
+			if out.has(wid):
+				out[wid]["sets"] = sets
 
 
 # 每个类别至少 MIN_SET_FAMILIES 个家族（不超过原版数量）：不足时补给只有一个类别、类型相符的家族
@@ -1974,23 +2046,45 @@ func _ensure_set_minimum(fam_sets: Dictionary) -> void:
 			for s in fam_sets[f]:
 				if s.my_id == id:
 					have += 1
-		if have >= need:
-			continue
+		# 候选：只有一个类别的家族补上；需要特性的类别（SET_REQUIRES）还可以顶替第二个类别
+		#   （只顶替不需要特性、且数量富余的类别），否则有该特性的家族往往已经有两个类别
+		var gated = SET_REQUIRES.has(id)
+		var counts = {}
+		for f in fam_sets:
+			for s in fam_sets[f]:
+				counts[s.my_id] = counts.get(s.my_id, 0) + 1
 		var cands = []
 		for f in fam_names:
 			var cur: Array = fam_sets[f]
-			if cur.size() >= 2 or _sets[id] in cur or not _set_ok(id, families[f].type):
+			if _sets[id] in cur or not _set_ok(id, families[f].type, _fam_tags.get(f, [])):
 				continue
 			if cur.size() == 1 and cur[0].my_id == "set_legendary":
 				continue
-			cands.push_back([rng.randf(), f])
+			if cur.size() < 2:
+				cands.push_back([rng.randf(), f, -1])
+			elif gated and cur.size() == 2 and not SET_REQUIRES.has(cur[1].my_id) and cur[1].my_id != "set_legendary":
+				cands.push_back([1.0 + rng.randf(), f, 1])
+		set_capacity[id] = have + cands.size()
+		if have >= need:
+			continue
 		# 元素是数组：Array.sort() 不能比较数组（正式版游戏会因排序越界闪退），按第一项排序
 		cands.sort_custom(self, "_sort_first")
 		for c in cands:
 			if have >= need:
 				break
-			fam_sets[c[1]] = fam_sets[c[1]] + [_sets[id]]
+			var cur: Array = fam_sets[c[1]]
+			if c[2] < 0:
+				fam_sets[c[1]] = cur + [_sets[id]]
+			else:
+				var old_id = cur[1].my_id
+				if counts.get(old_id, 0) <= min(MIN_SET_FAMILIES, int(_set_native_count.get(old_id, 0))):
+					continue
+				counts[old_id] -= 1
+				fam_sets[c[1]] = [cur[0], _sets[id]]
 			have += 1
+		# 需要特性的类别可能补不满（有该特性的家族不够）：记下实际能达到的数量
+		if have < need:
+			set_capacity[id] = have
 
 
 # ============================================================
