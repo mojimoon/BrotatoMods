@@ -41,6 +41,7 @@ const GraphEffect = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/graph_
 # enemy.gd 扩展安装前编译，之后 main.gd 的 `is Boss` 解析失败（Oudstand-DamageMeter）。所以在 _ready 里再加载
 const RUNTIME_PATH = "res://mods-unpacked/Mojimoon-BroEditor/graph/runtime.gd"
 const BurnChance = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/burn_chance_effect.gd")
+const TimeShift = preload("res://mods-unpacked/Mojimoon-BroEditor/graph/time_shift_effect.gd")
 # 上限类属性：角色效果直接设定上限值（原版 REPLACE 存储），而不是加减
 const CAP_KEYS = ["hp_cap", "speed_cap", "dodge_cap", "crit_chance_cap"]
 # 设定值型规则：直接设定数值（原版士兵的"移动时不能攻击"就是 REPLACE 为 0）；界面默认显示角色自身的值，0 也是有效值
@@ -147,8 +148,10 @@ func _ready() -> void:
 	add_child(runtime)
 	# 存档反序列化按 get_id() 在 ItemService.effects 中查找效果脚本：要在 ProgressData 读档之前注册
 	var isvc = _isvc()
-	if isvc != null and not GraphEffect in isvc.effects:
-		isvc.effects.push_back(GraphEffect)
+	if isvc != null:
+		for sc in [GraphEffect, TimeShift]:
+			if not sc in isvc.effects:
+				isvc.effects.push_back(sc)
 	_register_enemy_behavior()
 	# 自定义角色必须在 ProgressData 读档之前注册（存档里的本局可能就是自定义角色）
 	_register_customs()
@@ -1711,6 +1714,14 @@ func make_effect(spec: Dictionary):
 		e = load(EFFECT_SCRIPT).new()
 		e.effect_sign = 3	# FROM_VALUE
 	_set_typed(e, spec.get("set", {}))
+	# 时间扭曲：换成带"持续时间"字段的子类（见 graph/time_shift_effect.gd）
+	if str(e.key) == "time_shift_on_hit" and e.get_script() != null and e.get_script().resource_path == EFFECT_SCRIPT:
+		var ts = TimeShift.new()
+		for pr in e.get_property_list():
+			if pr.usage & PROPERTY_USAGE_STORAGE and pr.name != "script":
+				ts.set(pr.name, e.get(pr.name))
+		_set_typed(ts, spec.get("set", {}))
+		e = ts
 	# 子资源（燃烧数据、武器属性…）：复制后改写，不影响模板
 	var subs = spec.get("sub", {})
 	if subs is Dictionary:

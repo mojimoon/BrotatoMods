@@ -3013,3 +3013,32 @@ func test_329_feedback_fixes() -> void:
 	rd.apply_item_effects(holder, 0)
 	_eq(int(rd.get_player_effect(Keys.generate_hash("be_time_shift_secs"), 0)), 2, "time shift seconds stored")
 	_check(m.effect_text(fx, false).find("BE_") < 0, "time shift seconds text: " + m.effect_text(fx, false))
+	# 时间扭曲效果本身带"持续时间"字段：可编辑，应用时把差值写进 be_time_shift_secs，3 秒时按原版序列化
+	var ts_i = -1
+	var ts_effects = m.orig_effects("character_time_shifter")
+	for i in ts_effects.size():
+		if ts_effects[i].key == "time_shift_on_hit":
+			ts_i = i
+	_check(ts_i >= 0, "time shifter has time_shift_on_hit")
+	if ts_i >= 0:
+		var plain = m.make_effect({"from": "character_time_shifter", "i": ts_i})
+		var names = []
+		for f in m.Catalog.editable_fields(plain):
+			names.push_back(f.name)
+		_check("be_secs" in names, "time shift effect exposes duration field: " + str(names))
+		_eq(plain.serialize().effect_id, "effect", "3s time shift serializes as vanilla effect")
+		_eq(m.effect_text(plain, false), m.effect_text(ts_effects[ts_i], false), "3s keeps vanilla text")
+		var ts = m.make_effect({"from": "character_time_shifter", "i": ts_i, "set": {"be_secs": 5.5}})
+		_check(abs(ts.be_secs - 5.5) < 0.001, "duration set from spec")
+		_check(m.effect_text(ts, false).find("5.5") >= 0 and m.effect_text(ts, false).find("BE_") < 0, "duration in text: " + m.effect_text(ts, false))
+		var h = Keys.generate_hash("be_time_shift_secs")
+		var before = float(rd.get_player_effects(0)[h])
+		ts.apply(0)
+		_check(abs(float(rd.get_player_effects(0)[h]) - before - 2.5) < 0.001, "duration delta applied")
+		var ser = ts.serialize()
+		_eq(ser.effect_id, "be_time_shift", "changed duration serializes with own id")
+		var back = m.TimeShift.new()
+		back.deserialize_and_merge(ser)
+		_check(abs(back.be_secs - 5.5) < 0.001, "duration survives save")
+		ts.unapply(0)
+		_check(abs(float(rd.get_player_effects(0)[h]) - before) < 0.001, "duration delta reverted")
