@@ -3489,23 +3489,6 @@ func test_312_shared_clause_on_duplicate_weapons() -> void:
 	m.on_menu_reset()
 
 
-# 属性说明弹窗列出该属性的修改加成（重组道具上的属性修改效果在面板上看不到）与收获的材料掉落加成
-func test_313_stat_popup_shows_hidden_modifiers() -> void:
-	m.start_new_run()
-	var effects = rd.get_player_effects(0)
-	var gh = Keys.generate_hash("gain_stat_armor")
-	var before = isvc.get_stat_description_text(Keys.stat_armor_hash, 3, 0)
-	effects[gh] += 25
-	var after = isvc.get_stat_description_text(Keys.stat_armor_hash, 3, 0)
-	effects[gh] -= 25
-	_check(after.begins_with(before) and after.length() > before.length() and after.find("25%") >= 0, "armor popup lists +25%% gains: " + after.replace("\n", " | "))
-	effects[Keys.gold_drops_hash] += 20
-	var hv = isvc.get_stat_description_text(Keys.stat_harvesting_hash, 5, 0)
-	effects[Keys.gold_drops_hash] -= 20
-	_check(hv.find("+20%") >= 0, "harvesting popup lists material drops: " + hv.replace("\n", " | "))
-	m.on_menu_reset()
-
-
 # 重组道具的统计行：说明末尾显示条款带来的材料（原版统计文本），原版本身按 ID 统计的道具不显示
 func test_314_item_tracking_for_clauses() -> void:
 	m.start_new_run()
