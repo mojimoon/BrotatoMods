@@ -3042,3 +3042,32 @@ func test_329_feedback_fixes() -> void:
 		_check(abs(back.be_secs - 5.5) < 0.001, "duration survives save")
 		ts.unapply(0)
 		_check(abs(float(rd.get_player_effects(0)[h]) - before) < 0.001, "duration delta reverted")
+
+
+# 商店节点选分组：展开为道具与整个武器家族；必定出现取随机一件；文本写分组名
+func test_330_shop_group_refs() -> void:
+	_setup_player(CH)
+	var GE = load(MOD_DIR + "graph/graph_effect.gd")
+	var isvc = tree.root.get_node("ItemService")
+	var knife = isvc.get_element_safe(isvc.weapons, "weapon_knife_1")
+	var gid = m.create_group("Shop T")
+	m.toggle_group_member(gid, "item", "item_coupon")
+	m.toggle_group_member(gid, "weapon", knife.weapon_id)
+	m.toggle_group_member(gid, "character", CH)
+	var goods = m.group_goods(gid)
+	_check("item_coupon" in goods and "weapon_knife_1" in goods and "weapon_knife_4" in goods, "group goods: " + str(goods))
+	_check(not CH in goods, "characters are not shop goods")
+	var ref = m.GROUP_REF + gid
+	m.run_shop = m.new_run_shop()
+	m.run_shop_change(0, [ref], false)
+	var bans = m.ban_hashes(0)
+	_check(Keys.generate_hash("item_coupon") in bans and Keys.generate_hash("weapon_knife_3") in bans, "group removed for this run")
+	m.run_shop_change(0, [ref], true)
+	_check(not Keys.generate_hash("item_coupon") in m.ban_hashes(0), "group allowed again")
+	m.queue_shop_force(0, [ref])
+	_eq(m.run_shop[0].force.size(), 1, "forced group queues one member")
+	_check(m.run_shop[0].force[0] in goods, "forced member from the group")
+	var t = GE._payload_text({"kind": "shop_remove", "params": {"items": [ref, "item_coupon"]}}, "wave_start", false)
+	_check(t.find("Shop T") >= 0 and t.find("BE_") < 0, "text names the group: " + t)
+	m.run_shop = m.new_run_shop()
+	m.delete_group(gid)

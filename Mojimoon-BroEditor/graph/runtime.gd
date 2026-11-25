@@ -24,6 +24,7 @@ var _poll := 0.0
 var _steps: Array = [0.0, 0.0, 0.0, 0.0]
 var _wave_serial := 0
 var _explosion_effect = null
+var _spawn_queue: Array = []	# 分批生成的敌人：[{scene, p, left, every, acc}]（见 _spawn）
 var _timed_list: Array = []	# 持续 N 秒的效果：[{p, u: 撤销列表}]
 var _transforms: Array = []	# 待执行的道具变化：[{p, src: 移除的道具或 null, id: 加入的道具 id 或 "", self: 是否为道具变为}]（敌袭结束 / 商店中执行）
 
@@ -49,6 +50,7 @@ func start_wave(p_main: Node) -> void:
 func end_wave() -> void:
 	_wave_serial += 1
 	wave_over = true
+	_spawn_queue = []
 	for p in entries.size():
 		for en in entries[p]:
 			for id in en.st:
@@ -836,16 +838,44 @@ func _charm(p: int, target, secs: float = Utils.CHARM_DURATION) -> void:
 
 
 # 生成敌人：地图上随机位置（原版出生标记）
+# 生成敌人：一次最多 SPAWN_MAX 个；"秒" > 0 时在这段时间内均匀生成（敌袭结束时未生成的作废）
+const SPAWN_MAX = 300
+
+
 func _spawn(n: Dictionary, p: int) -> void:
 	if main == null or not is_instance_valid(main) or mod == null:
 		return
 	var scene = mod.enemy_scene(str(_param(n, "enemy", "")))
 	if scene == null:
 		return
-	for _i in clamp(int(_param(n, "n", 1)), 0, 50):
-		var req = SpawnRequest.new(EntityType.ENEMY, scene, ZoneService.get_rand_pos())
-		req.player_index = p
-		main._entity_spawner.spawn_entity_birth(req)
+	var count = int(clamp(int(_param(n, "n", 1)), 0, SPAWN_MAX))
+	var secs = float(_param(n, "secs", 0))
+	if secs > 0 and count > 1:
+		_spawn_queue.push_back({"scene": scene, "p": p, "left": count, "every": secs / count, "acc": secs / count})
+		return
+	for _i in count:
+		_spawn_one(scene, p)
+
+
+func _spawn_one(scene, p: int) -> void:
+	var req = SpawnRequest.new(EntityType.ENEMY, scene, ZoneService.get_rand_pos())
+	req.player_index = p
+	main._entity_spawner.spawn_entity_birth(req)
+
+
+func _tick_spawns(delta: float) -> void:
+	var i = 0
+	while i < _spawn_queue.size():
+		var q = _spawn_queue[i]
+		q.acc += delta
+		while q.left > 0 and q.acc + 0.0001 >= q.every:
+			q.acc -= q.every
+			q.left -= 1
+			_spawn_one(q.scene, q.p)
+		if q.left <= 0:
+			_spawn_queue.remove(i)
+		else:
+			i += 1
 
 
 # 损坏：持有者是武器时，这把武器损坏并掉落材料（同原版砖块）
@@ -1107,6 +1137,8 @@ func _physics_process(delta: float) -> void:
 	if wave_over or main == null or not is_instance_valid(main):
 		return
 	_elapsed += delta
+	if not _spawn_queue.empty():
+		_tick_spawns(delta)
 	_count_steps(delta)
 	_tick()
 	_poll += delta

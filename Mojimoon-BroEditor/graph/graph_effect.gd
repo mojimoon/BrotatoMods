@@ -499,7 +499,9 @@ static func _payload_text(n: Dictionary, trigger_kind: String, colored: bool) ->
 		"spawn":
 			var m = _mod()
 			var en = str(_p(n, "enemy", ""))
-			return _tr("BE_PX_SPAWN").replace("{0}", _col(str(int(_p(n, "n", 1))), false, colored)).replace("{1}", m.enemy_name(en) if m != null else en)
+			var t = _tr("BE_PX_SPAWN").replace("{0}", _col(str(int(_p(n, "n", 1))), false, colored)).replace("{1}", m.enemy_name(en) if m != null else en)
+			var secs = int(_p(n, "secs", 0))
+			return t + (_tr("BE_PX_SPAWN_OVER").replace("{0}", str(secs)) if secs > 0 else "")
 		"break":
 			return _tr("BE_PX_BREAK").replace("{0}", str(v))
 		"var_set":
@@ -579,8 +581,12 @@ static func _item_names(ids: Array) -> String:
 	var m = _mod()
 	var names = []
 	for id in ids:
-		var it = m._find_any(str(id)) if m != null else null
-		names.push_back(TranslationServer.translate(it.name) if it != null else str(id))
+		id = str(id)
+		if m != null and id.begins_with(m.GROUP_REF):
+			names.push_back(_tr("BE_PX_GROUP_REF").replace("{0}", m.group_name(id.substr(m.GROUP_REF.length()))))
+			continue
+		var it = m._find_any(id) if m != null else null
+		names.push_back(TranslationServer.translate(it.name) if it != null else id)
 	return PoolStringArray(names).join(" / ") if not names.empty() else "-"
 
 

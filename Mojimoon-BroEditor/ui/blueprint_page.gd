@@ -250,8 +250,15 @@ func _param_control(n: Dictionary, p: Array) -> Control:
 		opt.rect_min_size = Vector2(170, 0)
 		opt.connect("selected", self, "_on_param_option", [int(n.id), p[0]])
 		return opt
-	if ptype == "items" or ptype == "goods":
-		return _items_control(n, p[0], cur if cur is Array else [], ui.goods_select_items() if ptype == "goods" else ui.item_select_items())
+	if ptype in ["items", "goods", "shop_items", "shop_goods"]:
+		var items = ui.goods_select_items() if ptype.ends_with("goods") else ui.item_select_items()
+		# 商店节点（本局可以出现 / 不再出现 / 必定出现）还可以选分组
+		if ptype.begins_with("shop_"):
+			var groups = []
+			for gid in ui._mod.groups:
+				groups.push_back([ui.tr("BE_P_GROUP") + ": " + ui._mod.group_name(gid), ui._mod.GROUP_REF + gid])
+			items = groups + items
+		return _items_control(n, p[0], cur if cur is Array else [], items)
 	if ptype in ["tag", "set", "group", "owned", "lockable"]:
 		var items = []
 		match ptype:

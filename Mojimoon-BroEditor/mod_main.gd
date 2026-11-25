@@ -4021,10 +4021,42 @@ func load_run_shop(state) -> void:
 
 
 # 加入 / 移出本局商店（同一件道具后执行的为准）
+# 蓝图商店节点里的分组引用："group:<分组 id>"，展开为分组里的道具与武器（武器为整个家族的各品质；角色不算）
+const GROUP_REF = "group:"
+
+
+func expand_group_refs(ids: Array) -> Array:
+	var out = []
+	for id in ids:
+		id = str(id)
+		if id.begins_with(GROUP_REF):
+			for m in group_goods(id.substr(GROUP_REF.length())):
+				if not m in out:
+					out.push_back(m)
+		elif not id in out:
+			out.push_back(id)
+	return out
+
+
+func group_goods(gid: String) -> Array:
+	var out = []
+	var g = groups.get(gid)
+	if g == null:
+		return out
+	for m in g.members:
+		if m[0] == "item":
+			out.push_back(str(m[1]))
+		elif m[0] == "weapon":
+			for w in _isvc().weapons:
+				if w != null and w.weapon_id == m[1]:
+					out.push_back(w.my_id)
+	return out
+
+
 func run_shop_change(p: int, ids, add: bool) -> void:
 	if not ids is Array or p < 0 or p >= run_shop.size():
 		return
-	for id in ids:
+	for id in expand_group_refs(ids):
 		id = str(id)
 		run_shop[p].add.erase(id)
 		run_shop[p].remove.erase(id)
@@ -4035,7 +4067,14 @@ func run_shop_change(p: int, ids, add: bool) -> void:
 func queue_shop_force(p: int, ids) -> void:
 	if ids is Array and p >= 0 and p < run_shop.size():
 		for id in ids:
-			run_shop[p].force.push_back(str(id))
+			id = str(id)
+			# 分组：随机一件成员
+			if id.begins_with(GROUP_REF):
+				var goods = group_goods(id.substr(GROUP_REF.length()))
+				if goods.empty():
+					continue
+				id = goods[randi() % goods.size()]
+			run_shop[p].force.push_back(id)
 
 
 func inject_shop_force(shop_items: Array, p: int, wave: int) -> void:
