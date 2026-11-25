@@ -1,7 +1,7 @@
 """打包 mod 并复制到创意工坊测试目录（PowerShell / cmd / bash 都能直接运行）。
 
-用法：python mods/tools/pack_mod.py <MOD> [workshop_dir]
-  1. mods/<MOD> 同步到 <游戏工程>/mods-unpacked/<MOD>（游戏工程 = 仓库上一级的 1.2/，可用环境变量 BROTATO_GAME 覆盖）
+用法：python mods/tools/pack_mod.py <MOD> [workshop_dir] [--game <目录>]
+  1. mods/<MOD> 同步到 <游戏工程>/mods-unpacked/<MOD>（游戏工程 = 仓库上一级的 1.2/；--game 填目录名（如 1.2.0.4）或绝对路径，也可用环境变量 BROTATO_GAME）
   2. 打包为 <游戏工程>/<MOD>.zip（内部路径 mods-unpacked/<MOD>/...，与 OneItemToRuleThemAll 一致，不含 .md）
   3. 复制 zip 到 workshop_dir（默认 1942280/3811213360）
 """
@@ -14,15 +14,29 @@ DEFAULT_WORKSHOP = r"D:\SteamLibrary\steamapps\workshop\content\1942280\38112133
 
 
 def main() -> int:
-    if len(sys.argv) < 2:
-        print("usage: python pack_mod.py <MOD> [workshop_dir]")
+    args = sys.argv[1:]
+    game = os.environ.get("BROTATO_GAME") or "1.2"
+    for i, a in enumerate(args):
+        if a == "--game" and i + 1 < len(args):
+            game = args[i + 1]
+            del args[i:i + 2]
+            break
+        if a.startswith("--game="):
+            game = a[len("--game="):]
+            del args[i]
+            break
+    if not args:
+        print("usage: python pack_mod.py <MOD> [workshop_dir] [--game <dir>]")
         return 2
-    mod = sys.argv[1]
+    mod = args[0]
     if not mod.startswith("Mojimoon-"):
         mod = "Mojimoon-" + mod
-    workshop = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_WORKSHOP
+    workshop = args[1] if len(args) > 1 else DEFAULT_WORKSHOP
     root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-    project = os.environ.get("BROTATO_GAME") or os.path.join(root, "1.2")
+    project = os.path.join(root, game)  # 绝对路径时 join 直接取 game
+    if not os.path.isfile(os.path.join(project, "project.godot")):
+        print("project.godot not found in " + project + " (use --game <dir>)")
+        return 2
     src = os.path.join(root, "mods", mod)
     if not os.path.isdir(src):
         print("mod not found: " + src)
